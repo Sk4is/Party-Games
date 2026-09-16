@@ -7,34 +7,62 @@ interface BombVisualProps {
   speedMultiplier: number;
 }
 
+/**
+ * Single, unified cartoon fuse curve geometry:
+ * 
+ *          🔥  ← Single burning point at (sparkX, sparkY)
+ *         ╭
+ *        ╯
+ *       ╱
+ *      ●   ← Metallic fuse socket at top of bomb (100, 73)
+ *     💣   ← Bomb sphere body centered at (100, 135)
+ * 
+ * Base Cubic Bezier:
+ * P0 = (100, 74)  - anchored directly inside the metallic socket hole
+ * P1 = (120, 56)  - curves naturally up and to the right (╱)
+ * P2 = (84, 34)   - curves back to the left (╯)
+ * P3 = (96, 14)   - top tip rounding up with the flame (╭)
+ * 
+ * As progress goes from 0 to 1, de Casteljau's algorithm calculates the exact remaining
+ * sub-curve from P0 to (sparkX, sparkY). The remaining fuse stroke and the burning flame
+ * are guaranteed to share the exact same endpoint at every single frame.
+ */
+const P0 = { x: 100, y: 74 };
+const P1 = { x: 120, y: 56 };
+const P2 = { x: 84, y: 34 };
+const P3 = { x: 96, y: 14 };
+
 export const BombVisual: React.FC<BombVisualProps> = ({
   progress,
   dangerLevel,
   speedMultiplier,
 }) => {
-  // Fuse length calculations along a curved path
-  // Total SVG fuse path length is ~130 units
-  const totalFuseLength = 130;
-  const burnedLength = Math.min(progress, 0.98) * totalFuseLength;
-  const remainingFuse = Math.max(0, totalFuseLength - burnedLength);
+  // Clamp progress strictly between 0.0 and 1.0
+  const clampedProgress = Math.max(0, Math.min(1.0, progress));
 
-  // Spark tip coordinates along the path approximating fuse progression
-  // The path starts at (130, 25), curves to (105, 55), down into the bomb top at (85, 80)
-  const sparkPosition = useMemo(() => {
-    const t = 1 - Math.min(progress, 0.96); // 1 = at start tip (130, 25), 0 = into the bomb cap (85, 80)
-    // Quadratic bezier curve interpolation
-    // P0 = (85, 80), P1 = (95, 20), P2 = (135, 25)
-    const p0 = { x: 85, y: 78 };
-    const p1 = { x: 95, y: 15 };
-    const p2 = { x: 135, y: 25 };
+  // t: 1 = start (full fuse, flame at tip P3), 0 = expired (flame reaches socket P0)
+  const t = 1 - clampedProgress;
+  const mt = 1 - t;
 
-    const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
-    const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
+  // Exact endpoint of the remaining fuse via cubic bezier formula:
+  const sparkX = mt * mt * mt * P0.x + 3 * mt * mt * t * P1.x + 3 * mt * t * t * P2.x + t * t * t * P3.x;
+  const sparkY = mt * mt * mt * P0.y + 3 * mt * mt * t * P1.y + 3 * mt * t * t * P2.y + t * t * t * P3.y;
 
-    return { x, y };
-  }, [progress]);
+  // De Casteljau sub-curve control points for the remaining fuse from P0 to (sparkX, sparkY):
+  const q1 = {
+    x: mt * P0.x + t * P1.x,
+    y: mt * P0.y + t * P1.y,
+  };
+  const q2 = {
+    x: mt * mt * P0.x + 2 * mt * t * P1.x + t * t * P2.x,
+    y: mt * mt * P0.y + 2 * mt * t * P1.y + t * t * P2.y,
+  };
 
-  // Determine shake class based on danger level
+  // Remaining fuse path string:
+  const remainingFuseD = `M ${P0.x} ${P0.y} C ${q1.x.toFixed(2)} ${q1.y.toFixed(2)}, ${q2.x.toFixed(2)} ${q2.y.toFixed(2)}, ${sparkX.toFixed(2)} ${sparkY.toFixed(2)}`;
+  const fullGuidePathD = `M ${P0.x} ${P0.y} C ${P1.x} ${P1.y}, ${P2.x} ${P2.y}, ${P3.x} ${P3.y}`;
+
+  // Shake animation class on the parent unit:
   const shakeClass = useMemo(() => {
     switch (dangerLevel) {
       case 'CRITICAL':
@@ -42,19 +70,18 @@ export const BombVisual: React.FC<BombVisualProps> = ({
       case 'DANGER':
         return 'animate-danger-wobble';
       case 'MIDDLE':
-        return 'animate-gentle-float';
       case 'EARLY':
       default:
         return 'animate-gentle-float';
     }
   }, [dangerLevel]);
 
-  // Eye and face expressions
+  // Facial state helpers:
   const isWinkOrSweat = dangerLevel === 'MIDDLE' || dangerLevel === 'DANGER' || dangerLevel === 'CRITICAL';
   const isPanic = dangerLevel === 'DANGER' || dangerLevel === 'CRITICAL';
   const isExtremePanic = dangerLevel === 'CRITICAL';
 
-  // Dynamic animation styling that speeds up with player multiplier
+  // Dynamic animation styling that speeds up with player mistake multiplier
   const shakeStyle = useMemo(() => {
     if (speedMultiplier > 1.0) {
       const baseDuration = dangerLevel === 'CRITICAL' ? 0.12 : dangerLevel === 'DANGER' ? 0.25 : 0.45;
@@ -65,30 +92,32 @@ export const BombVisual: React.FC<BombVisualProps> = ({
     return undefined;
   }, [dangerLevel, speedMultiplier]);
 
-  const sparkAnimDuration = `${Math.max(0.1, (0.3 / speedMultiplier)).toFixed(3)}s`;
-  const pingAnimDuration = `${Math.max(0.2, (0.8 / speedMultiplier)).toFixed(3)}s`;
-
   return (
     <div className="relative flex flex-col items-center justify-center select-none pointer-events-none">
       {/* Outer pulsating danger aura */}
       {dangerLevel === 'CRITICAL' && (
-        <div className="absolute inset-0 -m-8 rounded-full bg-rose-600/30 blur-2xl animate-ping" />
+        <div className="absolute inset-0 -m-8 rounded-full bg-rose-600/30 blur-2xl animate-ping pointer-events-none" />
       )}
       {dangerLevel === 'DANGER' && (
-        <div className="absolute inset-0 -m-6 rounded-full bg-amber-500/20 blur-xl animate-pulse" />
+        <div className="absolute inset-0 -m-6 rounded-full bg-amber-500/20 blur-xl animate-pulse pointer-events-none" />
       )}
 
-      {/* Main Bomb Wrapper with Shake Animation - reduced size (25-35% smaller) for airy, spacious layout */}
+      {/* 
+        MAIN BOMB CONTAINER:
+        The Bomb, the Socket, the Fuse, and the Flame are all inside this SAME container.
+        When this container shakes or wobbles, everything moves together as ONE connected object.
+      */}
       <div
-        className={`relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 transition-transform duration-75 ${shakeClass}`}
+        id="bomb-interactive-unit"
+        className={`relative w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 transition-transform duration-75 ${shakeClass}`}
         style={shakeStyle}
       >
         <svg
           viewBox="0 0 200 200"
           className="w-full h-full drop-shadow-2xl overflow-visible"
         >
-          {/* Defs for gradients */}
           <defs>
+            {/* Bomb 3D Sphere Body Gradient */}
             <radialGradient id="bombBodyGradient" cx="35%" cy="35%" r="65%">
               <stop offset="0%" stopColor="#475569" />
               <stop offset="35%" stopColor="#1e293b" />
@@ -96,77 +125,153 @@ export const BombVisual: React.FC<BombVisualProps> = ({
               <stop offset="100%" stopColor="#020617" />
             </radialGradient>
 
+            {/* Metallic Socket Collar Gradient */}
+            <linearGradient id="metallicCollarGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#475569" />
+              <stop offset="35%" stopColor="#94a3b8" />
+              <stop offset="70%" stopColor="#cbd5e1" />
+              <stop offset="100%" stopColor="#334155" />
+            </linearGradient>
+
+            {/* Fuse Burning Glow Gradient */}
             <radialGradient id="fuseGlowGradient" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#fef08a" />
-              <stop offset="40%" stopColor="#f97316" />
+              <stop offset="0%" stopColor="#fef08a" stopOpacity="1" />
+              <stop offset="40%" stopColor="#f97316" stopOpacity="0.85" />
+              <stop offset="80%" stopColor="#ef4444" stopOpacity="0.3" />
               <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
             </radialGradient>
 
-            <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
+            {/* Flame Teardrop Gradient */}
+            <linearGradient id="flameTeardropGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#ea580c" />
+              <stop offset="50%" stopColor="#f59e0b" />
+              <stop offset="90%" stopColor="#fef08a" />
+              <stop offset="100%" stopColor="#ffffff" />
+            </linearGradient>
           </defs>
 
-          {/* Bomb Fuse (rope) */}
-          {/* Full path guide (behind) */}
+          {/* ================================================================= */}
+          {/* 1. FAINT ASH / CHARRED TRAIL (Where the fuse has burned)          */}
+          {/* ================================================================= */}
           <path
-            d="M 85 80 Q 95 15 135 25"
+            d={fullGuidePathD}
             fill="none"
-            stroke="#473c35"
-            strokeWidth="5"
-            strokeLinecap="round"
+            stroke="#261c16"
+            strokeWidth="4"
+            strokeDasharray="2 3"
             opacity="0.25"
-          />
-
-          {/* Remaining burning fuse rope */}
-          <path
-            d="M 85 80 Q 95 15 135 25"
-            fill="none"
-            stroke="#d4a373"
-            strokeWidth="5"
-            strokeDasharray={totalFuseLength}
-            strokeDashoffset={burnedLength}
             strokeLinecap="round"
-            className="transition-all duration-100 ease-linear"
           />
 
-          {/* Bomb Metallic Collar / Cap */}
+          {/* ================================================================= */}
+          {/* 2. REMAINING ACTIVE FUSE ROPE                                     */}
+          {/* Emerges from socket P0(100, 74) and ends at (sparkX, sparkY)       */}
+          {/* ================================================================= */}
+          {t > 0.01 && (
+            <>
+              {/* Outer rope body */}
+              <path
+                d={remainingFuseD}
+                fill="none"
+                stroke="#92400e"
+                strokeWidth="5.5"
+                strokeLinecap="round"
+              />
+
+              {/* Inner warm braided rope texture */}
+              <path
+                d={remainingFuseD}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+              />
+
+              {/* Center golden thread */}
+              <path
+                d={remainingFuseD}
+                fill="none"
+                stroke="#fde68a"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                opacity="0.9"
+              />
+            </>
+          )}
+
+          {/* ================================================================= */}
+          {/* 3. BOMB METALLIC COLLAR & SOCKET [●]                              */}
+          {/* Inserted into top of bomb; fuse physically emerges from this hole  */}
+          {/* ================================================================= */}
+          {/* Metallic Collar Base */}
           <rect
-            x="76"
-            y="70"
-            width="28"
-            height="14"
-            rx="3"
-            fill="#64748b"
-            stroke="#334155"
+            x="88"
+            y="72"
+            width="24"
+            height="15"
+            rx="4"
+            fill="url(#metallicCollarGrad)"
+            stroke="#1e293b"
             strokeWidth="2"
           />
 
-          {/* Main Bomb Sphere */}
+          {/* Collar Rim Highlight */}
+          <line
+            x1="90"
+            y1="74"
+            x2="110"
+            y2="74"
+            stroke="#ffffff"
+            strokeWidth="1"
+            opacity="0.75"
+            strokeLinecap="round"
+          />
+
+          {/* Dark Socket Hole [●] where the fuse physically enters */}
+          <ellipse
+            cx="100"
+            cy="73"
+            rx="6.5"
+            ry="2.8"
+            fill="#090d16"
+            stroke="#334155"
+            strokeWidth="1.2"
+          />
+
+          {/* ================================================================= */}
+          {/* 4. MAIN BOMB BODY SPHERE 💣                                       */}
+          {/* ================================================================= */}
           <circle
             cx="100"
-            cy="125"
-            r="65"
+            cy="135"
+            r="52"
             fill="url(#bombBodyGradient)"
-            stroke={dangerLevel === 'CRITICAL' ? '#ef4444' : dangerLevel === 'DANGER' ? '#f59e0b' : '#334155'}
+            stroke={
+              dangerLevel === 'CRITICAL'
+                ? '#ef4444'
+                : dangerLevel === 'DANGER'
+                ? '#f59e0b'
+                : '#334155'
+            }
             strokeWidth={dangerLevel === 'CRITICAL' ? '4' : '3'}
             className="transition-colors duration-200"
           />
 
           {/* Glossy highlight on bomb shoulder */}
           <ellipse
-            cx="75"
-            cy="95"
-            rx="22"
-            ry="11"
+            cx="78"
+            cy="107"
+            rx="16"
+            ry="8"
             fill="#ffffff"
             opacity="0.18"
-            transform="rotate(-28 75 95)"
+            transform="rotate(-28 78 107)"
           />
 
-          {/* Cartoon Character Face */}
-          <g transform="translate(0, 0)">
+          {/* ================================================================= */}
+          {/* 5. CARTOON CHARACTER FACE & EXPRESSIONS                           */}
+          {/* ================================================================= */}
+          <g transform="translate(0, 10)">
             {/* EYES */}
             {/* Left Eye */}
             <ellipse
@@ -207,43 +312,76 @@ export const BombVisual: React.FC<BombVisualProps> = ({
             {/* Eyebrows */}
             {isExtremePanic ? (
               <>
-                <path d="M 74 102 Q 82 108 90 105" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
-                <path d="M 110 105 Q 118 108 126 102" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
+                <path
+                  d="M 74 102 Q 82 108 90 105"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M 110 105 Q 118 108 126 102"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
               </>
             ) : isPanic ? (
               <>
-                <path d="M 74 104 Q 82 109 90 106" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" />
-                <path d="M 110 106 Q 118 109 126 104" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" />
+                <path
+                  d="M 74 104 Q 82 109 90 106"
+                  fill="none"
+                  stroke="#cbd5e1"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M 110 106 Q 118 109 126 104"
+                  fill="none"
+                  stroke="#cbd5e1"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
               </>
             ) : (
               <>
-                <path d="M 75 106 Q 82 102 89 106" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
-                <path d="M 111 106 Q 118 102 125 106" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
+                <path
+                  d="M 75 106 Q 82 102 89 106"
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M 111 106 Q 118 102 125 106"
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
               </>
             )}
 
             {/* MOUTH */}
             {isExtremePanic ? (
-              /* Wide open screaming mouth with teeth */
               <path
-                d="M 85 140 Q 100 162 115 140 Z"
+                d="M 85 138 Q 100 160 115 138 Z"
                 fill="#e11d48"
                 stroke="#ffffff"
                 strokeWidth="2"
               />
             ) : isPanic ? (
-              /* Wobbly nervous wavy mouth */
               <path
-                d="M 86 142 Q 93 148 100 142 Q 107 136 114 142"
+                d="M 86 140 Q 93 146 100 140 Q 107 134 114 140"
                 fill="none"
                 stroke="#ffffff"
                 strokeWidth="3"
                 strokeLinecap="round"
               />
             ) : (
-              /* Calm cute mouth */
               <path
-                d="M 92 138 Q 100 146 108 138"
+                d="M 92 136 Q 100 144 108 136"
                 fill="none"
                 stroke="#cbd5e1"
                 strokeWidth="2.5"
@@ -251,7 +389,7 @@ export const BombVisual: React.FC<BombVisualProps> = ({
               />
             )}
 
-            {/* SWEAT DROPS when in danger */}
+            {/* Sweat Drops when in danger */}
             {isWinkOrSweat && (
               <path
                 d="M 132 105 C 130 108, 128 114, 131 117 C 134 120, 138 118, 138 114 C 138 111, 135 106, 132 105 Z"
@@ -270,59 +408,43 @@ export const BombVisual: React.FC<BombVisualProps> = ({
             )}
           </g>
 
-          {/* BURNING FUSE SPARK AND FLAME */}
-          <g
-            transform={`translate(${sparkPosition.x}, ${sparkPosition.y})`}
-            filter="url(#glowEffect)"
-            className="animate-fuse-flicker"
-            style={{ animationDuration: sparkAnimDuration }}
-          >
-            {/* Outer flame glow */}
-            <circle cx="0" cy="0" r={isExtremePanic ? '18' : isPanic ? '14' : '10'} fill="url(#fuseGlowGradient)" />
-
-            {/* Core bright flame */}
+          {/* ================================================================= */}
+          {/* 6. THE SINGLE MAIN BURNING POINT (FLAME & EMBER) 🔥                */}
+          {/* Positioned AT (sparkX, sparkY) - the literal endpoint of the fuse! */}
+          {/* ================================================================= */}
+          <g transform={`translate(${sparkX.toFixed(2)}, ${sparkY.toFixed(2)})`}>
+            {/* Heat aura */}
             <circle
               cx="0"
               cy="0"
-              r={isExtremePanic ? '8' : '6'}
-              fill="#fbbf24"
-              className="animate-ping"
-              style={{ animationDuration: pingAnimDuration }}
+              r={isExtremePanic ? 14 : isPanic ? 11 : 8}
+              fill="url(#fuseGlowGradient)"
+              opacity="0.8"
             />
-            <circle cx="0" cy="0" r="4" fill="#ffffff" />
 
-            {/* Radiating Spark Lines */}
-            <line x1="-6" y1="-8" x2="-14" y2="-16" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
-            <line x1="6" y1="-8" x2="14" y2="-16" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
-            <line x1="-10" y1="2" x2="-18" y2="4" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="10" y1="2" x2="18" y2="4" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="0" y1="-10" x2="0" y2="-20" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+            {/* Glowing Teardrop Flame pointing straight upward */}
+            <path
+              d="M 0 1 C -3.5 -1, -4.5 -6, 0 -13 C 4.5 -6, 3.5 -1, 0 1 Z"
+              fill="url(#flameTeardropGrad)"
+              opacity="0.95"
+            />
 
-            {/* Extra sparks for Danger / Critical */}
-            {(isPanic || isExtremePanic) && (
-              <>
-                <line x1="-8" y1="-14" x2="-16" y2="-24" stroke="#fbbf24" strokeWidth="1.5" />
-                <line x1="8" y1="-14" x2="16" y2="-24" stroke="#f59e0b" strokeWidth="1.5" />
-                <circle cx="-12" cy="-10" r="1.5" fill="#fef08a" />
-                <circle cx="12" cy="-12" r="1.5" fill="#fef08a" />
-                <circle cx="0" cy="-15" r="2" fill="#ffffff" />
-              </>
-            )}
-          </g>
+            {/* Hot Burnt Ember attached directly to rope end */}
+            <circle cx="0" cy="0" r="4" fill="#f97316" />
+            <circle cx="0" cy="0" r="2.4" fill="#fef08a" />
+            <circle cx="0" cy="0" r="1.2" fill="#ffffff" />
 
-          {/* SMOKE PUFFS */}
-          <g transform={`translate(${sparkPosition.x}, ${sparkPosition.y - 12})`}>
-            <circle cx="-4" cy="-10" r={isPanic ? '8' : '5'} fill="#94a3b8" opacity="0.35" />
-            <circle cx="6" cy="-16" r={isExtremePanic ? '11' : '6'} fill="#64748b" opacity="0.25" />
-            {isExtremePanic && (
-              <circle cx="-2" cy="-24" r="14" fill="#475569" opacity="0.3" />
-            )}
+            {/* Tiny spark crackles radiating strictly around the burning point */}
+            <line x1="-2" y1="-2" x2="-5" y2="-5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round" />
+            <line x1="2" y1="-2" x2="5" y2="-5" stroke="#f59e0b" strokeWidth="1.2" strokeLinecap="round" />
+            <line x1="-3" y1="1" x2="-5" y2="2" stroke="#ef4444" strokeWidth="1" strokeLinecap="round" />
+            <line x1="3" y1="1" x2="5" y2="2" stroke="#ef4444" strokeWidth="1" strokeLinecap="round" />
           </g>
         </svg>
 
         {/* Speed Multiplier Badge */}
         {speedMultiplier > 1.0 && (
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg flex items-center gap-1 border-2 border-amber-300 animate-pulse whitespace-nowrap">
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg flex items-center gap-1 border-2 border-amber-300 animate-pulse whitespace-nowrap z-20">
             <span>⚡ Mecha x{speedMultiplier.toFixed(2).replace('.', ',')}</span>
           </div>
         )}

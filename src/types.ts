@@ -18,6 +18,7 @@ export interface Player {
   validWordsCount: number;
   fastestAnswerTimeMs: number | null;
   lastValidWord?: string | null; // Last valid word submitted by this player in the current round
+  currentTypingWord?: string; // Realtime live typing state for the active player
   alphabetProgress?: string[]; // Array of unique uppercase letters completed in Spanish alphabet challenge (e.g. ['A', 'B', 'Ñ'])
 }
 

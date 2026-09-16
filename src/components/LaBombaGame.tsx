@@ -87,6 +87,9 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
 
   const [turnStartTime, setTurnStartTime] = useState<number>(Date.now());
 
+  // Real-time live typing state for the active player
+  const [currentTypingWord, setCurrentTypingWord] = useState<string>('');
+
   // Input & validation state
   const [isValidating, setIsValidating] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{
@@ -190,6 +193,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
 
     setPlayers(updatedPlayers);
     setAffectedPlayer(explodingPlayer);
+    setCurrentTypingWord('');
     setPhase('EXPLOSION');
   }, [activePlayerIndex, players]);
 
@@ -284,6 +288,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
 
     setAcceptedWordBanner(null);
     setFeedback({ type: null, message: '' });
+    setCurrentTypingWord('');
 
     setPhase('ROUND_INTRO');
   };
@@ -470,6 +475,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     // Next player can type right away; bomb timer NEVER pauses!
     setCurrentSequence(nextSeq);
     setActivePlayerIndex(nextPlayerIndex);
+    setCurrentTypingWord('');
     setTurnStartTime(Date.now());
     audio.playTurnChange();
 
@@ -528,6 +534,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     setAcceptedWordBanner(null);
     setTurnStartTime(Date.now());
     setFeedback({ type: null, message: '' });
+    setCurrentTypingWord('');
 
     setPhase('ROUND_INTRO');
   };
@@ -741,6 +748,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
             <PlayerRing
               players={players}
               activePlayerIndex={activePlayerIndex}
+              currentTypingWord={currentTypingWord}
             />
 
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
@@ -752,16 +760,8 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
             </div>
           </div>
 
-          {/* Desktop Turn Indicator - Centred on Screen */}
-          <div className="relative z-30 flex items-center justify-center mt-2 mb-2 select-none">
-            <div className="px-6 py-1.5 rounded-full bg-slate-900/95 border-2 border-amber-400 text-amber-300 font-display font-black text-sm md:text-base tracking-wider shadow-xl shadow-amber-500/20 flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-              <span>TURNO DE {activePlayer.name.toUpperCase()}</span>
-            </div>
-          </div>
-
           {/* Desktop Word Input - Centred on Screen */}
-          <div className="w-full max-w-2xl mt-1 mb-2">
+          <div className="w-full max-w-2xl mt-3 mb-2">
             <WordInput
               onWordSubmit={handleWordSubmit}
               disabled={phase !== 'PLAYING'}
@@ -770,6 +770,8 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
               requiredSequence={currentSequence.sequence}
               feedback={feedback}
               usedWords={usedWords}
+              currentTypingWord={currentTypingWord}
+              onTypingChange={setCurrentTypingWord}
             />
           </div>
         </main>
@@ -887,6 +889,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
           <MobilePlayerGrid
             players={players}
             activePlayerIndex={activePlayerIndex}
+            currentTypingWord={currentTypingWord}
           />
         </section>
 
@@ -903,6 +906,8 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
             requiredSequence={currentSequence.sequence}
             feedback={feedback}
             usedWords={usedWords}
+            currentTypingWord={currentTypingWord}
+            onTypingChange={setCurrentTypingWord}
           />
         </section>
       </div>

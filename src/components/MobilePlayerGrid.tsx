@@ -6,11 +6,13 @@ import { Skull, Zap } from 'lucide-react';
 interface MobilePlayerGridProps {
   players: Player[];
   activePlayerIndex: number;
+  currentTypingWord?: string;
 }
 
 export const MobilePlayerGrid: React.FC<MobilePlayerGridProps> = ({
   players,
   activePlayerIndex,
+  currentTypingWord,
 }) => {
   const renderLives = (lives: number, isEliminated: boolean) => {
     if (isEliminated) {
@@ -55,14 +57,6 @@ export const MobilePlayerGrid: React.FC<MobilePlayerGridProps> = ({
                   : 'bg-slate-900/85 border border-slate-800 shadow-md opacity-90'
               }`}
             >
-              {/* Active Player "TU TURNO" Badge */}
-              {isActive && !player.isEliminated && (
-                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-md flex items-center gap-1 whitespace-nowrap">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />
-                  <span>TU TURNO</span>
-                </div>
-              )}
-
               {/* Eliminated "CHAMUSCADO" Badge */}
               {player.isEliminated && (
                 <div className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-stone-900 border border-amber-900/80 text-orange-400 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md whitespace-nowrap">
@@ -106,26 +100,37 @@ export const MobilePlayerGrid: React.FC<MobilePlayerGridProps> = ({
                 </span>
               </div>
 
-              {/* Bottom Row: Last Valid Word */}
-              <div className="pt-1 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500 font-medium shrink-0">Última:</span>
-                <div className="relative overflow-hidden h-4 flex items-center justify-end flex-1 pl-1">
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    <motion.span
-                      key={player.lastValidWord || 'none'}
-                      initial={{ y: 6, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: -6, opacity: 0 }}
-                      transition={{ duration: 0.18, ease: 'easeOut' }}
-                      className={`font-black truncate block max-w-[85px] text-right ${
-                        player.lastValidWord ? 'text-amber-300' : 'text-slate-600'
+              {/* Dedicated Prominent Word Area */}
+              <div
+                className={`mt-2 px-2 py-1.5 rounded-xl flex items-center justify-center text-center transition-all duration-200 min-h-[38px] ${
+                  isActive && !player.isEliminated
+                    ? 'bg-slate-950 border-2 border-amber-400/90 shadow-[inset_0_0_10px_rgba(245,158,11,0.3)]'
+                    : 'bg-slate-950/90 border border-slate-800 shadow-inner'
+                }`}
+              >
+                {isActive && !player.isEliminated && currentTypingWord && currentTypingWord.trim().length > 0 ? (
+                  <div className="flex items-center justify-center gap-0.5 text-amber-300 font-display font-black text-xs sm:text-sm tracking-wider drop-shadow-[0_0_6px_rgba(245,158,11,0.5)] truncate max-w-full">
+                    <span className="truncate">{currentTypingWord.toUpperCase()}</span>
+                    <span className="inline-block w-0.5 h-3.5 bg-amber-400 shrink-0 animate-pulse ml-0.5" />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center truncate max-w-full">
+                    <span
+                      className={`font-display font-black text-xs sm:text-sm tracking-wider truncate ${
+                        player.lastValidWord
+                          ? isActive
+                            ? 'text-amber-200'
+                            : 'text-slate-100'
+                          : 'text-slate-600 font-normal'
                       }`}
-                      title={player.lastValidWord || undefined}
                     >
-                      {player.lastValidWord ? player.lastValidWord : '—'}
-                    </motion.span>
-                  </AnimatePresence>
-                </div>
+                      {player.lastValidWord ? player.lastValidWord.toUpperCase() : '—'}
+                    </span>
+                    {isActive && !player.isEliminated && (!currentTypingWord || currentTypingWord.trim().length === 0) && (
+                      <span className="inline-block w-0.5 h-3.5 bg-amber-400/80 shrink-0 animate-pulse ml-0.5" />
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Speed Multiplier Penalty */}

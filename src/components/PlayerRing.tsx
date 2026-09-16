@@ -6,11 +6,13 @@ import { Skull, Zap } from 'lucide-react';
 interface PlayerRingProps {
   players: Player[];
   activePlayerIndex: number;
+  currentTypingWord?: string;
 }
 
 export const PlayerRing: React.FC<PlayerRingProps> = ({
   players,
   activePlayerIndex,
+  currentTypingWord,
 }) => {
   const totalPlayers = players.length;
 
@@ -41,23 +43,23 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
   const angleToPlayerDeg = (angleToPlayerRad * 180) / Math.PI;
 
   // Active player card inner border offset towards the bomb
-  // Card dimensions: ~184px width, ~92px height (half-width: 92px, half-height: 46px)
+  // Card dimensions: ~196px width, ~110px height (half-width: 98px, half-height: 55px)
   const cosA = Math.abs(Math.cos(angleToPlayerRad)) || 0.001;
   const sinA = Math.abs(Math.sin(angleToPlayerRad)) || 0.001;
-  const cardBorderOffset = Math.min(92 / cosA, 46 / sinA);
+  const cardBorderOffset = Math.min(98 / cosA, 55 / sinA);
   const playerInnerEdgeDist = distToPlayer - cardBorderOffset;
 
-  // Bomb visual boundary radius (bomb body ~45px + fuse/spark margin = ~56px)
-  const bombOuterEdgeDist = 56;
+  // Bomb visual boundary radius (bomb body ~52px + border = ~55px)
+  const bombOuterEdgeDist = 55;
   const clearGap = Math.max(0, playerInnerEdgeDist - bombOuterEdgeDist);
 
-  // Arrow size: 72px long (half-length = 36px), 36px tall
-  // Position arrow ~58% of the distance into the clear gap towards the active player card
-  const arrowTargetDist = bombOuterEdgeDist + clearGap * 0.58;
+  // Arrow size: 76px long (half-length = 38px), 38px tall
+  // Position arrow ~60% of the distance into the clear gap towards the active player card
+  const arrowTargetDist = bombOuterEdgeDist + clearGap * 0.60;
 
   // Enforce visible space: BOMB -> GAP -> ARROW -> GAP -> PLAYER CARD
-  const minSafeDist = bombOuterEdgeDist + 36 + 18; // At least 18px clear from bomb
-  const maxSafeDist = playerInnerEdgeDist - 36 - 18; // At least 18px clear from player card
+  const minSafeDist = bombOuterEdgeDist + 38 + 14; // At least 14px clear from bomb
+  const maxSafeDist = playerInnerEdgeDist - 38 - 14; // At least 14px clear from player card
 
   const finalArrowDist = maxSafeDist >= minSafeDist
     ? Math.max(minSafeDist, Math.min(maxSafeDist, arrowTargetDist))
@@ -112,7 +114,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
     <div className="relative w-full h-full min-h-[380px] sm:min-h-[440px] md:min-h-[480px] lg:min-h-[500px] flex items-center justify-center">
       {/* ==================================================================== */}
       {/* CENTRAL ROTATING ARROW POINTING TO ACTIVE PLAYER (Desktop & Tablet)  */}
-      {/* 2.5x larger, arcade-style, glowing, positioned BETWEEN bomb & card   */}
+      {/* Sits strictly in the empty space between the bomb and active player */}
       {/* ==================================================================== */}
       <div
         className="absolute z-20 pointer-events-none hidden md:block transition-all duration-300 ease-out"
@@ -135,29 +137,29 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
           }}
         >
           <svg
-            width="72"
-            height="36"
-            viewBox="0 0 72 36"
+            width="76"
+            height="38"
+            viewBox="0 0 76 38"
             fill="none"
-            className="overflow-visible filter drop-shadow-[0_0_16px_rgba(245,158,11,0.95)] drop-shadow-[0_0_24px_rgba(234,88,12,0.65)]"
+            className="overflow-visible filter drop-shadow-[0_0_18px_rgba(245,158,11,0.95)] drop-shadow-[0_0_30px_rgba(234,88,12,0.7)]"
           >
             <defs>
               <linearGradient id="arcadeArrowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#ea580c" />
-                <stop offset="40%" stopColor="#f59e0b" />
+                <stop offset="35%" stopColor="#f59e0b" />
                 <stop offset="85%" stopColor="#fde047" />
                 <stop offset="100%" stopColor="#ffffff" />
               </linearGradient>
               <linearGradient id="arcadeArrowBorder" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#9a3412" />
-                <stop offset="50%" stopColor="#fbbf24" />
+                <stop offset="0%" stopColor="#7c2d12" />
+                <stop offset="50%" stopColor="#f59e0b" />
                 <stop offset="100%" stopColor="#ffffff" />
               </linearGradient>
             </defs>
 
-            {/* Pulsing Outer Glow Aura */}
+            {/* Outer Glow Halo */}
             <path
-              d="M 6,12 L 36,12 L 36,4 L 68,18 L 36,32 L 36,24 L 6,24 L 13,18 Z"
+              d="M 6,13 L 38,13 L 38,5 L 72,19 L 38,33 L 38,25 L 6,25 L 13,19 Z"
               fill="url(#arcadeArrowGrad)"
               opacity="0.4"
               className="animate-pulse"
@@ -165,7 +167,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
 
             {/* Main Chunky Arcade Arrow Body */}
             <path
-              d="M 6,12 L 36,12 L 36,4 L 68,18 L 36,32 L 36,24 L 6,24 L 13,18 Z"
+              d="M 6,13 L 38,13 L 38,5 L 72,19 L 38,33 L 38,25 L 6,25 L 13,19 Z"
               fill="url(#arcadeArrowGrad)"
               stroke="url(#arcadeArrowBorder)"
               strokeWidth="2.5"
@@ -175,27 +177,27 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
 
             {/* Top Specular Highlight */}
             <path
-              d="M 14,14 L 36,14 L 36,8 L 60,18 L 36,20 L 36,18 L 14,18 Z"
+              d="M 14,15 L 38,15 L 38,9 L 64,19 L 38,21 L 38,19 L 14,19 Z"
               fill="#ffffff"
-              opacity="0.6"
+              opacity="0.65"
             />
 
-            {/* Inner Motion Energy Chevrons */}
+            {/* Inner Energy Chevrons */}
             <path
-              d="M 22,14 L 28,18 L 22,22"
+              d="M 23,15 L 29,19 L 23,23"
               stroke="#7c2d12"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity="0.75"
+              opacity="0.85"
             />
             <path
-              d="M 30,14 L 36,18 L 30,22"
+              d="M 32,15 L 38,19 L 32,23"
               stroke="#7c2d12"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity="0.75"
+              opacity="0.85"
             />
           </svg>
         </motion.div>
@@ -224,7 +226,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
               }}
             >
               <div
-                className={`relative w-44 lg:w-48 p-3 rounded-2xl transition-all duration-300 select-none ${
+                className={`relative w-48 lg:w-52 p-3.5 rounded-2xl transition-all duration-300 select-none ${
                   player.isEliminated
                     ? 'burnt-effect border-2 border-amber-950/60 shadow-lg opacity-60'
                     : isActive
@@ -282,26 +284,37 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
                   </div>
                 </div>
 
-                {/* Last Valid Word display with smooth replacement transition */}
-                <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <span className="text-slate-400 font-medium">Última:</span>
-                  <div className="relative overflow-hidden h-5 flex items-center justify-end">
-                    <AnimatePresence mode="popLayout" initial={false}>
-                      <motion.span
-                        key={player.lastValidWord || 'none'}
-                        initial={{ y: 8, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: -8, opacity: 0 }}
-                        transition={{ duration: 0.22, ease: 'easeOut' }}
-                        className={`font-black truncate max-w-[110px] ${
-                          player.lastValidWord ? 'text-amber-300' : 'text-slate-600'
+                {/* Dedicated Prominent Word Area */}
+                <div
+                  className={`mt-2.5 px-3 py-2 rounded-xl flex items-center justify-center text-center transition-all duration-200 min-h-[44px] ${
+                    isActive && !player.isEliminated
+                      ? 'bg-slate-950 border-2 border-amber-400/90 shadow-[inset_0_0_12px_rgba(245,158,11,0.3)]'
+                      : 'bg-slate-950/90 border border-slate-700/80 shadow-inner'
+                  }`}
+                >
+                  {isActive && !player.isEliminated && currentTypingWord && currentTypingWord.trim().length > 0 ? (
+                    <div className="flex items-center justify-center gap-0.5 text-amber-300 font-display font-black text-sm lg:text-base tracking-wider drop-shadow-[0_0_8px_rgba(245,158,11,0.6)] truncate max-w-full">
+                      <span className="truncate">{currentTypingWord.toUpperCase()}</span>
+                      <span className="inline-block w-0.5 h-4 bg-amber-400 shrink-0 animate-pulse ml-0.5" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center truncate max-w-full">
+                      <span
+                        className={`font-display font-black text-sm lg:text-base tracking-wider truncate ${
+                          player.lastValidWord
+                            ? isActive
+                              ? 'text-amber-200'
+                              : 'text-slate-100'
+                            : 'text-slate-600 font-normal'
                         }`}
-                        title={player.lastValidWord || undefined}
                       >
-                        {player.lastValidWord ? player.lastValidWord : '—'}
-                      </motion.span>
-                    </AnimatePresence>
-                  </div>
+                        {player.lastValidWord ? player.lastValidWord.toUpperCase() : '—'}
+                      </span>
+                      {isActive && !player.isEliminated && (!currentTypingWord || currentTypingWord.trim().length === 0) && (
+                        <span className="inline-block w-0.5 h-4 bg-amber-400/80 shrink-0 animate-pulse ml-1" />
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Penalty Speed Multiplier Badge */}

@@ -15,6 +15,8 @@ interface WordInputProps {
     canonicalWord?: string;
   };
   usedWords: UsedWord[];
+  currentTypingWord: string;
+  onTypingChange: (word: string) => void;
 }
 
 export const WordInput: React.FC<WordInputProps> = ({
@@ -25,8 +27,9 @@ export const WordInput: React.FC<WordInputProps> = ({
   requiredSequence,
   feedback,
   usedWords,
+  currentTypingWord,
+  onTypingChange,
 }) => {
-  const [inputVal, setInputVal] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -41,11 +44,10 @@ export const WordInput: React.FC<WordInputProps> = ({
     e.preventDefault();
     if (disabled || isValidating) return;
 
-    const trimmed = inputVal.trim();
+    const trimmed = currentTypingWord.trim();
     if (!trimmed) return;
 
     onWordSubmit(trimmed);
-    setInputVal('');
   };
 
   return (
@@ -107,8 +109,8 @@ export const WordInput: React.FC<WordInputProps> = ({
           ref={inputRef}
           type="text"
           disabled={disabled || isValidating}
-          value={inputVal}
-          onChange={(e) => setInputVal(e.target.value)}
+          value={currentTypingWord}
+          onChange={(e) => onTypingChange(e.target.value)}
           onFocus={(e) => {
             // Mobile-safe scroll into view when virtual keyboard appears
             setTimeout(() => {
@@ -117,7 +119,7 @@ export const WordInput: React.FC<WordInputProps> = ({
           }}
           placeholder={
             disabled
-              ? 'Esperando turno...'
+              ? 'Esperando...'
               : isValidating
               ? 'Comprobando...'
               : `Escribe una palabra con «${requiredSequence}»...`
@@ -131,7 +133,7 @@ export const WordInput: React.FC<WordInputProps> = ({
         <button
           id="submit-word-button"
           type="submit"
-          disabled={disabled || isValidating || !inputVal.trim()}
+          disabled={disabled || isValidating || !currentTypingWord.trim()}
           className="w-full sm:w-auto h-13 sm:h-14 px-8 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-black text-base tracking-wider shadow-xl shadow-amber-500/25 active:scale-95 transition-all inline-flex items-center justify-center gap-2 cursor-pointer shrink-0"
         >
           <span>ENVIAR</span>
