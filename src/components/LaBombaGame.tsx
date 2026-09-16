@@ -6,6 +6,7 @@ import { validateSpanishWordAsync } from '../utils/validation';
 import { audio } from '../utils/audio';
 import { BombVisual } from './BombVisual';
 import { PlayerRing } from './PlayerRing';
+import { MobilePlayerGrid } from './MobilePlayerGrid';
 import { WordInput } from './WordInput';
 import { RoundIntroModal } from './RoundIntroModal';
 import { ExplosionOverlay } from './ExplosionOverlay';
@@ -450,7 +451,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
   }
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between p-3 sm:p-4 md:p-6 bg-radial from-slate-900 via-slate-950 to-black text-slate-100 overflow-x-hidden select-none">
+    <div className="relative min-h-screen min-h-dvh w-full flex flex-col justify-between p-2.5 sm:p-4 md:p-6 bg-radial from-slate-900 via-slate-950 to-black text-slate-100 overflow-x-hidden select-none">
       {/* Danger Screen Vignette */}
       {dangerLevel === 'CRITICAL' && (
         <div className="fixed inset-0 pointer-events-none border-4 border-rose-600/40 animate-pulse z-40" />
@@ -464,7 +465,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.9 }}
             transition={{ duration: 0.2 }}
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-2 rounded-full bg-emerald-500 text-slate-950 font-black text-xs sm:text-sm shadow-2xl flex items-center gap-2 border-2 border-emerald-300 pointer-events-none"
+            className="fixed top-14 md:top-16 left-1/2 -translate-x-1/2 z-50 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full bg-emerald-500 text-slate-950 font-black text-xs sm:text-sm shadow-2xl flex items-center gap-2 border-2 border-emerald-300 pointer-events-none"
           >
             <CheckCircle2 className="w-4 h-4 text-slate-950 shrink-0" />
             <span>✓ {acceptedWordBanner.word}</span>
@@ -472,35 +473,6 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Top Header Bar - Slim, non-intrusive navigation and game settings */}
-      <header className="relative z-30 flex items-center justify-between w-full max-w-6xl mx-auto pb-2 border-b border-slate-800/60">
-        <button
-          id="pause-menu-button"
-          type="button"
-          onClick={() => setConfirmExit(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-md active:scale-95"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Menú</span>
-        </button>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          <span className="text-xs font-black px-3 py-1 rounded-full bg-slate-800/90 text-amber-400 border border-slate-700 shadow-sm">
-            Ronda #{roundNumber}
-          </span>
-          <button
-            id="game-how-to-play-button"
-            type="button"
-            onClick={() => setShowHowToPlay(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-md active:scale-95"
-          >
-            <HelpCircle className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">Reglas</span>
-          </button>
-          <SoundToggle />
-        </div>
-      </header>
 
       {/* Confirmation modal before exiting to menu */}
       {confirmExit && (
@@ -533,84 +505,205 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
         </div>
       )}
 
-      {/* 
-        ========================================================================
-        1. REQUIRED LETTERS: THE MAIN VISUAL ELEMENT
-        Positioned at TOP CENTRE, completely separated from player cards.
-        2-3x larger than previous implementation, arcade glow & typography.
-        ========================================================================
-      */}
-      <section
-        aria-label="Letras obligatorias"
-        className="relative z-30 flex flex-col items-center justify-center mt-3 sm:mt-5 mb-2 sm:mb-4 select-none"
-      >
-        <div className="px-8 py-3.5 sm:px-14 sm:py-5 md:px-20 md:py-6 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-[0_0_35px_rgba(245,158,11,0.25)] flex flex-col items-center backdrop-blur-md">
-          <span className="text-xs sm:text-sm md:text-base font-black tracking-[0.25em] text-amber-300 uppercase mb-0.5">
-            PALABRAS CON
+      {/* ==================================================================== */}
+      {/* 1. DESKTOP / TABLET LAYOUT (>= 768px: hidden md:flex)                */}
+      {/* Spacious radial layout with players positioned around the central bomb*/}
+      {/* ==================================================================== */}
+      <div className="hidden md:flex flex-col flex-1 w-full max-w-6xl mx-auto">
+        {/* Desktop Top Header Bar */}
+        <header className="relative z-30 flex items-center justify-between w-full pb-2 border-b border-slate-800/60">
+          <button
+            id="pause-menu-button"
+            type="button"
+            onClick={() => setConfirmExit(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-md active:scale-95"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Menú</span>
+          </button>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="text-xs font-black px-3 py-1 rounded-full bg-slate-800/90 text-amber-400 border border-slate-700 shadow-sm">
+              Ronda #{roundNumber}
+            </span>
+            <button
+              id="game-how-to-play-button"
+              type="button"
+              onClick={() => setShowHowToPlay(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-md active:scale-95"
+            >
+              <HelpCircle className="w-4 h-4 text-amber-400" />
+              <span>Reglas</span>
+            </button>
+            <SoundToggle />
+          </div>
+        </header>
+
+        {/* Desktop Required Letters Section */}
+        <section
+          aria-label="Letras obligatorias"
+          className="relative z-30 flex flex-col items-center justify-center mt-5 mb-4 select-none"
+        >
+          <div className="px-14 py-5 md:px-20 md:py-6 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-[0_0_35px_rgba(245,158,11,0.25)] flex flex-col items-center backdrop-blur-md">
+            <span className="text-sm md:text-base font-black tracking-[0.25em] text-amber-300 uppercase mb-0.5">
+              PALABRAS CON
+            </span>
+
+            <div className="relative overflow-hidden flex items-center justify-center min-h-[92px] md:min-h-[110px] min-w-[260px] md:min-w-[320px]">
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.div
+                  key={currentSequence.sequence}
+                  initial={{ y: 35, opacity: 0, scale: 0.85 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  exit={{ y: -35, opacity: 0, scale: 0.85 }}
+                  transition={{ duration: 0.26, ease: 'easeOut' }}
+                  className="text-7xl md:text-8xl font-black font-display tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-500 drop-shadow-[0_0_24px_rgba(245,158,11,0.65)]"
+                >
+                  {currentSequence.sequence}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+        </section>
+
+        {/* Desktop Central Arena: Radial Players + Central Bomb */}
+        <main className="relative flex-1 flex flex-col items-center justify-center w-full my-3">
+          <div className="relative w-full flex items-center justify-center">
+            <PlayerRing
+              players={players}
+              activePlayerIndex={activePlayerIndex}
+            />
+
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+              <BombVisual
+                progress={progress}
+                dangerLevel={dangerLevel}
+                speedMultiplier={activePlayer?.multiplier || 1.0}
+              />
+            </div>
+          </div>
+
+          {/* Desktop Turn Indicator */}
+          <div className="relative z-30 flex items-center justify-center mt-4 mb-2 select-none">
+            <div className="px-6 py-2 rounded-full bg-slate-900/95 border-2 border-amber-400 text-amber-300 font-display font-black text-base tracking-wider shadow-xl shadow-amber-500/20 flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+              <span>TURNO DE {activePlayer.name.toUpperCase()}</span>
+            </div>
+          </div>
+
+          {/* Desktop Word Input */}
+          <div className="w-full mt-1 mb-2">
+            <WordInput
+              onWordSubmit={handleWordSubmit}
+              disabled={phase !== 'PLAYING' || isTransitioningTurn}
+              isValidating={isValidating}
+              activePlayerName={activePlayer?.name || ''}
+              requiredSequence={currentSequence.sequence}
+              feedback={feedback}
+              usedWords={usedWords}
+            />
+          </div>
+        </main>
+      </div>
+
+      {/* ==================================================================== */}
+      {/* 2. DEDICATED MOBILE VERTICAL FLOW LAYOUT (< 768px: flex md:hidden)   */}
+      {/* Normal document flow, NO radial layout, NO overlap, clean order:     */}
+      {/* 1. Compact Top Bar: [ ← ]  Ronda 1   [?] [🔇]                        */}
+      {/* 2. Required Letters (spacious, 20-28px margins)                      */}
+      {/* 3. Dedicated Bomb Section (above players)                            */}
+      {/* 4. Mobile 2-Column Player Grid (highlighted active card)             */}
+      {/* 5. Word Input Area (24-32px gap, fixed validation, full-width send)  */}
+      {/* 6. Secondary Collapsible Information & Footer                        */}
+      {/* ==================================================================== */}
+      <div className="flex md:hidden flex-col w-full max-w-md mx-auto">
+        {/* 1. Compact Top Bar */}
+        <header className="relative z-30 flex items-center justify-between w-full py-1.5 px-1 border-b border-slate-800/60">
+          <button
+            id="mobile-pause-menu-button"
+            type="button"
+            onClick={() => setConfirmExit(true)}
+            aria-label="Menú"
+            className="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+
+          <span className="text-xs font-black px-3 py-1 rounded-full bg-slate-800/90 text-amber-400 border border-slate-700/80 shadow-sm">
+            Ronda {roundNumber}
           </span>
 
-          {/* Letter container with fast 260ms slide-up & scale transition */}
-          <div className="relative overflow-hidden flex items-center justify-center min-h-[72px] sm:min-h-[92px] md:min-h-[110px] min-w-[180px] sm:min-w-[260px] md:min-w-[320px]">
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.div
-                key={currentSequence.sequence}
-                initial={{ y: 35, opacity: 0, scale: 0.85 }}
-                animate={{ y: 0, opacity: 1, scale: 1 }}
-                exit={{ y: -35, opacity: 0, scale: 0.85 }}
-                transition={{ duration: 0.26, ease: 'easeOut' }}
-                className="text-6xl sm:text-7xl md:text-8xl font-black font-display tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-500 drop-shadow-[0_0_24px_rgba(245,158,11,0.65)]"
-              >
-                {currentSequence.sequence}
-              </motion.div>
-            </AnimatePresence>
+          <div className="flex items-center gap-1.5">
+            <button
+              id="mobile-how-to-play-button"
+              type="button"
+              onClick={() => setShowHowToPlay(true)}
+              aria-label="Reglas"
+              className="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+            >
+              <HelpCircle className="w-4 h-4 text-amber-400" />
+            </button>
+            <SoundToggle compact />
           </div>
-        </div>
-      </section>
+        </header>
 
-      {/* 
-        ========================================================================
-        2. CENTRAL ARENA: PLAYERS SURROUNDING THE SMALLER BOMB
-        Players distributed further away on an airy ellipse with ample gaps.
-        ========================================================================
-      */}
-      <main className="relative flex-1 flex flex-col items-center justify-center w-full max-w-6xl mx-auto my-1 sm:my-3">
-        <div className="relative w-full flex items-center justify-center">
-          {/* Radial Player Layout surrounding the central bomb */}
-          <PlayerRing
-            players={players}
-            activePlayerIndex={activePlayerIndex}
-          />
+        {/* 2. Required Letters: HUGE, centered, 20-28px margins */}
+        <section
+          aria-label="Letras obligatorias"
+          className="relative z-30 flex flex-col items-center justify-center my-6 select-none"
+        >
+          <div className="w-full px-6 py-4 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-[0_0_30px_rgba(245,158,11,0.22)] flex flex-col items-center backdrop-blur-md">
+            <span className="text-xs font-black tracking-[0.25em] text-amber-300 uppercase mb-0.5">
+              PALABRAS CON
+            </span>
 
-          {/* Central Animated Bomb (25-35% smaller, with empty space around it) */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+            <div className="relative overflow-hidden flex items-center justify-center min-h-[72px] w-full">
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.div
+                  key={currentSequence.sequence}
+                  initial={{ y: 30, opacity: 0, scale: 0.85 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  exit={{ y: -30, opacity: 0, scale: 0.85 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                  className="text-6xl sm:text-7xl font-black font-display tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-500 drop-shadow-[0_0_20px_rgba(245,158,11,0.6)]"
+                >
+                  {currentSequence.sequence}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. Animated Bomb in its OWN Dedicated Section (ABOVE all player cards) */}
+        <section
+          aria-label="Bomba activa"
+          className="relative w-full flex items-center justify-center my-4 min-h-[120px] pointer-events-none select-none"
+        >
+          <div className="scale-95 flex items-center justify-center">
             <BombVisual
               progress={progress}
               dangerLevel={dangerLevel}
               speedMultiplier={activePlayer?.multiplier || 1.0}
             />
           </div>
-        </div>
+        </section>
 
-        {/* 
-          ======================================================================
-          3. CURRENT PLAYER INDICATOR
-          Single clear indicator positioned between the arena and the input.
-          ======================================================================
-        */}
-        <div className="relative z-30 flex items-center justify-center mt-3 sm:mt-4 mb-2 select-none">
-          <div className="px-6 py-2 rounded-full bg-slate-900/95 border-2 border-amber-400 text-amber-300 font-display font-black text-sm sm:text-base tracking-wider shadow-xl shadow-amber-500/20 flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-            <span>TURNO DE {activePlayer.name.toUpperCase()}</span>
-          </div>
-        </div>
+        {/* 4. Player Grid in Normal Document Flow (2 columns, highlighted active card) */}
+        <section
+          aria-label="Jugadores"
+          className="relative w-full mt-3 mb-6"
+        >
+          <MobilePlayerGrid
+            players={players}
+            activePlayerIndex={activePlayerIndex}
+          />
+        </section>
 
-        {/* 
-          ======================================================================
-          4. WORD INPUT COMPONENT
-          Separated from bomb. Fixed-height validation message area above input.
-          ======================================================================
-        */}
-        <div className="w-full mt-1 mb-2">
+        {/* 5. Word Input Section (24-32px gap after players, full-width send) */}
+        <section
+          aria-label="Entrada de palabra"
+          className="relative w-full mb-4"
+        >
           <WordInput
             onWordSubmit={handleWordSubmit}
             disabled={phase !== 'PLAYING' || isTransitioningTurn}
@@ -620,8 +713,8 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
             feedback={feedback}
             usedWords={usedWords}
           />
-        </div>
-      </main>
+        </section>
+      </div>
 
       {/* Bottom status line */}
       <footer className="relative z-20 text-center text-xs text-slate-500 py-1 flex items-center justify-center gap-4">

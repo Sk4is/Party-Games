@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import { audio } from '../utils/audio';
 
-export const SoundToggle: React.FC = () => {
+interface SoundToggleProps {
+  compact?: boolean;
+}
+
+export const SoundToggle: React.FC<SoundToggleProps> = ({ compact = false }) => {
   const [isMuted, setIsMuted] = useState(audio.getIsMuted());
 
   const handleToggle = () => {
@@ -12,6 +16,24 @@ export const SoundToggle: React.FC = () => {
       audio.playAnswerAccepted();
     }
   };
+
+  if (compact) {
+    return (
+      <button
+        id="sound-toggle-button-compact"
+        type="button"
+        onClick={handleToggle}
+        aria-label={isMuted ? 'Activar sonido' : 'Silenciar sonido'}
+        className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-sm"
+      >
+        {isMuted ? (
+          <VolumeX className="w-4 h-4 text-rose-400" />
+        ) : (
+          <Volume2 className="w-4 h-4 text-emerald-400" />
+        )}
+      </button>
+    );
+  }
 
   return (
     <button

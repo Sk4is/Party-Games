@@ -109,6 +109,12 @@ export const WordInput: React.FC<WordInputProps> = ({
           disabled={disabled || isValidating}
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
+          onFocus={(e) => {
+            // Mobile-safe scroll into view when virtual keyboard appears
+            setTimeout(() => {
+              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          }}
           placeholder={
             disabled
               ? 'Esperando turno...'
