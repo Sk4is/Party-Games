@@ -7,35 +7,41 @@ interface MobilePlayerGridProps {
   players: Player[];
   activePlayerIndex: number;
   currentTypingWord?: string;
+  maxLives?: number;
+  allowedMistakesPerRound?: number;
 }
 
 export const MobilePlayerGrid: React.FC<MobilePlayerGridProps> = ({
   players,
   activePlayerIndex,
   currentTypingWord,
+  maxLives = 3,
+  allowedMistakesPerRound = 3,
 }) => {
   const renderLives = (lives: number, isEliminated: boolean) => {
     if (isEliminated) {
       return (
-        <span className="text-[11px] text-slate-600 tracking-tighter">
-          🖤🖤🖤
+        <span className="text-[11px] text-slate-600 tracking-tighter flex gap-0.5">
+          {Array.from({ length: maxLives }).map((_, i) => (
+            <span key={i}>🖤</span>
+          ))}
         </span>
       );
     }
-    const hearts = [];
-    for (let i = 0; i < 3; i++) {
-      hearts.push(
-        <span
-          key={i}
-          className={`text-xs transition-all duration-200 ${
-            i < lives ? 'text-rose-500' : 'text-slate-600 grayscale'
-          }`}
-        >
-          {i < lives ? '❤️' : '🖤'}
-        </span>
-      );
-    }
-    return <span className="flex gap-0.5">{hearts}</span>;
+    return (
+      <span className="flex gap-0.5">
+        {Array.from({ length: maxLives }).map((_, i) => (
+          <span
+            key={i}
+            className={`text-xs transition-all duration-200 ${
+              i < lives ? 'text-rose-500' : 'text-slate-600 grayscale'
+            }`}
+          >
+            {i < lives ? '❤️' : '🖤'}
+          </span>
+        ))}
+      </span>
+    );
   };
 
   return (
@@ -96,7 +102,7 @@ export const MobilePlayerGrid: React.FC<MobilePlayerGridProps> = ({
               <div className="flex items-center justify-between py-1 border-t border-slate-800/80 text-xs">
                 {renderLives(player.lives, player.isEliminated)}
                 <span className="text-[10px] font-extrabold text-slate-400">
-                  {player.isEliminated ? 'RIP' : `F: ${player.mistakes}`}
+                  {player.isEliminated ? 'RIP' : `Fallos: ${player.roundMistakes ?? 0}/${allowedMistakesPerRound}`}
                 </span>
               </div>
 

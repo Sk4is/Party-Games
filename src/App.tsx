@@ -7,13 +7,17 @@ import React, { useState } from 'react';
 import { MainMenu } from './components/MainMenu';
 import { PlayerSetup } from './components/PlayerSetup';
 import { LaBombaGame } from './components/LaBombaGame';
-import { Player } from './types';
+import { Player, GameConfig } from './types';
 
 type AppView = 'MENU' | 'SETUP' | 'GAME';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('MENU');
   const [gamePlayers, setGamePlayers] = useState<Player[]>([]);
+  const [gameConfig, setGameConfig] = useState<GameConfig>({
+    startingLives: 3,
+    allowedMistakesPerRound: 3,
+  });
 
   const handleSelectGame = (gameId: string) => {
     if (gameId === 'la-bomba') {
@@ -21,8 +25,9 @@ export default function App() {
     }
   };
 
-  const handleStartGame = (players: Player[]) => {
+  const handleStartGame = (players: Player[], config: GameConfig) => {
     setGamePlayers(players);
+    setGameConfig(config);
     setCurrentView('GAME');
   };
 
@@ -46,6 +51,7 @@ export default function App() {
       {currentView === 'GAME' && (
         <LaBombaGame
           initialPlayers={gamePlayers}
+          gameConfig={gameConfig}
           onBackToMenu={handleBackToMenu}
         />
       )}

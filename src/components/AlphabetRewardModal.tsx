@@ -6,12 +6,14 @@ import { Player } from '../types';
 interface AlphabetRewardModalProps {
   player: Player;
   gainedLife: boolean;
+  maxLives?: number;
   onDismiss: () => void;
 }
 
 export const AlphabetRewardModal: React.FC<AlphabetRewardModalProps> = ({
   player,
   gainedLife,
+  maxLives = 3,
   onDismiss,
 }) => {
   return (
@@ -61,8 +63,8 @@ export const AlphabetRewardModal: React.FC<AlphabetRewardModalProps> = ({
             </div>
             <div className="text-xs text-slate-400 font-medium">
               {gainedLife
-                ? `Vidas recuperadas: ${player.lives}/3`
-                : 'Ya tenías las 3 vidas al máximo'}
+                ? `Vidas recuperadas: ${player.lives}/${maxLives}`
+                : `Ya tenías las ${maxLives} vidas al máximo`}
             </div>
           </div>
         </div>

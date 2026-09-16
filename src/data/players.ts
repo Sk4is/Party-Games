@@ -16,18 +16,26 @@ export const PLAYER_COLORS: PlayerColorOption[] = [
   { name: 'Turquesa', hex: '#14b8a6' },
 ];
 
-export const AVATARS = [
-  '🦊', // Zorro
-  '🐯', // Tigre
-  '🦁', // León
-  '🐼', // Panda
-  '🐸', // Rana
-  '🐵', // Mono
-  '🦄', // Unicornio
-  '🐙', // Pulpo
-  '🐨', // Koala
-  '🦉', // Búho
+export const AVATARS: string[] = [
+  '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐻‍❄️', '🐨',
+  '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🙈', '🐔', '🐧', '🐦',
+  '🐤', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝',
+  '🪲', '🐞', '🦋', '🐌', '🐛', '🪱', '🐜', '🕷️', '🦂', '🐢',
+  '🐍', '🦎', '🐙', '🦑', '🦀', '🦞', '🐠', '🐟', '🐡', '🦈',
+  '🐬', '🐳', '🐋', '🦭', '🐊', '🐆', '🦓', '🦍', '🦧', '🐘',
+  '🦛', '🦏', '🐪', '🦒', '🦘', '🦬', '🦙', '🦥', '🦦', '🦨',
+  '🦡', '🦔', '🐿️', '🦫', '🦜', '🦚', '🦩', '🦢',
 ];
+
+/**
+ * Returns a random animal avatar, preferring ones not currently in use.
+ */
+export function getRandomAnimalAvatar(usedAvatars: string[] = []): string {
+  const unused = AVATARS.filter((a) => !usedAvatars.includes(a));
+  const pool = unused.length > 0 ? unused : AVATARS;
+  const randomIndex = Math.floor(Math.random() * pool.length);
+  return pool[randomIndex];
+}
 
 export const DEFAULT_PLAYER_NAMES = [
   'Alex',

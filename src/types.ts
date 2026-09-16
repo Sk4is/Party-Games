@@ -5,14 +5,20 @@ export interface LetterSequence {
   examples?: string[];
 }
 
+export interface GameConfig {
+  startingLives: number; // 1 to 5, default 3
+  allowedMistakesPerRound: number; // 1 to 5, default 3
+}
+
 export interface Player {
   id: string;
   name: string;
   color: string;
   avatar: string;
-  lives: number; // starts at 3
-  mistakes: number;
-  multiplier: number; // 1.0, 1.5, 2.25, 3.375...
+  lives: number; // starts at startingLives (1..5)
+  mistakes: number; // total mistakes in match (for stats)
+  roundMistakes: number; // mistakes in current round (0..allowedMistakesPerRound)
+  multiplier: number; // 1.0, 1.5, 2.25, 3.375... (persists across rounds)
   isEliminated: boolean;
   bombsReceived: number;
   validWordsCount: number;

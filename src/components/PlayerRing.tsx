@@ -7,18 +7,22 @@ interface PlayerRingProps {
   players: Player[];
   activePlayerIndex: number;
   currentTypingWord?: string;
+  maxLives?: number;
+  allowedMistakesPerRound?: number;
 }
 
 export const PlayerRing: React.FC<PlayerRingProps> = ({
   players,
   activePlayerIndex,
   currentTypingWord,
+  maxLives = 3,
+  allowedMistakesPerRound = 3,
 }) => {
   const totalPlayers = players.length;
 
   // Calculate angle for each player in radial layout
   // 2 players: 180° (left) and 0° (right)
-  // 4 players: 45°, 135°, 225°, 315° (corners) so top (letters) and bottom (input) remain clear
+  // 4 players: 45°, 135°, 225°, 315° (diagonal corners) so top & bottom remain clear
   // 3+ players: start at -90° (top: 12 o'clock) proceeding clockwise
   const playerAngles = useMemo(() => {
     const startAngle = totalPlayers === 2 ? 0 : totalPlayers === 4 ? 45 : -90;
@@ -27,8 +31,9 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
   }, [totalPlayers, players]);
 
   // Elliptical radii for player card positions around the central bomb
-  const radiusX = totalPlayers <= 4 ? 300 : totalPlayers <= 6 ? 340 : 380;
-  const radiusY = totalPlayers <= 4 ? 175 : totalPlayers <= 6 ? 185 : 195;
+  // Generous spacing to guarantee visible gaps: BOMB -> GAP -> ARROW -> GAP -> CARD
+  const radiusX = totalPlayers <= 4 ? 325 : totalPlayers <= 6 ? 355 : 390;
+  const radiusY = totalPlayers <= 4 ? 200 : totalPlayers <= 6 ? 210 : 220;
 
   // Active player card center position
   const activeAngleDeg = playerAngles[activePlayerIndex] ?? 0;
@@ -37,33 +42,35 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
   const activeCardX = Math.round(Math.cos(activeAngleRad) * radiusX);
   const activeCardY = Math.round(Math.sin(activeAngleRad) * radiusY);
 
-  // Direction and distance from bomb center (0, 0) to active player card (activeCardX, activeCardY)
+  // Direction and distance from arena center (0, 0) to active player card
   const distToPlayer = Math.hypot(activeCardX, activeCardY);
   const angleToPlayerRad = Math.atan2(activeCardY, activeCardX);
   const angleToPlayerDeg = (angleToPlayerRad * 180) / Math.PI;
 
-  // Active player card inner border offset towards the bomb
-  // Card dimensions: ~196px width, ~110px height (half-width: 98px, half-height: 55px)
+  // Card rectangular boundary calculation:
+  // Card dimensions: ~196px width, ~116px height (half-width: 98px, half-height: 58px)
   const cosA = Math.abs(Math.cos(angleToPlayerRad)) || 0.001;
   const sinA = Math.abs(Math.sin(angleToPlayerRad)) || 0.001;
-  const cardBorderOffset = Math.min(98 / cosA, 55 / sinA);
-  const playerInnerEdgeDist = distToPlayer - cardBorderOffset;
+  const cardBorderOffset = Math.min(98 / cosA, 58 / sinA);
+  const playerCardEdgeDist = distToPlayer - cardBorderOffset;
 
-  // Bomb visual boundary radius (bomb body ~52px + border = ~55px)
+  // Bomb visual boundary radius (bomb body ~52px + rim = ~55px)
   const bombOuterEdgeDist = 55;
-  const clearGap = Math.max(0, playerInnerEdgeDist - bombOuterEdgeDist);
 
-  // Arrow size: 76px long (half-length = 38px), 38px tall
-  // Position arrow ~60% of the distance into the clear gap towards the active player card
-  const arrowTargetDist = bombOuterEdgeDist + clearGap * 0.60;
+  // Arrow size: 56px long (25% smaller than original 76px), 28px tall
+  // Half-length = 28px. Arrow tip is at front (+28px), animation travel is +5px max.
+  // Maximum tip reach from arrow center = 28 + 5 = 33px.
+  // We strictly enforce at least a 22px visible gap between arrow tip and card border!
+  const safetyGapBeforeCard = 22;
+  const maxArrowDist = playerCardEdgeDist - safetyGapBeforeCard - 33;
+  const minArrowDist = bombOuterEdgeDist + 28 + 14; // At least 14px clear from bomb
 
-  // Enforce visible space: BOMB -> GAP -> ARROW -> GAP -> PLAYER CARD
-  const minSafeDist = bombOuterEdgeDist + 38 + 14; // At least 14px clear from bomb
-  const maxSafeDist = playerInnerEdgeDist - 38 - 14; // At least 14px clear from player card
-
-  const finalArrowDist = maxSafeDist >= minSafeDist
-    ? Math.max(minSafeDist, Math.min(maxSafeDist, arrowTargetDist))
-    : (bombOuterEdgeDist + playerInnerEdgeDist) / 2;
+  // Position arrow cleanly in the clear space between bomb and player card
+  const naturalGapCenter = bombOuterEdgeDist + (playerCardEdgeDist - bombOuterEdgeDist) * 0.52;
+  const finalArrowDist = Math.max(
+    minArrowDist,
+    Math.min(maxArrowDist, naturalGapCenter)
+  );
 
   // Arrow center coordinates relative to arena center (50%, 50%)
   const arrowX = Math.round(Math.cos(angleToPlayerRad) * finalArrowDist);
@@ -81,33 +88,33 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
     return next;
   }, [angleToPlayerDeg]);
 
-  // Render lives as hearts
+  // Render lives according to configured maxLives
   const renderLives = (lives: number, isEliminated: boolean) => {
     if (isEliminated) {
       return (
-        <div className="flex gap-1 text-slate-600 text-xs">
-          <span>🖤</span>
-          <span>🖤</span>
-          <span>🖤</span>
+        <div className="flex gap-0.5 text-slate-600 text-xs">
+          {Array.from({ length: maxLives }).map((_, i) => (
+            <span key={i}>🖤</span>
+          ))}
         </div>
       );
     }
-    const hearts = [];
-    for (let i = 0; i < 3; i++) {
-      hearts.push(
-        <span
-          key={i}
-          className={`transition-all duration-300 text-xs sm:text-sm ${
-            i < lives
-              ? 'text-rose-500 scale-100'
-              : 'text-slate-600 scale-90 grayscale'
-          }`}
-        >
-          {i < lives ? '❤️' : '🖤'}
-        </span>
-      );
-    }
-    return <div className="flex gap-1">{hearts}</div>;
+    return (
+      <div className="flex gap-0.5">
+        {Array.from({ length: maxLives }).map((_, i) => (
+          <span
+            key={i}
+            className={`transition-all duration-300 text-xs sm:text-sm ${
+              i < lives
+                ? 'text-rose-500 scale-100'
+                : 'text-slate-600 scale-90 grayscale'
+            }`}
+          >
+            {i < lives ? '❤️' : '🖤'}
+          </span>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -128,7 +135,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
         <motion.div
           className="flex items-center justify-center"
           animate={{
-            x: [0, 8, 0],
+            x: [0, 5, 0],
           }}
           transition={{
             duration: 0.85,
@@ -137,11 +144,11 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
           }}
         >
           <svg
-            width="76"
-            height="38"
-            viewBox="0 0 76 38"
+            width="56"
+            height="28"
+            viewBox="0 0 56 28"
             fill="none"
-            className="overflow-visible filter drop-shadow-[0_0_18px_rgba(245,158,11,0.95)] drop-shadow-[0_0_30px_rgba(234,88,12,0.7)]"
+            className="overflow-visible filter drop-shadow-[0_0_14px_rgba(245,158,11,0.9)] drop-shadow-[0_0_24px_rgba(234,88,12,0.65)]"
           >
             <defs>
               <linearGradient id="arcadeArrowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -159,7 +166,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
 
             {/* Outer Glow Halo */}
             <path
-              d="M 6,13 L 38,13 L 38,5 L 72,19 L 38,33 L 38,25 L 6,25 L 13,19 Z"
+              d="M 4,10 L 28,10 L 28,4 L 53,14 L 28,24 L 28,18 L 4,18 L 9,14 Z"
               fill="url(#arcadeArrowGrad)"
               opacity="0.4"
               className="animate-pulse"
@@ -167,34 +174,34 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
 
             {/* Main Chunky Arcade Arrow Body */}
             <path
-              d="M 6,13 L 38,13 L 38,5 L 72,19 L 38,33 L 38,25 L 6,25 L 13,19 Z"
+              d="M 4,10 L 28,10 L 28,4 L 53,14 L 28,24 L 28,18 L 4,18 L 9,14 Z"
               fill="url(#arcadeArrowGrad)"
               stroke="url(#arcadeArrowBorder)"
-              strokeWidth="2.5"
+              strokeWidth="2"
               strokeLinejoin="round"
               strokeLinecap="round"
             />
 
             {/* Top Specular Highlight */}
             <path
-              d="M 14,15 L 38,15 L 38,9 L 64,19 L 38,21 L 38,19 L 14,19 Z"
+              d="M 10,11 L 28,11 L 28,7 L 47,14 L 28,16 L 28,14 L 10,14 Z"
               fill="#ffffff"
               opacity="0.65"
             />
 
             {/* Inner Energy Chevrons */}
             <path
-              d="M 23,15 L 29,19 L 23,23"
+              d="M 17,11 L 22,14 L 17,17"
               stroke="#7c2d12"
-              strokeWidth="2.5"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
               opacity="0.85"
             />
             <path
-              d="M 32,15 L 38,19 L 32,23"
+              d="M 24,11 L 29,14 L 24,17"
               stroke="#7c2d12"
-              strokeWidth="2.5"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
               opacity="0.85"
@@ -273,12 +280,12 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
                       </span>
                     </div>
 
-                    {/* Lives & mistakes */}
+                    {/* Lives & Round mistakes */}
                     <div className="mt-0.5 flex items-center justify-between">
                       {renderLives(player.lives, player.isEliminated)}
 
                       <span className="text-[10px] font-bold text-slate-400">
-                        {player.isEliminated ? 'RIP' : `Fallos: ${player.mistakes}`}
+                        {player.isEliminated ? 'RIP' : `Fallos: ${player.roundMistakes ?? 0}/${allowedMistakesPerRound}`}
                       </span>
                     </div>
                   </div>
