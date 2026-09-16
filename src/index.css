@@ -44,6 +44,16 @@
   100% { transform: scale(0.95); opacity: 0.8; }
 }
 
+@keyframes fuse-flicker {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; }
+  50% { transform: scale(1.3) rotate(8deg); opacity: 0.85; }
+  100% { transform: scale(0.85) rotate(-6deg); opacity: 1; }
+}
+
+.animate-fuse-flicker {
+  animation: fuse-flicker 0.25s infinite alternate ease-in-out;
+}
+
 .animate-gentle-float {
   animation: gentle-float 3s ease-in-out infinite;
 }

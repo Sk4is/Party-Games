@@ -54,6 +54,20 @@ export const BombVisual: React.FC<BombVisualProps> = ({
   const isPanic = dangerLevel === 'DANGER' || dangerLevel === 'CRITICAL';
   const isExtremePanic = dangerLevel === 'CRITICAL';
 
+  // Dynamic animation styling that speeds up with player multiplier
+  const shakeStyle = useMemo(() => {
+    if (speedMultiplier > 1.0) {
+      const baseDuration = dangerLevel === 'CRITICAL' ? 0.12 : dangerLevel === 'DANGER' ? 0.25 : 0.45;
+      return {
+        animationDuration: `${(baseDuration / Math.sqrt(speedMultiplier)).toFixed(3)}s`,
+      };
+    }
+    return undefined;
+  }, [dangerLevel, speedMultiplier]);
+
+  const sparkAnimDuration = `${Math.max(0.1, (0.3 / speedMultiplier)).toFixed(3)}s`;
+  const pingAnimDuration = `${Math.max(0.2, (0.8 / speedMultiplier)).toFixed(3)}s`;
+
   return (
     <div className="relative flex flex-col items-center justify-center select-none pointer-events-none">
       {/* Outer pulsating danger aura */}
@@ -65,7 +79,10 @@ export const BombVisual: React.FC<BombVisualProps> = ({
       )}
 
       {/* Main Bomb Wrapper with Shake Animation - reduced size (25-35% smaller) for airy, spacious layout */}
-      <div className={`relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 transition-transform duration-75 ${shakeClass}`}>
+      <div
+        className={`relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 transition-transform duration-75 ${shakeClass}`}
+        style={shakeStyle}
+      >
         <svg
           viewBox="0 0 200 200"
           className="w-full h-full drop-shadow-2xl overflow-visible"
@@ -254,7 +271,12 @@ export const BombVisual: React.FC<BombVisualProps> = ({
           </g>
 
           {/* BURNING FUSE SPARK AND FLAME */}
-          <g transform={`translate(${sparkPosition.x}, ${sparkPosition.y})`} filter="url(#glowEffect)">
+          <g
+            transform={`translate(${sparkPosition.x}, ${sparkPosition.y})`}
+            filter="url(#glowEffect)"
+            className="animate-fuse-flicker"
+            style={{ animationDuration: sparkAnimDuration }}
+          >
             {/* Outer flame glow */}
             <circle cx="0" cy="0" r={isExtremePanic ? '18' : isPanic ? '14' : '10'} fill="url(#fuseGlowGradient)" />
 
@@ -265,6 +287,7 @@ export const BombVisual: React.FC<BombVisualProps> = ({
               r={isExtremePanic ? '8' : '6'}
               fill="#fbbf24"
               className="animate-ping"
+              style={{ animationDuration: pingAnimDuration }}
             />
             <circle cx="0" cy="0" r="4" fill="#ffffff" />
 

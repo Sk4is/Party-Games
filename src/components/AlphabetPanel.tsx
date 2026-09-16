@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Trophy, Check, Heart, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Trophy, Check, Heart, ChevronDown, ChevronUp, ChevronLeft } from 'lucide-react';
 import { Player } from '../types';
 import { SPANISH_ALPHABET, TOTAL_ALPHABET_LETTERS } from '../utils/alphabet';
 
@@ -9,6 +9,8 @@ interface AlphabetPanelProps {
   recentlyUnlockedLetters?: string[];
   isMobileDrawer?: boolean;
   onCloseMobileDrawer?: () => void;
+  isCollapsible?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const AlphabetPanel: React.FC<AlphabetPanelProps> = ({
@@ -17,6 +19,8 @@ export const AlphabetPanel: React.FC<AlphabetPanelProps> = ({
   recentlyUnlockedLetters = [],
   isMobileDrawer = false,
   onCloseMobileDrawer,
+  isCollapsible = false,
+  onToggleCollapse,
 }) => {
   const activePlayer = players[activePlayerIndex] || players[0];
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(activePlayer?.id || '');
@@ -39,7 +43,7 @@ export const AlphabetPanel: React.FC<AlphabetPanelProps> = ({
     <div
       id="alphabet-challenge-panel"
       className={`flex flex-col bg-slate-900/90 border border-slate-800/90 rounded-2xl p-3.5 sm:p-4 shadow-xl backdrop-blur-md select-none ${
-        isMobileDrawer ? 'w-full' : 'w-64 xl:w-72'
+        isMobileDrawer ? 'w-full' : 'w-[265px] xl:w-[275px]'
       }`}
     >
       {/* Header */}
@@ -65,6 +69,18 @@ export const AlphabetPanel: React.FC<AlphabetPanelProps> = ({
             className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
           >
             Cerrar
+          </button>
+        )}
+
+        {isCollapsible && onToggleCollapse && !isMobileDrawer && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-colors cursor-pointer"
+            title="Minimizar panel"
+            aria-label="Minimizar panel del abecedario"
+          >
+            <ChevronLeft className="w-4 h-4" />
           </button>
         )}
       </div>

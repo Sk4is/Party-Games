@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Player } from '../types';
 import { Skull, Zap } from 'lucide-react';
@@ -16,15 +16,68 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
 
   // Calculate angle for each player in radial layout
   // 2 players: 180° (left) and 0° (right)
+  // 4 players: 45°, 135°, 225°, 315° (corners) so top (letters) and bottom (input) remain clear
   // 3+ players: start at -90° (top: 12 o'clock) proceeding clockwise
   const playerAngles = useMemo(() => {
-    const startAngle = totalPlayers === 2 ? 0 : -90;
+    const startAngle = totalPlayers === 2 ? 0 : totalPlayers === 4 ? 45 : -90;
     const step = 360 / totalPlayers;
     return players.map((_, idx) => startAngle + idx * step);
   }, [totalPlayers, players]);
 
-  // Active player angle for the central directional arrow
-  const activeAngle = playerAngles[activePlayerIndex] ?? -90;
+  // Elliptical radii for player card positions around the central bomb
+  const radiusX = totalPlayers <= 4 ? 300 : totalPlayers <= 6 ? 340 : 380;
+  const radiusY = totalPlayers <= 4 ? 175 : totalPlayers <= 6 ? 185 : 195;
+
+  // Active player card center position
+  const activeAngleDeg = playerAngles[activePlayerIndex] ?? 0;
+  const activeAngleRad = (activeAngleDeg * Math.PI) / 180;
+
+  const activeCardX = Math.round(Math.cos(activeAngleRad) * radiusX);
+  const activeCardY = Math.round(Math.sin(activeAngleRad) * radiusY);
+
+  // Direction and distance from bomb center (0, 0) to active player card (activeCardX, activeCardY)
+  const distToPlayer = Math.hypot(activeCardX, activeCardY);
+  const angleToPlayerRad = Math.atan2(activeCardY, activeCardX);
+  const angleToPlayerDeg = (angleToPlayerRad * 180) / Math.PI;
+
+  // Active player card inner border offset towards the bomb
+  // Card dimensions: ~184px width, ~92px height (half-width: 92px, half-height: 46px)
+  const cosA = Math.abs(Math.cos(angleToPlayerRad)) || 0.001;
+  const sinA = Math.abs(Math.sin(angleToPlayerRad)) || 0.001;
+  const cardBorderOffset = Math.min(92 / cosA, 46 / sinA);
+  const playerInnerEdgeDist = distToPlayer - cardBorderOffset;
+
+  // Bomb visual boundary radius (bomb body ~45px + fuse/spark margin = ~56px)
+  const bombOuterEdgeDist = 56;
+  const clearGap = Math.max(0, playerInnerEdgeDist - bombOuterEdgeDist);
+
+  // Arrow size: 72px long (half-length = 36px), 36px tall
+  // Position arrow ~58% of the distance into the clear gap towards the active player card
+  const arrowTargetDist = bombOuterEdgeDist + clearGap * 0.58;
+
+  // Enforce visible space: BOMB -> GAP -> ARROW -> GAP -> PLAYER CARD
+  const minSafeDist = bombOuterEdgeDist + 36 + 18; // At least 18px clear from bomb
+  const maxSafeDist = playerInnerEdgeDist - 36 - 18; // At least 18px clear from player card
+
+  const finalArrowDist = maxSafeDist >= minSafeDist
+    ? Math.max(minSafeDist, Math.min(maxSafeDist, arrowTargetDist))
+    : (bombOuterEdgeDist + playerInnerEdgeDist) / 2;
+
+  // Arrow center coordinates relative to arena center (50%, 50%)
+  const arrowX = Math.round(Math.cos(angleToPlayerRad) * finalArrowDist);
+  const arrowY = Math.round(Math.sin(angleToPlayerRad) * finalArrowDist);
+
+  // Smooth shortest-arc rotation angle to prevent awkward 360 spins
+  const lastAngleRef = useRef<number>(angleToPlayerDeg);
+  const smoothAngleDeg = useMemo(() => {
+    const prev = lastAngleRef.current;
+    let diff = (angleToPlayerDeg - prev) % 360;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    const next = prev + diff;
+    lastAngleRef.current = next;
+    return next;
+  }, [angleToPlayerDeg]);
 
   // Render lives as hearts
   const renderLives = (lives: number, isEliminated: boolean) => {
@@ -57,37 +110,95 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
 
   return (
     <div className="relative w-full h-full min-h-[380px] sm:min-h-[440px] md:min-h-[480px] lg:min-h-[500px] flex items-center justify-center">
-      {/* CENTRAL ROTATING ARROW POINTING TO ACTIVE PLAYER (Desktop & Tablet) */}
+      {/* ==================================================================== */}
+      {/* CENTRAL ROTATING ARROW POINTING TO ACTIVE PLAYER (Desktop & Tablet)  */}
+      {/* 2.5x larger, arcade-style, glowing, positioned BETWEEN bomb & card   */}
+      {/* ==================================================================== */}
       <div
-        className="absolute z-20 pointer-events-none transition-transform duration-300 ease-out hidden md:block"
+        className="absolute z-20 pointer-events-none hidden md:block transition-all duration-300 ease-out"
         style={{
-          transform: `rotate(${activeAngle}deg)`,
+          top: `calc(50% + ${arrowY}px)`,
+          left: `calc(50% + ${arrowX}px)`,
+          transform: `translate(-50%, -50%) rotate(${smoothAngleDeg}deg)`,
         }}
+        aria-hidden="true"
       >
-        <div className="flex items-center" style={{ width: '135px' }}>
-          {/* Starts outside the small bomb and points towards active player card */}
-          <div className="flex-1" />
-          <div className="relative flex items-center translate-x-2">
-            <div className="animate-pulse flex items-center">
-              <svg
-                width="32"
-                height="24"
-                viewBox="0 0 32 24"
-                fill="none"
-                className="drop-shadow-[0_0_12px_rgba(245,158,11,0.9)]"
-              >
-                <path
-                  d="M0 12 H18 M14 4 L26 12 L14 20"
-                  stroke="#fbbf24"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <polygon points="28,12 16,5 16,19" fill="#f59e0b" />
-              </svg>
-            </div>
-          </div>
-        </div>
+        <motion.div
+          className="flex items-center justify-center"
+          animate={{
+            x: [0, 8, 0],
+          }}
+          transition={{
+            duration: 0.85,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        >
+          <svg
+            width="72"
+            height="36"
+            viewBox="0 0 72 36"
+            fill="none"
+            className="overflow-visible filter drop-shadow-[0_0_16px_rgba(245,158,11,0.95)] drop-shadow-[0_0_24px_rgba(234,88,12,0.65)]"
+          >
+            <defs>
+              <linearGradient id="arcadeArrowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#ea580c" />
+                <stop offset="40%" stopColor="#f59e0b" />
+                <stop offset="85%" stopColor="#fde047" />
+                <stop offset="100%" stopColor="#ffffff" />
+              </linearGradient>
+              <linearGradient id="arcadeArrowBorder" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#9a3412" />
+                <stop offset="50%" stopColor="#fbbf24" />
+                <stop offset="100%" stopColor="#ffffff" />
+              </linearGradient>
+            </defs>
+
+            {/* Pulsing Outer Glow Aura */}
+            <path
+              d="M 6,12 L 36,12 L 36,4 L 68,18 L 36,32 L 36,24 L 6,24 L 13,18 Z"
+              fill="url(#arcadeArrowGrad)"
+              opacity="0.4"
+              className="animate-pulse"
+            />
+
+            {/* Main Chunky Arcade Arrow Body */}
+            <path
+              d="M 6,12 L 36,12 L 36,4 L 68,18 L 36,32 L 36,24 L 6,24 L 13,18 Z"
+              fill="url(#arcadeArrowGrad)"
+              stroke="url(#arcadeArrowBorder)"
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+
+            {/* Top Specular Highlight */}
+            <path
+              d="M 14,14 L 36,14 L 36,8 L 60,18 L 36,20 L 36,18 L 14,18 Z"
+              fill="#ffffff"
+              opacity="0.6"
+            />
+
+            {/* Inner Motion Energy Chevrons */}
+            <path
+              d="M 22,14 L 28,18 L 22,22"
+              stroke="#7c2d12"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.75"
+            />
+            <path
+              d="M 30,14 L 36,18 L 30,22"
+              stroke="#7c2d12"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.75"
+            />
+          </svg>
+        </motion.div>
       </div>
 
       {/* RADIAL DESKTOP & TABLET LAYOUT (md and up) - Spacious, Elliptical distribution */}
@@ -95,11 +206,6 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
         {players.map((player, index) => {
           const angleDeg = playerAngles[index];
           const angleRad = (angleDeg * Math.PI) / 180;
-
-          // Wide elliptical radius so cards are moved FAR away from the bomb
-          // Horizontal spread uses full desktop width while vertical spread maintains clearance
-          const radiusX = totalPlayers <= 4 ? 320 : totalPlayers <= 6 ? 360 : 410;
-          const radiusY = totalPlayers <= 4 ? 165 : totalPlayers <= 6 ? 180 : 200;
 
           const x = Math.round(Math.cos(angleRad) * radiusX);
           const y = Math.round(Math.sin(angleRad) * radiusY);
@@ -122,7 +228,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
                   player.isEliminated
                     ? 'burnt-effect border-2 border-amber-950/60 shadow-lg opacity-60'
                     : isActive
-                    ? 'bg-slate-900/95 border-2 border-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.5)] ring-2 ring-amber-400/40 scale-105'
+                    ? 'bg-slate-900/95 border-2 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.6)] ring-2 ring-amber-400/50 scale-105'
                     : 'bg-slate-900/85 border border-slate-700/80 shadow-md opacity-90 hover:opacity-100'
                 }`}
               >

@@ -56,10 +56,10 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
             <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
             <div>
               <h3 className="font-bold text-slate-100 text-base mb-1">
-                2. Tiempo secreto y aleatorio
+                2. Bomba Global Continua (60 a 180 segundos)
               </h3>
               <p>
-                ¡Cada ronda tiene una duración oculta de entre <span className="text-amber-300 font-semibold">20 y 40 segundos</span>! No hay reloj numérico en pantalla: debes intuir el peligro observando la mecha, las chispas y las expresiones de pánico de la bomba.
+                Hay <strong className="text-amber-300">UNA SOLA BOMBA</strong> por ronda con una duración secreta de entre <span className="text-amber-300 font-semibold">60 y 180 segundos (1 a 3 minutos)</span>. El temporizador y la mecha son <strong className="text-white">continuos y compartidos</strong> por todos los jugadores: acertar una palabra pasa la bomba al siguiente jugador, pero la mecha <strong className="text-amber-300">NO se reinicia ni se pausa</strong>. Sigue ardiendo sin tregua hasta que estalle en el turno de alguien.
               </p>
             </div>
           </div>
@@ -68,10 +68,10 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
             <Zap className="w-6 h-6 text-yellow-400 shrink-0 mt-0.5" />
             <div>
               <h3 className="font-bold text-slate-100 text-base mb-1">
-                3. Penalización por fallos (Velocidad x1,5)
+                3. Penalización por fallos (Mecha acelerada)
               </h3>
               <p>
-                Si dices una palabra que no contiene la secuencia, una palabra que no existe en el diccionario o una palabra ya dicha en la ronda, recibirás <span className="text-yellow-300 font-semibold">+1 Fallo</span> y tu turno continúa. ¡Tus siguientes turnos consumirán la mecha un <span className="text-yellow-300 font-semibold">x1,5 más rápido</span>!
+                Si cometes un fallo, conservas el turno con la misma combinación. Además, cada fallo acelera el consumo de la mecha (<span className="text-yellow-300 font-semibold">x1,5, x2,25...</span>) <strong className="text-white">únicamente mientras sea tu turno</strong>. Cuando el turno pasa a un jugador sin fallos, la mecha vuelve a su ritmo habitual, manteniendo exactamente su longitud consumida.
               </p>
             </div>
           </div>

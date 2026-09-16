@@ -16,12 +16,16 @@ import { HowToPlayModal } from './HowToPlayModal';
 import { AlphabetPanel } from './AlphabetPanel';
 import { AlphabetRewardModal } from './AlphabetRewardModal';
 import { calculateAlphabetProgress } from '../utils/alphabet';
-import { HelpCircle, ArrowLeft, AlertTriangle, CheckCircle2, Trophy } from 'lucide-react';
+import { HelpCircle, ArrowLeft, AlertTriangle, CheckCircle2, Trophy, ChevronRight } from 'lucide-react';
 
 interface LaBombaGameProps {
   initialPlayers: Player[];
   onBackToMenu: () => void;
 }
+
+// Random hidden bomb duration between 60 seconds (1 min) and 180 seconds (3 min)
+// Continuous non-integer random value within [60, 180] seconds
+const getRandomBombDurationMs = () => (60 + Math.random() * 120) * 1000;
 
 export const LaBombaGame: React.FC<LaBombaGameProps> = ({
   initialPlayers,
@@ -45,8 +49,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
   const [roundNumber, setRoundNumber] = useState<number>(1);
   const [usedWords, setUsedWords] = useState<UsedWord[]>([]);
 
-  // Turn transition state (fast 200–400ms transition during which next player's timer is paused)
-  const [isTransitioningTurn, setIsTransitioningTurn] = useState<boolean>(false);
+  // Accepted word banner (brief floating feedback; does not pause game)
   const [acceptedWordBanner, setAcceptedWordBanner] = useState<{
     word: string;
     player: string;
@@ -60,14 +63,28 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     gainedLife: boolean;
   } | null>(null);
   const [isMobileAlphabetOpen, setIsMobileAlphabetOpen] = useState<boolean>(false);
+  const [isDesktopAlphabetOpen, setIsDesktopAlphabetOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1340;
+    }
+    return true;
+  });
 
   // Phases: 'ROUND_INTRO' | 'PLAYING' | 'EXPLOSION' | 'GAME_OVER'
   const [phase, setPhase] = useState<'ROUND_INTRO' | 'PLAYING' | 'EXPLOSION' | 'GAME_OVER'>('ROUND_INTRO');
   const [affectedPlayer, setAffectedPlayer] = useState<Player | null>(null);
 
-  // Hidden random duration for current round (20s to 40s)
-  const [hiddenDurationMs, setHiddenDurationMs] = useState<number>(() => 20000 + Math.random() * 20000);
-  const [elapsedMs, setElapsedMs] = useState<number>(0);
+  // GLOBAL CONTINUOUS BOMB TIMER:
+  // Random hidden duration between 60s and 180s (1 to 3 minutes)
+  // Shared across ALL players. ACERTAR UNA PALABRA NO REINICIA LA MECHA.
+  const [bombDurationMs, setBombDurationMs] = useState<number>(getRandomBombDurationMs);
+  const [bombRemainingMs, setBombRemainingMs] = useState<number>(bombDurationMs);
+
+  const bombDurationRef = useRef<number>(bombDurationMs);
+  const bombRemainingRef = useRef<number>(bombDurationMs);
+  const lastUpdateTimestampRef = useRef<number>(Date.now());
+  const activeMultiplierRef = useRef<number>(1.0);
+
   const [turnStartTime, setTurnStartTime] = useState<number>(Date.now());
 
   // Input & validation state
@@ -94,6 +111,11 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
 
   const activePlayer = players[activePlayerIndex] || players[0];
 
+  // Keep activeMultiplierRef in sync with current player's multiplier
+  useEffect(() => {
+    activeMultiplierRef.current = activePlayer?.multiplier || 1.0;
+  }, [activePlayer?.multiplier]);
+
   // Helper to find next surviving player clockwise
   const getNextSurvivingIndex = useCallback((startIndex: number, currentPlayers: Player[]) => {
     const total = currentPlayers.length;
@@ -108,29 +130,33 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
 
   const alivePlayers = players.filter((p) => !p.isEliminated);
 
-  // Progress fraction of current round (0 to 1)
-  const progress = Math.min(1.0, elapsedMs / hiddenDurationMs);
+  // Progress fraction of the global continuous bomb (0 to 1.0)
+  // Represents the single continuous fuse lifecycle shared across all players
+  const progress = Math.min(1.0, Math.max(0, 1 - bombRemainingMs / bombDurationMs));
 
-  // Danger level derived from progress
+  // Danger level derived from continuous progress
   const dangerLevel: BombDangerLevel =
     progress >= 0.88
       ? 'CRITICAL'
-      : progress >= 0.72
+      : progress >= 0.70
       ? 'DANGER'
-      : progress >= 0.42
+      : progress >= 0.40
       ? 'MIDDLE'
       : 'EARLY';
 
-  // Sound ticking effect during active play
+  // Sound ticking effect during active play (speeds up with danger level and player mistake multiplier)
   const lastTickRef = useRef<number>(0);
   useEffect(() => {
-    if (phase !== 'PLAYING' || isTransitioningTurn) return;
+    if (phase !== 'PLAYING') return;
 
     const now = Date.now();
     let tickInterval = 1000;
-    if (dangerLevel === 'CRITICAL') tickInterval = 250;
+    if (dangerLevel === 'CRITICAL') tickInterval = 240;
     else if (dangerLevel === 'DANGER') tickInterval = 450;
     else if (dangerLevel === 'MIDDLE') tickInterval = 750;
+
+    const currentMultiplier = activePlayer?.multiplier || 1.0;
+    tickInterval = Math.max(100, Math.round(tickInterval / Math.min(currentMultiplier, 2.5)));
 
     if (now - lastTickRef.current > tickInterval) {
       lastTickRef.current = now;
@@ -140,31 +166,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
         audio.playSpark();
       }
     }
-  }, [phase, elapsedMs, dangerLevel, isTransitioningTurn]);
-
-  // Main bomb timer engine
-  // FAIRNESS RULE: When isTransitioningTurn is true, the timer is frozen so no time is consumed during animations
-  useEffect(() => {
-    if (phase !== 'PLAYING' || isTransitioningTurn) return;
-
-    const intervalMs = 50;
-    const currentMultiplier = activePlayer?.multiplier || 1.0;
-
-    const interval = setInterval(() => {
-      setElapsedMs((prev) => {
-        const next = prev + intervalMs * currentMultiplier;
-
-        if (next >= hiddenDurationMs) {
-          clearInterval(interval);
-          triggerExplosion();
-          return hiddenDurationMs;
-        }
-        return next;
-      });
-    }, intervalMs);
-
-    return () => clearInterval(interval);
-  }, [phase, isTransitioningTurn, hiddenDurationMs, activePlayer?.multiplier]);
+  }, [phase, bombRemainingMs, dangerLevel, activePlayer?.multiplier]);
 
   // Trigger explosion
   const triggerExplosion = useCallback(() => {
@@ -191,7 +193,40 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     setPhase('EXPLOSION');
   }, [activePlayerIndex, players]);
 
-  // When explosion modal finishes -> start new round with fresh sequence & clear words
+  // Main global continuous bomb timer engine:
+  // 1. ONE single timer running continuously across all player turns
+  // 2. High-precision delta-timestamp timing
+  // 3. Consumed bomb time = elapsedRealTime * activePlayerMultiplier
+  // 4. Valid answers NEVER reset or pause the timer
+  // 5. Changing turn NEVER resets or pauses the timer
+  // 6. Only resets AFTER the bomb explodes!
+  useEffect(() => {
+    if (phase !== 'PLAYING') return;
+
+    lastUpdateTimestampRef.current = Date.now();
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const elapsedRealTime = Math.max(0, now - lastUpdateTimestampRef.current);
+      lastUpdateTimestampRef.current = now;
+
+      const currentMultiplier = activeMultiplierRef.current;
+      const consumedBombTime = elapsedRealTime * currentMultiplier;
+
+      const updatedRemaining = Math.max(0, bombRemainingRef.current - consumedBombTime);
+      bombRemainingRef.current = updatedRemaining;
+      setBombRemainingMs(updatedRemaining);
+
+      if (updatedRemaining <= 0) {
+        clearInterval(interval);
+        triggerExplosion();
+      }
+    }, 25);
+
+    return () => clearInterval(interval);
+  }, [phase, triggerExplosion]);
+
+  // When explosion modal finishes -> start new round with fresh sequence, clear words, and BRAND NEW BOMB TIMER
   const handleExplosionDismiss = () => {
     const remainingAlive = players.filter((p) => !p.isEliminated);
 
@@ -227,19 +262,26 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     // RESET WORDS ON NEW ROUND:
     // 1. Clear used words list
     setUsedWords([]);
-    // 2. Clear displayed player words: under each player, their last valid word is cleared to '—'
+    // 2. Reset player mistakes and last valid words for the new round
     setPlayers((prev) =>
       prev.map((p) => ({
         ...p,
+        mistakes: 0,
+        multiplier: 1.0,
         lastValidWord: null,
       }))
     );
 
-    // Reset round bomb timer
-    const newDuration = 20000 + Math.random() * 20000;
-    setHiddenDurationMs(newDuration);
-    setElapsedMs(0);
-    setIsTransitioningTurn(false);
+    // RESET BOMB TIMER:
+    // Only after explosion does the bomb reset to a NEW random duration between 60s and 180s!
+    const newDuration = getRandomBombDurationMs();
+    setBombDurationMs(newDuration);
+    setBombRemainingMs(newDuration);
+    bombDurationRef.current = newDuration;
+    bombRemainingRef.current = newDuration;
+    lastUpdateTimestampRef.current = Date.now();
+    activeMultiplierRef.current = 1.0;
+
     setAcceptedWordBanner(null);
     setFeedback({ type: null, message: '' });
 
@@ -248,7 +290,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
 
   // Word submission handler
   const handleWordSubmit = async (word: string) => {
-    if (phase !== 'PLAYING' || isValidating || isTransitioningTurn) return;
+    if (phase !== 'PLAYING' || isValidating) return;
 
     setIsValidating(true);
 
@@ -268,7 +310,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     // DO NOT change the required letters
     // DO NOT change player
     // same player must try again with the SAME letters
-    // bomb continues burning!
+    // THE GLOBAL BOMB CONTINUES BURNING at the accelerated multiplier!
     if (!validation.valid) {
       audio.playAnswerRejected();
 
@@ -276,6 +318,9 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
       const newMultiplier = Math.pow(1.5, newMistakes);
 
       setTotalMistakes((prev) => prev + 1);
+
+      // Accelerate active multiplier immediately on active player's turn
+      activeMultiplierRef.current = newMultiplier;
 
       setPlayers((prev) =>
         prev.map((p, idx) => {
@@ -397,13 +442,13 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
       canonicalWord: acceptedCanonical,
     });
 
-    // CRITICAL TRANSITION LOGIC:
-    // 1. Freeze timer immediately so incoming player loses 0ms of their bomb time
-    setIsTransitioningTurn(true);
-
-    // 2. Identify the next surviving player
+    // PASS TURN IMMEDIATELY — THE GLOBAL BOMB CONTINUES BURNING WITHOUT PAUSE!
+    // 1. Identify the next surviving player
     const nextPlayerIndex = getNextSurvivingIndex(activePlayerIndex, players);
     const nextPlayer = players[nextPlayerIndex];
+
+    // 2. Adjust active multiplier to the next player's multiplier immediately
+    activeMultiplierRef.current = nextPlayer.multiplier || 1.0;
 
     // 3. Generate a brand new letter sequence for the NEXT PLAYER
     const nextSeq = getNextSequence({
@@ -421,20 +466,17 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
       ],
     }));
 
-    // 4. Update the sequence and active player immediately to trigger the visual animations
-    // The top letters slide out/in (220ms) and the arrow rotates simultaneously (300ms)
+    // 4. Update the sequence and active player immediately
+    // Next player can type right away; bomb timer NEVER pauses!
     setCurrentSequence(nextSeq);
     setActivePlayerIndex(nextPlayerIndex);
+    setTurnStartTime(Date.now());
     audio.playTurnChange();
 
-    // 5. Very fast transition window: 280ms (strictly within 200–400 ms)
-    // FAIRNESS RULE:
-    // Sequence changes to ADO -> arrow reaches next player -> input receives focus -> timer begins!
+    // Clear feedback after brief moment
     setTimeout(() => {
-      setIsTransitioningTurn(false);
-      setTurnStartTime(Date.now());
       setFeedback({ type: null, message: '' });
-    }, 280);
+    }, 800);
 
     // Hide accepted word banner after brief display
     setTimeout(() => {
@@ -474,10 +516,15 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     setTotalExplosions(0);
     setFastestAnswer(null);
 
-    const newDuration = 20000 + Math.random() * 20000;
-    setHiddenDurationMs(newDuration);
-    setElapsedMs(0);
-    setIsTransitioningTurn(false);
+    // Generate brand new bomb duration 60-180s
+    const newDuration = getRandomBombDurationMs();
+    setBombDurationMs(newDuration);
+    setBombRemainingMs(newDuration);
+    bombDurationRef.current = newDuration;
+    bombRemainingRef.current = newDuration;
+    lastUpdateTimestampRef.current = Date.now();
+    activeMultiplierRef.current = 1.0;
+
     setAcceptedWordBanner(null);
     setTurnStartTime(Date.now());
     setFeedback({ type: null, message: '' });
@@ -577,9 +624,9 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
       {/* 1. DESKTOP / TABLET LAYOUT (>= 768px: hidden md:flex)                */}
       {/* Spacious radial layout with players positioned around the central bomb*/}
       {/* ==================================================================== */}
-      <div className="hidden md:flex flex-col flex-1 w-full max-w-7xl mx-auto">
+      <div className="hidden md:flex flex-col flex-1 w-full min-h-screen relative z-10 overflow-x-hidden">
         {/* Desktop Top Header Bar */}
-        <header className="relative z-30 flex items-center justify-between w-full pb-2 border-b border-slate-800/60">
+        <header className="relative z-30 flex items-center justify-between w-full max-w-7xl mx-auto px-4 md:px-6 pb-2 border-b border-slate-800/60">
           <button
             id="pause-menu-button"
             type="button"
@@ -591,14 +638,17 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
           </button>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Tablet-only alphabet button (screens between 768px and 1024px) */}
+            {/* Desktop alphabet trigger button (toggles independent left sidebar) */}
             <button
               type="button"
-              onClick={() => setIsMobileAlphabetOpen(true)}
-              className="lg:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all cursor-pointer"
+              onClick={() => setIsDesktopAlphabetOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Mostrar u ocultar Reto del Abecedario"
             >
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
-              <span>Abecedario ({activePlayer.name}: {(activePlayer.alphabetProgress || []).length}/27)</span>
+              <span>
+                Abecedario ({activePlayer.name}: {(activePlayer.alphabetProgress || []).length}/27)
+              </span>
             </button>
 
             <span className="text-xs font-black px-3 py-1 rounded-full bg-slate-800/90 text-amber-400 border border-slate-700 shadow-sm">
@@ -617,83 +667,112 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
           </div>
         </header>
 
-        {/* Desktop Required Letters Section */}
-        <section
-          aria-label="Letras obligatorias"
-          className="relative z-30 flex flex-col items-center justify-center mt-5 mb-3 select-none"
-        >
-          <div className="px-14 py-5 md:px-20 md:py-6 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-[0_0_35px_rgba(245,158,11,0.25)] flex flex-col items-center backdrop-blur-md">
-            <span className="text-sm md:text-base font-black tracking-[0.25em] text-amber-300 uppercase mb-0.5">
-              PALABRAS CON
-            </span>
-
-            <div className="relative overflow-hidden flex items-center justify-center min-h-[92px] md:min-h-[110px] min-w-[260px] md:min-w-[320px]">
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.div
-                  key={currentSequence.sequence}
-                  initial={{ y: 35, opacity: 0, scale: 0.85 }}
-                  animate={{ y: 0, opacity: 1, scale: 1 }}
-                  exit={{ y: -35, opacity: 0, scale: 0.85 }}
-                  transition={{ duration: 0.26, ease: 'easeOut' }}
-                  className="text-7xl md:text-8xl font-black font-display tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-500 drop-shadow-[0_0_24px_rgba(245,158,11,0.65)]"
-                >
-                  {currentSequence.sequence}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </div>
-        </section>
-
-        {/* Desktop Layout Body: Left-Side Alphabet Panel + Center Arena */}
-        <div className="relative flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-center w-full my-2 gap-6 xl:gap-8">
-          {/* Left-Side Alphabet Panel (Hidden below lg, clean sticky panel on lg & xl) */}
-          <aside className="hidden lg:flex flex-col shrink-0 self-center lg:self-start sticky top-4">
+        {/* ================================================================== */}
+        {/* 1. INDEPENDENT LEFT SIDEBAR: RETO DEL ABECEDARIO                    */}
+        {/* Sits close to the left edge of the viewport (left: 16-24px).        */}
+        {/* Does NOT participate in the centering calculation of the main game. */}
+        {/* ================================================================== */}
+        {isDesktopAlphabetOpen ? (
+          <aside
+            aria-label="Panel del Abecedario"
+            className="fixed left-4 xl:left-5 2xl:left-6 top-16 z-30 flex flex-col transition-all duration-300 ease-out"
+          >
             <AlphabetPanel
               players={players}
               activePlayerIndex={activePlayerIndex}
               recentlyUnlockedLetters={recentlyUnlockedLetters}
+              isCollapsible={true}
+              onToggleCollapse={() => setIsDesktopAlphabetOpen(false)}
             />
           </aside>
+        ) : (
+          /* Sleek docked button on the left edge when sidebar is collapsed */
+          <button
+            type="button"
+            onClick={() => setIsDesktopAlphabetOpen(true)}
+            className="fixed left-3 xl:left-4 top-20 z-30 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/95 border border-amber-500/50 text-amber-300 font-display font-bold text-xs shadow-2xl backdrop-blur-md hover:border-amber-400 hover:bg-slate-800 transition-all cursor-pointer group select-none"
+            title="Abrir Reto del Abecedario"
+            aria-label="Abrir Reto del Abecedario"
+          >
+            <Trophy className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+            <span className="hidden xl:inline">Abecedario</span>
+            <span className="bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-md text-[10px] font-black">
+              {(activePlayer?.alphabetProgress || []).length}/27
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
+          </button>
+        )}
 
-          {/* Central Arena: Radial Players + Central Bomb */}
-          <main className="relative flex-1 flex flex-col items-center justify-center w-full max-w-3xl">
-            <div className="relative w-full flex items-center justify-center">
-              <PlayerRing
-                players={players}
-                activePlayerIndex={activePlayerIndex}
-              />
+        {/* ================================================================== */}
+        {/* 2. TRUE SCREEN-CENTRED MAIN GAME CONTAINER                          */}
+        {/* Center of this container corresponds to exactly 50vw of viewport   */}
+        {/* The bomb and player ring visually sit in horizontal centre of screen*/}
+        {/* ================================================================== */}
+        <main className="relative flex-1 flex flex-col items-center justify-between w-full max-w-4xl lg:max-w-5xl mx-auto px-4 my-auto z-20">
+          {/* Desktop Required Letters Section - Centred on Screen */}
+          <section
+            aria-label="Letras obligatorias"
+            className="relative z-30 flex flex-col items-center justify-center mt-3 mb-2 select-none"
+          >
+            <div className="px-12 py-4 md:px-18 md:py-5 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-[0_0_35px_rgba(245,158,11,0.25)] flex flex-col items-center backdrop-blur-md">
+              <span className="text-xs md:text-sm font-black tracking-[0.25em] text-amber-300 uppercase mb-0.5">
+                PALABRAS CON
+              </span>
 
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
-                <BombVisual
-                  progress={progress}
-                  dangerLevel={dangerLevel}
-                  speedMultiplier={activePlayer?.multiplier || 1.0}
-                />
+              <div className="relative overflow-hidden flex items-center justify-center min-h-[85px] md:min-h-[100px] min-w-[240px] md:min-w-[300px]">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.div
+                    key={currentSequence.sequence}
+                    initial={{ y: 35, opacity: 0, scale: 0.85 }}
+                    animate={{ y: 0, opacity: 1, scale: 1 }}
+                    exit={{ y: -35, opacity: 0, scale: 0.85 }}
+                    transition={{ duration: 0.26, ease: 'easeOut' }}
+                    className="text-7xl md:text-8xl font-black font-display tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-500 drop-shadow-[0_0_24px_rgba(245,158,11,0.65)]"
+                  >
+                    {currentSequence.sequence}
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
+          </section>
 
-            {/* Desktop Turn Indicator */}
-            <div className="relative z-30 flex items-center justify-center mt-4 mb-2 select-none">
-              <div className="px-6 py-2 rounded-full bg-slate-900/95 border-2 border-amber-400 text-amber-300 font-display font-black text-base tracking-wider shadow-xl shadow-amber-500/20 flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-                <span>TURNO DE {activePlayer.name.toUpperCase()}</span>
-              </div>
-            </div>
+          {/* Central Arena: Radial Players + Central Bomb (Centered at 50vw) */}
+          <div className="relative w-full flex items-center justify-center my-1">
+            <PlayerRing
+              players={players}
+              activePlayerIndex={activePlayerIndex}
+            />
 
-            {/* Desktop Word Input */}
-            <div className="w-full mt-1 mb-2">
-              <WordInput
-                onWordSubmit={handleWordSubmit}
-                disabled={phase !== 'PLAYING' || isTransitioningTurn}
-                isValidating={isValidating}
-                activePlayerName={activePlayer?.name || ''}
-                requiredSequence={currentSequence.sequence}
-                feedback={feedback}
-                usedWords={usedWords}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+              <BombVisual
+                progress={progress}
+                dangerLevel={dangerLevel}
+                speedMultiplier={activePlayer?.multiplier || 1.0}
               />
             </div>
-          </main>
-        </div>
+          </div>
+
+          {/* Desktop Turn Indicator - Centred on Screen */}
+          <div className="relative z-30 flex items-center justify-center mt-2 mb-2 select-none">
+            <div className="px-6 py-1.5 rounded-full bg-slate-900/95 border-2 border-amber-400 text-amber-300 font-display font-black text-sm md:text-base tracking-wider shadow-xl shadow-amber-500/20 flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+              <span>TURNO DE {activePlayer.name.toUpperCase()}</span>
+            </div>
+          </div>
+
+          {/* Desktop Word Input - Centred on Screen */}
+          <div className="w-full max-w-2xl mt-1 mb-2">
+            <WordInput
+              onWordSubmit={handleWordSubmit}
+              disabled={phase !== 'PLAYING'}
+              isValidating={isValidating}
+              activePlayerName={activePlayer?.name || ''}
+              requiredSequence={currentSequence.sequence}
+              feedback={feedback}
+              usedWords={usedWords}
+            />
+          </div>
+        </main>
       </div>
 
       {/* ==================================================================== */}
@@ -818,7 +897,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
         >
           <WordInput
             onWordSubmit={handleWordSubmit}
-            disabled={phase !== 'PLAYING' || isTransitioningTurn}
+            disabled={phase !== 'PLAYING'}
             isValidating={isValidating}
             activePlayerName={activePlayer?.name || ''}
             requiredSequence={currentSequence.sequence}
@@ -844,8 +923,9 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
           roundNumber={roundNumber}
           startingPlayerName={activePlayer?.name}
           onFinish={() => {
-            setPhase('PLAYING');
+            lastUpdateTimestampRef.current = Date.now();
             setTurnStartTime(Date.now());
+            setPhase('PLAYING');
           }}
         />
       )}
