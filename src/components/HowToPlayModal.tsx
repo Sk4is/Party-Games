@@ -87,6 +87,18 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
               </p>
             </div>
           </div>
+
+          <div className="p-4 rounded-2xl bg-slate-800/60 border border-amber-500/30 flex gap-3.5">
+            <span className="text-xl shrink-0 mt-0.5">🔤</span>
+            <div>
+              <h3 className="font-bold text-amber-300 text-base mb-1">
+                5. Reto del Abecedario (+1 Vida)
+              </h3>
+              <p>
+                Cada jugador tiene su propio progreso del abecedario español (A-Z + Ñ). Con cada palabra válida que uses, tacharás letras nuevas. Si completas las <strong className="text-amber-300">27 letras</strong>, ¡recuperas <strong className="text-emerald-400">+1 vida extra</strong> (máx. 3 vidas)! Tu progreso se mantiene entre rondas y explosiones.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="mt-6 pt-4 border-t border-slate-800 flex justify-end">

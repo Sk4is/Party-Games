@@ -55,7 +55,7 @@ export interface GetNextSequenceOptions {
 }
 
 /**
- * Generates the next letter sequence according to difficulty weights (40% Fácil, 45% Normal, 15% Difícil),
+ * Generates the next letter sequence according to difficulty weights (45% Fácil, 40% Normal, 15% Difícil),
  * ensuring high replayability across thousands of Spanish word combinations and avoiding consecutive similarity.
  */
 export function getNextSequence(options: GetNextSequenceOptions = {}): LetterSequence {
@@ -66,11 +66,11 @@ export function getNextSequence(options: GetNextSequenceOptions = {}): LetterSeq
     preferredDifficulty,
   } = options;
 
-  // 1. Determine target difficulty according to weighted distribution
+  // 1. Determine target difficulty according to weighted distribution (45% EASY, 40% NORMAL, 15% HARD)
   let targetDifficulty = preferredDifficulty;
   if (!targetDifficulty) {
     const roll = Math.random();
-    if (roll < 0.40) {
+    if (roll < 0.45) {
       targetDifficulty = 'EASY';
     } else if (roll < 0.85) {
       targetDifficulty = 'NORMAL';

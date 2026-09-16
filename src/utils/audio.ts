@@ -356,6 +356,72 @@ class AudioManager {
       offset += n.d * 0.9;
     });
   }
+
+  // Audio chime when unlocking new alphabet letters
+  public playAlphabetLetterUnlock() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    [659.25, 880.0, 1174.66].forEach((freq, i) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + i * 0.05;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0.12, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.12);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(start);
+      osc.stop(start + 0.12);
+    });
+  }
+
+  // Grand reward fanfare when completing all 27 alphabet letters (+1 Vida!)
+  public playAlphabetComplete() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const notes = [
+      { f: 523.25, d: 0.1 }, // C5
+      { f: 659.25, d: 0.1 }, // E5
+      { f: 783.99, d: 0.1 }, // G5
+      { f: 987.77, d: 0.12 }, // B5
+      { f: 1046.50, d: 0.35 }, // C6
+      { f: 1318.51, d: 0.5 }, // E6
+    ];
+
+    let offset = 0;
+    notes.forEach((n) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + offset;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(n.f, start);
+
+      gain.gain.setValueAtTime(0.25, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + n.d);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(start);
+      osc.stop(start + n.d);
+
+      offset += n.d * 0.75;
+    });
+  }
 }
 
 export const audio = new AudioManager();

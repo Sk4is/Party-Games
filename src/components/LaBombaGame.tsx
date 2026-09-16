@@ -13,7 +13,10 @@ import { ExplosionOverlay } from './ExplosionOverlay';
 import { GameOverView } from './GameOverView';
 import { SoundToggle } from './SoundToggle';
 import { HowToPlayModal } from './HowToPlayModal';
-import { HelpCircle, ArrowLeft, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlphabetPanel } from './AlphabetPanel';
+import { AlphabetRewardModal } from './AlphabetRewardModal';
+import { calculateAlphabetProgress } from '../utils/alphabet';
+import { HelpCircle, ArrowLeft, AlertTriangle, CheckCircle2, Trophy } from 'lucide-react';
 
 interface LaBombaGameProps {
   initialPlayers: Player[];
@@ -47,7 +50,16 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
   const [acceptedWordBanner, setAcceptedWordBanner] = useState<{
     word: string;
     player: string;
+    bonusLetters?: number;
   } | null>(null);
+
+  // Reto del Abecedario states
+  const [recentlyUnlockedLetters, setRecentlyUnlockedLetters] = useState<string[]>([]);
+  const [alphabetRewardCelebration, setAlphabetRewardCelebration] = useState<{
+    player: Player;
+    gainedLife: boolean;
+  } | null>(null);
+  const [isMobileAlphabetOpen, setIsMobileAlphabetOpen] = useState<boolean>(false);
 
   // Phases: 'ROUND_INTRO' | 'PLAYING' | 'EXPLOSION' | 'GAME_OVER'
   const [phase, setPhase] = useState<'ROUND_INTRO' | 'PLAYING' | 'EXPLOSION' | 'GAME_OVER'>('ROUND_INTRO');
@@ -301,7 +313,46 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
       });
     }
 
-    // Update player's valid words count AND their displayed last valid word
+    // RETO DEL ABECEDARIO: Update progress for the active player
+    const alphabetUpdate = calculateAlphabetProgress(
+      activePlayer.alphabetProgress || [],
+      acceptedCanonical
+    );
+
+    let updatedLives = activePlayer.lives;
+    let gainedLifeFromAlphabet = false;
+    let finalAlphabetProgress = alphabetUpdate.updatedProgress;
+
+    if (alphabetUpdate.newLetters.length > 0) {
+      setRecentlyUnlockedLetters(alphabetUpdate.newLetters);
+      setTimeout(() => setRecentlyUnlockedLetters([]), 3500);
+    }
+
+    if (alphabetUpdate.isCompleted) {
+      // Completed all 27 letters! +1 Vida (max 3)
+      if (updatedLives < 3) {
+        updatedLives += 1;
+        gainedLifeFromAlphabet = true;
+      }
+      audio.playAlphabetComplete();
+
+      // Reset alphabet progress for this player so they can challenge it again
+      finalAlphabetProgress = [];
+
+      const celebratedPlayer: Player = {
+        ...activePlayer,
+        lives: updatedLives,
+        alphabetProgress: [],
+      };
+      setAlphabetRewardCelebration({
+        player: celebratedPlayer,
+        gainedLife: gainedLifeFromAlphabet,
+      });
+    } else if (alphabetUpdate.newLetters.length > 0) {
+      audio.playAlphabetLetterUnlock();
+    }
+
+    // Update player's valid words count, last valid word, lives, and alphabet progress
     setPlayers((prev) =>
       prev.map((p, idx) => {
         if (idx !== activePlayerIndex) return p;
@@ -309,9 +360,11 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
         const newBestMs = Math.round(answerTimeSeconds * 1000);
         return {
           ...p,
+          lives: updatedLives,
           validWordsCount: p.validWordsCount + 1,
           fastestAnswerTimeMs: currentBest ? Math.min(currentBest, newBestMs) : newBestMs,
           lastValidWord: acceptedCanonical.toLowerCase(),
+          alphabetProgress: finalAlphabetProgress,
         };
       })
     );
@@ -327,14 +380,20 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     };
     setUsedWords((prev) => [newUsedWord, ...prev]);
 
-    // Show brief accepted word feedback
+    // Show brief accepted word feedback with bonus letters count if any
     setAcceptedWordBanner({
       word: acceptedCanonical.toUpperCase(),
       player: activePlayer.name,
+      bonusLetters: alphabetUpdate.newLetters.length,
     });
     setFeedback({
       type: 'success',
-      message: '¡Palabra aceptada!',
+      message:
+        alphabetUpdate.newLetters.length > 0
+          ? `¡Palabra aceptada! (+${alphabetUpdate.newLetters.length} ${
+              alphabetUpdate.newLetters.length === 1 ? 'letra nueva' : 'letras nuevas'
+            })`
+          : '¡Palabra aceptada!',
       canonicalWord: acceptedCanonical,
     });
 
@@ -395,10 +454,14 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
       validWordsCount: 0,
       fastestAnswerTimeMs: null,
       lastValidWord: null,
+      alphabetProgress: [],
     }));
 
     setPlayers(resetPlayers);
     setActivePlayerIndex(0);
+    setRecentlyUnlockedLetters([]);
+    setAlphabetRewardCelebration(null);
+    setIsMobileAlphabetOpen(false);
 
     const initialSeq = getRandomSequence();
     setCurrentSequence(initialSeq);
@@ -470,6 +533,11 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
             <CheckCircle2 className="w-4 h-4 text-slate-950 shrink-0" />
             <span>✓ {acceptedWordBanner.word}</span>
             <span className="opacity-75 font-bold">({acceptedWordBanner.player})</span>
+            {acceptedWordBanner.bonusLetters !== undefined && acceptedWordBanner.bonusLetters > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full bg-emerald-950/40 text-emerald-100 text-[11px] font-extrabold border border-emerald-300/40">
+                +{acceptedWordBanner.bonusLetters} {acceptedWordBanner.bonusLetters === 1 ? 'letra' : 'letras'}
+              </span>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -509,7 +577,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
       {/* 1. DESKTOP / TABLET LAYOUT (>= 768px: hidden md:flex)                */}
       {/* Spacious radial layout with players positioned around the central bomb*/}
       {/* ==================================================================== */}
-      <div className="hidden md:flex flex-col flex-1 w-full max-w-6xl mx-auto">
+      <div className="hidden md:flex flex-col flex-1 w-full max-w-7xl mx-auto">
         {/* Desktop Top Header Bar */}
         <header className="relative z-30 flex items-center justify-between w-full pb-2 border-b border-slate-800/60">
           <button
@@ -523,6 +591,16 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
           </button>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Tablet-only alphabet button (screens between 768px and 1024px) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileAlphabetOpen(true)}
+              className="lg:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all cursor-pointer"
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <span>Abecedario ({activePlayer.name}: {(activePlayer.alphabetProgress || []).length}/27)</span>
+            </button>
+
             <span className="text-xs font-black px-3 py-1 rounded-full bg-slate-800/90 text-amber-400 border border-slate-700 shadow-sm">
               Ronda #{roundNumber}
             </span>
@@ -530,7 +608,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
               id="game-how-to-play-button"
               type="button"
               onClick={() => setShowHowToPlay(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-md active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-md active:scale-95"
             >
               <HelpCircle className="w-4 h-4 text-amber-400" />
               <span>Reglas</span>
@@ -542,7 +620,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
         {/* Desktop Required Letters Section */}
         <section
           aria-label="Letras obligatorias"
-          className="relative z-30 flex flex-col items-center justify-center mt-5 mb-4 select-none"
+          className="relative z-30 flex flex-col items-center justify-center mt-5 mb-3 select-none"
         >
           <div className="px-14 py-5 md:px-20 md:py-6 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-[0_0_35px_rgba(245,158,11,0.25)] flex flex-col items-center backdrop-blur-md">
             <span className="text-sm md:text-base font-black tracking-[0.25em] text-amber-300 uppercase mb-0.5">
@@ -566,44 +644,56 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
           </div>
         </section>
 
-        {/* Desktop Central Arena: Radial Players + Central Bomb */}
-        <main className="relative flex-1 flex flex-col items-center justify-center w-full my-3">
-          <div className="relative w-full flex items-center justify-center">
-            <PlayerRing
+        {/* Desktop Layout Body: Left-Side Alphabet Panel + Center Arena */}
+        <div className="relative flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-center w-full my-2 gap-6 xl:gap-8">
+          {/* Left-Side Alphabet Panel (Hidden below lg, clean sticky panel on lg & xl) */}
+          <aside className="hidden lg:flex flex-col shrink-0 self-center lg:self-start sticky top-4">
+            <AlphabetPanel
               players={players}
               activePlayerIndex={activePlayerIndex}
+              recentlyUnlockedLetters={recentlyUnlockedLetters}
             />
+          </aside>
 
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
-              <BombVisual
-                progress={progress}
-                dangerLevel={dangerLevel}
-                speedMultiplier={activePlayer?.multiplier || 1.0}
+          {/* Central Arena: Radial Players + Central Bomb */}
+          <main className="relative flex-1 flex flex-col items-center justify-center w-full max-w-3xl">
+            <div className="relative w-full flex items-center justify-center">
+              <PlayerRing
+                players={players}
+                activePlayerIndex={activePlayerIndex}
+              />
+
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+                <BombVisual
+                  progress={progress}
+                  dangerLevel={dangerLevel}
+                  speedMultiplier={activePlayer?.multiplier || 1.0}
+                />
+              </div>
+            </div>
+
+            {/* Desktop Turn Indicator */}
+            <div className="relative z-30 flex items-center justify-center mt-4 mb-2 select-none">
+              <div className="px-6 py-2 rounded-full bg-slate-900/95 border-2 border-amber-400 text-amber-300 font-display font-black text-base tracking-wider shadow-xl shadow-amber-500/20 flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                <span>TURNO DE {activePlayer.name.toUpperCase()}</span>
+              </div>
+            </div>
+
+            {/* Desktop Word Input */}
+            <div className="w-full mt-1 mb-2">
+              <WordInput
+                onWordSubmit={handleWordSubmit}
+                disabled={phase !== 'PLAYING' || isTransitioningTurn}
+                isValidating={isValidating}
+                activePlayerName={activePlayer?.name || ''}
+                requiredSequence={currentSequence.sequence}
+                feedback={feedback}
+                usedWords={usedWords}
               />
             </div>
-          </div>
-
-          {/* Desktop Turn Indicator */}
-          <div className="relative z-30 flex items-center justify-center mt-4 mb-2 select-none">
-            <div className="px-6 py-2 rounded-full bg-slate-900/95 border-2 border-amber-400 text-amber-300 font-display font-black text-base tracking-wider shadow-xl shadow-amber-500/20 flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-              <span>TURNO DE {activePlayer.name.toUpperCase()}</span>
-            </div>
-          </div>
-
-          {/* Desktop Word Input */}
-          <div className="w-full mt-1 mb-2">
-            <WordInput
-              onWordSubmit={handleWordSubmit}
-              disabled={phase !== 'PLAYING' || isTransitioningTurn}
-              isValidating={isValidating}
-              activePlayerName={activePlayer?.name || ''}
-              requiredSequence={currentSequence.sequence}
-              feedback={feedback}
-              usedWords={usedWords}
-            />
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
 
       {/* ==================================================================== */}
@@ -646,6 +736,28 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
             <SoundToggle compact />
           </div>
         </header>
+
+        {/* Reto del Abecedario Mobile Collapsible Trigger (compact & non-intrusive) */}
+        <div className="w-full px-1 mt-2 mb-1">
+          <button
+            type="button"
+            onClick={() => setIsMobileAlphabetOpen(true)}
+            className="w-full flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-slate-900/90 border border-amber-500/30 hover:border-amber-500/60 text-xs text-slate-300 transition-all cursor-pointer shadow-xs active:scale-98"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-amber-400 font-black flex items-center gap-1">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Abecedario</span>
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {activePlayer.avatar} {activePlayer.name}: <strong className="text-amber-300">{(activePlayer.alphabetProgress || []).length}/27</strong>
+              </span>
+            </div>
+            <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+              Ver letras ▼
+            </span>
+          </button>
+        </div>
 
         {/* 2. Required Letters: HUGE, centered, 20-28px margins */}
         <section
@@ -752,6 +864,30 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
         isOpen={showHowToPlay}
         onClose={() => setShowHowToPlay(false)}
       />
+
+      {/* Mobile / Tablet Alphabet Modal Drawer */}
+      {isMobileAlphabetOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-sm">
+            <AlphabetPanel
+              players={players}
+              activePlayerIndex={activePlayerIndex}
+              recentlyUnlockedLetters={recentlyUnlockedLetters}
+              isMobileDrawer={true}
+              onCloseMobileDrawer={() => setIsMobileAlphabetOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Alphabet Reward Modal when completing all 27 letters */}
+      {alphabetRewardCelebration && (
+        <AlphabetRewardModal
+          player={alphabetRewardCelebration.player}
+          gainedLife={alphabetRewardCelebration.gainedLife}
+          onDismiss={() => setAlphabetRewardCelebration(null)}
+        />
+      )}
     </div>
   );
 };

@@ -102,6 +102,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
         bombsReceived: 0,
         validWordsCount: 0,
         fastestAnswerTimeMs: null,
+        alphabetProgress: [],
       };
     });
 
