@@ -127,42 +127,75 @@
   }
 }
 
-@keyframes ambient-drift-2 {
-  0%, 100% {
-    transform: translate(0px, 0px) scale(1);
+/* Pinturillo Interactive UI Animations */
+@keyframes letter-pop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+    filter: drop-shadow(0 0 8px rgba(255, 201, 40, 0.9));
   }
-  50% {
-    transform: translate(-35px, -20px) scale(1.06);
+  55% {
+    transform: scale(1.22);
+    filter: drop-shadow(0 0 12px rgba(255, 201, 40, 1));
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 0px transparent);
   }
 }
 
-@keyframes ambient-drift-3 {
-  0%, 100% {
-    transform: translate(0px, 0px) scale(1);
+@keyframes modal-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
   }
-  50% {
-    transform: translate(25px, -30px) scale(1.05);
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
-.animate-ambient-drift-1 {
-  animation: ambient-drift-1 32s ease-in-out infinite;
-}
-
-.animate-ambient-drift-2 {
-  animation: ambient-drift-2 38s ease-in-out infinite;
-}
-
-.animate-ambient-drift-3 {
-  animation: ambient-drift-3 28s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-ambient-drift-1,
-  .animate-ambient-drift-2,
-  .animate-ambient-drift-3 {
-    animation: none !important;
+@keyframes canvas-sweep {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+    opacity: 0.85;
   }
+  100% {
+    transform: translateX(200%) skewX(-15deg);
+    opacity: 0;
+  }
+}
+
+@keyframes guess-sparkle {
+  0% {
+    transform: scale(0.7) translateY(4px);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.1) translateY(-2px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-letter-pop {
+  animation: letter-pop 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-pop-in {
+  animation: modal-pop-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-canvas-sweep {
+  animation: canvas-sweep 0.42s ease-out forwards;
+}
+
+.animate-guess-sparkle {
+  animation: guess-sparkle 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 

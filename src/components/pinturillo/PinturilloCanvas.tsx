@@ -8,6 +8,9 @@ interface PinturilloCanvasProps {
   currentTool: DrawingTool;
   currentColor: string;
   currentSize: number;
+  isClearConfirmOpen?: boolean;
+  onConfirmClear?: () => void;
+  onCancelClear?: () => void;
   onStrokeStart?: (stroke: DrawStroke) => void;
   onStrokeChunk?: (strokeId: string, points: NormalizedPoint[]) => void;
   onStrokeEnd?: (strokeId: string) => void;
@@ -368,6 +371,9 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
   currentTool,
   currentColor,
   currentSize,
+  isClearConfirmOpen = false,
+  onConfirmClear,
+  onCancelClear,
   onStrokeStart,
   onStrokeChunk,
   onStrokeEnd,
@@ -384,6 +390,29 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
   // Custom cursor position state
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
   const [isInsideCanvas, setIsInsideCanvas] = useState(false);
+  const [isSweeping, setIsSweeping] = useState(false);
+
+  // Handle ESC key to dismiss clear confirmation modal
+  useEffect(() => {
+    if (!isClearConfirmOpen || !onCancelClear) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancelClear();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isClearConfirmOpen, onCancelClear]);
+
+  // Execute confirm clear with brief white wipe animation
+  const handleExecuteConfirm = () => {
+    setIsSweeping(true);
+    setTimeout(() => setIsSweeping(false), 420);
+    if (onConfirmClear) {
+      onConfirmClear();
+    }
+  };
 
   // Redraw complete canvas from strokes history
   const redrawAllStrokes = useCallback((canvas: HTMLCanvasElement) => {
@@ -470,7 +499,7 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
 
   // Pointer Down (Mouse, Touch, Stylus)
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawer) return;
+    if (!isDrawer || isClearConfirmOpen) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -539,6 +568,11 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
 
   // Pointer Move (Mouse, Touch, Stylus)
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isClearConfirmOpen) {
+      setCursorPos(null);
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -660,7 +694,7 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
 
   // Pointer Up / Cancel
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawer || !activeStrokeRef.current) return;
+    if (!isDrawer || isClearConfirmOpen || !activeStrokeRef.current) return;
 
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
@@ -684,7 +718,7 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
 
   // Render custom floating cursor for drawing tools
   const renderCustomCursor = () => {
-    if (!isDrawer || !isInsideCanvas || !cursorPos) return null;
+    if (!isDrawer || !isInsideCanvas || !cursorPos || isClearConfirmOpen) return null;
 
     const canvas = canvasRef.current;
     let scaledSize = canvas ? Math.max(2, currentSize * (canvas.width / 800)) : currentSize;
@@ -711,10 +745,10 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
             currentTool === 'pencil'
               ? 'border border-dashed border-slate-700/80 bg-slate-400/20'
               : currentTool === 'brush'
-              ? 'border-2 border-amber-400/60 shadow-[0_0_8px_rgba(245,158,11,0.35)]'
+              ? 'border-2 border-amber-400/70 shadow-[0_0_8px_rgba(245,158,11,0.45)]'
               : currentTool === 'eraser'
-              ? 'border-2 border-slate-900 bg-white/70 shadow-sm'
-              : 'border border-slate-800'
+              ? 'border-2 border-slate-900 bg-white/80 shadow-md'
+              : 'border-2 border-slate-900 shadow-sm'
           }`}
           style={{
             width: `${Math.max(6, scaledSize)}px`,
@@ -743,32 +777,84 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
   };
 
   return (
-    <div
-      ref={containerRef}
-      onMouseEnter={() => setIsInsideCanvas(true)}
-      onMouseLeave={() => {
-        setIsInsideCanvas(false);
-        setCursorPos(null);
-      }}
-      className={`relative w-full h-full rounded-2xl overflow-hidden shadow-2xl border-4 border-slate-700/80 bg-white select-none ${
-        isDrawer ? 'cursor-none' : 'cursor-default'
-      }`}
-      style={{
-        touchAction: 'none', // Crucial: prevents mobile screen pull-to-refresh and page scroll while drawing
-      }}
-    >
-      <canvas
-        ref={canvasRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        className="w-full h-full block bg-white"
-        style={{ touchAction: 'none' }}
-      />
+    <div className="relative w-full h-full">
+      {/* Pure White Drawing Canvas Container (#FFFFFF) */}
+      <div
+        ref={containerRef}
+        onMouseEnter={() => setIsInsideCanvas(true)}
+        onMouseLeave={() => {
+          setIsInsideCanvas(false);
+          setCursorPos(null);
+        }}
+        className={`relative w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border-4 border-slate-700/80 bg-white select-none ${
+          isDrawer && !isClearConfirmOpen ? 'cursor-none' : 'cursor-default'
+        }`}
+        style={{
+          touchAction: 'none', // Crucial: prevents mobile screen pull-to-refresh and page scroll while drawing
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className="w-full h-full block bg-white"
+          style={{ touchAction: 'none' }}
+        />
 
-      {/* Drawer custom cursor overlay */}
-      {renderCustomCursor()}
+        {/* Drawer custom cursor overlay */}
+        {renderCustomCursor()}
+
+        {/* Quick White Wipe / Sweep Animation on Clear */}
+        {isSweeping && (
+          <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
+            <div className="w-full h-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95 animate-canvas-sweep" />
+          </div>
+        )}
+
+        {/* Clear Canvas Safety Confirmation Modal DIRECTLY INSIDE THE WHITE CANVAS */}
+        {isClearConfirmOpen && (
+          <div
+            className="absolute inset-0 z-40 flex items-center justify-center p-3 sm:p-5 bg-slate-950/25 backdrop-blur-[2px] animate-fade-in select-none"
+            onClick={onCancelClear}
+          >
+            <div
+              className="bg-[#0b1022] border-2 border-rose-500/60 rounded-2xl sm:rounded-3xl p-5 sm:p-7 max-w-sm w-full text-center shadow-[0_25px_65px_-10px_rgba(0,0,0,0.9)] animate-modal-pop-in"
+              onClick={e => e.stopPropagation()}
+            >
+              <div
+                className="w-13 h-13 sm:w-14 sm:h-14 mx-auto mb-3 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center text-3xl shadow-inner animate-bounce"
+                style={{ animationDuration: '2.5s' }}
+              >
+                🗑️
+              </div>
+              <h3 className="text-lg sm:text-2xl font-black font-display text-white mb-2 tracking-wide">
+                ¿BORRAR TODO EL DIBUJO?
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 mb-6 font-medium leading-relaxed">
+                Se eliminará todo el dibujo de esta ronda.
+              </p>
+              <div className="flex items-center gap-2.5 sm:gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={onCancelClear}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition-all cursor-pointer border border-slate-700 active:scale-95 shadow-sm"
+                >
+                  CANCELAR
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteConfirm}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-[#FF6B6B] hover:bg-[#ff5252] text-white font-black text-xs sm:text-sm transition-all shadow-lg shadow-rose-600/40 cursor-pointer active:scale-95"
+                >
+                  SÍ, BORRAR
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

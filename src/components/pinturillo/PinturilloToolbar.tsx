@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { DrawingTool } from '../../types/pinturillo';
 import { audio } from '../../utils/audio';
 import { Undo2, Redo2, Trash2, PaintBucket, Eraser, Brush, PenLine, Pencil } from 'lucide-react';
@@ -12,30 +12,31 @@ interface PinturilloToolbarProps {
   onSelectSize: (size: number) => void;
   onUndo: () => void;
   onRedo: () => void;
-  onClear: () => void;
+  onRequestClear: () => void;
 }
 
+// 12 Refined, vibrant party-game palette colors
 const PALETTE = [
-  { name: 'Negro', hex: '#000000' },
-  { name: 'Gris', hex: '#64748b' },
-  { name: 'Blanco', hex: '#ffffff' },
-  { name: 'Marrón', hex: '#78350f' },
-  { name: 'Rojo', hex: '#ef4444' },
-  { name: 'Naranja', hex: '#f97316' },
-  { name: 'Amarillo', hex: '#eab308' },
-  { name: 'Verde', hex: '#22c55e' },
-  { name: 'Celeste', hex: '#38bdf8' },
-  { name: 'Azul', hex: '#2563eb' },
-  { name: 'Violeta', hex: '#8b5cf6' },
-  { name: 'Rosa', hex: '#ec4899' },
+  { name: 'Negro grafito', hex: '#0f172a' },
+  { name: 'Gris pizarra', hex: '#64748b' },
+  { name: 'Blanco puro', hex: '#ffffff' },
+  { name: 'Marrón madera', hex: '#854d0e' },
+  { name: 'Rojo coral', hex: '#ff6b6b' },
+  { name: 'Naranja fuego', hex: '#fb923c' },
+  { name: 'Amarillo oro', hex: '#ffc928' },
+  { name: 'Verde lima', hex: '#4ade80' },
+  { name: 'Cian cielo', hex: '#38d9ff' },
+  { name: 'Azul vibrante', hex: '#3b82f6' },
+  { name: 'Púrpura neón', hex: '#a78bfa' },
+  { name: 'Rosa chicle', hex: '#f472b6' },
 ];
 
 const BRUSH_SIZES = [
   { label: 'Fino', size: 3, dotSize: 4 },
   { label: 'Medio', size: 7, dotSize: 8 },
-  { label: 'Grueso', size: 14, dotSize: 14 },
-  { label: 'Muy grueso', size: 24, dotSize: 20 },
-  { label: 'Extra', size: 40, dotSize: 26 },
+  { label: 'Grueso', size: 14, dotSize: 13 },
+  { label: 'Muy grueso', size: 24, dotSize: 18 },
+  { label: 'Extra', size: 40, dotSize: 24 },
 ];
 
 export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
@@ -47,10 +48,8 @@ export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
   onSelectSize,
   onUndo,
   onRedo,
-  onClear,
+  onRequestClear,
 }) => {
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-
   const handleToolClick = (tool: DrawingTool) => {
     audio.playPinturilloToolSelect();
     onSelectTool(tool);
@@ -64,89 +63,88 @@ export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
     }
   };
 
-  const handleConfirmClear = () => {
-    setShowClearConfirm(false);
-    audio.playBombWarning(1.0);
-    onClear();
-  };
-
   return (
-    <div className="relative w-full bg-slate-900/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3.5 border border-slate-800 shadow-xl flex flex-wrap items-center justify-between gap-3 text-slate-100">
+    <div className="relative w-full bg-[#0b1022]/95 backdrop-blur-md rounded-2xl sm:rounded-3xl p-2.5 sm:p-3.5 border-2 border-slate-700/80 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.7)] flex flex-wrap items-center justify-between gap-3 text-slate-100 select-none">
       {/* 1. Drawing Tools (Lápiz, Rotulador, Pincel, Goma, Relleno) */}
-      <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+      <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-0.5 sm:pb-0">
+        {/* Lápiz (#FFC928) */}
         <button
           type="button"
           onClick={() => handleToolClick('pencil')}
-          title="Lápiz fino"
-          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          title="Lápiz: trazo fino y preciso con textura de grafito"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer active:scale-95 ${
             currentTool === 'pencil'
-              ? 'bg-amber-500 text-slate-950 shadow-md scale-105'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              ? 'bg-[#FFC928] text-slate-950 shadow-[0_0_15px_rgba(255,201,40,0.5)] scale-105 border border-amber-300'
+              : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/70 hover:text-white'
           }`}
         >
-          <Pencil className="w-4 h-4" />
-          <span className="hidden sm:inline">Lápiz</span>
+          <Pencil className="w-4 h-4 shrink-0" />
+          <span>Lápiz</span>
         </button>
 
+        {/* Rotulador (#38D9FF) */}
         <button
           type="button"
           onClick={() => handleToolClick('marker')}
-          title="Rotulador"
-          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          title="Rotulador: línea suave, opaca y de grosor constante"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer active:scale-95 ${
             currentTool === 'marker'
-              ? 'bg-amber-500 text-slate-950 shadow-md scale-105'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              ? 'bg-[#38D9FF] text-slate-950 shadow-[0_0_15px_rgba(56,217,255,0.5)] scale-105 border border-cyan-300'
+              : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/70 hover:text-white'
           }`}
         >
-          <PenLine className="w-4 h-4" />
-          <span className="hidden sm:inline">Rotulador</span>
+          <PenLine className="w-4 h-4 shrink-0" />
+          <span>Rotulador</span>
         </button>
 
+        {/* Pincel (#A78BFA) */}
         <button
           type="button"
           onClick={() => handleToolClick('brush')}
-          title="Pincel suave"
-          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          title="Pincel: trazo artístico dinámico sensible a la velocidad"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer active:scale-95 ${
             currentTool === 'brush'
-              ? 'bg-amber-500 text-slate-950 shadow-md scale-105'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              ? 'bg-[#A78BFA] text-slate-950 shadow-[0_0_15px_rgba(167,139,250,0.5)] scale-105 border border-purple-300'
+              : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/70 hover:text-white'
           }`}
         >
-          <Brush className="w-4 h-4" />
-          <span className="hidden sm:inline">Pincel</span>
+          <Brush className="w-4 h-4 shrink-0" />
+          <span>Pincel</span>
         </button>
 
+        {/* Goma (#FF6B6B) */}
         <button
           type="button"
           onClick={() => handleToolClick('eraser')}
-          title="Goma de borrar"
-          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          title="Goma: borrar trazos sobre el lienzo blanco"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer active:scale-95 ${
             currentTool === 'eraser'
-              ? 'bg-amber-500 text-slate-950 shadow-md scale-105'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              ? 'bg-[#FF6B6B] text-white shadow-[0_0_15px_rgba(255,107,107,0.5)] scale-105 border border-rose-400'
+              : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/70 hover:text-white'
           }`}
         >
-          <Eraser className="w-4 h-4" />
-          <span className="hidden sm:inline">Goma</span>
+          <Eraser className="w-4 h-4 shrink-0" />
+          <span>Goma</span>
         </button>
 
+        {/* Relleno (#4ADE80) */}
         <button
           type="button"
           onClick={() => handleToolClick('fill')}
-          title="Cubo de pintura (Relleno)"
-          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          title="Cubo de pintura: rellenar áreas cerradas"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer active:scale-95 ${
             currentTool === 'fill'
-              ? 'bg-amber-500 text-slate-950 shadow-md scale-105'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              ? 'bg-[#4ADE80] text-slate-950 shadow-[0_0_15px_rgba(74,222,128,0.5)] scale-105 border border-emerald-300'
+              : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/70 hover:text-white'
           }`}
         >
-          <PaintBucket className="w-4 h-4" />
-          <span className="hidden sm:inline">Relleno</span>
+          <PaintBucket className="w-4 h-4 shrink-0" />
+          <span>Relleno</span>
         </button>
       </div>
 
       {/* 2. Brush Sizes with visual dot preview */}
-      <div className="flex items-center gap-1 sm:gap-2 px-2 py-1 bg-slate-950/60 rounded-xl border border-slate-800">
+      <div className="flex items-center gap-1 sm:gap-2 px-2.5 py-1.5 bg-[#070b18] rounded-xl border border-slate-800/90 shadow-inner">
         {BRUSH_SIZES.map(b => (
           <button
             key={b.size}
@@ -158,16 +156,16 @@ export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
             title={`Grosor: ${b.label} (${b.size}px)`}
             className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
               currentSize === b.size
-                ? 'bg-amber-500/25 border-2 border-amber-400'
-                : 'hover:bg-slate-800 border border-transparent'
+                ? 'bg-[#FFC928]/20 border-2 border-[#FFC928] shadow-[0_0_8px_rgba(255,201,40,0.3)]'
+                : 'hover:bg-slate-800 border border-transparent opacity-80 hover:opacity-100'
             }`}
           >
             <div
-              className="rounded-full bg-slate-100 transition-transform"
+              className="rounded-full transition-transform"
               style={{
                 width: `${b.dotSize}px`,
                 height: `${b.dotSize}px`,
-                backgroundColor: currentTool === 'eraser' ? '#cbd5e1' : currentColor,
+                backgroundColor: currentTool === 'eraser' ? '#FFFFFF' : currentColor,
               }}
             />
           </button>
@@ -175,7 +173,7 @@ export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
       </div>
 
       {/* 3. Colour Palette Swatches + Color Picker */}
-      <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-1">
+      <div className="flex items-center gap-1.5 overflow-x-auto py-1">
         {PALETTE.map(c => {
           const isSelected = currentColor.toLowerCase() === c.hex.toLowerCase() && currentTool !== 'eraser';
           return (
@@ -184,18 +182,22 @@ export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
               type="button"
               onClick={() => handleColorClick(c.hex)}
               title={c.name}
-              className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full transition-transform cursor-pointer border ${
-                c.hex === '#ffffff' ? 'border-slate-400' : 'border-slate-800'
-              } ${isSelected ? 'scale-125 ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900 shadow-md' : 'hover:scale-110'}`}
+              className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full transition-all cursor-pointer border ${
+                c.hex === '#ffffff' ? 'border-slate-400' : 'border-slate-800/80'
+              } ${
+                isSelected
+                  ? 'scale-125 ring-2 ring-[#FFC928] ring-offset-2 ring-offset-[#0b1022] shadow-[0_0_10px_rgba(255,201,40,0.6)] z-10'
+                  : 'hover:scale-115 opacity-90 hover:opacity-100'
+              }`}
               style={{ backgroundColor: c.hex }}
             />
           );
         })}
 
-        {/* Custom color picker */}
+        {/* Custom spectrum color picker */}
         <label
-          title="Más colores"
-          className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-rose-500 via-emerald-400 to-sky-400 border border-slate-700 cursor-pointer flex items-center justify-center hover:scale-110 transition-transform overflow-hidden"
+          title="Elegir otro color"
+          className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-[#FF6B6B] via-[#4ADE80] to-[#38D9FF] border-2 border-slate-700 cursor-pointer flex items-center justify-center hover:scale-115 transition-transform overflow-hidden shadow-sm"
         >
           <input
             type="color"
@@ -206,13 +208,13 @@ export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
         </label>
       </div>
 
-      {/* 4. Action Buttons (Undo, Redo, Clear) */}
-      <div className="flex items-center gap-1 sm:gap-1.5">
+      {/* 4. Action Buttons (Deshacer, Rehacer, Borrar Todo) */}
+      <div className="flex items-center gap-1.5 sm:gap-2">
         <button
           type="button"
           onClick={onUndo}
-          title="Deshacer trazo"
-          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95"
+          title="Deshacer último trazo"
+          className="p-2 sm:px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95 border border-slate-700/60 shadow-sm"
         >
           <Undo2 className="w-4 h-4" />
         </button>
@@ -221,52 +223,22 @@ export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
           type="button"
           onClick={onRedo}
           title="Rehacer trazo"
-          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95"
+          className="p-2 sm:px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95 border border-slate-700/60 shadow-sm"
         >
           <Redo2 className="w-4 h-4" />
         </button>
 
+        {/* Borrar Todo Button: Opens confirmation modal DIRECTLY INSIDE THE CANVAS */}
         <button
           type="button"
-          onClick={() => setShowClearConfirm(true)}
-          title="Limpiar todo el lienzo"
-          className="p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 hover:text-rose-200 transition-all cursor-pointer active:scale-95 flex items-center gap-1 text-xs font-bold"
+          onClick={onRequestClear}
+          title="Borrar todo el lienzo"
+          className="py-2 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/50 text-rose-300 hover:text-rose-200 transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 text-xs font-black shadow-sm"
         >
-          <Trash2 className="w-4 h-4 text-rose-400" />
-          <span className="hidden sm:inline">Limpiar</span>
+          <Trash2 className="w-4 h-4 text-rose-400 shrink-0" />
+          <span className="hidden sm:inline">BORRAR TODO</span>
         </button>
       </div>
-
-      {/* Clear Canvas Safety Confirmation Modal */}
-      {showClearConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border-2 border-rose-500/60 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
-            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-3xl">
-              🗑️
-            </div>
-            <h3 className="text-xl font-black text-white mb-2">¿Borrar todo el dibujo?</h3>
-            <p className="text-sm text-slate-300 mb-6">
-              Esta acción eliminará todos los trazos actuales de la pizarra.
-            </p>
-            <div className="flex items-center gap-3 justify-center">
-              <button
-                type="button"
-                onClick={() => setShowClearConfirm(false)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition-all cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmClear}
-                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm transition-all shadow-lg shadow-rose-600/30 cursor-pointer active:scale-95"
-              >
-                Sí, borrar todo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

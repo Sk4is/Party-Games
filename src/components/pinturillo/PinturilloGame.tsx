@@ -69,8 +69,14 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
 
   // Drawing tool state
   const [currentTool, setCurrentTool] = useState<DrawingTool>('pencil');
-  const [currentColor, setCurrentColor] = useState<string>('#000000');
+  const [currentColor, setCurrentColor] = useState<string>('#0f172a');
   const [currentSize, setCurrentSize] = useState<number>(7);
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
+
+  // Close clear canvas modal automatically on turn/phase transitions
+  useEffect(() => {
+    setIsClearConfirmOpen(false);
+  }, [roomState?.currentTurn, roomState?.phase]);
 
   // WebSocket Ref
   const wsRef = useRef<WebSocket | null>(null);
@@ -369,7 +375,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   // 1. If not in a room, show Entry profile / join / create screen
   if (!roomState) {
     return (
-      <div className="relative min-h-screen bg-slate-950 text-white flex flex-col justify-center overflow-x-hidden">
+      <div className="relative min-h-screen bg-[#050A18] text-white flex flex-col justify-center overflow-x-hidden">
         <PinturilloBackground />
         <div className="relative z-10">
           {errorMessage && (
@@ -392,7 +398,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   // 2. If in LOBBY phase
   if (roomState.phase === 'LOBBY') {
     return (
-      <div className="relative min-h-screen bg-slate-950 text-white flex flex-col justify-center overflow-x-hidden">
+      <div className="relative min-h-screen bg-[#050A18] text-white flex flex-col justify-center overflow-x-hidden">
         <PinturilloBackground />
         <div className="relative z-10">
           {errorMessage && (
@@ -419,7 +425,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   const isTimeCritical = isDrawing && roomState.remainingTime <= 10;
 
   return (
-    <div className="relative min-h-screen bg-slate-950 text-white flex flex-col overflow-x-hidden select-none">
+    <div className="relative min-h-screen bg-[#050A18] text-white flex flex-col overflow-x-hidden select-none">
       <PinturilloBackground />
 
       {/* Countdown 3, 2, 1, ¡A DIBUJAR! Overlay */}
@@ -530,44 +536,74 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
           {/* Center: Secret Word (Drawer) or Hint (Guesser) */}
           <div className="flex-1 flex items-center justify-center max-w-xl mx-2">
             {isDrawer && roomState.secretWord ? (
-              <div className="flex flex-col items-center bg-amber-500/15 border-2 border-amber-400/50 px-4 sm:px-6 py-1.5 rounded-2xl shadow-inner">
-                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-amber-300">
+              <div className="flex flex-col items-center bg-[#FFC928]/15 border-2 border-[#FFC928]/60 px-4 sm:px-6 py-1.5 rounded-2xl shadow-[0_0_20px_rgba(255,201,40,0.2)]">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-[#FFC928]">
                   <Eye className="w-3.5 h-3.5" />
                   <span>Tu palabra secreta (¡Solo la ves tú!)</span>
-                </div>
-                <span className="text-lg sm:text-2xl font-black font-display tracking-widest text-white uppercase">
-                  {roomState.secretWord}
-                </span>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center bg-slate-800/80 border border-slate-700/80 px-4 sm:px-6 py-1.5 rounded-2xl shadow-inner">
-                <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black uppercase text-slate-400">
-                  <span>
-                    {roomState.config.hintsEnabled ? 'Con pistas' : 'Sin pistas'} ({roomState.wordLength} letras)
-                  </span>
                   {roomState.wordCategory && (
-                    <span className="px-1.5 py-0.2 rounded bg-slate-700 text-amber-300 font-bold">
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-900/80 text-[#38D9FF] text-[10px] font-bold border border-slate-700">
                       {roomState.wordCategory}
                     </span>
                   )}
                 </div>
-                <span className="text-lg sm:text-2xl font-black font-mono tracking-widest text-amber-400 uppercase">
-                  {roomState.wordHint || '...'}
+                <span className="text-xl sm:text-3xl font-black font-display tracking-widest text-white uppercase drop-shadow-md">
+                  {roomState.secretWord}
                 </span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center bg-[#070b18]/90 border-2 border-slate-700/80 px-4 sm:px-6 py-1.5 rounded-2xl shadow-inner">
+                <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black uppercase text-slate-400 mb-1">
+                  <span className="text-slate-300">
+                    {roomState.config.hintsEnabled ? '💡 Con pistas' : '🔒 Sin pistas'} ({roomState.wordLength} letras)
+                  </span>
+                  {roomState.wordCategory && (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[#38D9FF] font-bold text-[10px]">
+                      {roomState.wordCategory}
+                    </span>
+                  )}
+                </div>
+                {/* Individual Animated Letter Boxes */}
+                <div className="flex items-center gap-1 sm:gap-1.5">
+                  {(roomState.wordHint || '...').split(' ').map((char, i) => {
+                    const isLetter = char !== '_' && char !== '';
+                    return (
+                      <span
+                        key={`${i}-${char}`}
+                        className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-lg font-black font-mono text-base sm:text-lg uppercase transition-all select-none ${
+                          isLetter
+                            ? 'bg-[#FFC928]/25 border-2 border-[#FFC928] text-[#FFC928] shadow-[0_0_8px_rgba(255,201,40,0.5)] animate-letter-pop'
+                            : 'bg-slate-800/80 border border-slate-700 text-slate-500'
+                        }`}
+                      >
+                        {isLetter ? char : ''}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Right: Round Timer */}
+          {/* Right: Round Timer with multi-tier playful colors */}
           <div className="flex items-center gap-2">
             <div
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-2xl border transition-all ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-2xl border-2 transition-all ${
                 isTimeCritical
-                  ? 'bg-rose-500/20 border-rose-500 text-rose-300 animate-pulse'
-                  : 'bg-slate-800/90 border-slate-700 text-slate-200'
+                  ? 'bg-rose-500/20 border-[#FF6B6B] text-rose-300 shadow-[0_0_15px_rgba(255,107,107,0.4)] animate-pulse'
+                  : roomState.remainingTime <= 25
+                  ? 'bg-amber-500/15 border-[#FFC928] text-amber-300 shadow-[0_0_10px_rgba(255,201,40,0.25)]'
+                  : 'bg-[#070b18]/90 border-[#38D9FF]/60 text-cyan-200'
               }`}
             >
-              <Clock className={`w-4 h-4 ${isTimeCritical ? 'text-rose-400 animate-spin' : 'text-amber-400'}`} />
+              <Clock
+                className={`w-4 h-4 ${
+                  isTimeCritical
+                    ? 'text-[#FF6B6B] animate-spin'
+                    : roomState.remainingTime <= 25
+                    ? 'text-[#FFC928]'
+                    : 'text-[#38D9FF]'
+                }`}
+              />
               <span className="font-mono font-black text-sm sm:text-base">
                 {roomState.remainingTime}s
               </span>
@@ -582,16 +618,31 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
         <section className="flex-1 flex flex-col gap-2 min-h-[380px] lg:min-h-0">
           {/* Canvas Header info: Active drawer label */}
           <div className="flex items-center justify-between px-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-base">{currentDrawer?.avatar || '🎨'}</span>
-              <span className="text-slate-300 font-bold">
-                {isDrawer ? '¡Estás dibujando tú!' : `Dibujando: ${currentDrawer?.name || 'Compañero'}`}
-              </span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div
+                className={`flex items-center gap-2 px-3 py-1 rounded-xl border font-bold text-xs sm:text-sm shadow-sm ${
+                  isDrawer
+                    ? 'bg-[#FFC928] text-slate-950 border-amber-300 font-black shadow-[0_0_12px_rgba(255,201,40,0.35)]'
+                    : 'bg-slate-800/90 text-slate-200 border-slate-700'
+                }`}
+              >
+                <span className="text-base">{currentDrawer?.avatar || '🎨'}</span>
+                <span>
+                  {isDrawer ? '¡Estás dibujando tú!' : `Dibujando: ${currentDrawer?.name || 'Compañero'}`}
+                </span>
+              </div>
+
+              {roomState.wordCategory && (
+                <span className="hidden sm:inline-block px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 text-xs font-semibold">
+                  Categoría: <strong className="text-[#38D9FF]">{roomState.wordCategory}</strong>
+                </span>
+              )}
             </div>
 
             {hasGuessed && !isDrawer && (
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] border border-emerald-500/40">
-                ✓ ¡Acertaste!
+              <span className="px-3 py-1 rounded-xl bg-emerald-500/20 text-[#4ADE80] font-black text-xs border border-emerald-500/50 shadow-sm flex items-center gap-1.5 animate-guess-sparkle">
+                <span>✓</span>
+                <span>¡Acertaste la palabra!</span>
               </span>
             )}
           </div>
@@ -604,6 +655,12 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
               currentTool={currentTool}
               currentColor={currentColor}
               currentSize={currentSize}
+              isClearConfirmOpen={isClearConfirmOpen}
+              onConfirmClear={() => {
+                setIsClearConfirmOpen(false);
+                handleClear();
+              }}
+              onCancelClear={() => setIsClearConfirmOpen(false)}
               onStrokeStart={handleStrokeStart}
               onStrokeChunk={handleStrokeChunk}
               onStrokeEnd={handleStrokeEnd}
@@ -623,7 +680,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
                 onSelectSize={setCurrentSize}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
-                onClear={handleClear}
+                onRequestClear={() => setIsClearConfirmOpen(true)}
               />
             </div>
           )}
