@@ -281,16 +281,10 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   }, [roomState?.phase]);
 
   // Handlers for room actions
-  const handleCreateRoom = (
-    player: { id: string; name: string; avatar: string; color: string },
-    config?: Partial<PinturilloConfig>
-  ) => {
+  const handleCreateRoom = (player: { id: string; name: string; avatar: string; color: string }) => {
     setLocalPlayer(player);
     connectWebSocket(() => {
       sendMessage({ type: 'create_room', player });
-      if (config) {
-        sendMessage({ type: 'update_config', config });
-      }
     });
   };
 
