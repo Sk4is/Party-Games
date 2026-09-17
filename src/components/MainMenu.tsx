@@ -167,42 +167,46 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             </div>
           </div>
 
-          {/* CARD 3: PINTURILLO (PRÓXIMAMENTE) */}
+          {/* CARD 3: PINTURILLO (ACTIVE & ONLINE MULTIPLAYER) */}
           <div
             id="card-pinturillo"
-            onClick={() => handleComingSoon('Pinturillo')}
-            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-slate-900/60 border-2 border-slate-800 hover:border-slate-700 shadow-xl transition-all duration-300 cursor-pointer opacity-85 hover:opacity-100 transform hover:-translate-y-1 overflow-hidden"
+            onClick={() => handleSelectGame('pinturillo')}
+            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-slate-850 to-slate-900 border-2 border-cyan-500/80 hover:border-cyan-400 shadow-2xl hover:shadow-cyan-500/20 transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-98 overflow-hidden"
           >
+            {/* Dynamic glow effect */}
+            <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/15 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
+
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-6">
-                <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-3xl shadow-inner group-hover:scale-105 transition-transform text-cyan-400">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-3xl shadow-lg shadow-cyan-500/30 group-hover:scale-110 transition-transform">
                   🎨
                 </div>
-                <span className="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-xs font-bold uppercase tracking-wider">
-                  Próximamente
+                <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  Online
                 </span>
               </div>
 
-              <h2 className="text-3xl sm:text-4xl font-black font-display text-slate-200 tracking-wide mb-2 group-hover:text-cyan-400 transition-colors">
+              <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-cyan-300 transition-colors">
                 PINTURILLO
               </h2>
-              <p className="text-slate-400 text-base sm:text-lg font-medium leading-snug">
-                &ldquo;Dibuja. Adivina. Sobrevive al caos.&rdquo;
+              <p className="text-slate-300 text-base sm:text-lg font-medium leading-snug">
+                &ldquo;Dibuja, adivina y compite en tiempo real.&rdquo;
               </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/40 border border-slate-800">2–12 Jugadores</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/40 border border-slate-800">Dibujo rápido</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/40 border border-slate-800">Pique asegurado</span>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">2–10 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">Multijugador Online</span>
+                <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">Lienzo en vivo</span>
               </div>
             </div>
 
-            <div className="relative z-10 mt-8 pt-6 border-t border-slate-800/60 flex items-center justify-between text-slate-500">
-              <span className="text-xs font-semibold uppercase tracking-wider">
-                En desarrollo activo
+            <div className="relative z-10 mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-sm font-bold text-cyan-400 group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
+                Entrar a la sala <ArrowRight className="w-4 h-4" />
               </span>
-              <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-800 text-slate-400">
-                Próximamente
-              </span>
+              <div className="w-10 h-10 rounded-full bg-cyan-500 group-hover:bg-cyan-400 text-slate-950 flex items-center justify-center font-black shadow-md transition-all">
+                <Play className="w-5 h-5 fill-current ml-0.5" />
+              </div>
             </div>
           </div>
         </div>

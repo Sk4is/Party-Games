@@ -563,6 +563,310 @@ class AudioManager {
       osc.stop(start + c.d);
     });
   }
+
+  // Generic crisp click
+  public playClick() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(300, now + 0.04);
+
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }
+
+  // Game start ascending energetic chord
+  public playGameStart() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const notes = [392.00, 523.25, 659.25, 783.99]; // G4, C5, E5, G5
+    notes.forEach((freq, i) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + i * 0.06;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0.18, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(start);
+      osc.stop(start + 0.25);
+    });
+  }
+
+  // ==========================================
+  // PINTURILLO AUDIO & CHILL MUSIC
+  // ==========================================
+  private musicPlaying: boolean = false;
+  private musicInterval: any = null;
+  private lastStrokeSoundTime: number = 0;
+
+  public getIsMusicPlaying(): boolean {
+    return this.musicPlaying;
+  }
+
+  public toggleMusic(): boolean {
+    if (this.musicPlaying) {
+      this.stopPinturilloMusic();
+      return false;
+    } else {
+      this.startPinturilloMusic();
+      return true;
+    }
+  }
+
+  public startPinturilloMusic() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    if (this.musicPlaying) return;
+    this.musicPlaying = true;
+
+    // Chill, playful pentatonic chords sequence (C major pentatonic: C, D, E, G, A)
+    const melodyNotes = [
+      523.25, 659.25, 783.99, 659.25, // C5, E5, G5, E5
+      587.33, 659.25, 523.25, 440.00, // D5, E5, C5, A4
+      523.25, 783.99, 880.00, 783.99, // C5, G5, A5, G5
+      659.25, 587.33, 523.25, 0,      // E5, D5, C5, rest
+    ];
+
+    let step = 0;
+    const tempoMs = 280;
+
+    this.musicInterval = setInterval(() => {
+      if (!this.musicPlaying || this.isMuted || !this.ctx) return;
+
+      const freq = melodyNotes[step % melodyNotes.length];
+      step++;
+
+      if (freq > 0) {
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = 'sine'; // Soft, warm bell/marimba tone
+          osc.frequency.setValueAtTime(freq, now);
+
+          // Subdued gentle background volume
+          gain.gain.setValueAtTime(0.025, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(now);
+          osc.stop(now + 0.35);
+        } catch {
+          // Ignore
+        }
+      }
+    }, tempoMs);
+  }
+
+  public stopPinturilloMusic() {
+    this.musicPlaying = false;
+    if (this.musicInterval) {
+      clearInterval(this.musicInterval);
+      this.musicInterval = null;
+    }
+  }
+
+  // Pinturillo countdown tick (3, 2, 1, ¡A dibujar!)
+  public playPinturilloCountdown(count: number) {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    const freq = count > 0 ? 440 + (4 - count) * 80 : 880;
+    osc.frequency.setValueAtTime(freq, now);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + (count > 0 ? 0.15 : 0.4));
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + (count > 0 ? 0.15 : 0.4));
+  }
+
+  // Pinturillo correct guess fanfare
+  public playPinturilloCorrect() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + i * 0.07;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0.2, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(start);
+      osc.stop(start + 0.3);
+    });
+  }
+
+  // Pinturillo "casi" / near miss subtle warm alert
+  public playPinturilloNearMiss() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(620, now);
+    osc.frequency.exponentialRampToValueAtTime(740, now + 0.1);
+
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  // Pinturillo soft drawing stroke sound (throttled)
+  public playPinturilloStroke() {
+    if (this.isMuted) return;
+    const nowMs = Date.now();
+    if (nowMs - this.lastStrokeSoundTime < 80) return; // limit frequency
+    this.lastStrokeSoundTime = nowMs;
+
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(320 + Math.random() * 40, now);
+
+    gain.gain.setValueAtTime(0.015, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.05);
+  }
+
+  // Pinturillo tool select
+  public playPinturilloToolSelect() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(580, now);
+
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.06);
+  }
+
+  // Pinturillo bucket flood fill sound: splash
+  public playPinturilloFill() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(350, now);
+    osc.frequency.exponentialRampToValueAtTime(700, now + 0.12);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.22);
+  }
+
+  // Pinturillo timer clock tick in last 10s
+  public playPinturilloClockTick(isCritical: boolean = false) {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = isCritical ? 'square' : 'triangle';
+    osc.frequency.setValueAtTime(isCritical ? 880 : 660, now);
+
+    gain.gain.setValueAtTime(isCritical ? 0.12 : 0.06, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }
 }
 
 export const audio = new AudioManager();

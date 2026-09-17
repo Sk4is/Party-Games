@@ -3,18 +3,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MainMenu } from './components/MainMenu';
 import { PlayerSetup } from './components/PlayerSetup';
 import { LaBombaGame } from './components/LaBombaGame';
 import { LaPeorRespuestaSetup } from './components/LaPeorRespuestaSetup';
 import { LaPeorRespuestaGame } from './components/LaPeorRespuestaGame';
+import { PinturilloGame } from './components/pinturillo/PinturilloGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 
-type AppView = 'MENU' | 'SETUP' | 'GAME' | 'LPR_SETUP' | 'LPR_GAME';
+type AppView = 'MENU' | 'SETUP' | 'GAME' | 'LPR_SETUP' | 'LPR_GAME' | 'PINTURILLO';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<AppView>('MENU');
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    // Check if user came from a shared invitation link for Pinturillo
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('game') === 'pinturillo' || params.get('room')) {
+        return 'PINTURILLO';
+      }
+    }
+    return 'MENU';
+  });
 
   // La Bomba state
   const [gamePlayers, setGamePlayers] = useState<Player[]>([]);
@@ -34,6 +44,8 @@ export default function App() {
       setCurrentView('SETUP');
     } else if (gameId === 'la-peor-respuesta') {
       setCurrentView('LPR_SETUP');
+    } else if (gameId === 'pinturillo') {
+      setCurrentView('PINTURILLO');
     }
   };
 
@@ -52,6 +64,11 @@ export default function App() {
   };
 
   const handleBackToMenu = () => {
+    // Clear URL parameters if any so user returns cleanly to menu
+    if (window.history.pushState) {
+      const newUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
+      window.history.pushState({ path: newUrl }, '', newUrl);
+    }
     setCurrentView('MENU');
   };
 
@@ -61,7 +78,7 @@ export default function App() {
         <MainMenu onSelectGame={handleSelectGame} />
       )}
 
-      {/* LA BOMBA */}
+      {/* 1. LA BOMBA */}
       {currentView === 'SETUP' && (
         <PlayerSetup
           onStartGame={handleStartGame}
@@ -77,7 +94,7 @@ export default function App() {
         />
       )}
 
-      {/* LA PEOR RESPUESTA */}
+      {/* 2. LA PEOR RESPUESTA */}
       {currentView === 'LPR_SETUP' && (
         <LaPeorRespuestaSetup
           onStartGame={handleStartLPRGame}
@@ -91,6 +108,11 @@ export default function App() {
           config={lprConfig}
           onBackToMenu={handleBackToMenu}
         />
+      )}
+
+      {/* 3. PINTURILLO ONLINE */}
+      {currentView === 'PINTURILLO' && (
+        <PinturilloGame onBackToMenu={handleBackToMenu} />
       )}
     </div>
   );

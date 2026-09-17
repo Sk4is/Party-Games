@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Flame, Zap, Heart, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Flame, Zap, Heart, AlertTriangle, Paintbrush, Award, Clock } from 'lucide-react';
 
 interface HowToPlayModalProps {
   isOpen: boolean;
@@ -7,10 +7,12 @@ interface HowToPlayModalProps {
 }
 
 export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose }) => {
+  const [activeTab, setActiveTab] = useState<'bomba' | 'lpr' | 'pinturillo'>('bomba');
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
       <div
         id="how-to-play-modal"
         className="relative w-full max-w-lg bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-amber-500/10 text-slate-100 max-h-[90vh] overflow-y-auto"
@@ -25,92 +27,185 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl shadow-inner">
-            💣
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold font-display tracking-wide text-amber-400">
-              Cómo Jugar a La Bomba
-            </h2>
-            <p className="text-xs text-slate-400 font-medium">
-              Reglas rápidas para jugar en grupo
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-4 text-sm leading-relaxed text-slate-300">
-          <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-            <Flame className="w-6 h-6 text-orange-400 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-bold text-slate-100 text-base mb-1">
-                1. Nueva secuencia en cada respuesta válida
-              </h3>
-              <p>
-                El jugador activo recibe una combinación de 2 o 3 letras (por ejemplo, <span className="text-amber-300 font-bold">«TRA»</span>). Escribe rápidamente una <strong className="text-white">palabra real en español</strong> que contenga esas letras juntas y en ese orden (ej: <em>«trabajo»</em>). ¡Al acertar, <strong className="text-amber-300">se genera inmediatamente una NUEVA secuencia</strong> para el siguiente jugador (ej: <em>«ADO»</em>)!
-              </p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-            <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-bold text-slate-100 text-base mb-1">
-                2. Bomba Global Continua (60 a 180 segundos)
-              </h3>
-              <p>
-                Hay <strong className="text-amber-300">UNA SOLA BOMBA</strong> por ronda con una duración secreta de entre <span className="text-amber-300 font-semibold">60 y 180 segundos (1 a 3 minutos)</span>. El temporizador y la mecha son <strong className="text-white">continuos y compartidos</strong> por todos los jugadores: acertar una palabra pasa la bomba al siguiente jugador, pero la mecha <strong className="text-amber-300">NO se reinicia ni se pausa</strong>. Sigue ardiendo sin tregua hasta que estalle en el turno de alguien.
-              </p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-            <Zap className="w-6 h-6 text-yellow-400 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-bold text-slate-100 text-base mb-1">
-                3. Penalización por fallos (Mecha acelerada)
-              </h3>
-              <p>
-                Si cometes un fallo, conservas el turno con la misma combinación. Además, cada fallo acelera el consumo de la mecha (<span className="text-yellow-300 font-semibold">x1,5, x2,25...</span>) <strong className="text-white">únicamente mientras sea tu turno</strong>. Cuando el turno pasa a un jugador sin fallos, la mecha vuelve a su ritmo habitual, manteniendo exactamente su longitud consumida.
-              </p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-            <Heart className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-bold text-slate-100 text-base mb-1">
-                4. Vidas y eliminación
-              </h3>
-              <p>
-                Cada jugador empieza con 3 vidas (❤️❤️❤️). Cuando la bomba estalla en tu turno, pierdes una vida y comienza una nueva ronda con una secuencia nueva. Si pierdes las tres vidas quedas <span className="text-rose-400 font-semibold">chamuscado</span>. ¡Gana el último superviviente!
-              </p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-800/60 border border-amber-500/30 flex gap-3.5">
-            <span className="text-xl shrink-0 mt-0.5">🔤</span>
-            <div>
-              <h3 className="font-bold text-amber-300 text-base mb-1">
-                5. Reto del Abecedario (+1 Vida)
-              </h3>
-              <p>
-                Cada jugador tiene su propio progreso del abecedario español (A-Z + Ñ). Con cada palabra válida que uses, tacharás letras nuevas. Si completas las <strong className="text-amber-300">27 letras</strong>, ¡recuperas <strong className="text-emerald-400">+1 vida extra</strong> (máx. 3 vidas)! Tu progreso se mantiene entre rondas y explosiones.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 pt-4 border-t border-slate-800 flex justify-end">
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800 mb-6">
           <button
-            id="understood-rules-button"
             type="button"
-            onClick={onClose}
-            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-base shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+            onClick={() => setActiveTab('bomba')}
+            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+              activeTab === 'bomba'
+                ? 'bg-amber-500 text-slate-950 shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
           >
-            ¡Entendido, a jugar!
+            <span>💣</span>
+            <span>La Bomba</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('lpr')}
+            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+              activeTab === 'lpr'
+                ? 'bg-amber-500 text-slate-950 shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+          >
+            <span>💀</span>
+            <span>La Peor Resp.</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('pinturillo')}
+            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+              activeTab === 'pinturillo'
+                ? 'bg-cyan-500 text-slate-950 shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+          >
+            <span>🎨</span>
+            <span>Pinturillo</span>
           </button>
         </div>
+
+        {/* TAB 1: LA BOMBA */}
+        {activeTab === 'bomba' && (
+          <div className="space-y-4 text-sm leading-relaxed text-slate-300">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl">
+                💣
+              </div>
+              <div>
+                <h3 className="text-xl font-bold font-display text-amber-400">Reglas de La Bomba</h3>
+                <p className="text-xs text-slate-400">Piensa rápido antes de que explote</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
+              <Flame className="w-6 h-6 text-orange-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-slate-100 text-base mb-1">
+                  1. Nueva secuencia en cada respuesta válida
+                </h4>
+                <p>
+                  El jugador activo recibe 2 o 3 letras (ej: <span className="text-amber-300 font-bold">«TRA»</span>). Escribe una <strong className="text-white">palabra real en español</strong> que las contenga juntas (ej: <em>«trabajo»</em>). ¡Al acertar pasa al siguiente con nueva secuencia!
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
+              <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-slate-100 text-base mb-1">
+                  2. Bomba Global Continua
+                </h4>
+                <p>
+                  Hay una sola mecha compartida continua que dura entre 60 y 180 segundos. La mecha no se reinicia ni se detiene hasta que explota en el turno de alguien.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
+              <Heart className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-slate-100 text-base mb-1">
+                  3. Vidas y eliminación
+                </h4>
+                <p>
+                  Empiezas con 3 vidas. Cada explosión te quita una vida. ¡El último jugador con vidas gana la partida!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: LA PEOR RESPUESTA */}
+        {activeTab === 'lpr' && (
+          <div className="space-y-4 text-sm leading-relaxed text-slate-300">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-2xl bg-stone-800 border border-stone-700 flex items-center justify-center text-xl">
+                💀
+              </div>
+              <div>
+                <h3 className="text-xl font-bold font-display text-amber-400">Reglas de La Peor Respuesta</h3>
+                <p className="text-xs text-slate-400">Cuanto peor, mejor</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50">
+              <h4 className="font-bold text-slate-100 text-base mb-1">1. Pregunta irreverente</h4>
+              <p>
+                En cada ronda se revela una carta con una situación incómoda, surrealista o absurda.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50">
+              <h4 className="font-bold text-slate-100 text-base mb-1">2. Respuesta libre secreta</h4>
+              <p>
+                Cada jugador escribe en secreto su respuesta intentando ser lo más divertido, ingenioso o políticamente incorrecto posible.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50">
+              <h4 className="font-bold text-slate-100 text-base mb-1">3. Votación anónima</h4>
+              <p>
+                Las respuestas se barajan de forma anónima. Todos votan la que consideren la más graciosa. ¡La más votada se lleva la ronda!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: PINTURILLO */}
+        {activeTab === 'pinturillo' && (
+          <div className="space-y-4 text-sm leading-relaxed text-slate-300">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-xl">
+                🎨
+              </div>
+              <div>
+                <h3 className="text-xl font-bold font-display text-cyan-400">Reglas de Pinturillo Online</h3>
+                <p className="text-xs text-slate-400">Dibuja, adivina y compite en tiempo real</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
+              <Paintbrush className="w-6 h-6 text-cyan-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-slate-100 text-base mb-1">
+                  1. Un dibujante con palabra secreta
+                </h4>
+                <p>
+                  Por turnos, un jugador recibe una palabra secreta (¡solo él puede verla!) y debe dibujarla en el gran lienzo blanco usando lápiz, rotulador, pincel, goma o cubo de pintura.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
+              <Award className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-slate-100 text-base mb-1">
+                  2. Adivina por chat y suma puntos
+                </h4>
+                <p>
+                  Todos los demás intentan adivinar escribiendo en el chat. Cuanto más rápido aciertes, más puntos consigues (hasta 1.500 pts). El dibujante también gana +200 pts por cada acierto.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
+              <Clock className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-slate-100 text-base mb-1">
+                  3. Pistas y «¡Casi!»
+                </h4>
+                <p>
+                  A medida que corre el tiempo, se van desvelando letras en el panel de pistas. Y si tu respuesta está a solo una letra de diferencia, recibirás un aviso privado de <strong className="text-amber-400">«🔥 ¡Casi!»</strong> para afinar el tiro.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
