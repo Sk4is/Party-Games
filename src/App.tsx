@@ -3,37 +3,60 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { MainMenu } from './components/MainMenu';
 import { PlayerSetup } from './components/PlayerSetup';
 import { LaBombaGame } from './components/LaBombaGame';
+import { BombaOnlineContainer } from './components/bomba/BombaOnlineContainer';
 import { LaPeorRespuestaSetup } from './components/LaPeorRespuestaSetup';
 import { LaPeorRespuestaGame } from './components/LaPeorRespuestaGame';
+import { LPROnlineContainer } from './components/lpr/LPROnlineContainer';
 import { PinturilloGame } from './components/pinturillo/PinturilloGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 
-type AppView = 'MENU' | 'SETUP' | 'GAME' | 'LPR_SETUP' | 'LPR_GAME' | 'PINTURILLO';
+type AppView =
+  | 'MENU'
+  | 'BOMBA_ONLINE'
+  | 'LPR_ONLINE'
+  | 'PINTURILLO'
+  | 'BOMBA_LOCAL_SETUP'
+  | 'BOMBA_LOCAL_GAME'
+  | 'LPR_LOCAL_SETUP'
+  | 'LPR_LOCAL_GAME';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<AppView>(() => {
-    // Check if user came from a shared invitation link for Pinturillo
+  const [urlRoomCode, setUrlRoomCode] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('game') === 'pinturillo' || params.get('room')) {
+      return params.get('room') || '';
+    }
+    return '';
+  });
+
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const game = params.get('game');
+      const room = params.get('room');
+
+      if (game === 'la-bomba') return 'BOMBA_ONLINE';
+      if (game === 'la-peor-respuesta') return 'LPR_ONLINE';
+      if (game === 'pinturillo') return 'PINTURILLO';
+      if (room) {
+        // Default with room parameter: Pinturillo
         return 'PINTURILLO';
       }
     }
     return 'MENU';
   });
 
-  // La Bomba state
+  // Local modes state (optional pass-and-play fallbacks)
   const [gamePlayers, setGamePlayers] = useState<Player[]>([]);
   const [gameConfig, setGameConfig] = useState<GameConfig>({
     startingLives: 3,
     allowedMistakesPerRound: 3,
   });
 
-  // La Peor Respuesta state
   const [lprPlayers, setLprPlayers] = useState<LPRPlayer[]>([]);
   const [lprConfig, setLprConfig] = useState<LaPeorRespuestaConfig>({
     totalRounds: 10,
@@ -41,26 +64,12 @@ export default function App() {
 
   const handleSelectGame = (gameId: string) => {
     if (gameId === 'la-bomba') {
-      setCurrentView('SETUP');
+      setCurrentView('BOMBA_ONLINE');
     } else if (gameId === 'la-peor-respuesta') {
-      setCurrentView('LPR_SETUP');
+      setCurrentView('LPR_ONLINE');
     } else if (gameId === 'pinturillo') {
       setCurrentView('PINTURILLO');
     }
-  };
-
-  // La Bomba handlers
-  const handleStartGame = (players: Player[], config: GameConfig) => {
-    setGamePlayers(players);
-    setGameConfig(config);
-    setCurrentView('GAME');
-  };
-
-  // La Peor Respuesta handlers
-  const handleStartLPRGame = (players: LPRPlayer[], config: LaPeorRespuestaConfig) => {
-    setLprPlayers(players);
-    setLprConfig(config);
-    setCurrentView('LPR_GAME');
   };
 
   const handleBackToMenu = () => {
@@ -69,7 +78,15 @@ export default function App() {
       const newUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
       window.history.pushState({ path: newUrl }, '', newUrl);
     }
+    setUrlRoomCode('');
     setCurrentView('MENU');
+  };
+
+  const handleSwitchGame = (game: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo', code: string) => {
+    setUrlRoomCode(code);
+    if (game === 'la-bomba') setCurrentView('BOMBA_ONLINE');
+    else if (game === 'la-peor-respuesta') setCurrentView('LPR_ONLINE');
+    else if (game === 'pinturillo') setCurrentView('PINTURILLO');
   };
 
   return (
@@ -78,15 +95,42 @@ export default function App() {
         <MainMenu onSelectGame={handleSelectGame} />
       )}
 
-      {/* 1. LA BOMBA */}
-      {currentView === 'SETUP' && (
+      {/* 1. LA BOMBA (ONLINE MULTIPLAYER) */}
+      {currentView === 'BOMBA_ONLINE' && (
+        <BombaOnlineContainer
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
+      )}
+
+      {/* 2. LA PEOR RESPUESTA (ONLINE MULTIPLAYER) */}
+      {currentView === 'LPR_ONLINE' && (
+        <LPROnlineContainer
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
+      )}
+
+      {/* 3. PINTURILLO (ONLINE MULTIPLAYER) */}
+      {currentView === 'PINTURILLO' && (
+        <PinturilloGame onBackToMenu={handleBackToMenu} />
+      )}
+
+      {/* OPTIONAL LOCAL PASS-AND-PLAY FALLBACKS */}
+      {currentView === 'BOMBA_LOCAL_SETUP' && (
         <PlayerSetup
-          onStartGame={handleStartGame}
+          onStartGame={(p, c) => {
+            setGamePlayers(p);
+            setGameConfig(c);
+            setCurrentView('BOMBA_LOCAL_GAME');
+          }}
           onBackToMenu={handleBackToMenu}
         />
       )}
 
-      {currentView === 'GAME' && (
+      {currentView === 'BOMBA_LOCAL_GAME' && (
         <LaBombaGame
           initialPlayers={gamePlayers}
           gameConfig={gameConfig}
@@ -94,27 +138,24 @@ export default function App() {
         />
       )}
 
-      {/* 2. LA PEOR RESPUESTA */}
-      {currentView === 'LPR_SETUP' && (
+      {currentView === 'LPR_LOCAL_SETUP' && (
         <LaPeorRespuestaSetup
-          onStartGame={handleStartLPRGame}
+          onStartGame={(p, c) => {
+            setLprPlayers(p);
+            setLprConfig(c);
+            setCurrentView('LPR_LOCAL_GAME');
+          }}
           onBackToMenu={handleBackToMenu}
         />
       )}
 
-      {currentView === 'LPR_GAME' && (
+      {currentView === 'LPR_LOCAL_GAME' && (
         <LaPeorRespuestaGame
           initialPlayers={lprPlayers}
           config={lprConfig}
           onBackToMenu={handleBackToMenu}
         />
       )}
-
-      {/* 3. PINTURILLO ONLINE */}
-      {currentView === 'PINTURILLO' && (
-        <PinturilloGame onBackToMenu={handleBackToMenu} />
-      )}
     </div>
   );
 }
-

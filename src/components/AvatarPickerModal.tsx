@@ -7,8 +7,9 @@ import { audio } from '../utils/audio';
 interface AvatarPickerModalProps {
   isOpen: boolean;
   playerName: string;
-  playerColorHex: string;
-  selectedAvatar: string;
+  playerColorHex?: string;
+  selectedAvatar?: string;
+  currentAvatar?: string;
   usedAvatars?: string[];
   onSelectAvatar: (avatar: string) => void;
   onClose: () => void;
@@ -17,13 +18,16 @@ interface AvatarPickerModalProps {
 export const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
   isOpen,
   playerName,
-  playerColorHex,
+  playerColorHex = '#f59e0b',
   selectedAvatar,
+  currentAvatar,
   usedAvatars = [],
   onSelectAvatar,
   onClose,
 }) => {
   if (!isOpen) return null;
+
+  const activeAvatar = selectedAvatar || currentAvatar || '🦁';
 
   const handlePick = (avatar: string) => {
     onSelectAvatar(avatar);
@@ -32,8 +36,8 @@ export const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
 
   const handleRandom = () => {
     // Pick an unused random avatar, excluding current
-    const unused = AVATARS.filter((a) => a !== selectedAvatar && !usedAvatars.includes(a));
-    const pool = unused.length > 0 ? unused : AVATARS.filter((a) => a !== selectedAvatar);
+    const unused = AVATARS.filter((a) => a !== activeAvatar && !usedAvatars.includes(a));
+    const pool = unused.length > 0 ? unused : AVATARS.filter((a) => a !== activeAvatar);
     const chosen = pool[Math.floor(Math.random() * pool.length)] || getRandomAnimalAvatar();
     onSelectAvatar(chosen);
     audio.playSpark();
@@ -56,7 +60,7 @@ export const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
                 className="w-10 h-10 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-white/20 shrink-0"
                 style={{ backgroundColor: playerColorHex }}
               >
-                {selectedAvatar}
+                {activeAvatar}
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-black font-display text-white tracking-wide">
@@ -93,7 +97,7 @@ export const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
           {/* Grid of Avatars */}
           <div className="p-4 sm:p-6 overflow-y-auto max-h-[55vh] grid grid-cols-6 sm:grid-cols-8 gap-2.5 sm:gap-3 bg-slate-900/90">
             {AVATARS.map((avatar, index) => {
-              const isSelected = avatar === selectedAvatar;
+              const isSelected = avatar === activeAvatar;
               const isUsedByOther = usedAvatars.includes(avatar) && !isSelected;
 
               return (

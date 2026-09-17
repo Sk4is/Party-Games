@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Player, LetterSequence, UsedWord, GameStats, BombDangerLevel } from '../types';
+import { Player, LetterSequence, UsedWord, GameStats, BombDangerLevel, GameConfig } from '../types';
 import { getNextSequence, getRandomSequence } from '../data/sequences';
 import { validateSpanishWordAsync } from '../utils/validation';
 import { audio } from '../utils/audio';
@@ -20,6 +20,7 @@ import { HelpCircle, ArrowLeft, AlertTriangle, CheckCircle2, Trophy, ChevronRigh
 
 interface LaBombaGameProps {
   initialPlayers: Player[];
+  gameConfig?: GameConfig;
   onBackToMenu: () => void;
 }
 

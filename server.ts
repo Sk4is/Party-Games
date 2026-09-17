@@ -6,6 +6,8 @@ import { createRequire } from 'module';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import { PinturilloServer } from './server/pinturilloGameServer';
+import { PartyGameServer } from './server/partyGameServer';
+import { roomRegistry } from './server/roomRegistry';
 
 dotenv.config();
 
@@ -176,7 +178,114 @@ Devuelve JSON: { "isRealWord": boolean, "canonicalWord": string }`;
   }
 });
 
+// Game servers instances (single source of truth for rooms)
+let pinturilloServer: PinturilloServer;
+let partyGameServer: PartyGameServer;
+
+// Check room info by code
+app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
+  const code = (req.params.code || '').toUpperCase().trim();
+  const partyInfo = partyGameServer?.getRoomInfo(code);
+  if (partyInfo) {
+    return res.json({ exists: true, room: partyInfo, code: partyInfo.code, gameType: partyInfo.gameType });
+  }
+  const pinturilloInfo = pinturilloServer?.getRoomInfo(code);
+  if (pinturilloInfo) {
+    return res.json({ exists: true, room: pinturilloInfo, code: pinturilloInfo.code, gameType: pinturilloInfo.gameType });
+  }
+  return res.status(404).json({ exists: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
+});
+
+// Create room HTTP endpoint (fast deterministic room generation)
+app.post('/api/rooms/create', (req, res) => {
+  try {
+    const { gameType, hostPlayer, config } = req.body;
+    if (!gameType || !hostPlayer || !hostPlayer.id) {
+      return res.status(400).json({ success: false, message: 'Faltan datos requeridos para crear la sala' });
+    }
+
+    const normalizedPlayer = {
+      id: hostPlayer.id,
+      name: (hostPlayer.name || 'Jugador').trim(),
+      avatar: hostPlayer.avatar || '🦊',
+      color: hostPlayer.color || '#f59e0b',
+    };
+
+    if (gameType === 'la-bomba' || gameType === 'la-peor-respuesta') {
+      const room = partyGameServer.createRoomDirect(gameType, normalizedPlayer, config);
+      return res.json({ success: true, room });
+    } else if (gameType === 'pinturillo') {
+      const room = pinturilloServer.createRoomDirect(normalizedPlayer as any, config);
+      return res.json({ success: true, room });
+    }
+
+    return res.status(400).json({ success: false, message: 'Tipo de juego no soportado' });
+  } catch (err: any) {
+    console.error('Error in /api/rooms/create:', err);
+    return res.status(500).json({ success: false, message: 'Error interno al crear la sala' });
+  }
+});
+
+// Validate join room HTTP endpoint (instant validation before connecting socket)
+app.post('/api/rooms/validate-join', (req, res) => {
+  try {
+    const { code: rawCode, gameType } = req.body;
+    const code = (rawCode || '').toUpperCase().trim();
+    if (!code) {
+      return res.status(400).json({ valid: false, message: 'Introduce un código de sala' });
+    }
+
+    const partyInfo = partyGameServer?.getRoomInfo(code);
+    const pinturilloInfo = pinturilloServer?.getRoomInfo(code);
+    const roomInfo = partyInfo || pinturilloInfo;
+
+    if (!roomInfo) {
+      return res.status(404).json({ valid: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
+    }
+
+    if (gameType && roomInfo.gameType !== gameType) {
+      const gameName =
+        roomInfo.gameType === 'la-bomba'
+          ? 'LA BOMBA'
+          : roomInfo.gameType === 'la-peor-respuesta'
+          ? 'LA PEOR RESPUESTA'
+          : 'PINTURILLO';
+      return res.status(400).json({
+        valid: false,
+        wrongGame: true,
+        actualGameType: roomInfo.gameType,
+        message: `ESTE CÓDIGO PERTENECE A ${gameName}`,
+        room: roomInfo,
+      });
+    }
+
+    if (roomInfo.phase !== 'LOBBY') {
+      return res.status(400).json({
+        valid: false,
+        message: 'LA PARTIDA YA HA EMPEZADO',
+        room: roomInfo,
+      });
+    }
+
+    if (roomInfo.isFull) {
+      return res.status(400).json({
+        valid: false,
+        message: 'LA SALA ESTÁ COMPLETA',
+        room: roomInfo,
+      });
+    }
+
+    return res.json({ valid: true, room: roomInfo });
+  } catch (err: any) {
+    console.error('Error in /api/rooms/validate-join:', err);
+    return res.status(500).json({ valid: false, message: 'Error al verificar la sala' });
+  }
+});
+
 async function startServer() {
+  pinturilloServer = new PinturilloServer();
+  partyGameServer = new PartyGameServer();
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -192,7 +301,24 @@ async function startServer() {
   }
 
   const httpServer = http.createServer(app);
-  new PinturilloServer(httpServer);
+
+  // Explicit WebSocket upgrade routing
+  httpServer.on('upgrade', (request, socket, head) => {
+    const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+    const pathname = url.pathname;
+
+    if (pathname === '/ws/pinturillo') {
+      pinturilloServer.wss.handleUpgrade(request, socket, head, (ws) => {
+        pinturilloServer.wss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/ws/party' || pathname === '/ws') {
+      partyGameServer.wss.handleUpgrade(request, socket, head, (ws) => {
+        partyGameServer.wss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  });
 
   httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);

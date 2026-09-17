@@ -55,7 +55,8 @@ export type PinturilloPhase =
   | 'COUNTDOWN'
   | 'DRAWING'
   | 'ROUND_RESULTS'
-  | 'FINAL_RESULTS';
+  | 'FINAL_RESULTS'
+  | 'MATCH_ABORTED_NOT_ENOUGH_PLAYERS';
 
 export interface PinturilloPlayer {
   id: string;
@@ -126,6 +127,7 @@ export interface PinturilloRoomState {
       order?: number;
     }>;
   };
+  abortReason?: string;
 }
 
 // WebSocket Event Payloads

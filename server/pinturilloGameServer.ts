@@ -11,6 +11,7 @@ import {
   NormalizedPoint,
 } from '../src/types/pinturillo';
 import { PINTURILLO_WORDS, getRandomWordOptions, DrawableWord } from '../src/data/pinturilloWords';
+import { roomRegistry } from './roomRegistry';
 
 interface ClientConnection {
   ws: WebSocket;
@@ -20,6 +21,7 @@ interface ClientConnection {
 
 interface ServerRoom {
   code: string;
+  gameType?: 'pinturillo';
   hostId: string;
   phase: PinturilloRoomState['phase'];
   config: PinturilloConfig;
@@ -98,19 +100,120 @@ function generateRoomCode(existingCodes: Set<string>): string {
     for (let i = 0; i < 5; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-  } while (existingCodes.has(code));
+  } while (existingCodes.has(code) || roomRegistry.has(code));
   return code;
 }
 
 export class PinturilloServer {
-  private wss: WebSocketServer;
+  public wss: WebSocketServer;
   private rooms = new Map<string, ServerRoom>();
   private clients = new Map<WebSocket, ClientConnection>();
 
-  constructor(server: HttpServer) {
-    this.wss = new WebSocketServer({ server, path: '/ws/pinturillo' });
+  constructor(server?: HttpServer) {
+    if (server) {
+      this.wss = new WebSocketServer({ server, path: '/ws/pinturillo' });
+    } else {
+      this.wss = new WebSocketServer({ noServer: true });
+    }
     this.init();
     console.log('[Pinturillo] Servidor WebSocket inicializado en /ws/pinturillo');
+  }
+
+  public getRoomInfo(code: string) {
+    const clean = code.toUpperCase().trim();
+    const room = this.rooms.get(clean);
+    if (room) {
+      return {
+        roomId: room.code,
+        roomCode: room.code,
+        code: room.code,
+        gameType: 'pinturillo' as const,
+        hostId: room.hostId,
+        phase: room.phase,
+        playersCount: room.players.filter(p => p.isConnected).length,
+        totalPlayers: room.players.length,
+        maxPlayers: 10,
+        isFull: room.players.length >= 10,
+        players: room.players,
+        createdAt: Date.now(),
+      };
+    }
+    return null;
+  }
+
+  public createRoomDirect(player: PinturilloPlayer, config?: any) {
+    const roomCode = roomRegistry.generateCode();
+    const room: ServerRoom = {
+      code: roomCode,
+      gameType: 'pinturillo',
+      hostId: player.id,
+      phase: 'LOBBY',
+      config: {
+        roundTimeSeconds: (config as any)?.roundTimeSeconds || 90,
+        totalVueltas: (config as any)?.totalVueltas || 2,
+        hintsEnabled: (config as any)?.hintsEnabled ?? true,
+        categories: [
+          'animales',
+          'comida',
+          'objetos',
+          'lugares',
+          'cine_tv',
+          'videojuegos',
+          'deportes',
+          'profesiones',
+          'naturaleza',
+          'acciones',
+        ],
+      },
+      players: [{ ...player, isHost: true, isConnected: true }],
+      currentDrawerIndex: 0,
+      currentTurn: 0,
+      totalTurns: 0,
+      currentVuelta: 1,
+      secretWord: '',
+      wordCategory: '',
+      wordOptions: [],
+      revealedIndices: new Set(),
+      wordHint: '',
+      remainingTime: 90,
+      totalRoundTime: 90,
+      selectionRemainingSeconds: 10,
+      drawingStrokes: [],
+      undoStack: [],
+      chatMessages: [
+        {
+          id: 'sys-welcome',
+          playerName: 'Sistema',
+          text: `¡Sala creada! Código de acceso: ${roomCode}`,
+          isSystem: true,
+          timestamp: Date.now(),
+        },
+      ],
+      usedWords: new Set(),
+      timerInterval: null,
+      selectionInterval: null,
+      countdownInterval: null,
+      countdownTimeouts: [],
+      countdownFailSafeTimeout: null,
+      intermissionTimeout: null,
+    };
+
+    this.rooms.set(roomCode, room);
+    roomRegistry.register(roomCode, 'pinturillo', 'pinturillo');
+    return {
+      roomId: roomCode,
+      roomCode,
+      code: roomCode,
+      gameType: 'pinturillo' as const,
+      hostId: player.id,
+      phase: 'LOBBY' as const,
+      createdAt: Date.now(),
+      settings: room.config,
+      players: room.players,
+      playersCount: 1,
+      maxPlayers: 10,
+      isFull: false,
+    };
   }
 
   private init() {
@@ -209,6 +312,7 @@ export class PinturilloServer {
         };
 
         this.rooms.set(roomCode, room);
+        roomRegistry.register(roomCode, 'pinturillo', 'pinturillo');
         this.clients.set(ws, { ws, playerId: player.id, roomId: roomCode });
         this.broadcastRoomState(room);
         break;
@@ -219,6 +323,15 @@ export class PinturilloServer {
         const room = this.rooms.get(code);
 
         if (!room) {
+          const roomMeta = roomRegistry.get(code);
+          if (roomMeta && roomMeta.gameType !== 'pinturillo') {
+            const gameName = roomMeta.gameType === 'la-bomba' ? 'La Bomba' : 'La Peor Respuesta';
+            this.send(ws, {
+              type: 'error',
+              message: `Este código de sala (${code}) pertenece a ${gameName}.`,
+            });
+            return;
+          }
           this.send(ws, { type: 'error', message: `No se ha encontrado ninguna sala con el código «${code}». Comprueba el código e inténtalo de nuevo.` });
           return;
         }
@@ -893,9 +1006,21 @@ export class PinturilloServer {
       player.isConnected = false;
     }
 
+    // In LOBBY phase, remove disconnected player to avoid ghost players
+    if (room.phase === 'LOBBY') {
+      room.players = room.players.filter(p => p.id !== client.playerId);
+    }
+
+    if (room.players.length === 0) {
+      this.clearAllTimers(room);
+      this.rooms.delete(room.code);
+      roomRegistry.unregister(room.code);
+      return;
+    }
+
     // If host left, assign new host
     if (room.hostId === client.playerId) {
-      const nextConnected = room.players.find(p => p.isConnected);
+      const nextConnected = room.players.find(p => p.isConnected) || room.players[0];
       if (nextConnected) {
         room.hostId = nextConnected.id;
         nextConnected.isHost = true;
@@ -924,6 +1049,7 @@ export class PinturilloServer {
         if (stillInactive) {
           this.clearAllTimers(room);
           this.rooms.delete(room.code);
+          roomRegistry.unregister(room.code);
           console.log(`[Pinturillo] Sala ${room.code} eliminada por inactividad.`);
         }
       }, 300000);

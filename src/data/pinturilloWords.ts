@@ -5,295 +5,592 @@ export interface DrawableWord {
   word: string;
   category: PinturilloCategory;
   difficulty: 'FACIL' | 'NORMAL' | 'DIFICIL';
+  aliases?: string[];
 }
 
-// Helper to build list concisely
+type WordEntry = string | { word: string; aliases: string[] };
+
 function buildCategoryWords(
   cat: PinturilloCategory,
-  facil: string[],
-  normal: string[],
-  dificil: string[]
+  facil: WordEntry[],
+  normal: WordEntry[],
+  dificil: WordEntry[]
 ): DrawableWord[] {
   let idx = 1;
   const list: DrawableWord[] = [];
-  for (const w of facil) {
-    list.push({ id: `${cat}_${idx++}`, word: w.toLowerCase().trim(), category: cat, difficulty: 'FACIL' });
-  }
-  for (const w of normal) {
-    list.push({ id: `${cat}_${idx++}`, word: w.toLowerCase().trim(), category: cat, difficulty: 'NORMAL' });
-  }
-  for (const w of dificil) {
-    list.push({ id: `${cat}_${idx++}`, word: w.toLowerCase().trim(), category: cat, difficulty: 'DIFICIL' });
-  }
+
+  const addEntries = (entries: WordEntry[], diff: 'FACIL' | 'NORMAL' | 'DIFICIL') => {
+    for (const item of entries) {
+      if (typeof item === 'string') {
+        list.push({
+          id: `${cat}_${idx++}`,
+          word: item.trim(),
+          category: cat,
+          difficulty: diff,
+        });
+      } else {
+        list.push({
+          id: `${cat}_${idx++}`,
+          word: item.word.trim(),
+          category: cat,
+          difficulty: diff,
+          aliases: item.aliases,
+        });
+      }
+    }
+  };
+
+  addEntries(facil, 'FACIL');
+  addEntries(normal, 'NORMAL');
+  addEntries(dificil, 'DIFICIL');
   return list;
 }
 
-// 1. ANIMALES (~135 words)
-const ANIMALES_FACIL = [
-  'perro', 'gato', 'raton', 'oso', 'leon', 'elefante', 'mono', 'jirafa', 'vaca', 'caballo',
-  'cerdo', 'oveja', 'pato', 'conejo', 'pez', 'tiburon', 'delfin', 'ballena', 'tortuga', 'rana',
-  'serpiente', 'pajaro', 'loro', 'aguila', 'buho', 'mariposa', 'abeja', 'mosca', 'arana', 'hormiga',
-  'cangrejo', 'caracol', 'gallina', 'gallo', 'burro', 'cabra', 'foca', 'zorro', 'lobo', 'pinguino',
-  'pulpo', 'koala', 'panda', 'tigre', 'cocodrilo', 'cebra', 'rinoceronte', 'hipopotamo', 'camello',
-  'hamster', 'canario', 'huron', 'erizo', 'ciervo', 'paloma', 'cisne', 'cigueña', 'leopardo', 'oso polar'
-];
-const ANIMALES_NORMAL = [
-  'flamenco', 'erizo', 'ardilla', 'murcielago', 'medusa', 'camaleon', 'castor', 'nutria', 'mapache',
-  'cisne', 'pelicano', 'avestruz', 'pavo real', 'tucan', 'guepardo', 'leopardo', 'hiena', 'morsa',
-  'canguro', 'ornitorrinco', 'lemur', 'suricata', 'topo', 'grillo', 'saltamontes', 'mantis',
-  'luciernaga', 'escorpion', 'calamar', 'estrella de mar', 'caballito de mar', 'raya', 'pez espada',
-  'pez payaso', 'chimpance', 'gorila', 'orangutan', 'halcon', 'gaviota', 'golondrina', 'colibri',
-  'chigüiro', 'armadillo', 'perezoso', 'iguana', 'gecko', 'salamandra', 'sapo', 'ciervo', 'alce', 'jabali',
-  'mantarraya', 'langostino', 'salmon', 'atun', 'bacalao', 'ganso', 'buitre', 'lince', 'hiena'
-];
-const ANIMALES_DIFICIL = [
-  'ajolote', 'narval', 'beluga', 'pangolin', 'lemur volador', 'quetzal', 'kiwi', 'dodo', 'lemur de cola anillada',
-  'diablo de tasmania', 'ocelote', 'tapir', 'capibara', 'caracal', 'fenec', 'dugongo', 'pez globo', 'anguila electrica',
-  'dragon de komodo', 'ciempies', 'milpies', 'cucaracha', 'chinche', 'mariquita', 'escarabajo rinoceronte',
-  'pez linterna', 'anaconda', 'cobra real', 'lobo marino', 'orca asesina', 'camaron mantis', 'lechuza',
-  'tarantula gigante', 'salamandra de fuego', 'camaleon pantera', 'pez espada gigante', 'escarabajo pelotero',
-  'babosa de mar multicolor', 'pez leon venenoso', 'mantarraya gigante', 'cangrejo ermitano', 'pulpo mimico'
+// ============================================================================
+// 1. ANIMALES (~140 palabras: ~85% una sola palabra, ~15% compuestos naturales)
+// ============================================================================
+const ANIMALES_FACIL: WordEntry[] = [
+  'perro', 'gato', 'ratón', 'oso', 'león', 'tigre', 'elefante', 'jirafa', 'mono', 'gorila',
+  'vaca', 'toro', 'caballo', 'cerdo', 'oveja', 'cabra', 'pato', 'conejo', 'pez', 'tiburón',
+  'delfín', 'ballena', 'tortuga', 'rana', 'serpiente', 'pájaro', 'loro', 'águila', 'búho', 'mariposa',
+  'abeja', 'mosca', 'araña', 'hormiga', 'cangrejo', 'caracol', 'gallina', 'gallo', 'burro', 'lobo',
+  'zorro', 'pingüino', 'pulpo', 'koala', 'cebra', 'rinoceronte', 'hipopótamo', 'camello', 'foca', 'ciervo',
+  'paloma', 'cisne', 'leopardo',
+  { word: 'oso polar', aliases: ['polar', 'oso del polo'] },
+  { word: 'oso panda', aliases: ['panda'] },
+  { word: 'pez payaso', aliases: ['nemo', 'payaso'] },
+  { word: 'pavo real', aliases: ['pavorreal'] },
+  { word: 'estrella de mar', aliases: ['estrella marina'] },
+  { word: 'caballito de mar', aliases: ['hipocampo'] },
+  { word: 'pez espada', aliases: ['espadarte'] }
 ];
 
-// 2. COMIDA Y BEBIDA (~135 words)
-const COMIDA_FACIL = [
-  'pizza', 'hamburguesa', 'patatas fritas', 'helado', 'tarta', 'pastel', 'chocolate', 'galleta',
-  'pan', 'huevo', 'leche', 'queso', 'manzana', 'platano', 'pera', 'naranja', 'limon', 'fresa',
-  'sandia', 'melon', 'uva', 'cereza', 'pinia', 'tomate', 'zanahoria', 'lechuga', 'cebolla',
-  'pescado', 'pollo', 'carne', 'arroz', 'sopa', 'espaguetis', 'bocadillo', 'cafe', 'te',
-  'zumo', 'agua', 'refresco', 'palomitas', 'croissant', 'donut', 'magdalena', 'caramelo', 'chicle',
-  'bombones', 'salchicha', 'filete', 'pure de patatas', 'ensalada', 'aceite de oliva', 'miel', 'mantequilla'
-];
-const COMIDA_NORMAL = [
-  'paella', 'tortilla de patatas', 'croquetas', 'churros con chocolate', 'gazpacho', 'salmorejo',
-  'jamon serrano', 'sushi', 'taco', 'burrito', 'nachos con queso', 'quesadilla', 'guacamole',
-  'lasaña', 'raviolis', 'crepe', 'gofre', 'tortitas', 'batido de fresa', 'granizado de limon',
-  'cacao', 'ensalada mixta', 'espárragos', 'alcachofa', 'berenjena', 'calabacin', 'champiñon',
-  'setas', 'aceitunas', 'pepino', 'pimiento', 'aguacate', 'mango', 'kiwi', 'melocoton', 'albaricoque',
-  'higo', 'granada', 'pomelo', 'frambuesa', 'arandanos', 'moras', 'flan', 'natillas', 'arroz con leche',
-  'callos a la madrileña', 'empanadillas', 'patatas alioli', 'tortilla francesa', 'torrijas', 'crema de calabaza'
-];
-const COMIDA_DIFICIL = [
-  'fondue de queso', 'pulpo a la gallega', 'fabada asturiana', 'cocido madrileño', 'patatas bravas',
-  'empanada gallega', 'calamares a la romana', 'langosta', 'bogavante', 'mejillones al vapor',
-  'ostras', 'tiramisu', 'profiteroles', 'brownie con nueces', 'fondant de chocolate', 'mojito sin alcohol',
-  'sangria', 'cerveza sin alcohol', 'crema catalana', 'polvoron', 'turron de jijona', 'roscon de reyes',
-  'pisto manchego', 'salmorejo cordobes', 'pimientos de padron', 'huevos rotos con jamon', 'ensaladilla rusa'
+const ANIMALES_NORMAL: WordEntry[] = [
+  'flamenco', 'erizo', 'ardilla', 'murciélago', 'medusa', 'camaleón', 'castor', 'nutria', 'mapache',
+  'pelícano', 'avestruz', 'tucán', 'colibrí', 'halcón', 'gaviota', 'golondrina', 'cuervo', 'pavo',
+  'guepardo', 'hiena', 'morsa', 'canguro', 'topo', 'grillo', 'saltamontes', 'mantis', 'luciérnaga',
+  'escorpión', 'calamar', 'chimpancé', 'orangután', 'perezoso', 'armadillo', 'ornitorrinco', 'lémur',
+  'suricata', 'iguana', 'sapo', 'alce', 'jabalí', 'dromedario', 'langosta', 'mosquito', 'avispa',
+  'mariquita', 'libélula', 'salmón', 'atún', 'buitre', 'cigüeña', 'lince',
+  { word: 'pez globo', aliases: ['globo'] },
+  { word: 'pez martillo', aliases: ['martillo'] },
+  { word: 'mantarraya', aliases: ['manta raya', 'raya gigante'] }
 ];
 
-// 3. OBJETOS (~130 words)
-const OBJETOS_FACIL = [
-  'mesa', 'silla', 'cama', 'sofa', 'armario', 'puerta', 'ventana', 'espejo', 'reloj', 'lampara',
-  'bombilla', 'vela', 'libro', 'lapiz', 'boligrafo', 'papel', 'tijeras', 'goma de borrar', 'regla',
-  'mochila', 'maleta', 'bolso', 'cartera', 'llave', 'candado', 'telefono', 'movil', 'ordenador',
-  'teclado', 'raton de ordenador', 'pantalla', 'television', 'radio', 'altavoz', 'camara', 'gafas',
-  'paraguas', 'cepillo de dientes', 'peine', 'jabon', 'toalla', 'vaso', 'taza', 'plato', 'cuchara',
-  'tenedor', 'cuchillo', 'sarten', 'olla', 'botella', 'cepillo de pelo', 'esponja de baño', 'cubo de basura',
-  'pinza de ropa', 'percha', 'hucha de cerdito', 'abrelatas', 'sacacorchos', 'embudo', 'rallador de queso'
-];
-const OBJETOS_NORMAL = [
-  'microfono', 'auriculares', 'mando a distancia', 'ventilador', 'aspiradora', 'tostadora', 'cafetera',
-  'microondas', 'nevera', 'lavadora', 'plancha de ropa', 'secador de pelo', 'bateria portatil',
-  'cable usb', 'enchufe', 'linterna', 'pilas', 'brujula', 'mapa', 'globo terraqueo', 'termometro',
-  'balanza', 'reloj de arena', 'reloj de pulsera', 'despertador', 'prismáticos', 'telescopio',
-  'microscopio', 'lupa', 'gafas de sol', 'sombrero', 'gorra', 'bufanda', 'guantes', 'cinturon',
-  'paraguero', 'perchero', 'felpudo', 'estanteria', 'cuadro', 'jarron con flores', 'maceta',
-  'cojin', 'manta', 'alfombra', 'cortina', 'extintor', 'caja de herramientas', 'martillo', 'destornillador',
-  'regadera de jardin', 'planta artificial', 'termo de cafe', 'botijo de barro', 'abanico espanol', 'fregonas y cubo'
-];
-const OBJETOS_DIFICIL = [
-  'alicate', 'llave inglesa', 'sierra manual', 'taladro electrico', 'cinta metrica', 'carretilla',
-  'escalera de mano', 'buzon de correos', 'farola', 'semaforo', 'boca de incendios', 'parquímetro',
-  'cabina telefonica', 'maquina expendedora', 'tocadiscos', 'cinta de cassette', 'walkie talkie',
-  'proyector de cine', 'maquina de escribir', 'bola de discoteca', 'trofeo dorado', 'medalla de oro',
-  'yunque de herrero', 'fuelle de chimenea', 'veleta de viento', 'reloj de sol', 'gramofono antiguo'
+const ANIMALES_DIFICIL: WordEntry[] = [
+  'ajolote', 'narval', 'beluga', 'pangolín', 'capibara', 'ocelote', 'tapir', 'fenec', 'dodo',
+  'quetzal', 'kiwi', 'ciempiés', 'milpiés', 'tarántula', 'salamandra', 'gecko',
+  { word: 'dragón de komodo', aliases: ['varano de komodo', 'komodo'] },
+  { word: 'demonio de tasmania', aliases: ['diablo de tasmania'] },
+  { word: 'anguila eléctrica', aliases: ['anguila'] },
+  { word: 'pez linterna', aliases: ['rape abisal'] },
+  { word: 'pez león', aliases: ['pez leon'] },
+  { word: 'cobra real', aliases: ['cobra'] },
+  { word: 'anaconda', aliases: ['boa'] },
+  { word: 'cangrejo ermitaño', aliases: ['ermitaño'] },
+  { word: 'escarabajo pelotero', aliases: ['pelotero'] }
 ];
 
-// 4. LUGARES (~125 words)
-const LUGARES_FACIL = [
-  'casa', 'colegio', 'parque', 'playa', 'bosque', 'montaña', 'rio', 'isla', 'castillo', 'hospital',
-  'supermercado', 'tienda', 'restaurante', 'cine', 'teatro', 'piscina', 'zoo', 'aeropuerto',
-  'estacion de tren', 'puerto', 'puente', 'calle', 'plaza', 'granja', 'circo', 'hotel', 'estadio',
-  'cabaña de madera', 'terraza de bar', 'churrería', 'quiosco de prensa', 'gasolinera', 'lavadero de coches'
-];
-const LUGARES_NORMAL = [
-  'biblioteca', 'museo de arte', 'banco', 'farmacia', 'panaderia', 'peluqueria', 'gasolinera',
-  'aparcamiento', 'comisaria de policia', 'parque de bomberos', 'iglesia', 'catedral', 'cementerio',
-  'parque de atracciones', 'acuario', 'bolera', 'discoteca', 'gimnasio', 'pista de hielo',
-  'estacion de autobuses', 'parada de metro', 'faro en la costa', 'molino de viento', 'torre eiffel',
-  'coliseo romano', 'piramide de egipto', 'estatua de la libertad', 'muralla china', 'cueva oscura',
-  'volcan activo', 'desierto de arena', 'glaciar helado', 'cascada de agua', 'selva tropical',
-  'embarcadero de madera', 'mercadillo ambulante', 'bodega de vino', 'plaza de toros', 'pista de tenis', 'campo de golf'
-];
-const LUGARES_DIFICIL = [
-  'refugio de montaña', 'observatorio astronomico', 'laboratorio secreto', 'estacion espacial',
-  'base antartica', 'isla desierta', 'pueblo fantasma', 'castillo embrujado', 'laberinto de setos',
-  'mina de carbon', 'plataforma petrolifera', 'submarino sumergido', 'estudio de grabacion',
-  'hangar de aviones', 'trinchera historica', 'tribunal de justicia', 'campamento militar',
-  'mercado medieval', 'mirador panoramico', 'puerto deportivo', 'parque nacional protegido',
-  'mina de oro abandonada', 'monasterio en la montaña', 'aldea vikinga', 'templo budista', 'isla volcanica'
+// ============================================================================
+// 2. COMIDA Y BEBIDA (~135 palabras: ~82% una sola palabra, ~18% compuestos reales)
+// ============================================================================
+const COMIDA_FACIL: WordEntry[] = [
+  'pizza', 'hamburguesa', 'paella', 'croqueta', 'tortilla', 'sushi', 'taco', 'burrito',
+  'espaguetis', 'macarrones', 'lasaña', 'helado', 'churros', 'donut', 'galleta', 'tarta',
+  'sandía', 'plátano', 'fresa', 'manzana', 'pera', 'naranja', 'limón', 'uva', 'cereza', 'piña',
+  'queso', 'pan', 'bocadillo', 'palomitas', 'café', 'cerveza', 'refresco', 'batido', 'zumo',
+  'leche', 'chocolate', 'huevo', 'carne', 'pescado', 'pollo', 'sopa', 'arroz', 'ensalada',
+  'flan', 'magdalena', 'croissant', 'caramelo', 'chicle', 'salchicha', 'filete', 'jamón',
+  'bacon', 'mantequilla', 'miel', 'tomate', 'patata', 'zanahoria',
+  { word: 'patatas fritas', aliases: ['papas fritas', 'patatas'] }
 ];
 
-// 5. CINE Y TELEVISIÓN (~120 words)
-const CINE_TV_FACIL = [
-  'cine', 'camara de cine', 'palomitas de maiz', 'pantalla gigante', 'claqueta de director',
-  'silla de director', 'superheroe', 'villano', 'princesa', 'caballero con armadura', 'dragon',
-  'mago con varita', 'bruja volando', 'fantasma', 'zombi', 'momia', 'alienigena', 'robot',
-  'monstruo', 'pirata con parche', 'vaquero del oeste', 'detective privado', 'agente secreto',
-  'estrella de hollywood', 'estatuilla del oscar', 'alfombra roja', 'entrada de cine',
-  'espada magica', 'escoba voladora', 'caldero magico', 'mascara de antifaz', 'capa negra', 'pistola laser'
-];
-const CINE_TV_NORMAL = [
-  'capa de superheroe', 'mascara de luchador', 'escudo protector', 'espada laser', 'platillo volante',
-  'nave espacial', 'coche fantastico', 'dinosaurio t-rex', 'hombre lobo aullando', 'vampiro con colmillos',
-  'calabaza de halloween', 'calavera pirata', 'cofre del tesoro', 'mapa del tesoro', 'isla calavera',
-  'barco pirata', 'tren del oeste', 'duelo al amanecer', 'explosion de accion', 'persecucion de coches',
-  'salto en paracaidas', 'pelea de artes marciales', 'viaje en el tiempo', 'maquina del tiempo',
-  'portal dimensional', 'rayo congelador', 'rayo reductor', 'espejo magico', 'lampara maravillosa',
-  'sirena con cola', 'unicornio con cuerno', 'ogro verde', 'duende travieso', 'gargola de piedra'
-];
-const CINE_TV_DIFICIL = [
-  'sombrero seleccionador', 'varita de sauco', 'anillo invisible', 'zapatilla de cristal',
-  'manzana envenenada', 'reloj de cuco embrujado', 'cuadro que se mueve', 'armadura parlante',
-  'cazafantasmas con mochila', 'monstruo del lago ness', 'pie grande en el bosque', 'king kong en rascacielos',
-  'godzilla en la ciudad', 'apocalipsis zombi', 'invasion extraterrestre', 'rueda de prensa',
-  'sala de montaje', 'guion de pelicula', 'efectos especiales de pantalla verde', 'doble de accion',
-  'coche descapotable de espia', 'reloj con rayos laser', 'baticueva secreta', 'trono de hierro', 'sable de luz doble'
+const COMIDA_NORMAL: WordEntry[] = [
+  'gazpacho', 'salmorejo', 'empanada', 'guacamole', 'quesadilla', 'nachos', 'crepe', 'gofre',
+  'tortitas', 'brownie', 'tiramisú', 'natillas', 'torrijas', 'alcachofa', 'espárragos', 'berenjena',
+  'calabacín', 'champiñón', 'setas', 'aceitunas', 'pepino', 'pimiento', 'aguacate', 'mango',
+  'kiwi', 'melocotón', 'albaricoque', 'higo', 'granada', 'frambuesa', 'arándanos', 'moras',
+  'melón', 'lentejas', 'garbanzos', 'judías', 'guisantes', 'maíz', 'calamares',
+  { word: 'tortilla de patatas', aliases: ['tortilla española', 'tortilla de patata'] },
+  { word: 'arroz con leche', aliases: ['arroz con leche'] },
+  { word: 'perrito caliente', aliases: ['hot dog', 'hotdog'] },
+  { word: 'tarta de queso', aliases: ['cheesecake'] },
+  { word: 'ensaladilla rusa', aliases: ['ensaladilla'] },
+  { word: 'patatas bravas', aliases: ['bravas'] },
+  { word: 'chocolate caliente', aliases: ['cacao caliente'] },
+  { word: 'zumo de naranja', aliases: ['jugo de naranja'] }
 ];
 
-// 6. VIDEOJUEGOS (~120 words)
-const VIDEOJUEGOS_FACIL = [
-  'mando de consola', 'pantalla de juego', 'auriculares gamer', 'teclado mecanico', 'raton gamer',
-  'moneda de oro', 'vida extra con corazon', 'seta magica', 'estrella de poder', 'pocion de salud',
-  'espada pixelada', 'escudo de madera', 'arco con flechas', 'pistola laser', 'bomba con mecha',
-  'caja misteriosa', 'cofre con llave', 'trofeo de platino', 'game over', 'pantalla de victory',
-  'llave de oro', 'puerta con candado', 'pocion verde', 'joya azul', 'corona de rey', 'corazon de vida'
-];
-const VIDEOJUEGOS_NORMAL = [
-  'consola portatil', 'maquina recreativa arcade', 'joystick clasico', 'casco de realidad virtual',
-  'bloque de ladrillos', 'tuberia verde', 'fantasmas persiguiendo', 'laberinto comecocos',
-  'bloque de tetris cayendo', 'creeper verde explotando', 'pico de diamante', 'antorcha encendida',
-  'coche de carreras con turbo', 'cascara de platano en pista', 'caparazon rojo teledirigido',
-  'anillo dorado flotante', 'esmeralda brillante', 'cristal de mana', 'pergamino magico',
-  'botas de velocidad', 'capa de invisibilidad', 'gancho de escalada', 'portal azul y naranja',
-  'escudo de pinchos', 'bola de fuego magica', 'martillo de guerra', 'pocion de invisibilidad'
-];
-const VIDEOJUEGOS_DIFICIL = [
-  'jefe final gigante con cuernos', 'barra de vida roja', 'barra de mana azul', 'puntos de experiencia',
-  'subida de nivel', 'arbol de habilidades', 'inventario lleno de objetos', 'mapa de mazmorra',
-  'trampa de pinchos en suelo', 'plataforma flotante movil', 'punto de guardado brillante',
-  'drop de botin legendario', 'speedrun con cronometro', 'combate por turnos', 'arena de batalla',
-  'pase de batalla desbloqueado', 'skin dorada exclusiva', 'easter egg oculto', 'zona segura de tormenta',
-  'respawn en hoguera', 'arma legendaria resplandeciente', 'torreta automatica', 'robot centinela'
+const COMIDA_DIFICIL: WordEntry[] = [
+  'ceviche', 'canelones', 'gyozas', 'ramen', 'fideuá', 'carpaccio', 'profiteroles', 'turrón',
+  { word: 'pulpo a la gallega', aliases: ['pulpo a feira', 'pulpo'] },
+  { word: 'fabada asturiana', aliases: ['fabada'] },
+  { word: 'cocido madrileño', aliases: ['cocido'] },
+  { word: 'calamares a la romana', aliases: ['calamares rebozados'] },
+  { word: 'bogavante', aliases: ['langosta'] },
+  { word: 'ostras', aliases: ['ostra'] },
+  { word: 'mejillones', aliases: ['mejillon'] },
+  { word: 'crema catalana', aliases: ['crema quemada'] },
+  { word: 'roscón de reyes', aliases: ['roscon'] },
+  { word: 'pisto manchego', aliases: ['pisto'] },
+  { word: 'huevos rotos', aliases: ['huevos estrellados'] },
+  { word: 'fondue de queso', aliases: ['fondue'] },
+  { word: 'pimientos de padrón', aliases: ['pimientos de padron'] }
 ];
 
-// 7. DEPORTES (~120 words)
-const DEPORTES_FACIL = [
-  'balon de futbol', 'porteria de futbol', 'canasta de baloncesto', 'balon de baloncesto',
-  'raqueta de tenis', 'pelota de tenis', 'pelota de golf', 'palo de golf', 'guantes de boxeo',
-  'ring de boxeo', 'bicicleta de carreras', 'casco de ciclista', 'patinete', 'monopatin',
-  'patines en linea', 'tabla de surf', 'olas para surfear', 'esquis en la nieve', 'trineo',
-  'piscina olimpica', 'banador', 'gafas de buceo', 'tubo de snorkel', 'aletas de buceo',
-  'pelota de futbol sala', 'cono de entrenamiento', 'silbato deportivo', 'cuerda de saltar'
-];
-const DEPORTES_NORMAL = [
-  'arbitro sacando tarjeta roja', 'tarjeta amarilla', 'silbato de arbitro', 'cinta de meta',
-  'podio con medallas', 'copa de campeon', 'bandera a cuadros de f1', 'coche de formula 1',
-  'moto de carreras', 'bate de beisbol', 'guante de beisbol', 'balon de rugby', 'red de voleibol',
-  'balon de voleibol', 'mesa de ping pong', 'pala de ping pong', 'diana con dardos',
-  'arco y flecha olimpico', 'tatami de judo', 'cinturon negro de karate', 'pesas de gimnasio',
-  'barra con discos', 'mancuernas', 'cuerda para saltar', 'cinta de correr', 'escalada en roca',
-  'arnes de seguridad', 'paracaidismo', 'ala delta planeando', 'kayak en rio bravo', 'piragua',
-  'portero parando penalti', 'remate de cabeza en futbol', 'tiro triple de baloncesto', 'salto de longitud'
-];
-const DEPORTES_DIFICIL = [
-  'tiro con arco olimpico', 'salto con pertiga', 'lanzamiento de jabalina', 'lanzamiento de disco',
-  'carrera de vallas', 'relevo con testigo', 'gimnasia con cinta ritmica', 'salto de trampolin al agua',
-  'natacion sincronizada', 'patinaje artistico sobre hielo', 'curling con escobilla', 'hockey sobre hielo',
-  'disco de hockey', 'salto en esqui de trampolin', 'bobsleigh en tubo de hielo', 'triatlon con medalla',
-  'esgrima con florete', 'remo en trainera', 'waterpolo en piscina', 'descenso en rafting'
+// ============================================================================
+// 3. OBJETOS (~140 palabras: ~85% una sola palabra, ~15% compuestos naturales)
+// ============================================================================
+const OBJETOS_FACIL: WordEntry[] = [
+  'paraguas', 'martillo', 'reloj', 'mochila', 'gafas', 'móvil', 'ordenador', 'televisión',
+  'nevera', 'tenedor', 'cuchillo', 'cuchara', 'llave', 'maleta', 'ventilador', 'micrófono',
+  'extintor', 'cámara', 'linterna', 'espejo', 'silla', 'mesa', 'sofá', 'cama', 'lámpara',
+  'cepillo', 'escoba', 'pala', 'tijeras', 'casco', 'globo', 'cometa', 'puerta', 'ventana',
+  'armario', 'estantería', 'alfombra', 'cuadro', 'jarrón', 'maceta', 'plato', 'vaso', 'taza',
+  'botella', 'sartén', 'olla', 'cubo', 'percha', 'toalla', 'jabón', 'peine', 'lápiz',
+  'bolígrafo', 'goma', 'regla', 'cuaderno', 'libro', 'candado', 'bombilla', 'vela'
 ];
 
-// 8. PROFESIONES (~120 words)
-const PROFESIONES_FACIL = [
-  'medico con bata', 'enfermero', 'bombero apagando fuego', 'policia con placa', 'profesor en pizarra',
-  'cocinero con gorro alto', 'camarero con bandeja', 'pintor con brocha', 'astronauta con casco',
-  'piloto de avion', 'azafata de vuelo', 'conductor de autobus', 'taxista', 'cartero con cartas',
-  'jardinero con regadera', 'pescador con caña', 'granjero con tractor', 'panadero amasando pan',
-  'carnicero con cuchillo', 'peluquero con tijeras', 'zapatero arreglando bota', 'mecanico con buzo'
-];
-const PROFESIONES_NORMAL = [
-  'dentista con espejo dental', 'veterinario curando perro', 'fotografo con tripode', 'mecanico bajo coche',
-  'fontanero con llave de tubo', 'electricista con cables', 'carpintero con serrucho', 'albanil con ladrillos',
-  'arquitecto con planos', 'cientifico con probetas', 'detective con gabardina y lupa', 'juez con mazo',
-  'abogado con maletin', 'periodista con microfono', 'locutor de radio', 'musico tocando guitarra',
-  'cantante en concierto', 'bailarina de ballet con tutú', 'actor de teatro con mascara', 'mago haciendo truco',
-  'guia turistico con bandera', 'socorrista en playa con flotador', 'pastor con ovejas', 'cajero de supermercado'
-];
-const PROFESIONES_DIFICIL = [
-  'arqueologo desenterrando fosil', 'paleontologo con hueso de dinosaurio', 'buzo profesional con bombona',
-  'relojero con pinzas diminutas', 'joyero tallando diamante', 'soplador de vidrio artistico',
-  'meteorologo señalando mapa', 'controlador aereo en torre', 'escultor con cincel y martillo',
-  'cirujano en quirofano con mascarilla', 'apicultor con traje protector', 'sommelier oliendo copa de vino',
-  'guardabosques con prismaticos', 'domador de leones con latigo', 'trapecista en el aire',
-  'encuadernador artesanal', 'restaurador de cuadros antiguos', 'luthier construyendo violin', 'catador de quesos'
+const OBJETOS_NORMAL: WordEntry[] = [
+  'aspiradora', 'tostadora', 'microondas', 'lavadora', 'secador', 'plancha', 'cafetera',
+  'auriculares', 'teclado', 'ratón', 'pantalla', 'radio', 'altavoz', 'enchufe', 'cable',
+  'pilas', 'batería', 'brújula', 'mapa', 'termómetro', 'balanza', 'despertador', 'prismáticos',
+  'telescopio', 'microscopio', 'lupa', 'sombrero', 'gorra', 'bufanda', 'guantes', 'cinturón',
+  'corbata', 'anillo', 'collar', 'pulsera', 'pendientes', 'grapadora', 'clip', 'sobre',
+  'cerilla', 'mechero', 'hucha', 'sacacorchos', 'abrelatas', 'embudo', 'regadera', 'flotador',
+  'diana', 'patinete', 'monopatín',
+  { word: 'reloj de arena', aliases: ['clepsidra'] },
+  { word: 'gafas de sol', aliases: ['lentes de sol'] },
+  { word: 'cepillo de dientes', aliases: ['cepillo dental'] },
+  { word: 'mando a distancia', aliases: ['mando de la tele', 'control remoto'] }
 ];
 
-// 9. NATURALEZA (~120 words)
-const NATURALEZA_FACIL = [
-  'sol brillante', 'luna llena', 'estrella fugaz', 'nube blanca', 'lluvia cayendo', 'arcoiris colorido',
-  'nieve cayendo', 'relampago en tormenta', 'viento soplando hojas', 'arbol con frutos', 'flor roja',
-  'hierba verde', 'montana nevada', 'rio cristalino', 'playa de arena', 'isla tropical con palmera',
-  'volcan con lava', 'cueva misteriosa', 'desierto con dunas', 'bosque frondoso',
-  'charco de agua de lluvia', 'piedra redonda', 'hoja de otono cayendo', 'rama de arbol', 'semilla germinando'
-];
-const NATURALEZA_NORMAL = [
-  'cascada gigante', 'glaciar de hielo azul', 'iceberg flotante', 'terremoto abriendo grieta',
-  'tornado destructivo', 'tsunami con ola gigante', 'aurora boreal verde', 'eclipse solar con anillo',
-  'eclipse lunar rojo', 'luna menguante', 'constelacion de estrellas', 'cometa con cola brillante',
-  'meteorito cayendo a tierra', 'geiser expulsando agua caliente', 'pantano con niebla espesa',
-  'arrecife de coral multicolor', 'oasis con agua y palmeras', 'caniçon rocoso profundo',
-  'acantilado sobre el mar', 'duna de arena ondeada', 'estalactitas colgando de techo',
-  'manantial de agua dulce', 'laguna con patos', 'selva con lianas colgantes', 'valle entre montanas',
-  'pradera verde', 'cordillera nevada', 'playa salvaje', 'pozo de agua natural', 'cueva de hielo',
-  'brote de planta verde', 'diente de leon al viento', 'rosa con espinas', 'trebol de cuatro hojas', 'orquidea salvaje'
-];
-const NATURALEZA_DIFICIL = [
-  'planta carnivora atrapando mosca', 'bosque de bambu gigante', 'secuoya milenaria gigante',
-  'flor de loto sobre agua', 'girasol gigante mirando al sol', 'nenufar con rana encima',
-  'cactus saguaro en el desierto', 'baobab con tronco inmenso', 'campo de lavanda morado',
-  'campo de tulipanes holandes', 'hongo bioluminiscente que brilla', 'fosil incrustado en roca',
-  'granizo rompiendo hojas', 'olas chocando en rompeolas', 'niebla espesa matutina', 'nieve en copo perfecto',
-  'sauce lloron sobre estanque', 'arbol bonsái milenario', 'helecho gigante prehistorico', 'palmera azotada por huracan'
+const OBJETOS_DIFICIL: WordEntry[] = [
+  'tocadiscos', 'proyector', 'podómetro', 'metrónomo', 'barómetro', 'caleidoscopio', 'periscopio',
+  'multímetro', 'gramófono', 'desatascador', 'cortacésped', 'motosierra',
+  { word: 'máquina de coser', aliases: ['maquina coser'] },
+  { word: 'detector de metales', aliases: ['detector metales'] },
+  { word: 'walkie talkie', aliases: ['walkie', 'transmisor'] },
+  { word: 'chaleco salvavidas', aliases: ['salvavidas'] },
+  { word: 'cinta métrica', aliases: ['metro', 'flexómetro'] },
+  { word: 'nivel de burbuja', aliases: ['nivel'] },
+  { word: 'gato hidráulico', aliases: ['gato mecanico'] }
 ];
 
-// 10. ACCIONES Y SITUACIONES (~120 words)
-const ACCIONES_FACIL = [
-  'dormir con zzz', 'correr muy rapido', 'bailar con musica', 'cantar con microfono', 'reir a carcajadas',
-  'llorar con lagrimas', 'comer pizza', 'beber agua en vaso', 'saltar en cama elastica', 'nadar crol',
-  'dibujar en papel', 'escribir carta', 'leer libro gordo', 'cocinar en sarten', 'barrer con escoba',
-  'lavar platos con espuma', 'lavarse los dientes', 'ducharse con patito de goma', 'peinarse frente al espejo',
-  'abrazar a un amigo', 'saludar con la mano', 'aplaudir entusiasmado', 'guiñar un ojo', 'dar un beso',
-  'silbar alegremente', 'guiar el coche', 'abrir un paraguas', 'cerrar una cremallera', 'atar los cordones'
-];
-const ACCIONES_NORMAL = [
-  'hacerse un selfie con palo', 'tropezar con una piedra', 'resbalar con platano', 'estornudar fuerte',
-  'bostezar con boca abierta', 'perder el autobus corriendo', 'abrir un regalo con lazo', 'apagar velas de cumpleanos',
-  'tirar penalti decisivo', 'pescar bota vieja del agua', 'construir castillo de arena', 'volar cometa con viento',
-  'pasear al perro con correa', 'regar las plantas con regadera', 'hacer la compra con carrito',
-  'esperar en la cola pacientemente', 'cruzar paso de cebra', 'hacer autostop con pulgar',
-  'subir escaleras cansado', 'bajar por tobogan rapido', 'balancearse en columpio alto',
-  'hacer pompas de jabon', 'soplar molinillo de viento', 'inflar un globo hasta explotar', 'chocar los cinco',
-  'esquivar una pelota', 'pelar una patata', 'hacer una videollamada', 'meter gol por la escuadra', 'buscar en google'
-];
-const ACCIONES_DIFICIL = [
-  'cantar bajo la lluvia con paraguas', 'pedir matrimonio de rodillas con anillo', 'ganar la loteria celebrando',
-  'buscar llaves perdidas en el bolso', 'llegar tarde corriendo con tostada en boca', 'dormirse en el transporte publico',
-  'pisar un charco y salpicarse', 'intentar abrir tarro atascado con fuerza', 'montar mueble con instrucciones liadas',
-  'hacer yoga en postura del arbol', 'dar un susto saliendo de esquina', 'tirarse en bomba a la piscina',
-  'mirar las estrellas con manta', 'hacer equilibrio sobre cuerda', 'hacer malabares con tres pelotas'
+// ============================================================================
+// 4. LUGARES (~130 palabras: ~80% una sola palabra, ~20% monumentos/ciudades famosas)
+// ============================================================================
+const LUGARES_FACIL: WordEntry[] = [
+  'playa', 'hospital', 'aeropuerto', 'castillo', 'colegio', 'universidad', 'supermercado',
+  'cementerio', 'parque', 'estadio', 'cine', 'restaurante', 'isla', 'faro', 'gasolinera',
+  'biblioteca', 'zoológico', 'museo', 'iglesia', 'cárcel', 'hotel', 'discoteca', 'gimnasio',
+  'piscina', 'granja', 'bosque', 'desierto', 'montaña', 'volcán', 'cueva', 'puerto',
+  'estación', 'fábrica', 'banco', 'farmacia', 'panadería', 'carnicería', 'teatro', 'circo',
+  'casino', 'acuario', 'plaza', 'puente', 'túnel', 'calle', 'rascacielos', 'cabaña', 'iglú', 'pirámide',
+  { word: 'parque de atracciones', aliases: ['parque temático', 'feria'] }
 ];
 
+const LUGARES_NORMAL: WordEntry[] = [
+  'comisaría', 'ayuntamiento', 'planetario', 'mirador', 'mezquita', 'catedral', 'templo',
+  'helipuerto', 'observatorio', 'campamento', 'mina', 'pantano', 'laberinto', 'oasis',
+  'alcantarilla', 'balcón', 'terraza', 'garaje', 'invernadero',
+  { word: 'Torre Eiffel', aliases: ['torre eiffel', 'la torre eiffel'] },
+  { word: 'Coliseo', aliases: ['coliseo romano', 'coliseo de roma'] },
+  { word: 'Estatua de la Libertad', aliases: ['estatua libertad'] },
+  { word: 'Big Ben', aliases: ['reloj de londres', 'torre big ben'] },
+  { word: 'Sagrada Familia', aliases: ['la sagrada familia'] },
+  { word: 'Gran Muralla', aliases: ['gran muralla china', 'muralla china'] },
+  { word: 'Taj Mahal', aliases: ['tajmahal'] },
+  { word: 'Pirámides de Egipto', aliases: ['piramides', 'giza'] },
+  { word: 'Nueva York', aliases: ['new york', 'nueva york'] },
+  { word: 'París', aliases: ['paris'] },
+  { word: 'Londres', aliases: ['london'] },
+  { word: 'Roma', aliases: ['rome'] },
+  { word: 'Tokio', aliases: ['tokyo'] },
+  { word: 'Venecia', aliases: ['venice'] }
+];
+
+const LUGARES_DIFICIL: WordEntry[] = [
+  'pentágono', 'búnker', 'hangar', 'monasterio', 'catacumbas', 'acueducto', 'teleférico',
+  { word: 'Machu Picchu', aliases: ['machu picchu', 'machupicchu'] },
+  { word: 'Stonehenge', aliases: ['stonehenge'] },
+  { word: 'Cataratas del Niágara', aliases: ['cataratas niagara', 'niagara'] },
+  { word: 'Monte Everest', aliases: ['everest'] },
+  { word: 'Gran Cañón', aliases: ['gran canon', 'gran cañon del colorado'] },
+  { word: 'Monte Fuji', aliases: ['fuji'] },
+  { word: 'Torre de Pisa', aliases: ['torre inclinada'] },
+  { word: 'Ópera de Sídney', aliases: ['opera de sydney', 'opera de sidney'] },
+  { word: 'Hollywood', aliases: ['letrero de hollywood'] },
+  { word: 'estación espacial', aliases: ['estacion internacional', 'iss'] },
+  { word: 'plataforma petrolífera', aliases: ['plataforma marina'] },
+  { word: 'central nuclear', aliases: ['planta nuclear'] }
+];
+
+// ============================================================================
+// 5. CINE Y TELEVISIÓN (~125 conceptos: Películas, series y personajes célebres)
+// ============================================================================
+const CINE_TV_FACIL: WordEntry[] = [
+  { word: 'Titanic', aliases: ['el titanic'] },
+  { word: 'Shrek', aliases: ['shrek el ogro'] },
+  { word: 'Avatar', aliases: ['avatar james cameron'] },
+  { word: 'Frozen', aliases: ['elsa frozen', 'olaf'] },
+  { word: 'Batman', aliases: ['el caballero oscuro', 'bruce wayne'] },
+  { word: 'Superman', aliases: ['clark kent'] },
+  { word: 'Spider-Man', aliases: ['spiderman', 'hombre araña', 'el hombre araña'] },
+  { word: 'Joker', aliases: ['el bromas', 'el guason'] },
+  { word: 'Barbie', aliases: ['muneca barbie'] },
+  { word: 'Rocky', aliases: ['rocky balboa'] },
+  { word: 'Gladiator', aliases: ['gladiador'] },
+  { word: 'Matrix', aliases: ['neo', 'the matrix'] },
+  { word: 'Alien', aliases: ['el octavo pasajero', 'xenomorfo'] },
+  { word: 'Terminator', aliases: ['arnold terminator'] },
+  { word: 'Toy Story', aliases: ['woody y buzz', 'buzz lightyear'] },
+  { word: 'Cars', aliases: ['rayo mcqueen', 'rayo macqueen'] },
+  { word: 'Los Simpson', aliases: ['los simpsons', 'homer simpson', 'bart simpson'] },
+  { word: 'Futurama', aliases: ['bender'] },
+  { word: 'Friends', aliases: ['serie friends'] },
+  { word: 'Harry Potter', aliases: ['potter', 'hogwarts'] },
+  { word: 'Star Wars', aliases: ['la guerra de las galaxias'] },
+  { word: 'Bob Esponja', aliases: ['spongebob', 'fondo de bikini'] },
+  { word: 'Jurassic Park', aliases: ['parque jurasico', 'dinosaurios jurassic'] },
+  { word: 'El Rey León', aliases: ['el rey leon', 'simba'] },
+  { word: 'Tarzán', aliases: ['tarzan'] },
+  { word: 'Aladdín', aliases: ['aladdin', 'el genio'] },
+  { word: 'Pinocho', aliases: ['pinocchio'] },
+  { word: 'Cenicienta', aliases: ['cinderella'] },
+  { word: 'Coco', aliases: ['pelicula coco'] },
+  { word: 'Nemo', aliases: ['buscando a nemo'] },
+  { word: 'Minions', aliases: ['los minions', 'minion'] },
+  { word: 'Thor', aliases: ['thor dios del trueno'] },
+  { word: 'Hulk', aliases: ['el increible hulk'] },
+  { word: 'Ironman', aliases: ['iron man', 'tony stark'] },
+  { word: 'Deadpool', aliases: ['masacre'] },
+  { word: 'Yoda', aliases: ['maestro yoda', 'baby yoda'] },
+  { word: 'Drácula', aliases: ['conde dracula', 'dracula'] },
+  { word: 'Frankenstein', aliases: ['monstruo de frankenstein'] },
+  { word: 'Godzilla', aliases: ['godzila'] },
+  { word: 'King Kong', aliases: ['kong'] }
+];
+
+const CINE_TV_NORMAL: WordEntry[] = [
+  { word: 'Wednesday', aliases: ['miercoles', 'miercoles addams'] },
+  { word: 'Stranger Things', aliases: ['stranger things', 'once'] },
+  { word: 'Breaking Bad', aliases: ['walter white', 'heisenberg'] },
+  { word: 'Los Vengadores', aliases: ['avengers', 'los avengers'] },
+  { word: 'El Señor de los Anillos', aliases: ['senor de los anillos', 'el senor de los anillos', 'esdla', 'lotr'] },
+  { word: 'Los Increíbles', aliases: ['los increibles', 'mr increible'] },
+  { word: 'La Sirenita', aliases: ['ariel'] },
+  { word: 'La Bella y la Bestia', aliases: ['bella y la bestia'] },
+  { word: 'Cazafantasmas', aliases: ['los cazafantasmas', 'ghostbusters'] },
+  { word: 'Regreso al Futuro', aliases: ['volver al futuro', 'delorean'] },
+  { word: 'Piratas del Caribe', aliases: ['jack sparrow', 'piratas en el caribe'] },
+  { word: 'Misión Imposible', aliases: ['mision imposible', 'tom cruise'] },
+  { word: 'El Padrino', aliases: ['the godfather', 'vito corleone'] },
+  { word: 'Indiana Jones', aliases: ['indy'] },
+  { word: 'Peppa Pig', aliases: ['peppa'] },
+  { word: 'Doraemon', aliases: ['gato cosmico'] },
+  { word: 'Pocahontas', aliases: ['pocajontas'] },
+  { word: 'Mulán', aliases: ['mulan'] },
+  { word: 'Hércules', aliases: ['hercules disney'] },
+  { word: 'Sherlock Holmes', aliases: ['sherlock'] },
+  { word: 'Jack Sparrow', aliases: ['capitan jack sparrow'] },
+  { word: 'Gollum', aliases: ['smeagol', 'mi tesoro'] },
+  { word: 'Voldemort', aliases: ['lord voldemort', 'el que no debe ser nombrado'] },
+  { word: 'Dumbledore', aliases: ['albus dumbledore'] },
+  { word: 'Gandalf', aliases: ['gandalf el gris'] },
+  { word: 'Darth Vader', aliases: ['anakin', 'vader'] },
+  { word: 'Chewbacca', aliases: ['chewie'] },
+  { word: 'Robocop', aliases: ['robo cop'] },
+  { word: 'Rambo', aliases: ['john rambo'] },
+  { word: 'Forrest Gump', aliases: ['gump'] },
+  { word: 'Wall-E', aliases: ['walle'] },
+  { word: 'Up', aliases: ['up la pelicula', 'casa con globos'] },
+  { word: 'Ratatouille', aliases: ['ratatouille cocinero', 'remy'] },
+  { word: 'Monstruos SA', aliases: ['monsters inc', 'sulley'] },
+  { word: 'Kung Fu Panda', aliases: ['po el panda'] },
+  { word: 'Madagascar', aliases: ['los pinguinos de madagascar'] },
+  { word: 'Ice Age', aliases: ['la era de hielo', 'scrat'] },
+  { word: 'Los Juegos del Hambre', aliases: ['juegos del hambre', 'katniss'] },
+  { word: 'Crepúsculo', aliases: ['twilight', 'vampiros crepusculo'] }
+];
+
+const CINE_TV_DIFICIL: WordEntry[] = [
+  { word: 'Juego de Tronos', aliases: ['game of thrones', 'trono de hierro', 'got'] },
+  { word: 'Pulp Fiction', aliases: ['pulp fiction tarantino'] },
+  { word: 'El Caballero Oscuro', aliases: ['the dark knight'] },
+  { word: 'Interestelar', aliases: ['interstellar'] },
+  { word: 'El Club de la Lucha', aliases: ['fight club'] },
+  { word: 'Eduardo Manostijeras', aliases: ['el joven manos de tijera'] },
+  { word: 'Pesadilla antes de Navidad', aliases: ['jack skellington'] },
+  { word: 'Alicia en el País de las Maravillas', aliases: ['alicia en el pais de las maravillas'] },
+  { word: 'Blancanieves', aliases: ['blanca nieves'] },
+  { word: 'La Pantera Rosa', aliases: ['pantera rosa'] },
+  { word: 'Scooby Doo', aliases: ['scooby'] },
+  { word: 'Los Picapiedra', aliases: ['pedro picapiedra'] },
+  { word: 'El Show de Truman', aliases: ['truman show'] },
+  { word: 'Blade Runner', aliases: ['bladerunner'] },
+  { word: 'Kill Bill', aliases: ['la novia kill bill'] },
+  { word: 'El Resplandor', aliases: ['the shining', 'jack torrance'] },
+  { word: 'Men in Black', aliases: ['hombres de negro', 'mib'] },
+  { word: 'Karate Kid', aliases: ['daniel san', 'senor miyagi'] },
+  { word: 'El Mago de Oz', aliases: ['mago de oz', 'dorothy'] },
+  { word: 'ET el Extraterrestre', aliases: ['et', 'e.t.'] },
+  { word: 'Tiburón', aliases: ['pelicula tiburon', 'jaws'] }
+];
+
+// ============================================================================
+// 6. VIDEOJUEGOS (~130 videojuegos reales y franquicias célebres)
+// ============================================================================
+const VIDEOJUEGOS_FACIL: WordEntry[] = [
+  { word: 'Minecraft', aliases: ['maincra'] },
+  { word: 'Fortnite', aliases: ['fornite', 'fort night'] },
+  { word: 'Roblox', aliases: ['roblox game'] },
+  { word: 'Tetris', aliases: ['tetris bloques'] },
+  { word: 'Pac-Man', aliases: ['pacman', 'pac man', 'comecocos'] },
+  { word: 'Pokémon', aliases: ['pokemon', 'pikachu'] },
+  { word: 'FIFA', aliases: ['ea sports fc', 'fifa futbol'] },
+  { word: 'Among Us', aliases: ['amongus', 'el impostor'] },
+  { word: 'Fall Guys', aliases: ['fallguys'] },
+  { word: 'Super Mario', aliases: ['mario bros', 'super mario bros', 'mario'] },
+  { word: 'Mario Kart', aliases: ['mariokart', 'carreras de mario'] },
+  { word: 'GTA', aliases: ['grand theft auto', 'gta v', 'gta san andreas'] },
+  { word: 'Sonic', aliases: ['sonic el erizo', 'sonic the hedgehog'] },
+  { word: 'Zelda', aliases: ['the legend of zelda', 'link'] },
+  { word: 'Rocket League', aliases: ['coches y futbol'] },
+  { word: 'The Sims', aliases: ['los sims', 'sims'] },
+  { word: 'Brawl Stars', aliases: ['brawlstars'] },
+  { word: 'Clash Royale', aliases: ['clashroyale'] },
+  { word: 'Overwatch', aliases: ['over watch'] },
+  { word: 'Valorant', aliases: ['valo'] },
+  { word: 'Terraria', aliases: ['terraria 2d'] },
+  { word: 'Portal', aliases: ['portal gun', 'glados'] },
+  { word: 'Skyrim', aliases: ['the elder scrolls skyrim', 'dovahkiin'] },
+  { word: 'Doom', aliases: ['doom slayer'] },
+  { word: 'Tekken', aliases: ['teken'] },
+  { word: 'Street Fighter', aliases: ['ryu y ken', 'streetfighter'] },
+  { word: 'Donkey Kong', aliases: ['donkey', 'donkey kong country'] },
+  { word: 'Kirby', aliases: ['kirby rosa'] },
+  { word: 'Angry Birds', aliases: ['angrybirds', 'pajaros enfadados'] },
+  { word: 'Subway Surfers', aliases: ['subway surfer', 'subwaysurfers'] }
+];
+
+const VIDEOJUEGOS_NORMAL: WordEntry[] = [
+  { word: 'Call of Duty', aliases: ['cod', 'warzone', 'callofduty'] },
+  { word: 'League of Legends', aliases: ['lol', 'leagueoflegends'] },
+  { word: 'Apex Legends', aliases: ['apex'] },
+  { word: 'God of War', aliases: ['kratos', 'godofwar'] },
+  { word: 'Genshin Impact', aliases: ['genshin'] },
+  { word: 'Hollow Knight', aliases: ['hollowknight'] },
+  { word: 'Cuphead', aliases: ['cup head'] },
+  { word: 'Crash Bandicoot', aliases: ['crash'] },
+  { word: 'Mortal Kombat', aliases: ['mortalkombat', 'scorpion y subzero'] },
+  { word: 'Animal Crossing', aliases: ['animalcrossing', 'tom nook'] },
+  { word: 'Super Smash Bros', aliases: ['smash bros', 'smash'] },
+  { word: 'Red Dead Redemption', aliases: ['red dead', 'rdr2'] },
+  { word: 'Counter Strike', aliases: ['csgo', 'cs go', 'counter'] },
+  { word: 'World of Warcraft', aliases: ['wow'] },
+  { word: 'Resident Evil', aliases: ['biohazard', 'resident evil zombie'] },
+  { word: 'Final Fantasy', aliases: ['finalfantasy', 'cloud strife'] },
+  { word: 'Assassin\'s Creed', aliases: ['assassins creed', 'credo de asesinos'] },
+  { word: 'Monster Hunter', aliases: ['monsterhunter'] },
+  { word: 'Need for Speed', aliases: ['nfs', 'needforspeed'] },
+  { word: 'Dark Souls', aliases: ['darksouls', 'hoguera'] },
+  { word: 'Elden Ring', aliases: ['eldenring', 'tierras intermedias'] },
+  { word: 'Cyberpunk', aliases: ['cyberpunk 2077'] },
+  { word: 'The Witcher', aliases: ['witcher', 'geralt de rivia'] },
+  { word: 'Splatoon', aliases: ['calamares y tinta'] },
+  { word: 'Celeste', aliases: ['escalar montana celeste'] },
+  { word: 'Rayman', aliases: ['rayman origins'] },
+  { word: 'Pikmin', aliases: ['pikmins'] },
+  { word: 'Bioshock', aliases: ['big daddy'] },
+  { word: 'Rust', aliases: ['juego rust'] },
+  { word: 'Subnautica', aliases: ['submarino subnautica'] },
+  { word: 'Halo', aliases: ['master chief', 'jefe maestro'] },
+  { word: 'Uncharted', aliases: ['nathan drake'] },
+  { word: 'Spyro', aliases: ['spyro el dragon'] },
+  { word: 'Metroid', aliases: ['samus aran', 'samus'] },
+  { word: 'Undertale', aliases: ['sans'] },
+  { word: 'Fallout', aliases: ['pipboy', 'refugio fallout'] },
+  { word: 'Half-Life', aliases: ['halflife', 'gordon freeman'] },
+  { word: 'Tomb Raider', aliases: ['lara croft'] },
+  { word: 'Mega Man', aliases: ['megaman'] }
+];
+
+const VIDEOJUEGOS_DIFICIL: WordEntry[] = [
+  { word: 'Bloodborne', aliases: ['cazador bloodborne'] },
+  { word: 'Hades', aliases: ['zagreo hades'] },
+  { word: 'Dead Cells', aliases: ['deadcells'] },
+  { word: 'Sea of Thieves', aliases: ['mar de ladrones'] },
+  { word: 'Team Fortress', aliases: ['tf2'] },
+  { word: 'Left 4 Dead', aliases: ['l4d'] },
+  { word: 'Payday', aliases: ['payday atracos'] },
+  { word: 'Dead by Daylight', aliases: ['dbd'] },
+  { word: 'Phasmophobia', aliases: ['fantasmas phasmophobia'] },
+  { word: 'Geometry Dash', aliases: ['geometrydash'] },
+  { word: 'Stardew Valley', aliases: ['stardew'] },
+  { word: 'Factorio', aliases: ['factorio fabricas'] },
+  { word: 'Civilization', aliases: ['civ'] },
+  { word: 'Age of Empires', aliases: ['age of empires estrategia'] },
+  { word: 'SimCity', aliases: ['construir ciudad simcity'] },
+  { word: 'Gran Turismo', aliases: ['simulador gran turismo'] },
+  { word: 'Guitar Hero', aliases: ['guitarhero', 'guitarra videojuego'] },
+  { word: 'Just Dance', aliases: ['justdance'] },
+  { word: 'Kingdom Hearts', aliases: ['llave espada'] },
+  { word: 'Persona 5', aliases: ['phantom thieves'] },
+  { word: 'Sekiro', aliases: ['sekiro sombras mueren dos veces'] },
+  { word: 'Metal Gear Solid', aliases: ['metal gear', 'solid snake'] },
+  { word: 'Silent Hill', aliases: ['cabeza de piramide', 'niebla silent hill'] },
+  { word: 'Dead Space', aliases: ['isaac clarke'] }
+];
+
+// ============================================================================
+// 7. DEPORTES (~115 disciplinas deportivas y conceptos directos)
+// ============================================================================
+const DEPORTES_FACIL: WordEntry[] = [
+  'fútbol', 'tenis', 'baloncesto', 'boxeo', 'natación', 'surf', 'esquí', 'golf',
+  'ciclismo', 'voleibol', 'rugby', 'karate', 'judo', 'patinaje', 'escalada', 'béisbol',
+  'hockey', 'pádel', 'atletismo', 'motociclismo', 'gimnasia', 'piragüismo', 'esgrima',
+  'waterpolo', 'triatlón', 'remo', 'bádminton', 'balonmano', 'billar', 'dardos', 'bolos', 'ajedrez'
+];
+
+const DEPORTES_NORMAL: WordEntry[] = [
+  'snowboard', 'windsurf', 'rafting', 'paracaidismo', 'submarinismo', 'vela', 'equitación',
+  'taekwondo', 'halterofilia', 'motocross', 'rally', 'polo', 'críquet', 'petanca',
+  { word: 'Fórmula 1', aliases: ['f1', 'formula uno', 'formula 1'] },
+  { word: 'ping pong', aliases: ['tenis de mesa', 'pingpong'] },
+  { word: 'fútbol sala', aliases: ['futsal'] },
+  { word: 'salto de longitud', aliases: ['salto longitud'] },
+  { word: 'salto de altura', aliases: ['salto altura'] },
+  { word: 'tiro con arco', aliases: ['tiro arco', 'arquería'] },
+  { word: 'carrera de vallas', aliases: ['vallas'] },
+  { word: 'patinaje sobre hielo', aliases: ['patinaje artistico'] },
+  { word: 'lucha libre', aliases: ['wrestling'] }
+];
+
+const DEPORTES_DIFICIL: WordEntry[] = [
+  'curling', 'bobsleigh', 'skeleton', 'biatlón', 'decatlón',
+  { word: 'salto con pértiga', aliases: ['pertiga', 'garrocha'] },
+  { word: 'lanzamiento de jabalina', aliases: ['jabalina'] },
+  { word: 'lanzamiento de disco', aliases: ['disco atletismo'] },
+  { word: 'lanzamiento de martillo', aliases: ['martillo atletismo'] },
+  { word: 'natación sincronizada', aliases: ['natacion artistica'] },
+  { word: 'hockey sobre hielo', aliases: ['hockey hielo'] },
+  { word: 'tiro al plato', aliases: ['tiro al pichon'] },
+  { word: 'doma clásica', aliases: ['equitacion artistica'] },
+  { word: 'salto de trampolín', aliases: ['clavado'] }
+];
+
+// ============================================================================
+// 8. PROFESIONES (~120 profesiones y oficios reales)
+// ============================================================================
+const PROFESIONES_FACIL: WordEntry[] = [
+  'médico', 'bombero', 'policía', 'profesor', 'cocinero', 'astronauta', 'fontanero',
+  'fotógrafo', 'mecánico', 'dentista', 'veterinario', 'piloto', 'cartero', 'pintor',
+  'detective', 'abogado', 'juez', 'camarero', 'panadero', 'peluquero', 'electricista',
+  'actor', 'cantante', 'periodista', 'socorrista', 'enfermero', 'jardinero', 'pescador',
+  'granjero', 'carnicero', 'zapatero', 'carpintero', 'albañil'
+];
+
+const PROFESIONES_NORMAL: WordEntry[] = [
+  'arquitecto', 'científico', 'locutor', 'músico', 'bailarín', 'mago', 'pastor',
+  'cajero', 'arqueólogo', 'paleontólogo', 'buzo', 'relojero', 'joyero', 'escultor',
+  'cirujano', 'apicultor', 'guardabosques', 'trapecista', 'minero', 'militar', 'soldado',
+  'barrendero', 'cerrajero', 'informático', 'taxista', 'bibliotecario', 'farmacéutico',
+  'óptico', 'fisioterapeuta', 'psicólogo',
+  { word: 'conductor de autobús', aliases: ['chófer', 'chofer de autobus'] },
+  { word: 'azafata de vuelo', aliases: ['azafata', 'auxiliar de vuelo'] },
+  { word: 'guía turístico', aliases: ['guia'] }
+];
+
+const PROFESIONES_DIFICIL: WordEntry[] = [
+  'meteorólogo', 'sommelier', 'luthier', 'restaurador', 'encuadernador', 'domador',
+  'titiritero', 'mimo', 'ventrílocuo', 'alpinista', 'acróbata', 'orfebre', 'taxidermista',
+  'guardacostas', 'cartógrafo', 'botánico', 'astrónomo', 'geólogo',
+  { word: 'controlador aéreo', aliases: ['controlador de vuelo'] },
+  { word: 'soplador de vidrio', aliases: ['artesano del vidrio'] },
+  { word: 'doble de acción', aliases: ['especialista de cine'] }
+];
+
+// ============================================================================
+// 9. NATURALEZA (~125 paisajes, clima, fenómenos y elementos naturales)
+// ============================================================================
+const NATURALEZA_FACIL: WordEntry[] = [
+  'volcán', 'tornado', 'montaña', 'río', 'cascada', 'bosque', 'desierto', 'isla',
+  'tormenta', 'arcoíris', 'nube', 'relámpago', 'glaciar', 'cueva', 'palmera', 'lago',
+  'mar', 'océano', 'playa', 'selva', 'huracán', 'meteorito', 'luna', 'sol', 'estrella',
+  'nieve', 'lluvia', 'granizo', 'viento', 'niebla', 'árbol', 'flor', 'rosa', 'margarita',
+  'girasol', 'cactus', 'hierba', 'hoja', 'roca', 'piedra'
+];
+
+const NATURALEZA_NORMAL: WordEntry[] = [
+  'acantilado', 'valle', 'pradera', 'pantano', 'oasis', 'iceberg', 'cometa', 'eclipse',
+  'galaxia', 'planeta', 'bambú', 'helecho', 'rama', 'semilla', 'raíz', 'tulipán',
+  'orquídea', 'amapola', 'loto', 'musgo', 'seta', 'hongo', 'duna', 'géiser', 'cañón',
+  'fiordo', 'arrecife', 'manantial', 'charco', 'marea', 'ola', 'tsunami', 'terremoto',
+  { word: 'estrella fugaz', aliases: ['cometa brillante'] },
+  { word: 'aurora boreal', aliases: ['luces del norte'] },
+  { word: 'luna llena', aliases: ['plenilunio'] },
+  { word: 'arrecife de coral', aliases: ['coral'] },
+  { word: 'arena movediza', aliases: ['arenas movedizas'] }
+];
+
+const NATURALEZA_DIFICIL: WordEntry[] = [
+  'secuoya', 'baobab', 'bonsái', 'nenúfar', 'estalactita', 'estalagmita', 'manglar',
+  'taiga', 'tundra', 'cráter', 'atolón', 'cenote', 'nebulosa',
+  { word: 'sauce llorón', aliases: ['sauce'] },
+  { word: 'planta carnívora', aliases: ['carnivora'] },
+  { word: 'falla tectónica', aliases: ['grieta sismica'] },
+  { word: 'lluvia de estrellas', aliases: ['perseidas'] }
+];
+
+// ============================================================================
+// 10. ACCIONES Y SITUACIONES (~115 verbos y acciones humanas inmediatas)
+// ============================================================================
+const ACCIONES_FACIL: WordEntry[] = [
+  'bailar', 'dormir', 'correr', 'saltar', 'estornudar', 'cocinar', 'caerse', 'nadar',
+  'esconderse', 'casarse', 'surfear', 'cantar', 'llorar', 'reír', 'pescar', 'conducir',
+  'volar', 'escalar', 'pelear', 'besar', 'abrazar', 'ducharse', 'patinar', 'bucear',
+  'dibujar', 'escribir', 'leer', 'barrer', 'pintar', 'aplaudir', 'silbar', 'bostezar',
+  'tropezar', 'resbalar', 'comer', 'beber', 'esquiar', 'soñar', 'gritar', 'saludar'
+];
+
+const ACCIONES_NORMAL: WordEntry[] = [
+  'afeitarse', 'peinarse', 'vestirse', 'fregar', 'planchar', 'coser', 'tejer', 'podar',
+  'regar', 'cavar', 'remar', 'boxear', 'gatear', 'trotar',
+  { word: 'dar un beso', aliases: ['besar'] },
+  { word: 'chocar los cinco', aliases: ['choca esos cinco', 'high five'] },
+  { word: 'montar a caballo', aliases: ['cabalgar'] },
+  { word: 'montar en bici', aliases: ['pedalear', 'andar en bicicleta'] },
+  { word: 'lavarse los dientes', aliases: ['cepillarse los dientes'] },
+  { word: 'abrir un regalo', aliases: ['desenvolver regalo'] },
+  { word: 'soplar las velas', aliases: ['apagar las velas'] },
+  { word: 'hacer una foto', aliases: ['tomar una foto', 'fotografiar'] },
+  { word: 'atarse los cordones', aliases: ['atar cordones'] },
+  { word: 'guiñar un ojo', aliases: ['guiño'] },
+  { word: 'hacer malabares', aliases: ['malabarismo'] },
+  { word: 'hacer equilibrio', aliases: ['equilibrio'] }
+];
+
+const ACCIONES_DIFICIL: WordEntry[] = [
+  { word: 'hacer autostop', aliases: ['autostop'] },
+  { word: 'pedir matrimonio', aliases: ['proposicion de matrimonio', 'pedir la mano'] },
+  { word: 'pedir un deseo', aliases: ['deseo'] },
+  { word: 'cruzar los dedos', aliases: ['dedos cruzados'] },
+  { word: 'hacer yoga', aliases: ['postura de yoga'] },
+  { word: 'tocar el piano', aliases: ['pianista'] },
+  { word: 'tocar la guitarra', aliases: ['guitarrista'] },
+  { word: 'tocar la batería', aliases: ['baterista'] },
+  { word: 'tirar la basura', aliases: ['botar la basura'] },
+  { word: 'cruzar el paso de cebra', aliases: ['paso de cebra'] },
+  { word: 'inflar un globo', aliases: ['soplar un globo'] },
+  { word: 'hacer pompas de jabón', aliases: ['burbujas'] },
+  { word: 'tirarse en paracaídas', aliases: ['saltar en paracaidas'] },
+  { word: 'saltar en trampolín', aliases: ['cama elastica'] }
+];
+
+// ============================================================================
+// MASTER LIST EXPORT
+// ============================================================================
 export const PINTURILLO_WORDS: DrawableWord[] = [
   ...buildCategoryWords('animales', ANIMALES_FACIL, ANIMALES_NORMAL, ANIMALES_DIFICIL),
   ...buildCategoryWords('comida', COMIDA_FACIL, COMIDA_NORMAL, COMIDA_DIFICIL),
@@ -313,15 +610,31 @@ export function getRandomWordOptions(
   usedWords: Set<string> = new Set(),
   allowedCategories: PinturilloCategory[] = []
 ): DrawableWord[] {
-  // If no categories provided, allow all
-  const categoriesPool = allowedCategories && allowedCategories.length > 0
-    ? allowedCategories
-    : (['animales', 'comida', 'objetos', 'lugares', 'cine_tv', 'videojuegos', 'deportes', 'profesiones', 'naturaleza', 'acciones'] as PinturilloCategory[]);
+  const categoriesPool: PinturilloCategory[] =
+    allowedCategories && allowedCategories.length > 0
+      ? allowedCategories
+      : [
+          'animales',
+          'comida',
+          'objetos',
+          'lugares',
+          'cine_tv',
+          'videojuegos',
+          'deportes',
+          'profesiones',
+          'naturaleza',
+          'acciones',
+        ];
 
   // Filter available words by enabled categories and not already used
-  const categoryWords = PINTURILLO_WORDS.filter(w => categoriesPool.includes(w.category));
-  const available = categoryWords.filter(w => !usedWords.has(w.word.toLowerCase()));
-  const pool = available.length >= count ? available : (categoryWords.length >= count ? categoryWords : PINTURILLO_WORDS);
+  const categoryWords = PINTURILLO_WORDS.filter((w) => categoriesPool.includes(w.category));
+  const available = categoryWords.filter((w) => !usedWords.has(w.word.toLowerCase()));
+  const pool =
+    available.length >= count
+      ? available
+      : categoryWords.length >= count
+      ? categoryWords
+      : PINTURILLO_WORDS;
 
   // Group by category to maximize semantic and category variety
   const byCat: Partial<Record<PinturilloCategory, DrawableWord[]>> = {};
@@ -339,24 +652,25 @@ export function getRandomWordOptions(
   // Pick one word from distinct categories first
   for (const cat of shuffledCats) {
     if (selected.length >= count) break;
-    const catWords = (byCat[cat] || []).filter(w => !chosenWordsSet.has(w.word));
+    const catWords = (byCat[cat] || []).filter((w) => !chosenWordsSet.has(w.word));
     if (catWords.length > 0) {
       // Pick balanced difficulty (40% facil, 45% normal, 15% dificil)
       const r = Math.random();
-      const targetDiff = r < 0.40 ? 'FACIL' : r < 0.85 ? 'NORMAL' : 'DIFICIL';
-      const matchingDiff = catWords.filter(w => w.difficulty === targetDiff);
-      const chosen = matchingDiff.length > 0
-        ? matchingDiff[Math.floor(Math.random() * matchingDiff.length)]
-        : catWords[Math.floor(Math.random() * catWords.length)];
+      const targetDiff = r < 0.4 ? 'FACIL' : r < 0.85 ? 'NORMAL' : 'DIFICIL';
+      const matchingDiff = catWords.filter((w) => w.difficulty === targetDiff);
+      const chosen =
+        matchingDiff.length > 0
+          ? matchingDiff[Math.floor(Math.random() * matchingDiff.length)]
+          : catWords[Math.floor(Math.random() * catWords.length)];
 
       selected.push(chosen);
       chosenWordsSet.add(chosen.word);
     }
   }
 
-  // Fill up if needed
+  // Fill up if needed from remaining pool while ensuring distinct items
   while (selected.length < count) {
-    const remaining = pool.filter(w => !chosenWordsSet.has(w.word));
+    const remaining = pool.filter((w) => !chosenWordsSet.has(w.word));
     if (remaining.length === 0) break;
     const fallback = remaining[Math.floor(Math.random() * remaining.length)];
     selected.push(fallback);

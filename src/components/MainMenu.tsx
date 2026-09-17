@@ -91,7 +91,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 </div>
                 <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  Disponible
+                  Online
                 </span>
               </div>
 
@@ -103,14 +103,14 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
                 <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">2–10 Jugadores</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">Secuencias de letras</span>
+                <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">Multijugador Online</span>
                 <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">Alta tensión</span>
               </div>
             </div>
 
             <div className="relative z-10 mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between">
               <span className="text-sm font-bold text-amber-400 group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
-                Configurar partida <ArrowRight className="w-4 h-4" />
+                Entrar a la sala <ArrowRight className="w-4 h-4" />
               </span>
               <div className="w-10 h-10 rounded-full bg-amber-500 group-hover:bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md transition-all">
                 <Play className="w-5 h-5 fill-current ml-0.5" />
@@ -134,7 +134,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 </div>
                 <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  Disponible
+                  Online
                 </span>
               </div>
 
@@ -149,17 +149,17 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                   3–10 Jugadores
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-stone-900/90 border border-stone-800 text-stone-300">
-                  Humor irreverente
+                  Multijugador Online
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-stone-900/90 border border-stone-800 text-stone-300">
-                  Votación secreta
+                  Votación simultánea
                 </span>
               </div>
             </div>
 
             <div className="relative z-10 mt-8 pt-6 border-t border-stone-800/80 flex items-center justify-between">
               <span className="text-sm font-bold text-amber-400 group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
-                Configurar partida <ArrowRight className="w-4 h-4" />
+                Entrar a la sala <ArrowRight className="w-4 h-4" />
               </span>
               <div className="w-10 h-10 rounded-full bg-amber-500 group-hover:bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md transition-all">
                 <Play className="w-5 h-5 fill-current ml-0.5" />

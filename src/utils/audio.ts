@@ -867,6 +867,15 @@ class AudioManager {
     osc.start(now);
     osc.stop(now + 0.04);
   }
+
+  // Convenient aliases
+  public playTick() {
+    this.playClick();
+  }
+
+  public playError() {
+    this.playAnswerRejected();
+  }
 }
 
 export const audio = new AudioManager();
