@@ -1,6 +1,6 @@
 {
   "name": "Fiesta de Juegos",
-  "description": "Juegos de fiesta multijugador para jugar con amigos en directo, destacando el trepidante juego de palabras La Bomba.",
+  "description": "Juegos de fiesta multijugador para jugar con amigos: el trepidante juego de palabras La Bomba y el juego de cartas irreverente La Peor Respuesta.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

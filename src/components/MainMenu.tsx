@@ -118,42 +118,52 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             </div>
           </div>
 
-          {/* CARD 2: LA PEOR RESPUESTA (PRÓXIMAMENTE) */}
+          {/* CARD 2: LA PEOR RESPUESTA (ACTIVE & PLAYABLE) */}
           <div
             id="card-la-peor-respuesta"
-            onClick={() => handleComingSoon('La Peor Respuesta')}
-            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-slate-900/60 border-2 border-slate-800 hover:border-slate-700 shadow-xl transition-all duration-300 cursor-pointer opacity-85 hover:opacity-100 transform hover:-translate-y-1 overflow-hidden"
+            onClick={() => handleSelectGame('la-peor-respuesta')}
+            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-stone-900 to-slate-950 border-2 border-stone-700/90 hover:border-amber-400/90 shadow-2xl hover:shadow-amber-500/10 transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-98 overflow-hidden"
           >
+            {/* Ambient card glow */}
+            <div className="absolute inset-0 bg-gradient-to-b from-stone-700/15 via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
+
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-6">
-                <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-3xl shadow-inner group-hover:scale-105 transition-transform text-rose-400">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-stone-800 via-neutral-900 to-black border border-stone-700 flex items-center justify-center text-3xl shadow-lg group-hover:scale-110 group-hover:border-amber-400/60 transition-transform">
                   💀
                 </div>
-                <span className="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-xs font-bold uppercase tracking-wider">
-                  Próximamente
+                <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  Disponible
                 </span>
               </div>
 
-              <h2 className="text-3xl sm:text-4xl font-black font-display text-slate-200 tracking-wide mb-2 group-hover:text-rose-400 transition-colors">
+              <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-amber-400 transition-colors">
                 LA PEOR RESPUESTA
               </h2>
-              <p className="text-slate-400 text-base sm:text-lg font-medium leading-snug">
-                &ldquo;La peor respuesta puede ser la mejor.&rdquo;
+              <p className="text-stone-300 text-base sm:text-lg font-medium leading-snug">
+                &ldquo;Cuanto peor, mejor.&rdquo;
               </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/40 border border-slate-800">3–8 Jugadores</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/40 border border-slate-800">Humor negro</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/40 border border-slate-800">Votación en grupo</span>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-stone-400">
+                <span className="px-2.5 py-1 rounded-lg bg-stone-900/90 border border-stone-800 text-stone-300">
+                  3–10 Jugadores
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-stone-900/90 border border-stone-800 text-stone-300">
+                  Humor irreverente
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-stone-900/90 border border-stone-800 text-stone-300">
+                  Votación secreta
+                </span>
               </div>
             </div>
 
-            <div className="relative z-10 mt-8 pt-6 border-t border-slate-800/60 flex items-center justify-between text-slate-500">
-              <span className="text-xs font-semibold uppercase tracking-wider">
-                En desarrollo activo
+            <div className="relative z-10 mt-8 pt-6 border-t border-stone-800/80 flex items-center justify-between">
+              <span className="text-sm font-bold text-amber-400 group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
+                Configurar partida <ArrowRight className="w-4 h-4" />
               </span>
-              <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-800 text-slate-400">
-                Próximamente
-              </span>
+              <div className="w-10 h-10 rounded-full bg-amber-500 group-hover:bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md transition-all">
+                <Play className="w-5 h-5 fill-current ml-0.5" />
+              </div>
             </div>
           </div>
 

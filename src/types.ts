@@ -71,3 +71,46 @@ export interface GameStats {
     explosions: number;
   } | null;
 }
+
+// ==========================================
+// LA PEOR RESPUESTA TYPES
+// ==========================================
+
+export interface BlackCard {
+  id: string;
+  text: string;
+  blanks: 1 | 2;
+  category?: string;
+}
+
+export type LaPeorRespuestaPhase =
+  | 'SETUP'
+  | 'ROUND_START'
+  | 'WRITING'
+  | 'REVEAL'
+  | 'VOTING'
+  | 'RESULTS'
+  | 'FINAL_RESULTS';
+
+export interface LPRPlayer {
+  id: string;
+  name: string;
+  avatar: string;
+  color: string;
+  score: number;
+}
+
+export interface AnswerCard {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;
+  authorColor: string;
+  text: string;
+  revealed: boolean;
+  votes: string[]; // playerIds of players who voted for this answer
+}
+
+export interface LaPeorRespuestaConfig {
+  totalRounds: number; // 5, 10, 15, 20, or -1 for Infinity
+}

@@ -61,3 +61,30 @@
   border-color: #442211 !important;
   box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.9), 0 0 10px rgba(120, 50, 10, 0.2);
 }
+
+/* 3D Card Flip styles for La Peor Respuesta */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Subtle card float and hover states */
+.card-shadow-lift {
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+}
+
+.card-shadow-lift:hover {
+  box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.8), 0 8px 10px -4px rgba(0, 0, 0, 0.6);
+}
