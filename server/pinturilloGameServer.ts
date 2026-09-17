@@ -161,6 +161,19 @@ export class PinturilloServer {
           config: {
             roundTimeSeconds: 90,
             totalVueltas: 2,
+            hintsEnabled: true,
+            categories: [
+              'animales',
+              'comida',
+              'objetos',
+              'lugares',
+              'cine_tv',
+              'videojuegos',
+              'deportes',
+              'profesiones',
+              'naturaleza',
+              'acciones',
+            ],
           },
           players: [player],
           currentDrawerIndex: 0,
@@ -268,6 +281,12 @@ export class PinturilloServer {
         }
         if (message.config.totalVueltas) {
           room.config.totalVueltas = message.config.totalVueltas;
+        }
+        if (typeof message.config.hintsEnabled === 'boolean') {
+          room.config.hintsEnabled = message.config.hintsEnabled;
+        }
+        if (Array.isArray(message.config.categories) && message.config.categories.length > 0) {
+          room.config.categories = message.config.categories;
         }
 
         this.broadcastRoomState(room);
@@ -638,8 +657,8 @@ export class PinturilloServer {
     const currentDrawer = room.players[room.currentDrawerIndex];
     if (!currentDrawer) return;
 
-    // Pick 3 words from word bank
-    room.wordOptions = getRandomWordOptions(3, room.usedWords);
+    // Pick 3 words from word bank according to room categories
+    room.wordOptions = getRandomWordOptions(3, room.usedWords, room.config.categories);
     room.selectionRemainingSeconds = 10;
 
     this.broadcastRoomState(room);
@@ -759,16 +778,18 @@ export class PinturilloServer {
     room.timerInterval = setInterval(() => {
       room.remainingTime--;
 
-      // Hints reveal at 50% and 20% remaining time
-      const pct = room.remainingTime / room.totalRoundTime;
-      const cleanWord = room.secretWord.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/g, '');
+      // Hints reveal at 50% and 20% remaining time (only if hintsEnabled is true)
+      if (room.config.hintsEnabled) {
+        const pct = room.remainingTime / room.totalRoundTime;
+        const cleanWord = room.secretWord.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/g, '');
 
-      if (pct <= 0.50 && room.revealedIndices.size === 0 && cleanWord.length >= 5) {
-        // Reveal 1 random letter
-        this.revealRandomLetter(room);
-      } else if (pct <= 0.20 && room.revealedIndices.size === 1 && cleanWord.length >= 7) {
-        // Reveal another letter
-        this.revealRandomLetter(room);
+        if (pct <= 0.50 && room.revealedIndices.size === 0 && cleanWord.length >= 5) {
+          // Reveal 1 random letter
+          this.revealRandomLetter(room);
+        } else if (pct <= 0.20 && room.revealedIndices.size === 1 && cleanWord.length >= 7) {
+          // Reveal another letter
+          this.revealRandomLetter(room);
+        }
       }
 
       this.broadcastToRoom(room, {

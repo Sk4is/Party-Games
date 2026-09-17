@@ -1,8 +1,28 @@
 import React, { useState } from 'react';
-import { PinturilloRoomState, PinturilloPlayer, PinturilloConfig } from '../../types/pinturillo';
+import {
+  PinturilloRoomState,
+  PinturilloPlayer,
+  PinturilloConfig,
+  PinturilloCategory,
+  PINTURILLO_CATEGORIES_LIST,
+} from '../../types/pinturillo';
 import { AVATARS } from '../../data/players';
 import { audio } from '../../utils/audio';
-import { Copy, Check, Users, Play, Crown, Clock, Repeat, ArrowLeft, Share2 } from 'lucide-react';
+import {
+  Copy,
+  Check,
+  Users,
+  Play,
+  Crown,
+  Clock,
+  Repeat,
+  ArrowLeft,
+  Share2,
+  Lightbulb,
+  EyeOff,
+  Layers,
+  Sparkles,
+} from 'lucide-react';
 
 interface PinturilloLobbyProps {
   roomState: PinturilloRoomState;
@@ -39,6 +59,39 @@ export const PinturilloLobby: React.FC<PinturilloLobbyProps> = ({
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const currentCategories: PinturilloCategory[] =
+    roomState.config.categories && roomState.config.categories.length > 0
+      ? roomState.config.categories
+      : PINTURILLO_CATEGORIES_LIST.map(c => c.id);
+
+  const hintsEnabled = roomState.config.hintsEnabled ?? true;
+
+  const handleToggleHints = (enabled: boolean) => {
+    if (!isHost) return;
+    audio.playClick();
+    onUpdateConfig({ hintsEnabled: enabled });
+  };
+
+  const handleToggleCategory = (catId: PinturilloCategory) => {
+    if (!isHost) return;
+    audio.playClick();
+    let updated: PinturilloCategory[];
+    if (currentCategories.includes(catId)) {
+      // Must keep at least 1 category active
+      if (currentCategories.length <= 1) return;
+      updated = currentCategories.filter(c => c !== catId);
+    } else {
+      updated = [...currentCategories, catId];
+    }
+    onUpdateConfig({ categories: updated });
+  };
+
+  const handleSelectAllCategories = () => {
+    if (!isHost) return;
+    audio.playClick();
+    onUpdateConfig({ categories: PINTURILLO_CATEGORIES_LIST.map(c => c.id) });
+  };
 
   const handleCopyCode = () => {
     audio.playClick();
@@ -195,6 +248,138 @@ export const PinturilloLobby: React.FC<PinturilloLobbyProps> = ({
                 </strong>{' '}
                 ({roomState.config.totalVueltas} turno(s) de dibujo por cada jugador).
               </p>
+            </div>
+
+            {/* Pistas (Hints Mode) */}
+            <div className="pt-4 border-t border-slate-800">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Modo de pistas</span>
+                </span>
+                <span className="text-[11px] font-bold text-amber-400">
+                  {hintsEnabled ? 'Con pistas automáticas' : 'Sin pistas (Modo experto)'}
+                </span>
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Con pistas */}
+                <button
+                  type="button"
+                  disabled={!isHost}
+                  onClick={() => handleToggleHints(true)}
+                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer ${
+                    hintsEnabled
+                      ? 'bg-amber-500/15 border-amber-400 text-amber-200 shadow-md ring-1 ring-amber-400/40'
+                      : 'bg-slate-850 hover:bg-slate-800 text-slate-400 border-slate-800 disabled:opacity-60 disabled:hover:bg-slate-850'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black ${
+                        hintsEnabled ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      <Lightbulb className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-bold text-xs uppercase tracking-wide text-white">Con pistas</span>
+                    {hintsEnabled && <span className="ml-auto text-xs text-amber-400 font-bold">✓ Activo</span>}
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-snug">
+                    Revela letras automáticamente al 50% y 20% del tiempo de la ronda.
+                  </p>
+                </button>
+
+                {/* Sin pistas */}
+                <button
+                  type="button"
+                  disabled={!isHost}
+                  onClick={() => handleToggleHints(false)}
+                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer ${
+                    !hintsEnabled
+                      ? 'bg-amber-500/15 border-amber-400 text-amber-200 shadow-md ring-1 ring-amber-400/40'
+                      : 'bg-slate-850 hover:bg-slate-800 text-slate-400 border-slate-800 disabled:opacity-60 disabled:hover:bg-slate-850'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black ${
+                        !hintsEnabled ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      <EyeOff className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-bold text-xs uppercase tracking-wide text-white">Sin pistas</span>
+                    {!hintsEnabled && <span className="ml-auto text-xs text-amber-400 font-bold">✓ Activo</span>}
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-snug">
+                    Solo muestra guiones hasta el final. ¡Mayor reto y dificultad!
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            {/* Categorías de palabras (10 categorías seleccionables) */}
+            <div className="pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-between mb-2.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Categorías de palabras</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-amber-400 border border-slate-700">
+                    {currentCategories.length}/{PINTURILLO_CATEGORIES_LIST.length} activas
+                  </span>
+                  {isHost && currentCategories.length < PINTURILLO_CATEGORIES_LIST.length && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAllCategories}
+                      className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                    >
+                      Seleccionar todas
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 mb-3">
+                {isHost
+                  ? 'Elige las categorías que entrarán en el sorteo de palabras (mínimo 1):'
+                  : 'Categorías incluidas en esta partida por el anfitrión:'}
+              </p>
+
+              {/* 10 Categories Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
+                {PINTURILLO_CATEGORIES_LIST.map(category => {
+                  const isSelected = currentCategories.includes(category.id);
+                  return (
+                    <button
+                      key={category.id}
+                      type="button"
+                      disabled={!isHost}
+                      onClick={() => handleToggleCategory(category.id)}
+                      className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                        isSelected
+                          ? 'bg-amber-500/15 border-amber-400/80 text-white shadow-sm'
+                          : 'bg-slate-950/50 border-slate-800 text-slate-500 opacity-60 hover:opacity-80'
+                      } ${!isHost ? 'cursor-default' : ''}`}
+                    >
+                      <span className="text-xl flex-shrink-0 mt-0.5">{category.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`text-xs font-bold truncate ${isSelected ? 'text-amber-300' : 'text-slate-400'}`}>
+                            {category.name}
+                          </span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
+                        </div>
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                          {category.description}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

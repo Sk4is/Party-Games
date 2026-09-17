@@ -117,3 +117,52 @@
   animation: countdown-pop 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Ambient Background Drift Animations (Very slow: 25s - 40s) */
+@keyframes ambient-drift-1 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  50% {
+    transform: translate(30px, 25px) scale(1.08);
+  }
+}
+
+@keyframes ambient-drift-2 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  50% {
+    transform: translate(-35px, -20px) scale(1.06);
+  }
+}
+
+@keyframes ambient-drift-3 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  50% {
+    transform: translate(25px, -30px) scale(1.05);
+  }
+}
+
+.animate-ambient-drift-1 {
+  animation: ambient-drift-1 32s ease-in-out infinite;
+}
+
+.animate-ambient-drift-2 {
+  animation: ambient-drift-2 38s ease-in-out infinite;
+}
+
+.animate-ambient-drift-3 {
+  animation: ambient-drift-3 28s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ambient-drift-1,
+  .animate-ambient-drift-2,
+  .animate-ambient-drift-3 {
+    animation: none !important;
+  }
+}
+
+

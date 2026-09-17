@@ -16,7 +16,7 @@ import { PinturilloToolbar } from './PinturilloToolbar';
 import { PinturilloChat } from './PinturilloChat';
 import { PinturilloWordChoiceModal } from './PinturilloWordChoiceModal';
 import { PinturilloResults } from './PinturilloResults';
-import { PinturilloBackgroundDoodles } from './PinturilloBackgroundDoodles';
+import { PinturilloBackground } from './PinturilloBackground';
 import { audio } from '../../utils/audio';
 import {
   Clock,
@@ -370,7 +370,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   if (!roomState) {
     return (
       <div className="relative min-h-screen bg-slate-950 text-white flex flex-col justify-center overflow-x-hidden">
-        <PinturilloBackgroundDoodles />
+        <PinturilloBackground />
         <div className="relative z-10">
           {errorMessage && (
             <div className="max-w-md mx-auto mb-4 p-4 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-sm flex items-center gap-2">
@@ -393,7 +393,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   if (roomState.phase === 'LOBBY') {
     return (
       <div className="relative min-h-screen bg-slate-950 text-white flex flex-col justify-center overflow-x-hidden">
-        <PinturilloBackgroundDoodles />
+        <PinturilloBackground />
         <div className="relative z-10">
           {errorMessage && (
             <div className="max-w-md mx-auto mb-4 p-4 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-sm flex items-center gap-2">
@@ -420,7 +420,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
 
   return (
     <div className="relative min-h-screen bg-slate-950 text-white flex flex-col overflow-x-hidden select-none">
-      <PinturilloBackgroundDoodles />
+      <PinturilloBackground />
 
       {/* Countdown 3, 2, 1, ¡A DIBUJAR! Overlay */}
       {countdownInfo && (roomState.phase === 'COUNTDOWN' || roomState.phase === 'DRAWING') && (
@@ -542,7 +542,9 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
             ) : (
               <div className="flex flex-col items-center bg-slate-800/80 border border-slate-700/80 px-4 sm:px-6 py-1.5 rounded-2xl shadow-inner">
                 <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black uppercase text-slate-400">
-                  <span>Pistas ({roomState.wordLength} letras)</span>
+                  <span>
+                    {roomState.config.hintsEnabled ? 'Con pistas' : 'Sin pistas'} ({roomState.wordLength} letras)
+                  </span>
                   {roomState.wordCategory && (
                     <span className="px-1.5 py-0.2 rounded bg-slate-700 text-amber-300 font-bold">
                       {roomState.wordCategory}

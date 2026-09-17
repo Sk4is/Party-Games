@@ -1,9 +1,42 @@
 export type DrawingTool = 'pencil' | 'marker' | 'brush' | 'eraser' | 'fill';
 
+export type PinturilloCategory =
+  | 'animales'
+  | 'comida'
+  | 'objetos'
+  | 'lugares'
+  | 'cine_tv'
+  | 'videojuegos'
+  | 'deportes'
+  | 'profesiones'
+  | 'naturaleza'
+  | 'acciones';
+
+export interface CategoryInfo {
+  id: PinturilloCategory;
+  name: string;
+  icon: string;
+  description: string;
+}
+
+export const PINTURILLO_CATEGORIES_LIST: CategoryInfo[] = [
+  { id: 'animales', name: 'Animales', icon: '🐾', description: 'Mascotas, salvajes, aves e insectos' },
+  { id: 'comida', name: 'Comida y Bebida', icon: '🍕', description: 'Platos típicos, tapas, postres y bebidas' },
+  { id: 'objetos', name: 'Objetos', icon: '🏠', description: 'Herramientas, aparatos y cosas cotidianas' },
+  { id: 'lugares', name: 'Lugares', icon: '🌍', description: 'Espacios, edificios y tipos de sitios' },
+  { id: 'cine_tv', name: 'Cine y Televisión', icon: '🎬', description: 'Conceptos del cine, géneros y arquetipos' },
+  { id: 'videojuegos', name: 'Videojuegos', icon: '🎮', description: 'Consolas, mecánicas y elementos gamer' },
+  { id: 'deportes', name: 'Deportes', icon: '⚽', description: 'Disciplinas deportivas, material y acciones' },
+  { id: 'profesiones', name: 'Profesiones', icon: '👷', description: 'Oficios, trabajos y uniformes' },
+  { id: 'naturaleza', name: 'Naturaleza', icon: '🌳', description: 'Clima, paisajes, fenómenos y plantas' },
+  { id: 'acciones', name: 'Acciones y Situaciones', icon: '🎭', description: 'Verbos divertidos y situaciones cotidianas' },
+];
+
 export interface NormalizedPoint {
   x: number; // 0 to 1
   y: number; // 0 to 1
   pressure?: number;
+  widthFactor?: number; // Organic dynamic brush thickness
 }
 
 export interface DrawStroke {
@@ -40,6 +73,8 @@ export interface PinturilloPlayer {
 export interface PinturilloConfig {
   roundTimeSeconds: number; // 30, 45, 60, 90 (default), 120, 180
   totalVueltas: number; // 1, 2 (default), 3, 5
+  hintsEnabled: boolean; // true = CON PISTAS, false = SIN PISTAS
+  categories: PinturilloCategory[]; // Selected categories
 }
 
 export interface ChatMessage {
