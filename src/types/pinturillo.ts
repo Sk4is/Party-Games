@@ -94,6 +94,14 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface HintSlot {
+  type: 'letter' | 'punctuation';
+  char: string;
+  isRevealed: boolean;
+}
+
+export type HintWordGroup = HintSlot[];
+
 export interface PinturilloRoomState {
   code: string;
   roundId?: string;
@@ -107,6 +115,7 @@ export interface PinturilloRoomState {
   currentVuelta: number; // 1 to totalVueltas
   secretWord?: string | null; // ONLY populated for the active drawer!
   wordHint: string; // e.g. "_ _ _ _ _ _ _ _ _"
+  hintWords?: HintWordGroup[]; // Structured word groups for rendering
   wordLength: number;
   wordCategory?: string;
   wordOptions?: Array<{ word: string; category: string; difficulty: string }>; // for drawer during WORD_SELECTION
