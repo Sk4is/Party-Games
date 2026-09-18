@@ -1,0 +1,23 @@
+{
+  "name": "Fiesta de Juegos",
+  "short_name": "Fiesta de Juegos",
+  "description": "Juegos de fiesta multijugador para jugar con amigos: La Bomba, La Peor Respuesta y Pinturillo Online.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512 1254x1254",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512 1254x1254",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
