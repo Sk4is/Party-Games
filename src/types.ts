@@ -114,3 +114,4 @@ export interface AnswerCard {
 export interface LaPeorRespuestaConfig {
   totalRounds: number; // 5, 10, 15, 20, or -1 for Infinity
 }
+

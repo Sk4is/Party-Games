@@ -1,12 +1,12 @@
-import { createRequire } from 'module';
 import { GoogleGenAI, Type } from '@google/genai';
-
-const require = createRequire(import.meta.url);
+import spanishWordsRaw from 'an-array-of-spanish-words';
 
 let spanishDictionarySet: Set<string> | null = null;
 try {
-  const wordsList: string[] = require('an-array-of-spanish-words');
-  spanishDictionarySet = new Set(wordsList);
+  const wordsList: string[] = (spanishWordsRaw as any).default || spanishWordsRaw;
+  if (Array.isArray(wordsList)) {
+    spanishDictionarySet = new Set(wordsList);
+  }
 } catch (e) {
   console.error('[wordValidator] Error cargando an-array-of-spanish-words:', e);
 }

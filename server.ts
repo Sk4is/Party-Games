@@ -1,30 +1,31 @@
 import express from 'express';
 import http from 'http';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
-import { createRequire } from 'module';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
+import spanishWordsRaw from 'an-array-of-spanish-words';
 import { PinturilloServer } from './server/pinturilloGameServer';
 import { PartyGameServer } from './server/partyGameServer';
 import { roomRegistry } from './server/roomRegistry';
 
 dotenv.config();
 
-const require = createRequire(import.meta.url);
-
 // Load Spanish dictionary (636,598 authentic words)
 let spanishDictionarySet: Set<string> | null = null;
 try {
-  const wordsList: string[] = require('an-array-of-spanish-words');
-  spanishDictionarySet = new Set(wordsList);
-  console.log(`[Diccionario] Cargadas ${spanishDictionarySet.size} palabras españolas.`);
+  const wordsList: string[] = (spanishWordsRaw as any).default || spanishWordsRaw;
+  if (Array.isArray(wordsList)) {
+    spanishDictionarySet = new Set(wordsList);
+    console.log(`[Diccionario] Cargadas ${spanishDictionarySet.size} palabras españolas.`);
+  }
 } catch (e) {
   console.error('[Diccionario] Error cargando an-array-of-spanish-words:', e);
 }
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
@@ -293,7 +294,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = fs.existsSync(path.join(process.cwd(), 'dist', 'index.html'))
+      ? path.join(process.cwd(), 'dist')
+      : (typeof __dirname !== 'undefined' ? __dirname : path.join(process.cwd(), 'dist'));
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
