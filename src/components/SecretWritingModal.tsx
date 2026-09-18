@@ -202,6 +202,16 @@ export const SecretWritingModal: React.FC<SecretWritingModalProps> = ({
                       maxLength={60}
                       value={answerPart1}
                       onChange={(e) => setAnswerPart1(e.target.value.slice(0, 60))}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const pasted = e.clipboardData.getData('text') || '';
+                        setAnswerPart1((answerPart1 + pasted).slice(0, 60));
+                      }}
+                      onBeforeInput={(e: any) => {
+                        if (e.data && answerPart1.length >= 60 && !window.getSelection()?.toString()) {
+                          e.preventDefault();
+                        }
+                      }}
                       placeholder="Escribe tu respuesta..."
                       className="w-full p-4 pb-8 rounded-2xl bg-white border-2 border-stone-300 focus:border-amber-500 text-slate-950 font-bold text-base sm:text-lg outline-none resize-none shadow-inner"
                     />

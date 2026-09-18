@@ -6,7 +6,9 @@ import { Skull, Zap } from 'lucide-react';
 interface PlayerRingProps {
   players: Player[];
   activePlayerIndex: number;
+  activePlayerId?: string;
   currentTypingWord?: string;
+  typingPlayerId?: string;
   maxLives?: number;
   allowedMistakesPerRound?: number;
 }
@@ -14,7 +16,9 @@ interface PlayerRingProps {
 export const PlayerRing: React.FC<PlayerRingProps> = ({
   players,
   activePlayerIndex,
+  activePlayerId,
   currentTypingWord,
+  typingPlayerId,
   maxLives = 3,
   allowedMistakesPerRound = 3,
 }) => {
@@ -234,7 +238,14 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
 
           const x = Math.round(Math.cos(angleRad) * radiusX);
           const y = Math.round(Math.sin(angleRad) * radiusY);
-          const isActive = index === activePlayerIndex;
+          const isActive = activePlayerId ? player.id === activePlayerId : index === activePlayerIndex;
+          const typingWord =
+            isActive && !player.isEliminated
+              ? (typingPlayerId && typingPlayerId === player.id
+                  ? currentTypingWord
+                  : player.currentTypingWord) || ''
+              : '';
+          const hasTyping = typingWord.trim().length > 0;
 
           return (
             <div
@@ -321,9 +332,9 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
                       : 'bg-slate-950/90 border border-slate-700/80 shadow-inner'
                   }`}
                 >
-                  {isActive && !player.isEliminated && currentTypingWord && currentTypingWord.trim().length > 0 ? (
+                  {hasTyping ? (
                     <div className="flex items-center justify-center gap-0.5 text-amber-300 font-display font-black text-xs sm:text-sm lg:text-base tracking-wider drop-shadow-[0_0_8px_rgba(245,158,11,0.6)] truncate max-w-full">
-                      <span className="truncate">{currentTypingWord.toUpperCase()}</span>
+                      <span className="truncate">{typingWord.toUpperCase()}</span>
                       <span className="inline-block w-0.5 h-3.5 bg-amber-400 shrink-0 animate-pulse ml-0.5" />
                     </div>
                   ) : (

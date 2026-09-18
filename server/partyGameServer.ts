@@ -39,6 +39,12 @@ interface BombaServerRoom {
   usedSequences: Set<string>;
   playerRecentSequences: Record<string, string[]>;
   activePlayerIndex: number;
+  activePlayerId: string | null;
+  currentTurnId: string;
+  challengeId: string;
+  processedSubmissionIds: Set<string>;
+  pendingSubmissions: Set<string>;
+  currentExplosionId: string | null;
   roundNumber: number;
   bombDurationMs: number;
   bombRemainingMs: number;
@@ -206,6 +212,12 @@ export class PartyGameServer {
         usedSequences: new Set([initialSeq.sequence]),
         playerRecentSequences: { [player.id]: [initialSeq.sequence] },
         activePlayerIndex: 0,
+        activePlayerId: player.id,
+        currentTurnId: `turn-1-0-${Date.now()}`,
+        challengeId: `chal-1-0-${Date.now()}`,
+        processedSubmissionIds: new Set(),
+        pendingSubmissions: new Set(),
+        currentExplosionId: null,
         roundNumber: 1,
         bombDurationMs: initialDuration,
         bombRemainingMs: initialDuration,
@@ -349,7 +361,10 @@ export class PartyGameServer {
         ? 'MIDDLE'
         : 'EARLY';
 
-    const activePlayer = room.players[room.activePlayerIndex] || null;
+    const activePlayer =
+      (room.activePlayerId ? room.players.find((p) => p.id === room.activePlayerId) : null) ||
+      room.players[room.activePlayerIndex] ||
+      null;
 
     const state: BombaRoomState = {
       code: room.code,
@@ -360,7 +375,9 @@ export class PartyGameServer {
       players: room.players,
       currentSequence: room.currentSequence,
       activePlayerIndex: room.activePlayerIndex,
-      activePlayerId: activePlayer ? activePlayer.id : null,
+      activePlayerId: room.activePlayerId || (activePlayer ? activePlayer.id : null),
+      currentTurnId: room.currentTurnId,
+      challengeId: room.challengeId,
       roundNumber: room.roundNumber,
       bombRemainingMs: Math.max(0, Math.round(room.bombRemainingMs)),
       bombDurationMs: room.bombDurationMs,
@@ -609,8 +626,7 @@ export class PartyGameServer {
       }
 
       // If active player left while playing, advance turn immediately
-      const activePlayer = room.players[room.activePlayerIndex];
-      if (activePlayer && activePlayer.id === playerId && room.phase === 'PLAYING') {
+      if (room.activePlayerId === playerId && room.phase === 'PLAYING') {
         this.advanceBombaTurn(room);
       } else {
         this.broadcastBombaState(room);
@@ -938,15 +954,24 @@ export class PartyGameServer {
         const room = this.bombaRooms.get(conn.roomId);
         if (!room || room.phase !== 'PLAYING') return;
 
-        const activePlayer = room.players[room.activePlayerIndex];
-        if (activePlayer && activePlayer.id === conn.playerId) {
-          activePlayer.currentTypingWord = message.text || '';
-          this.broadcastToBomba(room, {
-            type: 'bomba_typing_broadcast',
-            playerId: activePlayer.id,
-            text: activePlayer.currentTypingWord,
-          });
-        }
+        // Verify that sender is the active player by playerId
+        if (conn.playerId !== room.activePlayerId) return;
+
+        // Turn matching check
+        if (message.turnId && message.turnId !== room.currentTurnId) return;
+        if (message.roundNumber && message.roundNumber !== room.roundNumber) return;
+
+        const activePlayer = room.players.find((p) => p.id === room.activePlayerId);
+        if (!activePlayer || activePlayer.isEliminated) return;
+
+        activePlayer.currentTypingWord = message.text || '';
+        this.broadcastToBomba(room, {
+          type: 'bomba_typing_broadcast',
+          playerId: activePlayer.id,
+          text: activePlayer.currentTypingWord,
+          turnId: room.currentTurnId,
+          roundNumber: room.roundNumber,
+        });
         break;
       }
 
@@ -956,93 +981,156 @@ export class PartyGameServer {
         const room = this.bombaRooms.get(conn.roomId);
         if (!room || room.phase !== 'PLAYING') return;
 
-        const activePlayer = room.players[room.activePlayerIndex];
-        if (!activePlayer || activePlayer.id !== conn.playerId) return;
+        const submittingPlayerId = conn.playerId;
 
-        const word = message.word || '';
-        const validation = await validateSpanishWordServer(
-          word,
-          room.currentSequence.sequence,
-          room.usedWords.map((u) => u.word)
-        );
+        // Verify that submitting player is strictly the active player by playerId
+        if (submittingPlayerId !== room.activePlayerId) return;
 
-        if (room.phase !== 'PLAYING') return;
+        // Check turn match to prevent stale submissions
+        if (message.turnId && message.turnId !== room.currentTurnId) return;
+        if (message.roundNumber && message.roundNumber !== room.roundNumber) return;
 
-        if (!validation.valid) {
-          activePlayer.mistakes += 1;
-          activePlayer.multiplier = Math.pow(1.5, activePlayer.mistakes);
-          room.totalMistakes += 1;
-
-          this.broadcastToBomba(room, {
-            type: 'bomba_feedback',
-            feedbackType: 'error',
-            message: validation.reason || 'Palabra no válida',
-          });
-          this.broadcastBombaState(room);
+        // Check if submissionId is duplicate
+        const submissionId = message.submissionId;
+        if (submissionId && room.processedSubmissionIds.has(submissionId)) {
           return;
         }
 
-        // VALID WORD!
-        const acceptedWord = validation.canonicalWord || word.toLowerCase();
-        const answerTimeSeconds = Math.max(0.3, (Date.now() - room.turnStartedAt) / 1000);
-
-        room.totalValidWords += 1;
-        activePlayer.validWordsCount += 1;
-        activePlayer.lastValidWord = acceptedWord;
-        activePlayer.currentTypingWord = '';
-
-        const currentFastest = activePlayer.fastestAnswerTimeMs;
-        const answerMs = Math.round(answerTimeSeconds * 1000);
-        activePlayer.fastestAnswerTimeMs = currentFastest ? Math.min(currentFastest, answerMs) : answerMs;
-
-        if (!room.fastestAnswer || answerTimeSeconds < room.fastestAnswer.timeSeconds) {
-          room.fastestAnswer = {
-            playerName: activePlayer.name,
-            playerColor: activePlayer.color,
-            timeSeconds: answerTimeSeconds,
-            word: acceptedWord,
-          };
+        // Lock concurrent submissions for this player
+        if (room.pendingSubmissions.has(submittingPlayerId)) {
+          return;
+        }
+        room.pendingSubmissions.add(submittingPlayerId);
+        if (submissionId) {
+          room.processedSubmissionIds.add(submissionId);
         }
 
-        // Reto del Abecedario strictly for the active player!
-        const alphabetUpdate = calculateAlphabetProgress(activePlayer.alphabetProgress || [], acceptedWord);
-        let gainedLife = false;
+        try {
+          const targetPlayer = room.players.find((p) => p.id === submittingPlayerId);
+          if (!targetPlayer || targetPlayer.isEliminated) return;
 
-        if (alphabetUpdate.isCompleted) {
-          if (activePlayer.lives < room.config.startingLives) {
-            activePlayer.lives += 1;
-            gainedLife = true;
+          const word = (message.word || '').trim();
+          if (!word) return;
+
+          const validation = await validateSpanishWordServer(
+            word,
+            room.currentSequence.sequence,
+            room.usedWords.map((u) => u.word)
+          );
+
+          // If phase or turn changed while validating asynchronously, abort
+          if (room.phase !== 'PLAYING') return;
+          if (room.activePlayerId !== submittingPlayerId) return;
+
+          if (!validation.valid) {
+            // Mistake handling: atomic increment for submitting player
+            targetPlayer.mistakes += 1;
+            targetPlayer.roundMistakes = (targetPlayer.roundMistakes || 0) + 1;
+            targetPlayer.multiplier = Math.pow(1.5, targetPlayer.mistakes);
+            room.totalMistakes += 1;
+
+            const allowedMistakes = room.config.allowedMistakesPerRound || 3;
+            if (targetPlayer.roundMistakes >= allowedMistakes) {
+              targetPlayer.lives = Math.max(0, targetPlayer.lives - 1);
+              targetPlayer.roundMistakes = 0;
+              if (targetPlayer.lives === 0) {
+                targetPlayer.isEliminated = true;
+              }
+            }
+
+            this.broadcastToBomba(room, {
+              type: 'bomba_feedback',
+              feedbackType: 'error',
+              message: validation.reason || 'Palabra no válida',
+              playerId: targetPlayer.id,
+              submissionId,
+            });
+
+            // If player was eliminated from reaching the mistake limit
+            if (targetPlayer.isEliminated) {
+              const remainingAlive = room.players.filter((p) => !p.isEliminated);
+              if (remainingAlive.length <= 1) {
+                room.phase = 'GAME_OVER';
+                room.winner = remainingAlive[0] || null;
+                if (room.timerInterval) {
+                  clearInterval(room.timerInterval);
+                  room.timerInterval = null;
+                }
+                this.broadcastBombaState(room);
+                return;
+              }
+              this.advanceBombaTurn(room);
+              return;
+            }
+
+            this.broadcastBombaState(room);
+            return;
           }
-          activePlayer.alphabetProgress = []; // Reset this player only
-          this.broadcastToBomba(room, {
-            type: 'bomba_alphabet_reward',
-            playerId: activePlayer.id,
-            playerName: activePlayer.name,
-            gainedLife,
-          });
-        } else {
-          activePlayer.alphabetProgress = alphabetUpdate.updatedProgress;
+
+          // VALID WORD!
+          const acceptedWord = validation.canonicalWord || word.toLowerCase();
+          const answerTimeSeconds = Math.max(0.3, (Date.now() - room.turnStartedAt) / 1000);
+
+          room.totalValidWords += 1;
+          targetPlayer.validWordsCount += 1;
+          targetPlayer.lastValidWord = acceptedWord;
+          targetPlayer.currentTypingWord = '';
+
+          const currentFastest = targetPlayer.fastestAnswerTimeMs;
+          const answerMs = Math.round(answerTimeSeconds * 1000);
+          targetPlayer.fastestAnswerTimeMs = currentFastest ? Math.min(currentFastest, answerMs) : answerMs;
+
+          if (!room.fastestAnswer || answerTimeSeconds < room.fastestAnswer.timeSeconds) {
+            room.fastestAnswer = {
+              playerName: targetPlayer.name,
+              playerColor: targetPlayer.color,
+              timeSeconds: answerTimeSeconds,
+              word: acceptedWord,
+            };
+          }
+
+          // Reto del Abecedario strictly for the active player!
+          const alphabetUpdate = calculateAlphabetProgress(targetPlayer.alphabetProgress || [], acceptedWord);
+          let gainedLife = false;
+
+          if (alphabetUpdate.isCompleted) {
+            if (targetPlayer.lives < room.config.startingLives) {
+              targetPlayer.lives += 1;
+              gainedLife = true;
+            }
+            targetPlayer.alphabetProgress = []; // Reset this player only
+            this.broadcastToBomba(room, {
+              type: 'bomba_alphabet_reward',
+              playerId: targetPlayer.id,
+              playerName: targetPlayer.name,
+              gainedLife,
+            });
+          } else {
+            targetPlayer.alphabetProgress = alphabetUpdate.updatedProgress;
+          }
+
+          // Add to used words
+          const newUsedWord: UsedWord = {
+            word,
+            canonicalWord: acceptedWord,
+            playerId: targetPlayer.id,
+            playerName: targetPlayer.name,
+            playerColor: targetPlayer.color,
+            timestamp: Date.now(),
+          };
+          room.usedWords = [newUsedWord, ...room.usedWords];
+
+          room.acceptedWordBanner = {
+            word: acceptedWord.toUpperCase(),
+            player: targetPlayer.name,
+            bonusLetters: alphabetUpdate.newLetters.length,
+          };
+
+          // Advance turn clockwise
+          this.advanceBombaTurn(room);
+        } finally {
+          room.pendingSubmissions.delete(submittingPlayerId);
         }
-
-        // Add to used words
-        const newUsedWord: UsedWord = {
-          word,
-          canonicalWord: acceptedWord,
-          playerId: activePlayer.id,
-          playerName: activePlayer.name,
-          playerColor: activePlayer.color,
-          timestamp: Date.now(),
-        };
-        room.usedWords = [newUsedWord, ...room.usedWords];
-
-        room.acceptedWordBanner = {
-          word: acceptedWord.toUpperCase(),
-          player: activePlayer.name,
-          bonusLetters: alphabetUpdate.newLetters.length,
-        };
-
-        // Advance turn clockwise
-        this.advanceBombaTurn(room);
         break;
       }
 
@@ -1351,7 +1439,14 @@ export class PartyGameServer {
 
   private startBombaMatch(room: BombaServerRoom) {
     room.phase = 'PLAYING';
+    const startingPlayer = room.players[0];
     room.activePlayerIndex = 0;
+    room.activePlayerId = startingPlayer ? startingPlayer.id : null;
+    room.currentTurnId = `turn-1-0-${Date.now()}`;
+    room.challengeId = `chal-1-0-${Date.now()}`;
+    room.currentExplosionId = null;
+    room.processedSubmissionIds.clear();
+    room.pendingSubmissions.clear();
     room.roundNumber = 1;
     const initialDuration = getRandomBombDurationMs();
     room.bombDurationMs = initialDuration;
@@ -1361,14 +1456,15 @@ export class PartyGameServer {
     room.acceptedWordBanner = null;
     room.usedWords = [];
 
-    const startingPlayer = room.players[0];
     const initialSeq = getNextSequence({
       usedSequences: room.usedSequences,
-      playerRecentSequences: room.playerRecentSequences[startingPlayer.id] || [],
+      playerRecentSequences: startingPlayer ? room.playerRecentSequences[startingPlayer.id] || [] : [],
     });
     room.currentSequence = initialSeq;
     room.usedSequences.add(initialSeq.sequence);
-    room.playerRecentSequences[startingPlayer.id] = [initialSeq.sequence];
+    if (startingPlayer) {
+      room.playerRecentSequences[startingPlayer.id] = [initialSeq.sequence];
+    }
 
     this.runBombaTimer(room);
     this.broadcastBombaState(room);
@@ -1389,18 +1485,29 @@ export class PartyGameServer {
 
     room.activePlayerIndex = nextIdx;
     const nextPlayer = room.players[nextIdx];
+    room.activePlayerId = nextPlayer ? nextPlayer.id : null;
+    room.currentTurnId = `turn-${room.roundNumber}-${nextIdx}-${Date.now()}`;
+    room.challengeId = `chal-${room.roundNumber}-${nextIdx}-${Date.now()}`;
+    room.currentExplosionId = null;
+
+    // Clear typing buffer for all players upon turn advance
+    for (const p of room.players) {
+      p.currentTypingWord = '';
+    }
 
     const nextSeq = getNextSequence({
       usedSequences: room.usedSequences,
       previousSequence: room.currentSequence.sequence,
-      playerRecentSequences: room.playerRecentSequences[nextPlayer.id] || [],
+      playerRecentSequences: nextPlayer ? room.playerRecentSequences[nextPlayer.id] || [] : [],
     });
 
     room.usedSequences.add(nextSeq.sequence);
-    room.playerRecentSequences[nextPlayer.id] = [
-      ...(room.playerRecentSequences[nextPlayer.id] || []).slice(-4),
-      nextSeq.sequence,
-    ];
+    if (nextPlayer) {
+      room.playerRecentSequences[nextPlayer.id] = [
+        ...(room.playerRecentSequences[nextPlayer.id] || []).slice(-4),
+        nextSeq.sequence,
+      ];
+    }
     room.currentSequence = nextSeq;
     room.turnStartedAt = Date.now();
 
@@ -1422,7 +1529,9 @@ export class PartyGameServer {
       const elapsed = Math.max(0, now - room.lastUpdateTimestamp);
       room.lastUpdateTimestamp = now;
 
-      const activePlayer = room.players[room.activePlayerIndex];
+      const activePlayer =
+        (room.activePlayerId ? room.players.find((p) => p.id === room.activePlayerId) : null) ||
+        room.players[room.activePlayerIndex];
       const multiplier = activePlayer ? activePlayer.multiplier : 1.0;
       const consumed = elapsed * multiplier;
 
@@ -1436,10 +1545,24 @@ export class PartyGameServer {
   }
 
   private triggerBombaExplosion(room: BombaServerRoom) {
-    const explodingPlayer = room.players[room.activePlayerIndex];
+    if (room.phase !== 'PLAYING') return;
+    if (room.timerInterval) {
+      clearInterval(room.timerInterval);
+      room.timerInterval = null;
+    }
+
+    const explosionId = `exp-${room.roundNumber}-${room.currentTurnId}-${Date.now()}`;
+    if (room.currentExplosionId === explosionId) return;
+    room.currentExplosionId = explosionId;
+
+    // Strict playerId lookup for the exploding player
+    const explodingPlayer =
+      (room.activePlayerId ? room.players.find((p) => p.id === room.activePlayerId) : null) ||
+      room.players[room.activePlayerIndex];
     if (!explodingPlayer) return;
 
     room.totalExplosions += 1;
+    // Exactly ONE life deducted
     explodingPlayer.lives = Math.max(0, explodingPlayer.lives - 1);
     explodingPlayer.bombsReceived += 1;
     if (explodingPlayer.lives === 0) {
@@ -1447,7 +1570,9 @@ export class PartyGameServer {
     }
 
     room.affectedPlayer = { ...explodingPlayer };
-    explodingPlayer.currentTypingWord = '';
+    for (const p of room.players) {
+      p.currentTypingWord = '';
+    }
     room.phase = 'EXPLOSION';
     this.broadcastBombaState(room);
 
@@ -1480,16 +1605,23 @@ export class PartyGameServer {
     }
     room.activePlayerIndex = nextIdx;
     const nextPlayer = room.players[nextIdx];
+    room.activePlayerId = nextPlayer ? nextPlayer.id : null;
+
+    room.roundNumber += 1;
+    room.currentTurnId = `turn-${room.roundNumber}-${nextIdx}-${Date.now()}`;
+    room.challengeId = `chal-${room.roundNumber}-${nextIdx}-${Date.now()}`;
+    room.currentExplosionId = null;
+    room.processedSubmissionIds.clear();
+    room.pendingSubmissions.clear();
 
     const nextSeq = getNextSequence({
       usedSequences: room.usedSequences,
       previousSequence: room.currentSequence.sequence,
-      playerRecentSequences: room.playerRecentSequences[nextPlayer.id] || [],
+      playerRecentSequences: nextPlayer ? room.playerRecentSequences[nextPlayer.id] || [] : [],
     });
     room.usedSequences.add(nextSeq.sequence);
     room.currentSequence = nextSeq;
 
-    room.roundNumber += 1;
     room.usedWords = [];
 
     // Reset round mistakes and multiplier for all alive players

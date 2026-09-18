@@ -54,6 +54,48 @@ export interface GetNextSequenceOptions {
   preferredDifficulty?: 'EASY' | 'NORMAL' | 'HARD';
 }
 
+export interface SequenceChallenge {
+  challengeId: string;
+  sequence: LetterSequence;
+}
+
+// In-memory shuffle bags for non-repeating sequence selection
+class ShuffleBag<T> {
+  private items: T[];
+  private currentBag: T[] = [];
+
+  constructor(items: T[]) {
+    this.items = [...items];
+    this.refill();
+  }
+
+  private refill() {
+    this.currentBag = [...this.items];
+    // Fisher-Yates shuffle
+    for (let i = this.currentBag.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = this.currentBag[i];
+      this.currentBag[i] = this.currentBag[j];
+      this.currentBag[j] = temp;
+    }
+  }
+
+  next(): T {
+    if (this.currentBag.length === 0) {
+      this.refill();
+    }
+    return this.currentBag.pop()!;
+  }
+}
+
+const easyBag = new ShuffleBag(easyPool);
+const normalBag = new ShuffleBag(normalPool);
+const hardBag = new ShuffleBag(hardPool);
+
+export function generateChallengeId(seq: string): string {
+  return `chal-${seq.toUpperCase()}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+}
+
 /**
  * Generates the next letter sequence according to difficulty weights (45% Fácil, 40% Normal, 15% Difícil),
  * ensuring high replayability across thousands of Spanish word combinations and avoiding consecutive similarity.
@@ -105,7 +147,25 @@ export function getNextSequence(options: GetNextSequenceOptions = {}): LetterSeq
     });
   }
 
-  // 4. If still empty, search across all pools without usedSequences constraint (resetting cycle)
+  // 4. If still empty, use the corresponding shuffle bag
+  if (candidates.length === 0) {
+    const bag =
+      targetDifficulty === 'EASY'
+        ? easyBag
+        : targetDifficulty === 'NORMAL'
+        ? normalBag
+        : hardBag;
+
+    // Try a few picks from the bag to avoid immediate similarity
+    for (let attempts = 0; attempts < 15; attempts++) {
+      const candidate = bag.next();
+      if (!previousSequence || !isSimilarSequence(candidate.sequence, previousSequence)) {
+        return candidate;
+      }
+    }
+  }
+
+  // 5. If still empty, search across all pools without usedSequences constraint (resetting cycle)
   if (candidates.length === 0) {
     candidates = SEQUENCES.filter((item) => {
       const seq = item.sequence;
@@ -114,7 +174,7 @@ export function getNextSequence(options: GetNextSequenceOptions = {}): LetterSeq
     });
   }
 
-  // 5. Absolute fallback
+  // 6. Absolute fallback
   if (candidates.length === 0) {
     candidates = SEQUENCES.filter((item) => item.sequence !== previousSequence);
   }
@@ -125,6 +185,17 @@ export function getNextSequence(options: GetNextSequenceOptions = {}): LetterSeq
 
   const pickedIndex = Math.floor(Math.random() * candidates.length);
   return candidates[pickedIndex];
+}
+
+/**
+ * Creates a unique challenge pairing a letter sequence with a stable challengeId.
+ */
+export function createSequenceChallenge(options: GetNextSequenceOptions = {}): SequenceChallenge {
+  const sequence = getNextSequence(options);
+  return {
+    challengeId: generateChallengeId(sequence.sequence),
+    sequence,
+  };
 }
 
 /**

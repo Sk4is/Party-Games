@@ -31,22 +31,34 @@ export const WordInput: React.FC<WordInputProps> = ({
   onTypingChange,
 }) => {
   const [showHistory, setShowHistory] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingLockRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus input when enabled
   useEffect(() => {
-    if (!disabled && !isValidating && inputRef.current) {
+    if (!disabled && !isValidating && !isSubmitting && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [disabled, isValidating]);
+  }, [disabled, isValidating, isSubmitting]);
+
+  // Unlock submission when validation state finishes or feedback changes
+  useEffect(() => {
+    if (!isValidating) {
+      setIsSubmitting(false);
+      submittingLockRef.current = false;
+    }
+  }, [isValidating, feedback]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (disabled || isValidating) return;
+    if (disabled || isValidating || isSubmitting || submittingLockRef.current) return;
 
     const trimmed = currentTypingWord.trim();
     if (!trimmed) return;
 
+    submittingLockRef.current = true;
+    setIsSubmitting(true);
     onWordSubmit(trimmed);
   };
 
@@ -108,7 +120,7 @@ export const WordInput: React.FC<WordInputProps> = ({
           id="word-input-field"
           ref={inputRef}
           type="text"
-          disabled={disabled || isValidating}
+          disabled={disabled || isValidating || isSubmitting}
           value={currentTypingWord}
           onChange={(e) => onTypingChange(e.target.value)}
           onFocus={(e) => {
@@ -120,7 +132,7 @@ export const WordInput: React.FC<WordInputProps> = ({
           placeholder={
             disabled
               ? 'Esperando...'
-              : isValidating
+              : isValidating || isSubmitting
               ? 'Comprobando...'
               : `Escribe una palabra con «${requiredSequence}»...`
           }
@@ -133,7 +145,7 @@ export const WordInput: React.FC<WordInputProps> = ({
         <button
           id="submit-word-button"
           type="submit"
-          disabled={disabled || isValidating || !currentTypingWord.trim()}
+          disabled={disabled || isValidating || isSubmitting || !currentTypingWord.trim()}
           className="w-full sm:w-auto h-13 sm:h-14 px-8 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-black text-base tracking-wider shadow-xl shadow-amber-500/25 active:scale-95 transition-all inline-flex items-center justify-center gap-2 cursor-pointer shrink-0"
         >
           <span>ENVIAR</span>

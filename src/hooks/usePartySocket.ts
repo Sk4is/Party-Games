@@ -28,6 +28,13 @@ export interface AlphabetRewardEvent {
   gainedLife: boolean;
 }
 
+export interface ActiveTypingState {
+  playerId: string;
+  text: string;
+  turnId?: string;
+  roundNumber?: number;
+}
+
 export interface UsePartySocketOptions {
   id?: string;
   name?: string;
@@ -58,7 +65,7 @@ export function usePartySocket(options: UsePartySocketOptions) {
   const [lprState, setLprState] = useState<LPRRoomState | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; noticeType?: string } | null>(null);
-  const [activeTyping, setActiveTyping] = useState<{ playerId: string; text: string } | null>(null);
+  const [activeTyping, setActiveTyping] = useState<ActiveTypingState | null>(null);
   const [feedback, setFeedback] = useState<FeedbackEvent | null>(null);
   const [alphabetReward, setAlphabetReward] = useState<AlphabetRewardEvent | null>(null);
   const [otherCursors, setOtherCursors] = useState<Record<string, BoardCursor>>({});
@@ -129,7 +136,18 @@ export function usePartySocket(options: UsePartySocketOptions) {
             case 'room_state': {
               setIsJoiningOrCreating(false);
               if (msg.state.gameType === 'la-bomba') {
-                setBombaState(msg.state as BombaRoomState);
+                const newBombaState = msg.state as BombaRoomState;
+                setBombaState((prev) => {
+                  if (
+                    !prev ||
+                    prev.activePlayerId !== newBombaState.activePlayerId ||
+                    prev.currentTurnId !== newBombaState.currentTurnId ||
+                    prev.roundNumber !== newBombaState.roundNumber
+                  ) {
+                    setActiveTyping(null);
+                  }
+                  return newBombaState;
+                });
                 lastActiveRoomRef.current = { code: msg.state.code, gameType: 'la-bomba' };
               } else if (msg.state.gameType === 'la-peor-respuesta') {
                 setLprState(msg.state as LPRRoomState);
@@ -152,7 +170,12 @@ export function usePartySocket(options: UsePartySocketOptions) {
             }
 
             case 'bomba_typing_broadcast': {
-              setActiveTyping({ playerId: msg.playerId, text: msg.text });
+              setActiveTyping({
+                playerId: msg.playerId,
+                text: msg.text,
+                turnId: msg.turnId,
+                roundNumber: msg.roundNumber,
+              });
               break;
             }
 
@@ -334,17 +357,37 @@ export function usePartySocket(options: UsePartySocketOptions) {
 
   // La Bomba Actions
   const bombaTyping = useCallback(
-    (text: string) => {
-      send({ type: 'bomba_typing', text });
+    (text: string, turnId?: string, roundNumber?: number) => {
+      send({
+        type: 'bomba_typing',
+        text,
+        turnId,
+        roundNumber,
+        playerId: currentUser.id,
+      });
     },
-    [send]
+    [send, currentUser.id]
   );
 
   const bombaSubmitWord = useCallback(
-    (word: string) => {
-      send({ type: 'bomba_submit_word', word });
+    (
+      word: string,
+      submissionId?: string,
+      turnId?: string,
+      roundNumber?: number,
+      challengeId?: string
+    ) => {
+      send({
+        type: 'bomba_submit_word',
+        word,
+        submissionId: submissionId || `sub-${currentUser.id}-${Date.now()}`,
+        turnId,
+        roundNumber,
+        playerId: currentUser.id,
+        challengeId,
+      });
     },
-    [send]
+    [send, currentUser.id]
   );
 
   const bombaDismissExplosion = useCallback(() => {

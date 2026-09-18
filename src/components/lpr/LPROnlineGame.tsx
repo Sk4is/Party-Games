@@ -267,6 +267,17 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
                     maxLength={60}
                     value={localAnswerText}
                     onChange={(e) => setLocalAnswerText(e.target.value.slice(0, 60))}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const pasted = e.clipboardData.getData('text') || '';
+                      const combined = (localAnswerText + pasted).slice(0, 60);
+                      setLocalAnswerText(combined);
+                    }}
+                    onBeforeInput={(e: any) => {
+                      if (e.data && localAnswerText.length >= 60 && !window.getSelection()?.toString()) {
+                        e.preventDefault();
+                      }
+                    }}
                     placeholder="Escribe tu respuesta..."
                     className="w-full p-4 pb-8 bg-stone-950 border border-stone-800 rounded-2xl text-stone-100 placeholder-stone-600 text-base font-semibold focus:outline-none focus:border-[#FF3B4F] transition-colors resize-none"
                     autoFocus

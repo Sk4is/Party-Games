@@ -34,14 +34,25 @@ import {
 interface BombaOnlineGameProps {
   roomState: BombaRoomState;
   currentUserId: string;
-  activeTyping: { playerId: string; text: string } | null;
+  activeTyping: {
+    playerId: string;
+    text: string;
+    turnId?: string;
+    roundNumber?: number;
+  } | null;
   serverFeedback: { id: string; type: 'success' | 'error'; message: string } | null;
   alphabetReward: { id: string; playerId: string; playerName: string; gainedLife: boolean } | null;
   onUpdateConfig: (cfg: Partial<GameConfig>) => void;
   onStartGame: () => void;
   onLeaveRoom: () => void;
-  onTyping: (text: string) => void;
-  onSubmitWord: (word: string) => void;
+  onTyping: (text: string, turnId?: string, roundNumber?: number) => void;
+  onSubmitWord: (
+    word: string,
+    submissionId?: string,
+    turnId?: string,
+    roundNumber?: number,
+    challengeId?: string
+  ) => void;
   onDismissExplosion: () => void;
   onPlayAgain: () => void;
 }
@@ -72,6 +83,7 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
 
   // Local typing buffer for active player
   const [localTypingWord, setLocalTypingWord] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const lastTypingSentRef = useRef<number>(0);
 
   // Local feedback state
@@ -80,8 +92,15 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
     message: string;
   }>({ type: null, message: '' });
 
+  // Reset typing and unlock submissions when turn, activePlayer, or round changes
+  useEffect(() => {
+    setLocalTypingWord('');
+    setIsSubmitting(false);
+  }, [roomState.activePlayerId, roomState.currentTurnId, roomState.roundNumber, roomState.phase]);
+
   useEffect(() => {
     if (serverFeedback) {
+      setIsSubmitting(false);
       setFeedback({
         type: serverFeedback.type,
         message: serverFeedback.message,
@@ -131,7 +150,12 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
   }
 
   // Active Player & Status
-  const activePlayer = roomState.players[roomState.activePlayerIndex] || roomState.players[0];
+  const activePlayer =
+    (roomState.activePlayerId
+      ? roomState.players.find((p) => p.id === roomState.activePlayerId)
+      : null) ||
+    roomState.players[roomState.activePlayerIndex] ||
+    roomState.players[0];
   const isMeActive = activePlayer?.id === currentUserId;
   const me = roomState.players.find((p) => p.id === currentUserId) || roomState.players[0];
 
@@ -140,6 +164,7 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
 
   // Handle typing change
   const handleTypingChange = (val: string) => {
+    if (!isMeActive) return;
     setLocalTypingWord(val);
     setFeedback({ type: null, message: '' });
 
@@ -147,42 +172,66 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
     const now = Date.now();
     if (now - lastTypingSentRef.current > 30) {
       lastTypingSentRef.current = now;
-      onTyping(val);
+      onTyping(val, roomState.currentTurnId, roomState.roundNumber);
     }
   };
 
   // Handle submit
   const handleWordSubmit = (word: string) => {
+    if (!isMeActive || isSubmitting) return;
+    setIsSubmitting(true);
     audio.playTick();
-    onSubmitWord(word);
-    setLocalTypingWord('');
+    const submissionId = `sub-${currentUserId}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    onSubmitWord(
+      word,
+      submissionId,
+      roomState.currentTurnId,
+      roomState.roundNumber,
+      roomState.challengeId
+    );
   };
 
   // Convert BombaPlayerState to Player for components
-  const castPlayers: Player[] = roomState.players.map((p) => ({
-    id: p.id,
-    name: p.name,
-    color: p.color,
-    avatar: p.avatar,
-    lives: p.lives,
-    mistakes: p.mistakes,
-    roundMistakes: p.mistakes,
-    multiplier: p.multiplier,
-    isEliminated: p.isEliminated,
-    bombsReceived: p.bombsReceived,
-    validWordsCount: p.validWordsCount,
-    fastestAnswerTimeMs: p.fastestAnswerTimeMs,
-    lastValidWord: p.lastValidWord,
-    currentTypingWord:
-      p.id === activePlayer.id
-        ? isMeActive
-          ? localTypingWord
-          : activeTyping?.text || p.currentTypingWord || ''
-        : '',
-    alphabetProgress: p.alphabetProgress,
-  }));
+  const castPlayers: Player[] = roomState.players.map((p) => {
+    const isThisPlayerActive = p.id === activePlayer.id;
+    const isThisPlayerMe = p.id === currentUserId;
 
-  const castActivePlayer = castPlayers[roomState.activePlayerIndex] || castPlayers[0];
+    let currentTypingText = '';
+    if (isThisPlayerActive) {
+      if (isThisPlayerMe) {
+        currentTypingText = localTypingWord;
+      } else if (
+        activeTyping &&
+        activeTyping.playerId === p.id &&
+        (!activeTyping.turnId || activeTyping.turnId === roomState.currentTurnId)
+      ) {
+        currentTypingText = activeTyping.text;
+      }
+    }
+
+    return {
+      id: p.id,
+      name: p.name,
+      color: p.color,
+      avatar: p.avatar,
+      lives: p.lives,
+      mistakes: p.mistakes,
+      roundMistakes: p.roundMistakes ?? p.mistakes,
+      multiplier: p.multiplier,
+      isEliminated: p.isEliminated,
+      bombsReceived: p.bombsReceived,
+      validWordsCount: p.validWordsCount,
+      fastestAnswerTimeMs: p.fastestAnswerTimeMs,
+      lastValidWord: p.lastValidWord,
+      currentTypingWord: currentTypingText,
+      alphabetProgress: p.alphabetProgress,
+    };
+  });
+
+  const castActivePlayer =
+    castPlayers.find((p) => p.id === activePlayer.id) ||
+    castPlayers[roomState.activePlayerIndex] ||
+    castPlayers[0];
 
   // My Alphabet Progress
   const myAlphabetCount = me?.alphabetProgress?.length || 0;
@@ -324,8 +373,20 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
               <PlayerRing
                 players={castPlayers}
                 activePlayerIndex={roomState.activePlayerIndex}
+                activePlayerId={activePlayer.id}
                 currentTypingWord={
-                  isMeActive ? localTypingWord : activeTyping?.text || castActivePlayer.currentTypingWord
+                  isMeActive
+                    ? localTypingWord
+                    : activeTyping && activeTyping.playerId === activePlayer.id
+                    ? activeTyping.text
+                    : ''
+                }
+                typingPlayerId={
+                  isMeActive
+                    ? currentUserId
+                    : activeTyping && activeTyping.playerId === activePlayer.id
+                    ? activePlayer.id
+                    : undefined
                 }
                 maxLives={roomState.config.startingLives}
                 allowedMistakesPerRound={roomState.config.allowedMistakesPerRound}
@@ -338,8 +399,20 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
             <MobilePlayerGrid
               players={castPlayers}
               activePlayerIndex={roomState.activePlayerIndex}
+              activePlayerId={activePlayer.id}
               currentTypingWord={
-                isMeActive ? localTypingWord : activeTyping?.text || castActivePlayer.currentTypingWord
+                isMeActive
+                  ? localTypingWord
+                  : activeTyping && activeTyping.playerId === activePlayer.id
+                  ? activeTyping.text
+                  : ''
+              }
+              typingPlayerId={
+                isMeActive
+                  ? currentUserId
+                  : activeTyping && activeTyping.playerId === activePlayer.id
+                  ? activePlayer.id
+                  : undefined
               }
               maxLives={roomState.config.startingLives}
               allowedMistakesPerRound={roomState.config.allowedMistakesPerRound}
@@ -370,7 +443,9 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
                     </span>
                   </div>
                   <div className="text-xs text-slate-400">
-                    {activeTyping?.text ? (
+                    {activeTyping &&
+                    activeTyping.playerId === activePlayer.id &&
+                    activeTyping.text ? (
                       <span className="font-mono text-amber-300 font-semibold">
                         Escribiendo: «{activeTyping.text}»...
                       </span>

@@ -55,6 +55,8 @@ export interface BombaRoomState {
   currentSequence: LetterSequence | null;
   activePlayerIndex: number;
   activePlayerId: string | null;
+  currentTurnId?: string;
+  challengeId?: string;
   roundNumber: number;
   bombRemainingMs: number;
   bombDurationMs: number;
@@ -163,10 +165,18 @@ export type PartyClientMessage =
   | {
       type: 'bomba_typing';
       text: string;
+      turnId?: string;
+      roundNumber?: number;
+      playerId?: string;
     }
   | {
       type: 'bomba_submit_word';
       word: string;
+      submissionId?: string;
+      turnId?: string;
+      roundNumber?: number;
+      playerId?: string;
+      challengeId?: string;
     }
   | {
       type: 'bomba_dismiss_explosion';
@@ -227,12 +237,16 @@ export type PartyServerMessage =
       type: 'bomba_typing_broadcast';
       playerId: string;
       text: string;
+      turnId?: string;
+      roundNumber?: number;
     }
   | {
       type: 'bomba_feedback';
       feedbackType: 'success' | 'error';
       message: string;
       canonicalWord?: string;
+      playerId?: string;
+      submissionId?: string;
     }
   | {
       type: 'bomba_alphabet_reward';
