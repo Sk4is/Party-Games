@@ -358,7 +358,9 @@ export function usePartySocket(options: UsePartySocketOptions) {
   // La Peor Respuesta Actions
   const lprSubmitAnswer = useCallback(
     (text: string) => {
-      send({ type: 'lpr_submit_answer', text });
+      const answer = typeof text === 'string' ? text.trim() : '';
+      if (answer.length === 0 || answer.length > 60) return;
+      send({ type: 'lpr_submit_answer', text: answer });
     },
     [send]
   );

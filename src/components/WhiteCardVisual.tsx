@@ -38,12 +38,12 @@ export const WhiteCardVisual: React.FC<WhiteCardVisualProps> = ({
   showAuthor = false,
   className = '',
 }) => {
-  // Determine typography size based on length of the answer
+  // Determine typography size based on length of the answer (optimized for answers up to 60 chars)
   const getTextSizeClass = (str: string) => {
     const len = str.length;
-    if (len < 28) return 'text-xl sm:text-2xl font-black';
-    if (len < 65) return 'text-lg sm:text-xl font-bold';
-    return 'text-sm sm:text-base font-semibold';
+    if (len <= 20) return 'text-xl sm:text-2xl font-black tracking-tight';
+    if (len <= 40) return 'text-lg sm:text-xl font-black';
+    return 'text-base sm:text-lg font-extrabold';
   };
 
   const handleClick = () => {
@@ -150,9 +150,9 @@ export const WhiteCardVisual: React.FC<WhiteCardVisualProps> = ({
           </div>
 
           {/* Answer Text in the Center */}
-          <div className="relative z-10 flex-1 flex items-center my-2">
+          <div className="relative z-10 flex-1 flex items-center justify-center text-center my-2 px-1">
             <p
-              className={`text-slate-900 leading-snug break-words hyphens-auto font-['Plus_Jakarta_Sans',sans-serif] ${getTextSizeClass(
+              className={`text-slate-900 leading-snug break-words hyphens-auto font-['Plus_Jakarta_Sans',sans-serif] w-full ${getTextSizeClass(
                 text
               )}`}
             >

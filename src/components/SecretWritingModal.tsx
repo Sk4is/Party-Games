@@ -34,6 +34,13 @@ export const SecretWritingModal: React.FC<SecretWritingModalProps> = ({
     setStep('WRITING');
   };
 
+  // Check if answer is valid (1-60 characters)
+  const isAnswerValid = !isTwoBlanks
+    ? answerPart1.trim().length >= 1 && answerPart1.trim().length <= 60
+    : answerPart1.trim().length >= 1 &&
+      answerPart2.trim().length >= 1 &&
+      `${answerPart1.trim()} ... ${answerPart2.trim()}`.length <= 60;
+
   // Handles submission of current player's answer
   const handleSubmitAnswer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +54,10 @@ export const SecretWritingModal: React.FC<SecretWritingModalProps> = ({
     }
 
     const fullAnswerText = isTwoBlanks ? `${clean1} ... ${clean2}` : clean1;
+    if (fullAnswerText.length === 0 || fullAnswerText.length > 60) {
+      audio.playAnswerRejected();
+      return;
+    }
 
     const newSubmission: AnswerCard = {
       id: `ans-${activePlayer.id}-${Date.now()}`,
@@ -177,65 +188,96 @@ export const SecretWritingModal: React.FC<SecretWritingModalProps> = ({
               </span>
             </div>
 
-            <form onSubmit={handleSubmitAnswer} className="space-y-4">
+            <form id="lpr-secret-form" onSubmit={handleSubmitAnswer} className="space-y-4">
               {!isTwoBlanks ? (
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    Tu respuesta (máximo 140 caracteres)
+                  <label htmlFor="lpr-secret-answer-1" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Tu respuesta (máximo 60 caracteres)
                   </label>
-                  <textarea
-                    autoFocus
-                    rows={3}
-                    maxLength={140}
-                    value={answerPart1}
-                    onChange={(e) => setAnswerPart1(e.target.value)}
-                    placeholder="Escribe aquí la respuesta más divertida, incómoda o disparatada..."
-                    className="w-full p-4 rounded-2xl bg-white border-2 border-stone-300 focus:border-amber-500 text-slate-950 font-bold text-lg sm:text-xl outline-none resize-none shadow-inner"
-                  />
-                  <div className="flex justify-end mt-1 text-xs font-bold text-slate-500">
-                    <span>{answerPart1.length} / 140</span>
+                  <div className="relative">
+                    <textarea
+                      id="lpr-secret-answer-1"
+                      autoFocus
+                      rows={3}
+                      maxLength={60}
+                      value={answerPart1}
+                      onChange={(e) => setAnswerPart1(e.target.value.slice(0, 60))}
+                      placeholder="Escribe tu respuesta..."
+                      className="w-full p-4 pb-8 rounded-2xl bg-white border-2 border-stone-300 focus:border-amber-500 text-slate-950 font-bold text-base sm:text-lg outline-none resize-none shadow-inner"
+                    />
+                    <div className="absolute right-3.5 bottom-2.5 pointer-events-none select-none">
+                      <span
+                        id="lpr-secret-counter-1"
+                        className={`text-xs font-mono font-medium transition-colors ${
+                          answerPart1.length === 60
+                            ? 'text-amber-600 font-bold'
+                            : answerPart1.length >= 50
+                            ? 'text-amber-600/80 font-semibold'
+                            : 'text-stone-400'
+                        }`}
+                      >
+                        {answerPart1.length} / 60
+                      </span>
+                    </div>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      Primera parte del hueco
+                    <label htmlFor="lpr-secret-blank-1" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Primera parte del hueco (máx. 28 caracteres)
                     </label>
-                    <input
-                      autoFocus
-                      type="text"
-                      maxLength={70}
-                      value={answerPart1}
-                      onChange={(e) => setAnswerPart1(e.target.value)}
-                      placeholder="Primera respuesta..."
-                      className="w-full p-3.5 rounded-xl bg-white border-2 border-stone-300 focus:border-amber-500 text-slate-950 font-bold text-base outline-none shadow-inner"
-                    />
+                    <div className="relative">
+                      <input
+                        id="lpr-secret-blank-1"
+                        autoFocus
+                        type="text"
+                        maxLength={28}
+                        value={answerPart1}
+                        onChange={(e) => setAnswerPart1(e.target.value.slice(0, 28))}
+                        placeholder="Primera respuesta..."
+                        className="w-full p-3.5 pr-16 rounded-xl bg-white border-2 border-stone-300 focus:border-amber-500 text-slate-950 font-bold text-base outline-none shadow-inner"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none select-none">
+                        <span className="text-xs font-mono text-stone-400">
+                          {answerPart1.length} / 28
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      Segunda parte del hueco
+                    <label htmlFor="lpr-secret-blank-2" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Segunda parte del hueco (máx. 28 caracteres)
                     </label>
-                    <input
-                      type="text"
-                      maxLength={70}
-                      value={answerPart2}
-                      onChange={(e) => setAnswerPart2(e.target.value)}
-                      placeholder="Segunda respuesta..."
-                      className="w-full p-3.5 rounded-xl bg-white border-2 border-stone-300 focus:border-amber-500 text-slate-950 font-bold text-base outline-none shadow-inner"
-                    />
+                    <div className="relative">
+                      <input
+                        id="lpr-secret-blank-2"
+                        type="text"
+                        maxLength={28}
+                        value={answerPart2}
+                        onChange={(e) => setAnswerPart2(e.target.value.slice(0, 28))}
+                        placeholder="Segunda respuesta..."
+                        className="w-full p-3.5 pr-16 rounded-xl bg-white border-2 border-stone-300 focus:border-amber-500 text-slate-950 font-bold text-base outline-none shadow-inner"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none select-none">
+                        <span className="text-xs font-mono text-stone-400">
+                          {answerPart2.length} / 28
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
               <button
+                id="lpr-secret-submit-btn"
                 type="submit"
-                disabled={!answerPart1.trim() || (isTwoBlanks && !answerPart2.trim())}
+                disabled={!isAnswerValid}
                 className="w-full py-4 rounded-2xl bg-slate-950 hover:bg-stone-900 text-white font-black font-display text-base sm:text-lg tracking-wide uppercase transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer active:scale-98"
               >
                 <Send className="w-5 h-5" />
-                <span>Enviar respuesta</span>
+                <span>¡Listo! Enviar respuesta</span>
               </button>
             </form>
           </div>

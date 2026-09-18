@@ -132,11 +132,14 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
     score: p.score,
   }));
 
-  // Handle local submit answer
+  // Handle local submit answer with strict 1-60 characters validation
+  const cleanAnswer = localAnswerText.trim();
+  const isAnswerValid = cleanAnswer.length >= 1 && cleanAnswer.length <= 60;
+
   const handleAnswerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = localAnswerText.trim();
-    if (!trimmed) return;
+    if (trimmed.length === 0 || trimmed.length > 60) return;
 
     audio.playSpark();
     setHasLockedAnswer(true);
@@ -244,11 +247,12 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
             {/* Private Writing Box */}
             {!hasMyAnswerSubmitted ? (
               <form
+                id="lpr-writing-form"
                 onSubmit={handleAnswerSubmit}
                 className="bg-stone-900/90 border border-stone-800 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4"
               >
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-stone-300">
+                  <label htmlFor="lpr-answer-input" className="text-xs font-bold uppercase tracking-wider text-stone-300">
                     Tu Respuesta Privada
                   </label>
                   <span className="text-[11px] text-stone-500">
@@ -256,26 +260,45 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
                   </span>
                 </div>
 
-                <textarea
-                  rows={3}
-                  value={localAnswerText}
-                  onChange={(e) => setLocalAnswerText(e.target.value)}
-                  placeholder="Escribe aquí tu peor o más divertida respuesta..."
-                  className="w-full p-4 bg-stone-950 border border-stone-800 rounded-2xl text-stone-100 placeholder-stone-600 text-base font-semibold focus:outline-none focus:border-[#FF3B4F] transition-colors resize-none"
-                  autoFocus
-                />
+                <div className="relative">
+                  <textarea
+                    id="lpr-answer-input"
+                    rows={3}
+                    maxLength={60}
+                    value={localAnswerText}
+                    onChange={(e) => setLocalAnswerText(e.target.value.slice(0, 60))}
+                    placeholder="Escribe tu respuesta..."
+                    className="w-full p-4 pb-8 bg-stone-950 border border-stone-800 rounded-2xl text-stone-100 placeholder-stone-600 text-base font-semibold focus:outline-none focus:border-[#FF3B4F] transition-colors resize-none"
+                    autoFocus
+                  />
+                  <div className="absolute right-3.5 bottom-2.5 pointer-events-none select-none">
+                    <span
+                      id="lpr-char-counter"
+                      className={`text-xs font-mono font-medium transition-colors ${
+                        localAnswerText.length === 60
+                          ? 'text-amber-400 font-bold'
+                          : localAnswerText.length >= 50
+                          ? 'text-amber-400/80 font-semibold'
+                          : 'text-stone-500'
+                      }`}
+                    >
+                      {localAnswerText.length} / 60
+                    </span>
+                  </div>
+                </div>
 
                 <button
+                  id="lpr-submit-answer-btn"
                   type="submit"
-                  disabled={!localAnswerText.trim()}
+                  disabled={!isAnswerValid}
                   className="w-full py-4 px-6 rounded-2xl bg-[#FF3B4F] hover:bg-[#E6293D] text-white font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-[#FF3B4F]/25 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Lock className="w-4 h-4" />
-                  Confirmar y Bloquear Respuesta
+                  <span>¡Listo! Confirmar y Bloquear Respuesta</span>
                 </button>
               </form>
             ) : (
-              <div className="bg-stone-900/90 border border-stone-800 rounded-3xl p-6 shadow-2xl text-center space-y-3">
+              <div id="lpr-answer-submitted-card" className="bg-stone-900/90 border border-stone-800 rounded-3xl p-6 shadow-2xl text-center space-y-3">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 text-xs font-bold">
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Respuesta Enviada</span>
@@ -284,7 +307,7 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
                   ¡Tu respuesta está a salvo!
                 </h3>
                 <p className="text-xs text-stone-400 max-w-sm mx-auto">
-                  «<span className="text-stone-200 font-semibold">{localAnswerText || 'Tu respuesta'}</span>»
+                  «<span className="text-stone-200 font-semibold">{localAnswerText.trim() || 'Tu respuesta'}</span>»
                 </p>
                 <p className="text-xs text-[#FF3B4F]/90 font-medium">
                   Esperando a que el resto de jugadores terminen de escribir...

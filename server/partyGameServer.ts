@@ -1099,10 +1099,11 @@ export class PartyGameServer {
         const room = this.lprRooms.get(conn.roomId);
         if (!room || room.phase !== 'WRITING') return;
 
-        const text = (message.text || '').trim();
-        if (!text) return;
+        // Authoritative validation: answer must be trimmed, 1-60 characters
+        const answer = typeof message.text === 'string' ? message.text.trim() : '';
+        if (answer.length === 0 || answer.length > 60) return;
 
-        room.privateSubmissions.set(conn.playerId, text);
+        room.privateSubmissions.set(conn.playerId, answer);
         const player = room.players.find((p) => p.id === conn.playerId);
         if (player) {
           player.hasSubmittedAnswer = true;
