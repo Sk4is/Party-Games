@@ -163,7 +163,15 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
             break;
 
           case 'tick':
-            setRoomState(prev => prev ? { ...prev, remainingTime: msg.remainingTime } : null);
+            setRoomState(prev => {
+              if (!prev) return null;
+              if (msg.roundId && prev.roundId && msg.roundId !== prev.roundId) return prev;
+              return {
+                ...prev,
+                remainingTime: msg.remainingTime,
+                roundEndsAt: msg.roundEndsAt || prev.roundEndsAt,
+              };
+            });
             if (msg.remainingTime <= 10 && msg.remainingTime > 0) {
               audio.playPinturilloClockTick(msg.remainingTime <= 5);
             }
@@ -172,6 +180,8 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
           case 'stroke_start':
             setRoomState(prev => {
               if (!prev) return null;
+              if (msg.roundId && prev.roundId && msg.roundId !== prev.roundId) return prev;
+              if (prev.drawingStrokes.some(s => s.id === msg.stroke.id)) return prev;
               return {
                 ...prev,
                 drawingStrokes: [...prev.drawingStrokes, msg.stroke],
@@ -182,6 +192,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
           case 'stroke_chunk':
             setRoomState(prev => {
               if (!prev) return null;
+              if (msg.roundId && prev.roundId && msg.roundId !== prev.roundId) return prev;
               const strokes = [...prev.drawingStrokes];
               const target = strokes.find(s => s.id === msg.strokeId);
               if (target) {
@@ -194,6 +205,8 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
           case 'flood_fill':
             setRoomState(prev => {
               if (!prev) return null;
+              if (msg.roundId && prev.roundId && msg.roundId !== prev.roundId) return prev;
+              if (prev.drawingStrokes.some(s => s.id === msg.stroke.id)) return prev;
               return {
                 ...prev,
                 drawingStrokes: [...prev.drawingStrokes, msg.stroke],
@@ -300,6 +313,35 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
     }
   }, [roomState?.phase]);
 
+  // Keep remainingTime and selectionRemainingSeconds strictly synchronized with authoritative timestamps
+  useEffect(() => {
+    if (!roomState) return;
+
+    if (roomState.phase === 'DRAWING' && roomState.roundEndsAt) {
+      const interval = setInterval(() => {
+        const now = Date.now();
+        const rem = Math.max(0, Math.ceil((roomState.roundEndsAt! - now) / 1000));
+        setRoomState(prev => {
+          if (!prev || prev.phase !== 'DRAWING' || prev.remainingTime === rem) return prev;
+          return { ...prev, remainingTime: rem };
+        });
+      }, 250);
+      return () => clearInterval(interval);
+    }
+
+    if (roomState.phase === 'WORD_SELECTION' && roomState.selectionEndsAt) {
+      const interval = setInterval(() => {
+        const now = Date.now();
+        const rem = Math.max(0, Math.ceil((roomState.selectionEndsAt! - now) / 1000));
+        setRoomState(prev => {
+          if (!prev || prev.phase !== 'WORD_SELECTION' || prev.selectionRemainingSeconds === rem) return prev;
+          return { ...prev, selectionRemainingSeconds: rem };
+        });
+      }, 250);
+      return () => clearInterval(interval);
+    }
+  }, [roomState?.phase, roomState?.roundEndsAt, roomState?.selectionEndsAt]);
+
   // Handlers for room actions
   const handleCreateRoom = (
     player: { id: string; name: string; avatar: string; color: string },
@@ -349,10 +391,24 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   // Drawing event handlers
   const handleStrokeStart = (stroke: DrawStroke) => {
     sendMessage({ type: 'stroke_start', stroke });
+    setRoomState(prev => {
+      if (!prev) return null;
+      if (prev.drawingStrokes.some(s => s.id === stroke.id)) return prev;
+      return { ...prev, drawingStrokes: [...prev.drawingStrokes, stroke] };
+    });
   };
 
   const handleStrokeChunk = (strokeId: string, points: NormalizedPoint[]) => {
     sendMessage({ type: 'stroke_chunk', strokeId, points });
+    setRoomState(prev => {
+      if (!prev) return null;
+      const strokes = [...prev.drawingStrokes];
+      const target = strokes.find(s => s.id === strokeId);
+      if (target) {
+        target.points = [...target.points, ...points];
+      }
+      return { ...prev, drawingStrokes: strokes };
+    });
   };
 
   const handleStrokeEnd = (strokeId: string) => {
@@ -361,6 +417,19 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
 
   const handleFloodFill = (point: NormalizedPoint, color: string) => {
     sendMessage({ type: 'flood_fill', point, color });
+    const fillStroke: DrawStroke = {
+      id: `fill-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      tool: 'fill',
+      color,
+      size: 1,
+      points: [point],
+      isFill: true,
+      fillPoint: point,
+    };
+    setRoomState(prev => {
+      if (!prev) return null;
+      return { ...prev, drawingStrokes: [...prev.drawingStrokes, fillStroke] };
+    });
   };
 
   const handleUndo = () => {
@@ -451,7 +520,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   const isTimeCritical = isDrawing && roomState.remainingTime <= 10;
 
   return (
-    <div className="relative min-h-screen bg-[#050A18] text-white flex flex-col overflow-x-hidden select-none">
+    <div className="relative h-screen max-h-screen bg-[#050A18] text-white flex flex-col overflow-hidden select-none">
       <PinturilloBackground />
 
       {/* Countdown 3, 2, 1, ¡A DIBUJAR! Overlay */}
@@ -519,7 +588,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
       />
 
       {/* Top Header Navigation & Status Bar */}
-      <header className="relative z-20 px-3 sm:px-6 py-2.5 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md">
+      <header className="flex-shrink-0 relative z-20 px-3 sm:px-6 py-2.5 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           {/* Left: Exit & Audio Toggles */}
           <div className="flex items-center gap-2">
@@ -647,11 +716,11 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
       </header>
 
       {/* Main Game Stage: 80% Canvas + 20% Chat Layout */}
-      <main className="relative z-10 flex-1 p-2 sm:p-4 max-w-7xl w-full mx-auto flex flex-col lg:flex-row gap-3 min-h-0">
+      <main className="relative z-10 flex-1 min-h-0 p-2 sm:p-3 md:p-4 max-w-7xl w-full mx-auto flex flex-col lg:flex-row gap-3 overflow-hidden">
         {/* Left / Center: Canvas Stage & Toolbar (~80% area) */}
-        <section className="flex-1 flex flex-col gap-2 min-h-[380px] lg:min-h-0">
+        <section className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
           {/* Canvas Header info: Active drawer label */}
-          <div className="flex items-center justify-between px-2 text-xs">
+          <div className="flex-shrink-0 flex items-center justify-between px-2 text-xs">
             <div className="flex items-center gap-2 sm:gap-3">
               <div
                 className={`flex items-center gap-2 px-3 py-1 rounded-xl border font-bold text-xs sm:text-sm shadow-sm ${
@@ -682,8 +751,9 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
           </div>
 
           {/* The Hero White Canvas Element */}
-          <div className="flex-1 w-full min-h-[320px] sm:min-h-[440px] relative">
+          <div className="flex-1 min-h-0 w-full relative rounded-2xl overflow-hidden shadow-2xl">
             <PinturilloCanvas
+              roundId={roomState.roundId}
               isDrawer={isDrawer && isDrawing}
               strokes={roomState.drawingStrokes}
               currentTool={currentTool}
@@ -704,7 +774,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
 
           {/* Drawer Toolbar (Only visible to active drawer during DRAWING phase) */}
           {isDrawer && isDrawing && (
-            <div className="animate-fade-in">
+            <div className="flex-shrink-0 animate-fade-in">
               <PinturilloToolbar
                 currentTool={currentTool}
                 currentColor={currentColor}
@@ -721,7 +791,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
         </section>
 
         {/* Right Column: Chat & Guess Box (~20% desktop area) */}
-        <aside className="w-full lg:w-80 xl:w-96 h-72 lg:h-auto flex flex-col">
+        <aside className="w-full lg:w-80 xl:w-96 h-64 sm:h-72 lg:h-full min-h-0 flex-shrink-0 flex flex-col overflow-hidden">
           <PinturilloChat
             messages={roomState.chatMessages}
             players={roomState.players}

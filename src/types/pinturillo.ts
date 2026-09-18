@@ -41,6 +41,7 @@ export interface NormalizedPoint {
 
 export interface DrawStroke {
   id: string;
+  roundId?: string;
   tool: DrawingTool;
   color: string;
   size: number; // base thickness in px at canonical 800x500 scale
@@ -95,6 +96,7 @@ export interface ChatMessage {
 
 export interface PinturilloRoomState {
   code: string;
+  roundId?: string;
   hostId: string;
   phase: PinturilloPhase;
   config: PinturilloConfig;
@@ -109,6 +111,7 @@ export interface PinturilloRoomState {
   wordCategory?: string;
   wordOptions?: Array<{ word: string; category: string; difficulty: string }>; // for drawer during WORD_SELECTION
   selectionRemainingSeconds?: number;
+  selectionEndsAt?: number;
   countdownEndsAt?: number;
   roundStartedAt?: number;
   roundEndsAt?: number;
@@ -139,13 +142,13 @@ export type ClientMessage =
   | { type: 'update_config'; config: Partial<PinturilloConfig> }
   | { type: 'start_game' }
   | { type: 'choose_word'; word: string }
-  | { type: 'stroke_start'; stroke: DrawStroke }
-  | { type: 'stroke_chunk'; strokeId: string; points: NormalizedPoint[] }
-  | { type: 'stroke_end'; strokeId: string }
-  | { type: 'flood_fill'; point: NormalizedPoint; color: string }
-  | { type: 'undo' }
-  | { type: 'redo' }
-  | { type: 'clear_canvas' }
+  | { type: 'stroke_start'; stroke: DrawStroke; roundId?: string }
+  | { type: 'stroke_chunk'; strokeId: string; points: NormalizedPoint[]; roundId?: string }
+  | { type: 'stroke_end'; strokeId: string; roundId?: string }
+  | { type: 'flood_fill'; point: NormalizedPoint; color: string; roundId?: string }
+  | { type: 'undo'; roundId?: string }
+  | { type: 'redo'; roundId?: string }
+  | { type: 'clear_canvas'; roundId?: string }
   | { type: 'send_chat'; text: string }
   | { type: 'leave_room' }
   | { type: 'restart_game' }
@@ -154,15 +157,15 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: 'room_state'; state: PinturilloRoomState }
   | { type: 'error'; message: string }
-  | { type: 'stroke_start'; stroke: DrawStroke }
-  | { type: 'stroke_chunk'; strokeId: string; points: NormalizedPoint[] }
-  | { type: 'stroke_end'; strokeId: string }
-  | { type: 'flood_fill'; stroke: DrawStroke }
-  | { type: 'undo' }
-  | { type: 'redo' }
-  | { type: 'clear_canvas' }
+  | { type: 'stroke_start'; stroke: DrawStroke; roundId?: string }
+  | { type: 'stroke_chunk'; strokeId: string; points: NormalizedPoint[]; roundId?: string }
+  | { type: 'stroke_end'; strokeId: string; roundId?: string }
+  | { type: 'flood_fill'; stroke: DrawStroke; roundId?: string }
+  | { type: 'undo'; roundId?: string }
+  | { type: 'redo'; roundId?: string }
+  | { type: 'clear_canvas'; roundId?: string }
   | { type: 'chat_message'; message: ChatMessage }
-  | { type: 'tick'; remainingTime: number }
+  | { type: 'tick'; remainingTime: number; roundId?: string; roundEndsAt?: number }
   | { type: 'countdown_tick'; count: number; text?: string }
   | { type: 'correct_guess'; playerId: string; playerName: string; points: number; totalScore: number }
   | { type: 'near_miss'; playerId: string }

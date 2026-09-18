@@ -3,6 +3,7 @@ import { DrawStroke, DrawingTool, NormalizedPoint } from '../../types/pinturillo
 import { audio } from '../../utils/audio';
 
 interface PinturilloCanvasProps {
+  roundId?: string;
   isDrawer: boolean;
   strokes: DrawStroke[];
   currentTool: DrawingTool;
@@ -365,7 +366,30 @@ function renderEraserStroke(ctx: CanvasRenderingContext2D, stroke: DrawStroke, w
   ctx.restore();
 }
 
+// Helper to render an individual stroke onto a canvas context
+function renderSingleStroke(ctx: CanvasRenderingContext2D, stroke: DrawStroke, w: number, h: number) {
+  if (stroke.isFill && stroke.fillPoint) {
+    const fx = stroke.fillPoint.x * w;
+    const fy = stroke.fillPoint.y * h;
+    executeFloodFill(ctx, fx, fy, stroke.color, w, h);
+    return;
+  }
+
+  if (!stroke.points || stroke.points.length === 0) return;
+
+  if (stroke.tool === 'pencil') {
+    renderPencilStroke(ctx, stroke, w, h);
+  } else if (stroke.tool === 'brush') {
+    renderBrushStroke(ctx, stroke, w, h);
+  } else if (stroke.tool === 'eraser') {
+    renderEraserStroke(ctx, stroke, w, h);
+  } else {
+    renderMarkerStroke(ctx, stroke, w, h);
+  }
+}
+
 export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
+  roundId,
   isDrawer,
   strokes,
   currentTool,
@@ -392,6 +416,13 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
   const [isInsideCanvas, setIsInsideCanvas] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
 
+  // Rendering cache & round tracking refs
+  const strokesRef = useRef<DrawStroke[]>(strokes);
+  strokesRef.current = strokes;
+  const lastRoundIdRef = useRef<string | undefined>(roundId);
+  const renderedCountRef = useRef<number>(0);
+  const renderedPointCountsRef = useRef<Map<string, number>>(new Map());
+
   // Handle ESC key to dismiss clear confirmation modal
   useEffect(() => {
     if (!isClearConfirmOpen || !onCancelClear) return;
@@ -409,46 +440,119 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
   const handleExecuteConfirm = () => {
     setIsSweeping(true);
     setTimeout(() => setIsSweeping(false), 420);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+    renderedCountRef.current = 0;
+    renderedPointCountsRef.current.clear();
     if (onConfirmClear) {
       onConfirmClear();
     }
   };
 
-  // Redraw complete canvas from strokes history
-  const redrawAllStrokes = useCallback((canvas: HTMLCanvasElement) => {
+  // Full redraw helper: only used on round reset, resize, or undo
+  const redrawAllStrokes = useCallback((canvas: HTMLCanvasElement, strokeList: DrawStroke[]) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const w = canvas.width;
     const h = canvas.height;
 
-    // Fill pure white background
+    // Pure white canvas background
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, w, h);
 
-    strokes.forEach(stroke => {
-      if (stroke.isFill && stroke.fillPoint) {
-        const fx = stroke.fillPoint.x * w;
-        const fy = stroke.fillPoint.y * h;
-        executeFloodFill(ctx, fx, fy, stroke.color, w, h);
-        return;
-      }
-
-      if (!stroke.points || stroke.points.length === 0) return;
-
-      if (stroke.tool === 'pencil') {
-        renderPencilStroke(ctx, stroke, w, h);
-      } else if (stroke.tool === 'brush') {
-        renderBrushStroke(ctx, stroke, w, h);
-      } else if (stroke.tool === 'eraser') {
-        renderEraserStroke(ctx, stroke, w, h);
-      } else {
-        renderMarkerStroke(ctx, stroke, w, h);
-      }
+    strokeList.forEach(stroke => {
+      renderSingleStroke(ctx, stroke, w, h);
     });
-  }, [strokes]);
+  }, []);
 
-  // Adjust canvas pixel resolution to match container bounding rect
+  // 1. Authoritative Round Boundary: Clear canvas only when roundId changes
+  useEffect(() => {
+    if (roundId && roundId !== lastRoundIdRef.current) {
+      lastRoundIdRef.current = roundId;
+      renderedCountRef.current = 0;
+      renderedPointCountsRef.current.clear();
+      const canvas = canvasRef.current;
+      if (canvas) {
+        redrawAllStrokes(canvas, strokes);
+        renderedCountRef.current = strokes.length;
+        strokes.forEach(s => {
+          renderedPointCountsRef.current.set(s.id, s.points?.length || 0);
+        });
+      }
+    }
+  }, [roundId, redrawAllStrokes, strokes]);
+
+  // 2. Incremental rendering of strokes: does NOT wipe the canvas on re-renders, chat, or ticks!
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Check if strokes was cleared to 0 (explicit clear_canvas)
+    if (strokes.length === 0) {
+      if (renderedCountRef.current > 0) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, w, h);
+        renderedCountRef.current = 0;
+        renderedPointCountsRef.current.clear();
+      }
+      return;
+    }
+
+    // Check if strokes count decreased (undo)
+    if (strokes.length < renderedCountRef.current) {
+      redrawAllStrokes(canvas, strokes);
+      renderedCountRef.current = strokes.length;
+      renderedPointCountsRef.current.clear();
+      strokes.forEach(s => {
+        renderedPointCountsRef.current.set(s.id, s.points?.length || 0);
+      });
+      return;
+    }
+
+    // Render any newly added full strokes incrementally on top
+    for (let i = renderedCountRef.current; i < strokes.length; i++) {
+      const s = strokes[i];
+      // If this stroke is currently being drawn by local user, it's already rendered in real-time
+      if (isDrawer && activeStrokeRef.current && activeStrokeRef.current.id === s.id) {
+        continue;
+      }
+      renderSingleStroke(ctx, s, w, h);
+      renderedPointCountsRef.current.set(s.id, s.points?.length || 0);
+    }
+    renderedCountRef.current = strokes.length;
+
+    // Check for updated chunks in ongoing strokes (for non-drawers)
+    if (!isDrawer) {
+      const lastStroke = strokes[strokes.length - 1];
+      if (lastStroke && !lastStroke.isFill && lastStroke.points) {
+        const prevCount = renderedPointCountsRef.current.get(lastStroke.id) || 0;
+        if (lastStroke.points.length > prevCount) {
+          const newPts = lastStroke.points.slice(Math.max(0, prevCount - 1));
+          if (newPts.length >= 2) {
+            const subStroke: DrawStroke = {
+              ...lastStroke,
+              points: newPts,
+            };
+            renderSingleStroke(ctx, subStroke, w, h);
+          }
+          renderedPointCountsRef.current.set(lastStroke.id, lastStroke.points.length);
+        }
+      }
+    }
+  }, [strokes, isDrawer, redrawAllStrokes]);
+
+  // 3. Stable Resize Observer: Does NOT recreate on stroke updates or re-renders
   useEffect(() => {
     const handleResize = () => {
       const container = containerRef.current;
@@ -459,10 +563,18 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
       const targetW = Math.floor(rect.width);
       const targetH = Math.floor(rect.height);
 
-      if (targetW > 0 && targetH > 0 && (canvas.width !== targetW || canvas.height !== targetH)) {
-        canvas.width = targetW;
-        canvas.height = targetH;
-        redrawAllStrokes(canvas);
+      if (targetW > 10 && targetH > 10) {
+        // Only modify canvas dimensions if size genuinely changed by > 2px
+        if (Math.abs(canvas.width - targetW) > 2 || Math.abs(canvas.height - targetH) > 2) {
+          canvas.width = targetW;
+          canvas.height = targetH;
+          redrawAllStrokes(canvas, strokesRef.current);
+          renderedCountRef.current = strokesRef.current.length;
+          renderedPointCountsRef.current.clear();
+          strokesRef.current.forEach(s => {
+            renderedPointCountsRef.current.set(s.id, s.points?.length || 0);
+          });
+        }
       }
     };
 
@@ -478,14 +590,6 @@ export const PinturilloCanvas: React.FC<PinturilloCanvasProps> = ({
       observer.disconnect();
     };
   }, [redrawAllStrokes]);
-
-  // Redraw when strokes change
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      redrawAllStrokes(canvas);
-    }
-  }, [strokes, redrawAllStrokes]);
 
   // Flush batched chunk points over network
   const flushChunk = useCallback(() => {

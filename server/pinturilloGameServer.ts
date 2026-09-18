@@ -22,6 +22,7 @@ interface ClientConnection {
 
 interface ServerRoom {
   code: string;
+  roundId?: string;
   gameType?: 'pinturillo';
   hostId: string;
   phase: PinturilloRoomState['phase'];
@@ -39,6 +40,8 @@ interface ServerRoom {
   remainingTime: number;
   totalRoundTime: number;
   selectionRemainingSeconds: number;
+  selectionEndsAt?: number;
+  resultsEndsAt?: number;
   drawingStrokes: DrawStroke[];
   undoStack: DrawStroke[];
   chatMessages: ChatMessage[];
@@ -238,6 +241,28 @@ export class PinturilloServer {
         console.error('[Pinturillo] Error en socket:', err);
       });
     });
+
+    // Authoritative Watchdog: ensures no room can ever get frozen or stuck in any phase
+    setInterval(() => {
+      const now = Date.now();
+      for (const room of this.rooms.values()) {
+        try {
+          if (room.phase === 'DRAWING' && room.roundEndsAt && now > room.roundEndsAt + 2000) {
+            console.warn(`[Pinturillo Watchdog] Room ${room.code} round ${room.roundId} exceeded roundEndsAt by >2s, advancing.`);
+            this.endDrawingRound(room, room.roundId);
+          } else if (room.phase === 'WORD_SELECTION' && room.selectionEndsAt && now > room.selectionEndsAt + 2000) {
+            console.warn(`[Pinturillo Watchdog] Room ${room.code} word selection expired, forcing default word.`);
+            const defaultChoice = room.wordOptions[0] || { word: 'casa', category: 'objeto', difficulty: 'FACIL' };
+            this.selectWordAndStartCountdown(room, defaultChoice.word, defaultChoice.category);
+          } else if (room.phase === 'ROUND_RESULTS' && room.resultsEndsAt && now > room.resultsEndsAt + 2000) {
+            console.warn(`[Pinturillo Watchdog] Room ${room.code} round results expired, advancing to next turn.`);
+            this.advanceToNextTurn(room);
+          }
+        } catch (e) {
+          console.error(`[Pinturillo Watchdog] Error checking room ${room.code}:`, e);
+        }
+      }
+    }, 1000);
   }
 
   private handleClientMessage(ws: WebSocket, message: ClientMessage) {
@@ -464,6 +489,7 @@ export class PinturilloServer {
         const currentDrawer = room.players[room.currentDrawerIndex];
         if (!currentDrawer || currentDrawer.id !== client.playerId) return;
 
+        message.stroke.roundId = room.roundId;
         room.drawingStrokes.push(message.stroke);
         room.undoStack = []; // Clear redo stack on new stroke
 
@@ -471,6 +497,7 @@ export class PinturilloServer {
         this.broadcastToRoomExcept(room, ws, {
           type: 'stroke_start',
           stroke: message.stroke,
+          roundId: room.roundId,
         });
         break;
       }
@@ -493,6 +520,7 @@ export class PinturilloServer {
           type: 'stroke_chunk',
           strokeId: message.strokeId,
           points: message.points,
+          roundId: room.roundId,
         });
         break;
       }
@@ -509,6 +537,7 @@ export class PinturilloServer {
         this.broadcastToRoomExcept(room, ws, {
           type: 'stroke_end',
           strokeId: message.strokeId,
+          roundId: room.roundId,
         });
         break;
       }
@@ -524,6 +553,7 @@ export class PinturilloServer {
 
         const fillStroke: DrawStroke = {
           id: `fill-${Date.now()}`,
+          roundId: room.roundId,
           tool: 'fill',
           color: message.color,
           size: 0,
@@ -538,6 +568,7 @@ export class PinturilloServer {
         this.broadcastToRoomExcept(room, ws, {
           type: 'flood_fill',
           stroke: fillStroke,
+          roundId: room.roundId,
         });
         break;
       }
@@ -556,7 +587,7 @@ export class PinturilloServer {
           if (popped) {
             room.undoStack.push(popped);
           }
-          this.broadcastToRoom(room, { type: 'undo' });
+          this.broadcastToRoom(room, { type: 'undo', roundId: room.roundId });
         }
         break;
       }
@@ -577,6 +608,7 @@ export class PinturilloServer {
             this.broadcastToRoom(room, {
               type: restored.isFill ? 'flood_fill' : 'stroke_start',
               stroke: restored,
+              roundId: room.roundId,
             });
           }
         }
@@ -594,7 +626,7 @@ export class PinturilloServer {
 
         room.drawingStrokes = [];
         room.undoStack = [];
-        this.broadcastToRoom(room, { type: 'clear_canvas' });
+        this.broadcastToRoom(room, { type: 'clear_canvas', roundId: room.roundId });
         break;
       }
 
@@ -777,21 +809,27 @@ export class PinturilloServer {
     // Pick 3 words from word bank according to room categories
     room.wordOptions = getRandomWordOptions(3, room.usedWords, room.config.categories);
     room.selectionRemainingSeconds = 10;
+    room.selectionEndsAt = Date.now() + 10000;
 
     this.broadcastRoomState(room);
 
-    // 10-second timer for drawer to select word
+    // 10-second authoritative timer for drawer to select word
     room.selectionInterval = setInterval(() => {
-      room.selectionRemainingSeconds--;
-      if (room.selectionRemainingSeconds <= 0) {
+      const now = Date.now();
+      const remMs = (room.selectionEndsAt || now) - now;
+      const remSec = Math.max(0, Math.ceil(remMs / 1000));
+      room.selectionRemainingSeconds = remSec;
+
+      if (remSec <= 0) {
         if (room.selectionInterval) clearInterval(room.selectionInterval);
+        room.selectionInterval = null;
         // Auto-select first word if drawer didn't choose
         const defaultChoice = room.wordOptions[0] || { word: 'casa', category: 'objeto', difficulty: 'FACIL' };
         this.selectWordAndStartCountdown(room, defaultChoice.word, defaultChoice.category);
       } else {
         this.broadcastRoomState(room);
       }
-    }, 1000);
+    }, 500);
   }
 
   private selectWordAndStartCountdown(room: ServerRoom, word: string, category: string) {
@@ -876,10 +914,15 @@ export class PinturilloServer {
       return;
     }
 
+    // Authoritative unique round ID
+    room.roundId = `${room.code}-r${room.currentTurn}-v${room.currentVuelta}-${Date.now()}`;
+    const activeRoundId = room.roundId;
+
     room.phase = 'DRAWING';
     room.countdownEndsAt = undefined;
-    room.roundStartedAt = Date.now();
-    room.roundEndsAt = room.roundStartedAt + room.config.roundTimeSeconds * 1000;
+    const now = Date.now();
+    room.roundStartedAt = now;
+    room.roundEndsAt = now + room.config.roundTimeSeconds * 1000;
     room.remainingTime = room.config.roundTimeSeconds;
     room.totalRoundTime = room.config.roundTimeSeconds;
     room.drawingStrokes = [];
@@ -891,13 +934,22 @@ export class PinturilloServer {
     // Authoritative room state broadcast with phase DRAWING and initial round time
     this.broadcastRoomState(room);
 
-    // Authoritative 1s interval for drawing round
+    // Authoritative interval for drawing round using roundEndsAt timestamp
     room.timerInterval = setInterval(() => {
-      room.remainingTime--;
+      if (room.phase !== 'DRAWING' || room.roundId !== activeRoundId) {
+        if (room.timerInterval) clearInterval(room.timerInterval);
+        room.timerInterval = null;
+        return;
+      }
+
+      const currentNow = Date.now();
+      const remainingMs = (room.roundEndsAt || currentNow) - currentNow;
+      const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+      room.remainingTime = remainingSeconds;
 
       // Hints reveal at 50% and 20% remaining time (only if hintsEnabled is true)
-      if (room.config.hintsEnabled) {
-        const pct = room.remainingTime / room.totalRoundTime;
+      if (room.config.hintsEnabled && room.secretWord) {
+        const pct = remainingSeconds / room.totalRoundTime;
         const cleanWord = room.secretWord.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/g, '');
 
         if (pct <= 0.50 && room.revealedIndices.size === 0 && cleanWord.length >= 5) {
@@ -911,17 +963,20 @@ export class PinturilloServer {
 
       this.broadcastToRoom(room, {
         type: 'tick',
-        remainingTime: room.remainingTime,
+        remainingTime: remainingSeconds,
+        roundId: activeRoundId,
+        roundEndsAt: room.roundEndsAt,
       });
 
-      if (room.remainingTime <= 0) {
-        this.endDrawingRound(room);
+      if (remainingMs <= 0 || remainingSeconds <= 0) {
+        this.endDrawingRound(room, activeRoundId);
       }
-    }, 1000);
+    }, 500);
   }
 
   private revealRandomLetter(room: ServerRoom) {
     const word = room.secretWord;
+    if (!word) return;
     const eligibleIndices: number[] = [];
     for (let i = 0; i < word.length; i++) {
       const char = word[i];
@@ -949,9 +1004,17 @@ export class PinturilloServer {
       .join(' ');
   }
 
-  private endDrawingRound(room: ServerRoom) {
+  private endDrawingRound(room: ServerRoom, expectedRoundId?: string) {
+    if (expectedRoundId && room.roundId && room.roundId !== expectedRoundId) {
+      return; // Already transitioned to another round
+    }
+    if (room.phase !== 'DRAWING') {
+      return; // Not currently in DRAWING phase
+    }
+
     this.clearAllTimers(room);
     room.phase = 'ROUND_RESULTS';
+    room.resultsEndsAt = Date.now() + 6500;
 
     const currentDrawer = room.players[room.currentDrawerIndex];
 
@@ -1180,6 +1243,7 @@ export class PinturilloServer {
 
         const sanitizedState: PinturilloRoomState = {
           code: room.code,
+          roundId: room.roundId,
           hostId: room.hostId,
           phase: room.phase,
           config: room.config,
@@ -1195,6 +1259,7 @@ export class PinturilloServer {
           wordCategory: room.wordCategory,
           wordOptions: (room.phase === 'WORD_SELECTION' && isDrawer) ? room.wordOptions : undefined,
           selectionRemainingSeconds: room.phase === 'WORD_SELECTION' ? room.selectionRemainingSeconds : undefined,
+          selectionEndsAt: room.phase === 'WORD_SELECTION' ? room.selectionEndsAt : undefined,
           countdownEndsAt: room.countdownEndsAt,
           roundStartedAt: room.roundStartedAt,
           roundEndsAt: room.roundEndsAt,

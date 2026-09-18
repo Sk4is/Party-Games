@@ -25,14 +25,14 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [activeTab, setActiveTab] = useState<'chat' | 'players'>('chat');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
 
   const isDrawer = localPlayerId === currentDrawerId;
 
-  // Auto-scroll to latest message
+  // Auto-scroll internally strictly within the chat container without shifting window or canvas
   useEffect(() => {
-    if (activeTab === 'chat') {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (activeTab === 'chat' && chatScrollContainerRef.current) {
+      chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight;
     }
   }, [messages, activeTab]);
 
@@ -47,9 +47,9 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
 
   return (
-    <div className="flex flex-col h-full bg-[#0b1022]/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border-2 border-slate-700/80 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.7)] overflow-hidden select-none">
+    <div className="flex flex-col h-full w-full min-h-0 min-w-0 bg-[#0b1022]/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border-2 border-slate-700/80 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.7)] overflow-hidden select-none">
       {/* 1. Header with Tab Navigation (Chat vs Ranking) */}
-      <div className="px-3 py-2.5 bg-[#070b18] border-b border-slate-800 flex items-center justify-between gap-2">
+      <div className="flex-shrink-0 px-3 py-2.5 bg-[#070b18] border-b border-slate-800 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
           <button
             type="button"
@@ -92,7 +92,10 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
       {/* 2. Main Content Area */}
       {activeTab === 'chat' ? (
         /* Messages Stream */
-        <div className="flex-1 p-3 overflow-y-auto space-y-2 text-sm select-text">
+        <div
+          ref={chatScrollContainerRef}
+          className="flex-1 min-h-0 min-w-0 p-3 overflow-y-auto space-y-2 text-sm select-text"
+        >
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400">
               <span className="text-3xl mb-1 opacity-70">🎨</span>
@@ -124,7 +127,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
                 return (
                   <div
                     key={msg.id}
-                    className="py-1 px-2.5 rounded-xl bg-slate-800/60 border border-slate-800 text-slate-400 text-xs italic text-center font-medium"
+                    className="py-1 px-2.5 rounded-xl bg-slate-800/60 border border-slate-800 text-slate-400 text-xs italic text-center font-medium [overflow-wrap:anywhere] break-words"
                   >
                     {msg.text}
                   </div>
@@ -145,7 +148,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
                     </span>
                   </div>
                   <div
-                    className={`px-3 py-1.5 rounded-2xl max-w-[85%] break-words font-medium text-xs sm:text-sm shadow-sm ${
+                    className={`px-3 py-1.5 rounded-2xl max-w-[85%] break-words [overflow-wrap:anywhere] [word-break:break-word] font-medium text-xs sm:text-sm shadow-sm ${
                       isMe
                         ? 'bg-[#00BCEB]/20 border border-[#00BCEB]/40 text-cyan-100 rounded-br-none'
                         : 'bg-slate-800 border border-slate-700/80 text-slate-200 rounded-bl-none'
@@ -157,11 +160,10 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
               );
             })
           )}
-          <div ref={messagesEndRef} />
         </div>
       ) : (
         /* Player List & Leaderboard Tab */
-        <div className="flex-1 p-3 overflow-y-auto space-y-1.5">
+        <div className="flex-1 min-h-0 min-w-0 p-3 overflow-y-auto space-y-1.5">
           {sortedPlayers.map((p, idx) => {
             const isPlayerDrawer = p.id === currentDrawerId;
             const isMe = p.id === localPlayerId;
@@ -200,7 +202,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
                   </div>
                 </div>
 
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <span className="text-sm sm:text-base font-black text-[#00BCEB]">
                     {p.score.toLocaleString('es-ES')}
                   </span>
@@ -214,14 +216,14 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
 
       {/* 3. Near Miss "Casi" alert notification */}
       {nearMiss && !hasGuessed && (
-        <div className="px-3 py-1.5 bg-[#FF6B6B]/20 border-t border-[#FF6B6B]/40 flex items-center gap-2 text-rose-300 text-xs font-black animate-pulse">
+        <div className="flex-shrink-0 px-3 py-1.5 bg-[#FF6B6B]/20 border-t border-[#FF6B6B]/40 flex items-center gap-2 text-rose-300 text-xs font-black animate-pulse">
           <Flame className="w-4 h-4 text-[#FF6B6B] shrink-0" />
           <span>¡Casi lo tienes! ¡Estás muy pero que muy cerca!</span>
         </div>
       )}
 
       {/* 4. Chat Input / Role State Bar */}
-      <div className="p-3 bg-[#070b18] border-t border-slate-800">
+      <div className="flex-shrink-0 p-3 bg-[#070b18] border-t border-slate-800">
         {isDrawer ? (
           <div className="py-2.5 px-4 rounded-xl bg-slate-800/90 text-slate-300 text-xs font-bold text-center flex items-center justify-center gap-2 border border-slate-700">
             <span>🎨</span>
