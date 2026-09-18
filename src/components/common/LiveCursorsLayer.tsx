@@ -11,8 +11,8 @@ export const LiveCursorsLayer: React.FC<LiveCursorsLayerProps> = ({
   cursors,
   currentUserId,
 }) => {
-  const otherCursorsList = Object.values(cursors).filter(
-    (c) => c.playerId !== currentUserId && Date.now() - c.updatedAt < 10000
+  const otherCursorsList = (Object.values(cursors) as BoardCursor[]).filter(
+    (c: BoardCursor) => c.playerId !== currentUserId && Date.now() - c.updatedAt < 10000
   );
 
   return (

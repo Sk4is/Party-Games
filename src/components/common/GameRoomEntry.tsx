@@ -90,6 +90,7 @@ export const GameRoomEntry: React.FC<GameRoomEntryProps> = ({
       description={resolvedDesc}
       minPlayers={minPlayers}
       maxPlayers={maxPlayers}
+      gameType={gameType}
       onBack={onBackToMenu}
       backLabel="Volver al menú"
       errorMessage={errorMessage}
@@ -105,6 +106,7 @@ export const GameRoomEntry: React.FC<GameRoomEntryProps> = ({
         <RoomModeSelector
           mode={mode}
           onChange={setMode}
+          gameType={gameType}
         />
 
         {/* 3. Panel based on active mode */}
@@ -112,6 +114,7 @@ export const GameRoomEntry: React.FC<GameRoomEntryProps> = ({
           <CreateRoomPanel
             onCreate={handleCreate}
             isLoading={isConnecting}
+            gameType={gameType}
             settingsSlot={
               gameType === 'la-bomba' ? (
                 <BombaSettings
@@ -135,6 +138,7 @@ export const GameRoomEntry: React.FC<GameRoomEntryProps> = ({
             onJoin={onJoinRoom}
             isLoading={isConnecting}
             initialCode={initialRoomCode}
+            gameType={gameType}
           />
         )}
       </div>

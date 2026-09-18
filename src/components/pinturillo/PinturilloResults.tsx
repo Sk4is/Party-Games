@@ -41,13 +41,13 @@ export const PinturilloResults: React.FC<PinturilloResultsProps> = ({
   if (phase === 'ROUND_RESULTS') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
-        <div className="relative max-w-lg w-full bg-slate-900 rounded-3xl p-6 sm:p-8 border-2 border-amber-500/50 shadow-2xl text-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-black uppercase tracking-wider mb-3 border border-amber-500/30">
+        <div className="relative max-w-lg w-full bg-slate-900 rounded-3xl p-6 sm:p-8 border-2 border-[#00BCEB]/50 shadow-2xl text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00BCEB]/20 text-[#00BCEB] text-xs font-black uppercase tracking-wider mb-3 border border-[#00BCEB]/30">
             <Sparkles className="w-3.5 h-3.5" /> Fin de la ronda
           </div>
 
           <p className="text-xs uppercase font-bold text-slate-400 mb-1">La palabra secreta era:</p>
-          <h2 className="text-3xl sm:text-4xl font-black font-display tracking-widest text-amber-400 uppercase mb-6 drop-shadow-md">
+          <h2 className="text-3xl sm:text-4xl font-black font-display tracking-widest text-[#00BCEB] uppercase mb-6 drop-shadow-md">
             {lastRoundResults?.word || '???'}
           </h2>
 
@@ -66,7 +66,7 @@ export const PinturilloResults: React.FC<PinturilloResultsProps> = ({
                     <span className="text-lg">{item.playerAvatar}</span>
                     <span className="font-bold text-slate-200">{item.playerName}</span>
                     {item.isDrawer && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#00BCEB]/20 text-cyan-300 font-bold">
                         Dibujante
                       </span>
                     )}
@@ -85,7 +85,7 @@ export const PinturilloResults: React.FC<PinturilloResultsProps> = ({
           </div>
 
           <div className="inline-flex items-center gap-2 text-xs font-bold text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-[#00BCEB] animate-ping" />
             <span>Siguiente ronda en breves instantes...</span>
           </div>
         </div>
@@ -100,8 +100,8 @@ export const PinturilloResults: React.FC<PinturilloResultsProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="relative max-w-xl w-full bg-gradient-to-b from-slate-900 to-slate-950 rounded-3xl p-6 sm:p-8 border-2 border-amber-500/60 shadow-2xl text-center my-auto">
-        <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-black uppercase tracking-wider mb-4 border border-amber-500/30">
+      <div className="relative max-w-xl w-full bg-gradient-to-b from-slate-900 to-slate-950 rounded-3xl p-6 sm:p-8 border-2 border-[#00BCEB]/60 shadow-2xl text-center my-auto">
+        <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#00BCEB]/20 text-[#00BCEB] text-xs font-black uppercase tracking-wider mb-4 border border-[#00BCEB]/30">
           <Trophy className="w-4 h-4" /> ¡Partida completada!
         </div>
 
@@ -183,7 +183,7 @@ export const PinturilloResults: React.FC<PinturilloResultsProps> = ({
                   <span>{player.avatar}</span>
                   <span className="font-bold text-slate-200">{player.name}</span>
                 </div>
-                <span className="font-mono font-black text-amber-400">
+                <span className="font-mono font-black text-[#00BCEB]">
                   {player.score.toLocaleString('es-ES')} pts
                 </span>
               </div>
@@ -197,7 +197,7 @@ export const PinturilloResults: React.FC<PinturilloResultsProps> = ({
             <button
               type="button"
               onClick={onRestartGame}
-              className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/25 transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+              className="px-6 py-3 rounded-2xl bg-[#00BCEB] hover:bg-[#009ED0] text-slate-950 font-black text-sm shadow-xl shadow-[#00BCEB]/25 transition-all cursor-pointer flex items-center gap-2 active:scale-95"
             >
               <RotateCcw className="w-4 h-4" />
               <span>Jugar otra vez</span>

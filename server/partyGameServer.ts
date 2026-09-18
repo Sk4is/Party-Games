@@ -19,6 +19,7 @@ import { validateSpanishWordServer } from './wordValidator';
 import { getNextSequence, getRandomSequence } from '../src/data/sequences';
 import { getNextBlackCard } from '../src/data/blackCards';
 import { extractSpanishLetters, calculateAlphabetProgress } from '../src/utils/alphabet';
+import { matchDepartureHandler } from './matchDepartureHandler';
 
 interface ClientConnection {
   ws: WebSocket;
@@ -63,6 +64,8 @@ interface BombaServerRoom {
     timeSeconds: number;
     word: string;
   } | null;
+  abortReason?: string;
+  endMessage?: string;
 }
 
 interface LPRRawCard {
@@ -87,6 +90,8 @@ interface LPRServerRoom {
   shuffledCards: LPRRawCard[];
   votes: Map<string, string>; // voterPlayerId -> cardId (secret!)
   winningAuthorIds: string[];
+  abortReason?: string;
+  endMessage?: string;
 }
 
 const getRandomBombDurationMs = () => (60 + Math.random() * 120) * 1000;
@@ -300,7 +305,7 @@ export class PartyGameServer {
       });
 
       ws.on('close', () => {
-        this.handleDisconnect(ws);
+        this.handleSocketClose(ws);
       });
 
       ws.on('error', (err) => {
@@ -372,6 +377,8 @@ export class PartyGameServer {
         fastestAnswer: room.fastestAnswer,
         mostBurntPlayer: null,
       },
+      abortReason: room.abortReason,
+      endMessage: room.endMessage,
     };
 
     this.broadcastToBomba(room, { type: 'room_state', state });
@@ -433,6 +440,8 @@ export class PartyGameServer {
           readyCount: room.privateSubmissions.size,
           votedCount: room.votes.size,
           winningAuthorIds: isResultsPhase ? room.winningAuthorIds : undefined,
+          abortReason: room.abortReason,
+          endMessage: room.endMessage,
         };
 
         this.send(ws, { type: 'room_state', state });
@@ -440,7 +449,7 @@ export class PartyGameServer {
     }
   }
 
-  private handleDisconnect(ws: WebSocket) {
+  private handleSocketClose(ws: WebSocket) {
     const conn = this.clients.get(ws);
     if (!conn) return;
 
@@ -456,63 +465,25 @@ export class PartyGameServer {
         player.isConnected = false;
       }
 
-      // In LOBBY phase, remove the leaving player immediately so no ghost players remain
+      // In LOBBY, departures are immediate
       if (room.phase === 'LOBBY') {
-        room.players = room.players.filter((p) => p.id !== playerId);
+        this.processPermanentDeparture(roomId, playerId, gameType);
+        return;
       }
 
-      // If room is completely empty, clean it up immediately
-      if (room.players.length === 0 || !room.players.some((p) => p.isConnected)) {
-        if (room.phase === 'LOBBY' || room.players.length === 0) {
-          if (room.timerInterval) clearInterval(room.timerInterval);
-          this.bombaRooms.delete(roomId);
-          roomRegistry.unregister(roomId);
-          return;
-        }
-
-        // Schedule cleanup after 5 minutes for active games
-        setTimeout(() => {
-          const fresh = this.bombaRooms.get(roomId);
-          if (fresh && !fresh.players.some((p) => p.isConnected)) {
-            if (fresh.timerInterval) clearInterval(fresh.timerInterval);
-            this.bombaRooms.delete(roomId);
-            roomRegistry.unregister(roomId);
-          }
-        }, 5 * 60 * 1000);
-      } else {
-        // Migrate host if host disconnected
-        if (room.hostId === playerId) {
-          const nextHost = room.players.find((p) => p.isConnected) || room.players[0];
-          if (nextHost) {
-            room.hostId = nextHost.id;
-            nextHost.isHost = true;
-            this.broadcastToBomba(room, {
-              type: 'notification',
-              message: `${nextHost.name} es ahora el anfitrión de la sala`,
-              noticeType: 'info',
-            });
-          }
-        }
-
-        // If disconnected player was active player in PLAYING phase, set a grace period
-        if (room.phase === 'PLAYING') {
-          const activePlayer = room.players[room.activePlayerIndex];
-          if (activePlayer && activePlayer.id === playerId) {
-            if (room.disconnectGraceTimeout) clearTimeout(room.disconnectGraceTimeout);
-            room.disconnectGraceTimeout = setTimeout(() => {
-              const currentRoom = this.bombaRooms.get(roomId);
-              if (!currentRoom || currentRoom.phase !== 'PLAYING') return;
-              const curActive = currentRoom.players[currentRoom.activePlayerIndex];
-              if (curActive && !curActive.isConnected) {
-                // Advance turn to next surviving connected player
-                this.advanceBombaTurn(currentRoom);
-              }
-            }, 12000);
-          }
-        }
-
-        this.broadcastBombaState(room);
+      const isGameActive = room.phase !== 'MATCH_ABORTED' && room.phase !== 'GAME_OVER';
+      if (!isGameActive) {
+        this.processPermanentDeparture(roomId, playerId, gameType);
+        return;
       }
+
+      // Broadcast disconnected state to other players
+      this.broadcastBombaState(room);
+
+      // Register grace period for reconnection
+      matchDepartureHandler.registerDisconnection(roomId, playerId, gameType, () => {
+        this.processPermanentDeparture(roomId, playerId, gameType);
+      });
     } else if (gameType === 'la-peor-respuesta') {
       const room = this.lprRooms.get(roomId);
       if (!room) return;
@@ -522,40 +493,245 @@ export class PartyGameServer {
         player.isConnected = false;
       }
 
-      // In LOBBY phase, remove the leaving player immediately so no ghost players remain
       if (room.phase === 'LOBBY') {
-        room.players = room.players.filter((p) => p.id !== playerId);
+        this.processPermanentDeparture(roomId, playerId, gameType);
+        return;
       }
 
-      if (room.players.length === 0 || !room.players.some((p) => p.isConnected)) {
-        if (room.phase === 'LOBBY' || room.players.length === 0) {
-          this.lprRooms.delete(roomId);
+      const isGameActive = room.phase !== 'MATCH_ABORTED' && room.phase !== 'FINAL_RESULTS';
+      if (!isGameActive) {
+        this.processPermanentDeparture(roomId, playerId, gameType);
+        return;
+      }
+
+      this.broadcastLPRState(room);
+
+      matchDepartureHandler.registerDisconnection(roomId, playerId, gameType, () => {
+        this.processPermanentDeparture(roomId, playerId, gameType);
+      });
+    }
+  }
+
+  private handleExplicitLeave(ws: WebSocket) {
+    const conn = this.clients.get(ws);
+    if (!conn) return;
+
+    this.clients.delete(ws);
+    const { roomId, playerId, gameType } = conn;
+    matchDepartureHandler.cancelGracePeriod(roomId, playerId);
+    this.processPermanentDeparture(roomId, playerId, gameType);
+  }
+
+  private processPermanentDeparture(roomId: string, playerId: string, gameType: 'la-bomba' | 'la-peor-respuesta') {
+    if (gameType === 'la-bomba') {
+      const room = this.bombaRooms.get(roomId);
+      if (!room) return;
+
+      const departingPlayer = room.players.find((p) => p.id === playerId);
+      const wasHost = room.hostId === playerId;
+      const isGameActive = room.phase !== 'LOBBY' && room.phase !== 'MATCH_ABORTED' && room.phase !== 'GAME_OVER';
+
+      // 1. In LOBBY phase
+      if (room.phase === 'LOBBY') {
+        room.players = room.players.filter((p) => p.id !== playerId);
+        if (room.players.length === 0) {
+          if (room.timerInterval) clearInterval(room.timerInterval);
+          this.bombaRooms.delete(roomId);
           roomRegistry.unregister(roomId);
+          matchDepartureHandler.clearRoomGracePeriods(roomId);
           return;
         }
 
-        setTimeout(() => {
-          const fresh = this.lprRooms.get(roomId);
-          if (fresh && !fresh.players.some((p) => p.isConnected)) {
-            this.lprRooms.delete(roomId);
-            roomRegistry.unregister(roomId);
+        if (wasHost) {
+          const nextHost = matchDepartureHandler.findEarliestConnectedPlayer(room.players) || room.players[0];
+          if (nextHost) {
+            room.hostId = nextHost.id;
+            nextHost.isHost = true;
+            this.broadcastToBomba(room, {
+              type: 'notification',
+              message: `👑 ${nextHost.name} es ahora quien gestiona la sala.`,
+              noticeType: 'info',
+            });
           }
-        }, 5 * 60 * 1000);
+        }
+        this.broadcastBombaState(room);
+        return;
+      }
+
+      // 2. In ACTIVE MATCH or GAME OVER
+      const evaluation = matchDepartureHandler.evaluatePermanentDeparture({
+        gameType: 'la-bomba',
+        isGameActive,
+        departingPlayerId: playerId,
+        wasHost,
+        players: room.players,
+      });
+
+      if (evaluation.shouldAbort) {
+        if (room.timerInterval) clearInterval(room.timerInterval);
+        if (room.explosionTimeout) clearTimeout(room.explosionTimeout);
+        if (room.disconnectGraceTimeout) clearTimeout(room.disconnectGraceTimeout);
+        room.timerInterval = null;
+        room.explosionTimeout = null;
+        room.disconnectGraceTimeout = null;
+
+        room.phase = 'MATCH_ABORTED';
+        room.abortReason = evaluation.abortReason;
+        room.endMessage = evaluation.endMessage;
+
+        matchDepartureHandler.clearRoomGracePeriods(roomId);
+        this.broadcastBombaState(room);
+
+        setTimeout(() => {
+          this.bombaRooms.delete(roomId);
+          roomRegistry.unregister(roomId);
+        }, 30000);
+        return;
+      }
+
+      // Match continues (enough players remaining)
+      if (evaluation.migratedHost) {
+        room.hostId = evaluation.migratedHost.id;
+        const newHost = room.players.find((p) => p.id === evaluation.migratedHost!.id);
+        if (newHost) {
+          newHost.isHost = true;
+        }
+        this.broadcastToBomba(room, {
+          type: 'notification',
+          message: `👑 ${evaluation.migratedHost.name} es ahora quien gestiona la sala.`,
+          noticeType: 'info',
+        });
+      }
+
+      if (departingPlayer) {
+        departingPlayer.isConnected = false;
+        departingPlayer.isEliminated = true;
+      }
+
+      // If active player left while playing, advance turn immediately
+      const activePlayer = room.players[room.activePlayerIndex];
+      if (activePlayer && activePlayer.id === playerId && room.phase === 'PLAYING') {
+        this.advanceBombaTurn(room);
       } else {
-        if (room.hostId === playerId) {
-          const nextHost = room.players.find((p) => p.isConnected) || room.players[0];
+        this.broadcastBombaState(room);
+      }
+    } else if (gameType === 'la-peor-respuesta') {
+      const room = this.lprRooms.get(roomId);
+      if (!room) return;
+
+      const departingPlayer = room.players.find((p) => p.id === playerId);
+      const wasHost = room.hostId === playerId;
+      const isGameActive = room.phase !== 'LOBBY' && room.phase !== 'MATCH_ABORTED' && room.phase !== 'FINAL_RESULTS';
+
+      // 1. In LOBBY phase
+      if (room.phase === 'LOBBY') {
+        room.players = room.players.filter((p) => p.id !== playerId);
+        if (room.players.length === 0) {
+          this.lprRooms.delete(roomId);
+          roomRegistry.unregister(roomId);
+          matchDepartureHandler.clearRoomGracePeriods(roomId);
+          return;
+        }
+
+        if (wasHost) {
+          const nextHost = matchDepartureHandler.findEarliestConnectedPlayer(room.players) || room.players[0];
           if (nextHost) {
             room.hostId = nextHost.id;
             nextHost.isHost = true;
             this.broadcastToLPR(room, {
               type: 'notification',
-              message: `${nextHost.name} es ahora el anfitrión de la sala`,
+              message: `👑 ${nextHost.name} es ahora quien gestiona la sala.`,
               noticeType: 'info',
             });
           }
         }
         this.broadcastLPRState(room);
+        return;
       }
+
+      // 2. In ACTIVE MATCH or FINAL RESULTS
+      const evaluation = matchDepartureHandler.evaluatePermanentDeparture({
+        gameType: 'la-peor-respuesta',
+        isGameActive,
+        departingPlayerId: playerId,
+        wasHost,
+        players: room.players,
+      });
+
+      if (evaluation.shouldAbort) {
+        room.phase = 'MATCH_ABORTED';
+        room.abortReason = evaluation.abortReason;
+        room.endMessage = evaluation.endMessage;
+
+        matchDepartureHandler.clearRoomGracePeriods(roomId);
+        this.broadcastLPRState(room);
+
+        setTimeout(() => {
+          this.lprRooms.delete(roomId);
+          roomRegistry.unregister(roomId);
+        }, 30000);
+        return;
+      }
+
+      // Match continues (at least 3 players remain connected)
+      if (evaluation.migratedHost) {
+        room.hostId = evaluation.migratedHost.id;
+        const newHost = room.players.find((p) => p.id === evaluation.migratedHost!.id);
+        if (newHost) {
+          newHost.isHost = true;
+        }
+        this.broadcastToLPR(room, {
+          type: 'notification',
+          message: `👑 ${evaluation.migratedHost.name} es ahora quien gestiona la sala.`,
+          noticeType: 'info',
+        });
+      }
+
+      // Remove departing player
+      room.players = room.players.filter((p) => p.id !== playerId);
+      room.privateSubmissions.delete(playerId);
+      room.votes.delete(playerId);
+
+      // Check progression so the match does not get blocked
+      const remainingConnected = room.players.filter((p) => p.isConnected);
+      if (room.phase === 'WRITING') {
+        const allSubmitted = remainingConnected.length > 0 && remainingConnected.every((p) => room.privateSubmissions.has(p.id));
+        if (allSubmitted) {
+          const rawCards = remainingConnected.map((p, idx) => ({
+            id: `card-${idx + 1}-${Math.random().toString(36).substring(2, 6)}`,
+            authorId: p.id,
+            text: room.privateSubmissions.get(p.id) || '',
+            revealed: false,
+            votes: [],
+          }));
+          room.shuffledCards = shuffleArray(rawCards);
+          room.phase = 'REVEAL';
+        }
+      } else if (room.phase === 'VOTING') {
+        const allVoted = remainingConnected.length > 0 && remainingConnected.every((p) => room.votes.has(p.id));
+        if (allVoted) {
+          for (const card of room.shuffledCards) {
+            card.votes = [];
+            for (const [voterId, votedCardId] of room.votes.entries()) {
+              if (votedCardId === card.id) {
+                card.votes.push(voterId);
+              }
+            }
+          }
+          const maxVotes = Math.max(...room.shuffledCards.map((c) => c.votes.length), 0);
+          const winningCards = room.shuffledCards.filter((c) => c.votes.length === maxVotes && maxVotes > 0);
+          const winningAuthors = Array.from(new Set(winningCards.map((c) => c.authorId)));
+          room.winningAuthorIds = winningAuthors;
+          for (const p of room.players) {
+            if (winningAuthors.includes(p.id)) {
+              p.score += 1;
+            }
+          }
+          room.phase = 'RESULTS';
+        }
+      }
+
+      this.broadcastLPRState(room);
     }
   }
 
@@ -589,6 +765,7 @@ export class PartyGameServer {
 
           let existingPlayer = bombaRoom.players.find((p) => p.id === player.id);
           if (existingPlayer) {
+            matchDepartureHandler.cancelGracePeriod(code, existingPlayer.id);
             existingPlayer.isConnected = true;
             existingPlayer.name = player.name;
             existingPlayer.avatar = player.avatar;
@@ -642,6 +819,7 @@ export class PartyGameServer {
 
           let existingPlayer = lprRoom.players.find((p) => p.id === player.id);
           if (existingPlayer) {
+            matchDepartureHandler.cancelGracePeriod(code, existingPlayer.id);
             existingPlayer.isConnected = true;
             existingPlayer.name = player.name;
             existingPlayer.avatar = player.avatar;
@@ -742,7 +920,7 @@ export class PartyGameServer {
       }
 
       case 'leave_room': {
-        this.handleDisconnect(ws);
+        this.handleExplicitLeave(ws);
         break;
       }
 

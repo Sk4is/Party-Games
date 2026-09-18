@@ -39,6 +39,7 @@ export const PinturilloLobby: React.FC<PinturilloLobbyProps> = ({
       description="Dibuja la palabra secreta mientras tus amigos intentan adivinarla antes de que se acabe el tiempo."
       minPlayers={2}
       maxPlayers={10}
+      gameType="pinturillo"
       onBack={onLeaveRoom}
       backLabel="Salir de la sala"
       roomCode={roomState.code}
@@ -84,13 +85,13 @@ export const PinturilloLobby: React.FC<PinturilloLobbyProps> = ({
               type="button"
               disabled={!canStart}
               onClick={handleStart}
-              className="w-full py-4 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-stone-950 font-black text-sm sm:text-base uppercase tracking-wider transition-all shadow-xl shadow-amber-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-4 px-6 rounded-2xl bg-[#00BCEB] hover:bg-[#009ED0] disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-black text-sm sm:text-base uppercase tracking-wider transition-all shadow-xl shadow-[#00BCEB]/25 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
             >
               <Play className="w-5 h-5 fill-current" />
               <span>Iniciar Partida</span>
             </button>
             {!canStart && (
-              <p className="text-center text-xs text-amber-400/90 mt-2.5 font-medium">
+              <p className="text-center text-xs text-[#00BCEB]/90 mt-2.5 font-medium">
                 ⚠️ Invita al menos a 1 amigo para poder empezar (mínimo 2 jugadores).
               </p>
             )}
@@ -98,7 +99,7 @@ export const PinturilloLobby: React.FC<PinturilloLobbyProps> = ({
         ) : (
           <div className="p-4 rounded-2xl bg-stone-900/60 border border-stone-800/80 text-center">
             <div className="flex items-center justify-center gap-2 text-stone-300 text-sm font-semibold mb-1">
-              <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
+              <Sparkles className="w-4 h-4 text-[#00BCEB] animate-spin" />
               <span>Esperando a que el anfitrión inicie la partida...</span>
             </div>
             <p className="text-xs text-stone-500">

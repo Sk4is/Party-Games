@@ -156,7 +156,7 @@ export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
             title={`Grosor: ${b.label} (${b.size}px)`}
             className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
               currentSize === b.size
-                ? 'bg-[#FFC928]/20 border-2 border-[#FFC928] shadow-[0_0_8px_rgba(255,201,40,0.3)]'
+                ? 'bg-[#00BCEB]/20 border-2 border-[#00BCEB] shadow-[0_0_8px_rgba(0,188,235,0.3)]'
                 : 'hover:bg-slate-800 border border-transparent opacity-80 hover:opacity-100'
             }`}
           >
@@ -186,7 +186,7 @@ export const PinturilloToolbar: React.FC<PinturilloToolbarProps> = ({
                 c.hex === '#ffffff' ? 'border-slate-400' : 'border-slate-800/80'
               } ${
                 isSelected
-                  ? 'scale-125 ring-2 ring-[#FFC928] ring-offset-2 ring-offset-[#0b1022] shadow-[0_0_10px_rgba(255,201,40,0.6)] z-10'
+                  ? 'scale-125 ring-2 ring-[#00BCEB] ring-offset-2 ring-offset-[#0b1022] shadow-[0_0_10px_rgba(0,188,235,0.6)] z-10'
                   : 'hover:scale-115 opacity-90 hover:opacity-100'
               }`}
               style={{ backgroundColor: c.hex }}

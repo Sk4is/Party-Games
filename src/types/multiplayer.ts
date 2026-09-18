@@ -42,7 +42,8 @@ export type BombaPhase =
   | 'ROUND_INTRO'
   | 'PLAYING'
   | 'EXPLOSION'
-  | 'GAME_OVER';
+  | 'GAME_OVER'
+  | 'MATCH_ABORTED';
 
 export interface BombaRoomState {
   code: string;
@@ -67,6 +68,8 @@ export interface BombaRoomState {
   affectedPlayer: BombaPlayerState | null;
   winner: BombaPlayerState | null;
   stats: GameStats;
+  abortReason?: string;
+  endMessage?: string;
 }
 
 // ==========================================
@@ -85,7 +88,8 @@ export type LPRPhase =
   | 'REVEAL'
   | 'VOTING'
   | 'RESULTS'
-  | 'FINAL_RESULTS';
+  | 'FINAL_RESULTS'
+  | 'MATCH_ABORTED';
 
 export interface LPRShuffledCard {
   id: string;
@@ -114,6 +118,8 @@ export interface LPRRoomState {
   readyCount: number;
   votedCount: number;
   winningAuthorIds?: string[];
+  abortReason?: string;
+  endMessage?: string;
 }
 
 // Normalized cursor for live board cursors

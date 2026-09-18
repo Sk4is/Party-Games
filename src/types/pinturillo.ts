@@ -56,6 +56,7 @@ export type PinturilloPhase =
   | 'DRAWING'
   | 'ROUND_RESULTS'
   | 'FINAL_RESULTS'
+  | 'MATCH_ABORTED'
   | 'MATCH_ABORTED_NOT_ENOUGH_PLAYERS';
 
 export interface PinturilloPlayer {
@@ -128,6 +129,7 @@ export interface PinturilloRoomState {
     }>;
   };
   abortReason?: string;
+  endMessage?: string;
 }
 
 // WebSocket Event Payloads
@@ -164,4 +166,5 @@ export type ServerMessage =
   | { type: 'countdown_tick'; count: number; text?: string }
   | { type: 'correct_guess'; playerId: string; playerName: string; points: number; totalScore: number }
   | { type: 'near_miss'; playerId: string }
+  | { type: 'notification'; message: string; noticeType?: 'info' | 'success' | 'warning' }
   | { type: 'pong' };

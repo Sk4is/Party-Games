@@ -76,6 +76,7 @@ export const PinturilloEntry: React.FC<PinturilloEntryProps> = ({
       description="Dibuja la palabra secreta mientras tus amigos intentan adivinarla antes de que se acabe el tiempo."
       minPlayers={2}
       maxPlayers={10}
+      gameType="pinturillo"
       onBack={onBackToMenu}
       backLabel="Volver al menú"
       errorMessage={errorMessage}
@@ -91,6 +92,7 @@ export const PinturilloEntry: React.FC<PinturilloEntryProps> = ({
         <RoomModeSelector
           mode={mode}
           onChange={setMode}
+          gameType="pinturillo"
         />
 
         {/* 3. Panel based on active mode */}
@@ -98,6 +100,7 @@ export const PinturilloEntry: React.FC<PinturilloEntryProps> = ({
           <CreateRoomPanel
             onCreate={handleCreate}
             isLoading={isSubmitting}
+            gameType="pinturillo"
             settingsSlot={
               <PinturilloSettings
                 config={config}
@@ -111,6 +114,7 @@ export const PinturilloEntry: React.FC<PinturilloEntryProps> = ({
             onJoin={handleJoin}
             isLoading={isSubmitting}
             initialCode={initialRoomCode}
+            gameType="pinturillo"
           />
         )}
       </div>

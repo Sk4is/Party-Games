@@ -56,7 +56,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
             onClick={() => setActiveTab('chat')}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
               activeTab === 'chat'
-                ? 'bg-[#FFC928] text-slate-950 shadow-sm'
+                ? 'bg-[#00BCEB] text-slate-950 shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -69,7 +69,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
             onClick={() => setActiveTab('players')}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
               activeTab === 'players'
-                ? 'bg-[#38D9FF] text-slate-950 shadow-sm'
+                ? 'bg-[#00BCEB] text-slate-950 shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -83,7 +83,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
           {players.find(p => p.id === currentDrawerId) && (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-300">
               <span>{players.find(p => p.id === currentDrawerId)?.avatar}</span>
-              <span className="text-[#38D9FF]">✏️ Dibuja</span>
+              <span className="text-[#00BCEB]">✏️ Dibuja</span>
             </div>
           )}
         </div>
@@ -147,7 +147,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
                   <div
                     className={`px-3 py-1.5 rounded-2xl max-w-[85%] break-words font-medium text-xs sm:text-sm shadow-sm ${
                       isMe
-                        ? 'bg-[#FFC928]/20 border border-[#FFC928]/40 text-amber-100 rounded-br-none'
+                        ? 'bg-[#00BCEB]/20 border border-[#00BCEB]/40 text-cyan-100 rounded-br-none'
                         : 'bg-slate-800 border border-slate-700/80 text-slate-200 rounded-bl-none'
                     }`}
                   >
@@ -172,7 +172,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
                 key={p.id}
                 className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all ${
                   isMe
-                    ? 'bg-slate-800/90 border-[#FFC928]/50 shadow-sm'
+                    ? 'bg-slate-800/90 border-[#00BCEB]/50 shadow-sm'
                     : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
                 }`}
               >
@@ -185,12 +185,12 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
                         {p.name}
                       </span>
                       {isMe && (
-                        <span className="text-[10px] font-black uppercase text-[#FFC928]">(Tú)</span>
+                        <span className="text-[10px] font-black uppercase text-[#00BCEB]">(Tú)</span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
                       {isPlayerDrawer ? (
-                        <span className="text-[#38D9FF] font-bold">🎨 Dibujando</span>
+                        <span className="text-[#00BCEB] font-bold">🎨 Dibujando</span>
                       ) : p.hasGuessed ? (
                         <span className="text-[#4ADE80] font-bold">✓ Ha acertado</span>
                       ) : (
@@ -201,7 +201,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
                 </div>
 
                 <div className="text-right">
-                  <span className="text-sm sm:text-base font-black text-[#FFC928]">
+                  <span className="text-sm sm:text-base font-black text-[#00BCEB]">
                     {p.score.toLocaleString('es-ES')}
                   </span>
                   <span className="text-[10px] block text-slate-400 font-medium">pts</span>
@@ -234,7 +234,7 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
           </div>
         ) : disabled ? (
           <div className="py-2.5 px-4 rounded-xl bg-slate-800/90 text-slate-300 text-xs font-bold text-center flex items-center justify-center gap-2 border border-slate-700">
-            <span className="w-2 h-2 rounded-full bg-[#FFC928] animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-[#00BCEB] animate-pulse" />
             <span>¡Prepárate! La ronda está a punto de comenzar...</span>
           </div>
         ) : (
@@ -245,12 +245,12 @@ export const PinturilloChat: React.FC<PinturilloChatProps> = ({
               onChange={e => setInputText(e.target.value)}
               placeholder="Escribe tu respuesta aquí..."
               autoFocus
-              className="flex-1 px-3.5 py-2 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-100 placeholder-slate-400 text-sm font-medium focus:outline-none focus:border-[#FFC928] transition-colors"
+              className="flex-1 px-3.5 py-2 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-100 placeholder-slate-400 text-sm font-medium focus:outline-none focus:border-[#00BCEB] transition-colors"
             />
             <button
               type="submit"
               disabled={!inputText.trim()}
-              className="px-4 py-2 rounded-xl bg-[#FFC928] hover:bg-[#ffbe0b] disabled:opacity-40 disabled:hover:bg-[#FFC928] text-slate-950 font-black transition-all cursor-pointer shadow-md active:scale-95 flex items-center justify-center"
+              className="px-4 py-2 rounded-xl bg-[#00BCEB] hover:bg-[#009ED0] disabled:opacity-40 disabled:hover:bg-[#00BCEB] text-slate-950 font-black transition-all cursor-pointer shadow-md active:scale-95 flex items-center justify-center"
             >
               <Send className="w-4 h-4" />
             </button>

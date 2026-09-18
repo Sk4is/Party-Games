@@ -20,6 +20,7 @@ import { AlphabetSidebar } from './AlphabetSidebar';
 import { RequiredLettersBanner } from './RequiredLettersBanner';
 import { AlphabetRewardModal } from '../AlphabetRewardModal';
 import { AbandonConfirmationModal } from '../common/AbandonConfirmationModal';
+import { MatchAbortedModal } from '../common/MatchAbortedModal';
 import { BombaLobby } from './BombaLobby';
 import {
   HelpCircle,
@@ -441,6 +442,14 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
         isOpen={isAbandonModalOpen}
         onCancel={() => setIsAbandonModalOpen(false)}
         onConfirm={onLeaveRoom}
+      />
+
+      {/* MATCH ABORTED MODAL */}
+      <MatchAbortedModal
+        isOpen={roomState.phase === 'MATCH_ABORTED'}
+        title="PARTIDA FINALIZADA"
+        message={roomState.endMessage || roomState.abortReason || 'La partida no puede continuar por falta de jugadores suficientes.'}
+        onReturnToMenu={onLeaveRoom}
       />
     </div>
   );

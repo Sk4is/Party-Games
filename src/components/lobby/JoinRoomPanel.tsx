@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { ArrowRight, LogIn } from 'lucide-react';
 import { audio } from '../../utils/audio';
+import { GameSlug } from '../../styles/gameThemes';
 
 interface JoinRoomPanelProps {
   onJoin: (code: string) => void;
   isLoading?: boolean;
   initialCode?: string;
   accentClass?: string;
+  gameType?: GameSlug;
 }
 
 export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
   onJoin,
   isLoading = false,
   initialCode = '',
+  gameType = 'la-bomba',
 }) => {
   const [code, setCode] = useState(initialCode.toUpperCase().trim());
 
@@ -32,6 +35,20 @@ export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
   };
 
   const isValid = code.trim().length >= 3;
+
+  const inputThemeClass =
+    gameType === 'la-peor-respuesta'
+      ? 'focus:border-[#FF3B4F] text-[#FF3B4F]'
+      : gameType === 'pinturillo'
+      ? 'focus:border-[#00BCEB] text-[#00BCEB]'
+      : 'focus:border-[#FFB000] text-[#FFB000]';
+
+  const btnThemeClass =
+    gameType === 'la-peor-respuesta'
+      ? 'bg-[#FF3B4F] hover:bg-[#E6293D] text-white shadow-[#FF3B4F]/25'
+      : gameType === 'pinturillo'
+      ? 'bg-[#00BCEB] hover:bg-[#009ED0] text-slate-950 shadow-[#00BCEB]/25'
+      : 'bg-[#FFB000] hover:bg-[#FF8A00] text-stone-950 shadow-[#FFB000]/25';
 
   return (
     <form onSubmit={handleSubmit} className="bg-stone-900/70 border border-stone-800/90 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5">
@@ -59,7 +76,7 @@ export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
             autoCorrect="off"
             spellCheck="false"
             maxLength={8}
-            className="w-full text-center tracking-[0.35em] font-mono text-2xl sm:text-3xl font-black py-4 px-4 rounded-2xl bg-stone-950 border-2 border-stone-800 focus:border-amber-400 text-amber-400 placeholder:text-stone-700 focus:outline-none transition-colors shadow-inner"
+            className={`w-full text-center tracking-[0.35em] font-mono text-2xl sm:text-3xl font-black py-4 px-4 rounded-2xl bg-stone-950 border-2 border-stone-800 placeholder:text-stone-700 focus:outline-none transition-colors shadow-inner ${inputThemeClass}`}
           />
         </div>
       </div>
@@ -67,10 +84,10 @@ export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
       <button
         type="submit"
         disabled={!isValid || isLoading}
-        className="w-full py-4 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-stone-950 font-black text-sm sm:text-base uppercase tracking-wider transition-all shadow-xl shadow-amber-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+        className={`w-full py-4 px-6 rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed font-black text-sm sm:text-base uppercase tracking-wider transition-all shadow-xl active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer ${btnThemeClass}`}
       >
         {isLoading ? (
-          <div className="w-5 h-5 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ) : (
           <>
             <LogIn className="w-5 h-5 stroke-[2.5]" />

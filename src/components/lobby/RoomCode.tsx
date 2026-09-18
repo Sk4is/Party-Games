@@ -26,6 +26,20 @@ export const RoomCode: React.FC<RoomCodeProps> = ({ code, gameSlug }) => {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  const codeColor =
+    gameSlug === 'la-peor-respuesta'
+      ? 'text-[#FF3B4F]'
+      : gameSlug === 'pinturillo'
+      ? 'text-[#00BCEB]'
+      : 'text-[#FFB000]';
+
+  const shareBtnColor =
+    gameSlug === 'la-peor-respuesta'
+      ? 'bg-[#FF3B4F]/15 hover:bg-[#FF3B4F]/25 text-[#FF3B4F] border-[#FF3B4F]/30'
+      : gameSlug === 'pinturillo'
+      ? 'bg-[#00BCEB]/15 hover:bg-[#00BCEB]/25 text-[#00BCEB] border-[#00BCEB]/30'
+      : 'bg-[#FFB000]/15 hover:bg-[#FFB000]/25 text-[#FFB000] border-[#FFB000]/30';
+
   return (
     <div className="bg-stone-900/70 border border-stone-800/90 rounded-3xl p-5 sm:p-6 shadow-xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -33,7 +47,7 @@ export const RoomCode: React.FC<RoomCodeProps> = ({ code, gameSlug }) => {
           <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
             Código de la sala
           </span>
-          <div className="text-3xl sm:text-4xl font-mono font-black tracking-widest text-amber-400">
+          <div className={`text-3xl sm:text-4xl font-mono font-black tracking-widest ${codeColor}`}>
             {code}
           </div>
           <p className="text-xs text-stone-400 mt-1">
@@ -63,7 +77,7 @@ export const RoomCode: React.FC<RoomCodeProps> = ({ code, gameSlug }) => {
           <button
             type="button"
             onClick={handleCopyLink}
-            className="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 border border-amber-500/30 transition-colors cursor-pointer"
+            className={`flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-colors cursor-pointer ${shareBtnColor}`}
           >
             {copiedLink ? (
               <>

@@ -41,7 +41,7 @@ export const BombaSettings: React.FC<BombaSettingsProps> = ({
       <div>
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="text-stone-300 font-semibold flex items-center gap-1.5">
-            <Heart className="w-3.5 h-3.5 text-red-500 fill-current" />
+            <Heart className="w-3.5 h-3.5 text-rose-500 fill-current" />
             Vidas Iniciales
           </span>
           <span className="font-bold text-white font-mono">{startingLives} vidas</span>
@@ -60,7 +60,7 @@ export const BombaSettings: React.FC<BombaSettingsProps> = ({
               }}
               className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
                 startingLives === num
-                  ? 'bg-red-600 text-white shadow-md font-black scale-[1.02]'
+                  ? 'bg-rose-600 text-white shadow-md font-black scale-[1.02]'
                   : isHost
                   ? 'bg-stone-950 border border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700 cursor-pointer'
                   : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
@@ -76,7 +76,7 @@ export const BombaSettings: React.FC<BombaSettingsProps> = ({
       <div>
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="text-stone-300 font-semibold flex items-center gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+            <AlertCircle className="w-3.5 h-3.5 text-[#FFB000]" />
             Fallos por Turno
           </span>
           <span className="font-bold text-white font-mono">{allowedMistakesPerRound} fallos</span>
@@ -95,7 +95,7 @@ export const BombaSettings: React.FC<BombaSettingsProps> = ({
               }}
               className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
                 allowedMistakesPerRound === num
-                  ? 'bg-amber-500 text-stone-950 shadow-md font-black scale-[1.02]'
+                  ? 'bg-[#FFB000] text-stone-950 shadow-md shadow-[#FFB000]/25 font-black scale-[1.02]'
                   : isHost
                   ? 'bg-stone-950 border border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700 cursor-pointer'
                   : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
@@ -128,7 +128,7 @@ export const LPRSettings: React.FC<LPRSettingsProps> = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs mb-1">
         <span className="text-stone-300 font-semibold flex items-center gap-1.5">
-          <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+          <RotateCcw className="w-3.5 h-3.5 text-[#FF3B4F]" />
           Rondas por Partida
         </span>
         <span className="font-bold text-white font-mono">
@@ -150,7 +150,7 @@ export const LPRSettings: React.FC<LPRSettingsProps> = ({
             }}
             className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
               totalRounds === num
-                ? 'bg-amber-500 text-stone-950 shadow-md font-black scale-[1.02]'
+                ? 'bg-[#FF3B4F] text-white shadow-md shadow-[#FF3B4F]/25 font-black scale-[1.02]'
                 : isHost
                 ? 'bg-stone-950 border border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700 cursor-pointer'
                 : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
@@ -172,7 +172,7 @@ export const LPRSettings: React.FC<LPRSettingsProps> = ({
         }}
         className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
           totalRounds === -1
-            ? 'bg-amber-500 text-stone-950 shadow-md font-black scale-[1.01]'
+            ? 'bg-[#FF3B4F] text-white shadow-md shadow-[#FF3B4F]/25 font-black scale-[1.01]'
             : isHost
             ? 'bg-stone-950 border border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700 cursor-pointer'
             : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
@@ -246,7 +246,7 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
       <div>
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="text-stone-300 font-semibold flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <Clock className="w-3.5 h-3.5 text-[#00BCEB]" />
             Tiempo de Dibujo por Turno
           </span>
           <span className="font-bold text-white font-mono">{config.roundTimeSeconds}s</span>
@@ -265,7 +265,7 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
               }}
               className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all ${
                 config.roundTimeSeconds === opt.value
-                  ? 'bg-amber-500 text-stone-950 shadow-md font-black scale-[1.02]'
+                  ? 'bg-[#00BCEB] text-slate-950 shadow-md shadow-[#00BCEB]/25 font-black scale-[1.02]'
                   : isHost
                   ? 'bg-stone-950 border border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700 cursor-pointer'
                   : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
@@ -281,7 +281,7 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
       <div>
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="text-stone-300 font-semibold flex items-center gap-1.5">
-            <Repeat className="w-3.5 h-3.5 text-amber-400" />
+            <Repeat className="w-3.5 h-3.5 text-[#00BCEB]" />
             Rondas Completas (Vueltas)
           </span>
           <span className="font-bold text-white font-mono">{config.totalVueltas} vuelta(s)</span>
@@ -300,7 +300,7 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
               }}
               className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all ${
                 config.totalVueltas === opt.value
-                  ? 'bg-amber-500 text-stone-950 shadow-md font-black scale-[1.02]'
+                  ? 'bg-[#00BCEB] text-slate-950 shadow-md shadow-[#00BCEB]/25 font-black scale-[1.02]'
                   : isHost
                   ? 'bg-stone-950 border border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700 cursor-pointer'
                   : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
@@ -316,10 +316,10 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
       <div>
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="text-stone-300 font-semibold flex items-center gap-1.5">
-            <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+            <Lightbulb className="w-3.5 h-3.5 text-[#00BCEB]" />
             Modo de Pistas
           </span>
-          <span className="font-bold text-amber-400">
+          <span className="font-bold text-[#00BCEB]">
             {hintsEnabled ? 'Con pistas automáticas' : 'Sin pistas (Experto)'}
           </span>
         </div>
@@ -335,16 +335,16 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
             }}
             className={`p-3 rounded-2xl text-left border transition-all ${
               hintsEnabled
-                ? 'bg-amber-500/15 border-amber-400 text-amber-200 ring-1 ring-amber-400/40'
+                ? 'bg-[#00BCEB]/15 border-[#00BCEB] text-[#00BCEB] ring-1 ring-[#00BCEB]/40'
                 : isHost
                 ? 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700 cursor-pointer'
                 : 'bg-stone-950/60 border-stone-800/60 text-stone-600 cursor-default'
             }`}
           >
             <div className="flex items-center gap-1.5 mb-1">
-              <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+              <Lightbulb className="w-3.5 h-3.5 text-[#00BCEB]" />
               <span className="text-xs font-bold uppercase tracking-wide text-white">Con pistas</span>
-              {hintsEnabled && <span className="ml-auto text-xs text-amber-400 font-bold">✓</span>}
+              {hintsEnabled && <span className="ml-auto text-xs text-[#00BCEB] font-bold">✓</span>}
             </div>
             <p className="text-[11px] text-stone-400 leading-snug">
               Muestra letras reveladas al 50% y 20% del tiempo.
@@ -362,16 +362,16 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
             }}
             className={`p-3 rounded-2xl text-left border transition-all ${
               !hintsEnabled
-                ? 'bg-amber-500/15 border-amber-400 text-amber-200 ring-1 ring-amber-400/40'
+                ? 'bg-[#00BCEB]/15 border-[#00BCEB] text-[#00BCEB] ring-1 ring-[#00BCEB]/40'
                 : isHost
                 ? 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700 cursor-pointer'
                 : 'bg-stone-950/60 border-stone-800/60 text-stone-600 cursor-default'
             }`}
           >
             <div className="flex items-center gap-1.5 mb-1">
-              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+              <EyeOff className="w-3.5 h-3.5 text-[#00BCEB]" />
               <span className="text-xs font-bold uppercase tracking-wide text-white">Sin pistas</span>
-              {!hintsEnabled && <span className="ml-auto text-xs text-amber-400 font-bold">✓</span>}
+              {!hintsEnabled && <span className="ml-auto text-xs text-[#00BCEB] font-bold">✓</span>}
             </div>
             <p className="text-[11px] text-stone-400 leading-snug">
               Solo guiones hasta el final. ¡Mayor reto!
@@ -384,14 +384,14 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
       <div>
         <div className="flex items-center justify-between mb-2">
           <span className="text-stone-300 font-semibold text-xs flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5 text-amber-400" />
+            <Layers className="w-3.5 h-3.5 text-[#00BCEB]" />
             Categorías de Palabras ({currentCategories.length}/{PINTURILLO_CATEGORIES_LIST.length})
           </span>
           {isHost && currentCategories.length < PINTURILLO_CATEGORIES_LIST.length && (
             <button
               type="button"
               onClick={handleSelectAllCategories}
-              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 cursor-pointer underline"
+              className="text-[11px] font-bold text-[#00BCEB] hover:text-[#009ED0] cursor-pointer underline"
             >
               Seleccionar todas
             </button>
@@ -409,17 +409,17 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
                 onClick={() => handleToggleCategory(cat.id)}
                 className={`p-2 rounded-xl border text-left transition-all flex items-center gap-2 ${
                   isSelected
-                    ? 'bg-amber-500/15 border-amber-400/80 text-white'
+                    ? 'bg-[#00BCEB]/15 border-[#00BCEB]/80 text-white'
                     : isHost
                     ? 'bg-stone-950 border-stone-800/80 text-stone-500 hover:border-stone-700 cursor-pointer'
                     : 'bg-stone-950/60 border-stone-800/60 text-stone-600 cursor-default'
                 }`}
               >
                 <span className="text-base shrink-0">{cat.icon}</span>
-                <span className={`text-xs font-bold truncate flex-1 ${isSelected ? 'text-amber-300' : 'text-stone-400'}`}>
+                <span className={`text-xs font-bold truncate flex-1 ${isSelected ? 'text-[#00BCEB]' : 'text-stone-400'}`}>
                   {cat.name}
                 </span>
-                {isSelected && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                {isSelected && <Check className="w-3.5 h-3.5 text-[#00BCEB] shrink-0" />}
               </button>
             );
           })}

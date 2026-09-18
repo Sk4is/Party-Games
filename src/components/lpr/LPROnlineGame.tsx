@@ -13,6 +13,7 @@ import { WhiteCardVisual } from '../WhiteCardVisual';
 import { ResultsPhaseView } from '../ResultsPhaseView';
 import { FinalResultsView } from '../FinalResultsView';
 import { AbandonConfirmationModal } from '../common/AbandonConfirmationModal';
+import { MatchAbortedModal } from '../common/MatchAbortedModal';
 import { LiveCursorsLayer } from '../common/LiveCursorsLayer';
 import { SoundToggle } from '../SoundToggle';
 import { audio } from '../../utils/audio';
@@ -169,13 +170,13 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
 
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-stone-900 border border-stone-800 text-xs text-stone-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-mono font-bold text-amber-400">{roomState.code}</span>
+            <span className="font-mono font-bold text-[#FF3B4F]">{roomState.code}</span>
           </div>
         </div>
 
         {/* Center: Round Tracker */}
         <div className="flex items-center gap-2">
-          <div className="px-3.5 py-1 rounded-full bg-stone-900 border border-stone-800 text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+          <div className="px-3.5 py-1 rounded-full bg-stone-900 border border-stone-800 text-xs font-bold uppercase tracking-wider text-[#FF3B4F] flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" />
             <span>
               Ronda {roomState.round} {roomState.config.totalRounds !== -1 && `de ${roomState.config.totalRounds}`}
@@ -218,7 +219,7 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
             {/* Ready Status Bar */}
             <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-3.5 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-amber-400" />
+                <Users className="w-4 h-4 text-[#FF3B4F]" />
                 <span className="font-semibold text-stone-200">
                   {roomState.readyCount} de {connectedPlayers.length} respuestas listas
                 </span>
@@ -260,14 +261,14 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
                   value={localAnswerText}
                   onChange={(e) => setLocalAnswerText(e.target.value)}
                   placeholder="Escribe aquí tu peor o más divertida respuesta..."
-                  className="w-full p-4 bg-stone-950 border border-stone-800 rounded-2xl text-stone-100 placeholder-stone-600 text-base font-semibold focus:outline-none focus:border-amber-500 transition-colors resize-none"
+                  className="w-full p-4 bg-stone-950 border border-stone-800 rounded-2xl text-stone-100 placeholder-stone-600 text-base font-semibold focus:outline-none focus:border-[#FF3B4F] transition-colors resize-none"
                   autoFocus
                 />
 
                 <button
                   type="submit"
                   disabled={!localAnswerText.trim()}
-                  className="w-full py-4 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-amber-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full py-4 px-6 rounded-2xl bg-[#FF3B4F] hover:bg-[#E6293D] text-white font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-[#FF3B4F]/25 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Lock className="w-4 h-4" />
                   Confirmar y Bloquear Respuesta
@@ -285,7 +286,7 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
                 <p className="text-xs text-stone-400 max-w-sm mx-auto">
                   «<span className="text-stone-200 font-semibold">{localAnswerText || 'Tu respuesta'}</span>»
                 </p>
-                <p className="text-xs text-amber-400/90 font-medium">
+                <p className="text-xs text-[#FF3B4F]/90 font-medium">
                   Esperando a que el resto de jugadores terminen de escribir...
                 </p>
               </div>
@@ -347,7 +348,7 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
                   <button
                     type="button"
                     onClick={onProceedVoting}
-                    className="px-3.5 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-black transition-colors"
+                    className="px-3.5 py-1.5 rounded-full bg-[#FF3B4F] hover:bg-[#E6293D] text-white text-xs font-black transition-colors shadow-lg shadow-[#FF3B4F]/20"
                   >
                     Pasar a Votación →
                   </button>
@@ -391,7 +392,7 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
             />
 
             <div className="text-center space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center justify-center gap-1.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#FF3B4F] flex items-center justify-center gap-1.5">
                 <Vote className="w-3.5 h-3.5" />
                 Votación Simultánea Secreta
               </span>
@@ -413,7 +414,7 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
             {/* Voting Progress Status */}
             <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-3.5 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
-                <Vote className="w-4 h-4 text-amber-400" />
+                <Vote className="w-4 h-4 text-[#FF3B4F]" />
                 <span className="font-semibold text-stone-200">
                   {roomState.votedCount} de {connectedPlayers.length} votos emitidos
                 </span>
@@ -424,7 +425,7 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
                     key={p.id}
                     className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm border transition-all ${
                       p.hasVoted
-                        ? 'bg-amber-950 border-amber-500 shadow-sm'
+                        ? 'bg-rose-950/70 border-[#FF3B4F] shadow-sm'
                         : 'bg-stone-950 border-stone-800 opacity-60'
                     }`}
                     title={p.name}
@@ -469,7 +470,7 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
                   type="button"
                   disabled={!selectedVoteCardId}
                   onClick={handleVoteSubmit}
-                  className="w-full py-4 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-amber-500/30 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full py-4 px-6 rounded-2xl bg-[#FF3B4F] hover:bg-[#E6293D] text-white font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-[#FF3B4F]/30 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Vote className="w-5 h-5" />
                   Confirmar Voto
@@ -534,6 +535,14 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
         isOpen={isAbandonModalOpen}
         onCancel={() => setIsAbandonModalOpen(false)}
         onConfirm={onLeaveRoom}
+      />
+
+      {/* MATCH ABORTED MODAL */}
+      <MatchAbortedModal
+        isOpen={roomState.phase === 'MATCH_ABORTED'}
+        title="PARTIDA FINALIZADA"
+        message={roomState.endMessage || roomState.abortReason || 'La partida no puede continuar por falta de jugadores suficientes.'}
+        onReturnToMenu={onLeaveRoom}
       />
     </div>
   );

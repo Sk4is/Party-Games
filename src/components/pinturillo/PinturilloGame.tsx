@@ -17,6 +17,7 @@ import { PinturilloChat } from './PinturilloChat';
 import { PinturilloWordChoiceModal } from './PinturilloWordChoiceModal';
 import { PinturilloResults } from './PinturilloResults';
 import { PinturilloBackground } from './PinturilloBackground';
+import { MatchAbortedModal } from '../common/MatchAbortedModal';
 import { audio } from '../../utils/audio';
 import {
   Clock,
@@ -239,6 +240,25 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
             setNearMissAlert(true);
             setTimeout(() => setNearMissAlert(false), 3500);
             break;
+
+          case 'notification':
+            setRoomState(prev => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                chatMessages: [
+                  ...prev.chatMessages,
+                  {
+                    id: `sys-notif-${Date.now()}`,
+                    playerName: 'Sistema',
+                    text: msg.message,
+                    isSystem: true,
+                    timestamp: Date.now(),
+                  },
+                ],
+              };
+            });
+            break;
         }
       } catch (err) {
         console.error('[Pinturillo Client] Error analizando mensaje del servidor:', err);
@@ -443,7 +463,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
           <div className="text-center max-w-lg mx-auto">
             {countdownInfo.count > 0 ? (
               <div key={`cd-${countdownInfo.count}`} className="animate-countdown-pop">
-                <span className="inline-block text-8xl sm:text-9xl font-black font-display text-amber-400 drop-shadow-[0_10px_35px_rgba(245,158,11,0.5)]">
+                <span className="inline-block text-8xl sm:text-9xl font-black font-display text-[#00BCEB] drop-shadow-[0_10px_35px_rgba(0,188,235,0.5)]">
                   {countdownInfo.count}
                 </span>
                 <p className="text-2xl sm:text-3xl font-black font-display text-white mt-4 uppercase tracking-widest drop-shadow-md">
@@ -490,6 +510,14 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
         />
       )}
 
+      {/* MATCH ABORTED MODAL */}
+      <MatchAbortedModal
+        isOpen={roomState.phase === 'MATCH_ABORTED'}
+        title="PARTIDA FINALIZADA"
+        message={roomState.endMessage || roomState.abortReason || 'La partida no puede continuar por falta de jugadores suficientes.'}
+        onReturnToMenu={handleLeaveRoom}
+      />
+
       {/* Top Header Navigation & Status Bar */}
       <header className="relative z-20 px-3 sm:px-6 py-2.5 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
@@ -511,7 +539,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
               title={isMusicPlaying ? 'Pausar música chill' : 'Activar música chill'}
               className={`p-2 rounded-xl border transition-all cursor-pointer ${
                 isMusicPlaying
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm'
+                  ? 'bg-[#00BCEB]/20 border-[#00BCEB]/50 text-cyan-300 shadow-sm'
                   : 'bg-slate-800 border-slate-700 text-slate-400'
               }`}
             >
@@ -533,7 +561,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
               <span className="text-[10px] uppercase font-bold text-slate-400">
                 Turno {roomState.currentTurn}/{roomState.totalTurns}
               </span>
-              <span className="text-xs font-black text-amber-400">
+              <span className="text-xs font-black text-[#00BCEB]">
                 Vuelta {roomState.currentVuelta}/{roomState.config.totalVueltas}
               </span>
             </div>
@@ -542,12 +570,12 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
           {/* Center: Secret Word (Drawer) or Hint (Guesser) */}
           <div className="flex-1 flex items-center justify-center max-w-xl mx-2">
             {isDrawer && roomState.secretWord ? (
-              <div className="flex flex-col items-center bg-[#FFC928]/15 border-2 border-[#FFC928]/60 px-4 sm:px-6 py-1.5 rounded-2xl shadow-[0_0_20px_rgba(255,201,40,0.2)]">
-                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-[#FFC928]">
+              <div className="flex flex-col items-center bg-[#00BCEB]/15 border-2 border-[#00BCEB]/60 px-4 sm:px-6 py-1.5 rounded-2xl shadow-[0_0_20px_rgba(0,188,235,0.2)]">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-[#00BCEB]">
                   <Eye className="w-3.5 h-3.5" />
                   <span>Tu palabra secreta (¡Solo la ves tú!)</span>
                   {roomState.wordCategory && (
-                    <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-900/80 text-[#38D9FF] text-[10px] font-bold border border-slate-700">
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-900/80 text-[#00BCEB] text-[10px] font-bold border border-slate-700">
                       {roomState.wordCategory}
                     </span>
                   )}
@@ -563,7 +591,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
                     {roomState.config.hintsEnabled ? '💡 Con pistas' : '🔒 Sin pistas'} ({roomState.wordLength} letras)
                   </span>
                   {roomState.wordCategory && (
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[#38D9FF] font-bold text-[10px]">
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[#00BCEB] font-bold text-[10px]">
                       {roomState.wordCategory}
                     </span>
                   )}
@@ -577,7 +605,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
                         key={`${i}-${char}`}
                         className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-lg font-black font-mono text-base sm:text-lg uppercase transition-all select-none ${
                           isLetter
-                            ? 'bg-[#FFC928]/25 border-2 border-[#FFC928] text-[#FFC928] shadow-[0_0_8px_rgba(255,201,40,0.5)] animate-letter-pop'
+                            ? 'bg-[#00BCEB]/25 border-2 border-[#00BCEB] text-[#00BCEB] shadow-[0_0_8px_rgba(0,188,235,0.5)] animate-letter-pop'
                             : 'bg-slate-800/80 border border-slate-700 text-slate-500'
                         }`}
                       >
@@ -597,8 +625,8 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
                 isTimeCritical
                   ? 'bg-rose-500/20 border-[#FF6B6B] text-rose-300 shadow-[0_0_15px_rgba(255,107,107,0.4)] animate-pulse'
                   : roomState.remainingTime <= 25
-                  ? 'bg-amber-500/15 border-[#FFC928] text-amber-300 shadow-[0_0_10px_rgba(255,201,40,0.25)]'
-                  : 'bg-[#070b18]/90 border-[#38D9FF]/60 text-cyan-200'
+                  ? 'bg-amber-500/15 border-amber-400 text-amber-300 shadow-[0_0_10px_rgba(251,191,36,0.25)]'
+                  : 'bg-[#070b18]/90 border-[#00BCEB]/60 text-cyan-200'
               }`}
             >
               <Clock
@@ -606,8 +634,8 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
                   isTimeCritical
                     ? 'text-[#FF6B6B] animate-spin'
                     : roomState.remainingTime <= 25
-                    ? 'text-[#FFC928]'
-                    : 'text-[#38D9FF]'
+                    ? 'text-amber-400'
+                    : 'text-[#00BCEB]'
                 }`}
               />
               <span className="font-mono font-black text-sm sm:text-base">
@@ -628,7 +656,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
               <div
                 className={`flex items-center gap-2 px-3 py-1 rounded-xl border font-bold text-xs sm:text-sm shadow-sm ${
                   isDrawer
-                    ? 'bg-[#FFC928] text-slate-950 border-amber-300 font-black shadow-[0_0_12px_rgba(255,201,40,0.35)]'
+                    ? 'bg-[#00BCEB] text-slate-950 border-cyan-300 font-black shadow-[0_0_12px_rgba(0,188,235,0.35)]'
                     : 'bg-slate-800/90 text-slate-200 border-slate-700'
                 }`}
               >
@@ -640,7 +668,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
 
               {roomState.wordCategory && (
                 <span className="hidden sm:inline-block px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 text-xs font-semibold">
-                  Categoría: <strong className="text-[#38D9FF]">{roomState.wordCategory}</strong>
+                  Categoría: <strong className="text-[#00BCEB]">{roomState.wordCategory}</strong>
                 </span>
               )}
             </div>

@@ -79,14 +79,14 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
           <div
             id="card-la-bomba"
             onClick={() => handleSelectGame('la-bomba')}
-            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-slate-850 to-slate-900 border-2 border-amber-500/80 hover:border-amber-400 shadow-2xl hover:shadow-amber-500/20 transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-98 overflow-hidden"
+            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-slate-850 to-slate-900 border-2 border-[#FFB000]/80 hover:border-[#FFB000] shadow-2xl hover:shadow-[#FFB000]/20 transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-98 overflow-hidden"
           >
             {/* Dynamic glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-b from-amber-500/15 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#FFB000]/15 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-6">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-3xl shadow-lg shadow-orange-500/30 group-hover:scale-110 transition-transform">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FFB000] to-[#FF8A00] flex items-center justify-center text-3xl shadow-lg shadow-[#FFB000]/30 group-hover:scale-110 transition-transform">
                   💣
                 </div>
                 <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1">
@@ -95,7 +95,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 </span>
               </div>
 
-              <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-amber-300 transition-colors">
+              <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#FFB000] transition-colors">
                 LA BOMBA
               </h2>
               <p className="text-slate-300 text-base sm:text-lg font-medium leading-snug">
@@ -109,10 +109,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             </div>
 
             <div className="relative z-10 mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between">
-              <span className="text-sm font-bold text-amber-400 group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
+              <span className="text-sm font-bold text-[#FFB000] group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
                 Entrar a la sala <ArrowRight className="w-4 h-4" />
               </span>
-              <div className="w-10 h-10 rounded-full bg-amber-500 group-hover:bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md transition-all">
+              <div className="w-10 h-10 rounded-full bg-[#FFB000] group-hover:bg-[#FF8A00] text-slate-950 flex items-center justify-center font-black shadow-md shadow-[#FFB000]/25 transition-all">
                 <Play className="w-5 h-5 fill-current ml-0.5" />
               </div>
             </div>
@@ -122,14 +122,14 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
           <div
             id="card-la-peor-respuesta"
             onClick={() => handleSelectGame('la-peor-respuesta')}
-            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-stone-900 to-slate-950 border-2 border-stone-700/90 hover:border-amber-400/90 shadow-2xl hover:shadow-amber-500/10 transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-98 overflow-hidden"
+            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-stone-900 to-slate-950 border-2 border-[#FF3B4F]/80 hover:border-[#FF3B4F] shadow-2xl hover:shadow-[#FF3B4F]/20 transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-98 overflow-hidden"
           >
             {/* Ambient card glow */}
-            <div className="absolute inset-0 bg-gradient-to-b from-stone-700/15 via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#FF3B4F]/15 via-transparent to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-6">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-stone-800 via-neutral-900 to-black border border-stone-700 flex items-center justify-center text-3xl shadow-lg group-hover:scale-110 group-hover:border-amber-400/60 transition-transform">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FF3B4F] to-[#E6293D] flex items-center justify-center text-3xl shadow-lg shadow-[#FF3B4F]/30 group-hover:scale-110 transition-transform">
                   💀
                 </div>
                 <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1">
@@ -138,7 +138,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 </span>
               </div>
 
-              <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-amber-400 transition-colors">
+              <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#FF3B4F] transition-colors">
                 LA PEOR RESPUESTA
               </h2>
               <p className="text-stone-300 text-base sm:text-lg font-medium leading-snug">
@@ -158,10 +158,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             </div>
 
             <div className="relative z-10 mt-8 pt-6 border-t border-stone-800/80 flex items-center justify-between">
-              <span className="text-sm font-bold text-amber-400 group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
+              <span className="text-sm font-bold text-[#FF3B4F] group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
                 Entrar a la sala <ArrowRight className="w-4 h-4" />
               </span>
-              <div className="w-10 h-10 rounded-full bg-amber-500 group-hover:bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md transition-all">
+              <div className="w-10 h-10 rounded-full bg-[#FF3B4F] group-hover:bg-[#E6293D] text-white flex items-center justify-center font-black shadow-md shadow-[#FF3B4F]/25 transition-all">
                 <Play className="w-5 h-5 fill-current ml-0.5" />
               </div>
             </div>
@@ -171,14 +171,14 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
           <div
             id="card-pinturillo"
             onClick={() => handleSelectGame('pinturillo')}
-            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-slate-850 to-slate-900 border-2 border-cyan-500/80 hover:border-cyan-400 shadow-2xl hover:shadow-cyan-500/20 transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-98 overflow-hidden"
+            className="group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-slate-850 to-slate-900 border-2 border-[#00BCEB]/80 hover:border-[#00BCEB] shadow-2xl hover:shadow-[#00BCEB]/20 transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-98 overflow-hidden"
           >
             {/* Dynamic glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/15 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#00BCEB]/15 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-6">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-3xl shadow-lg shadow-cyan-500/30 group-hover:scale-110 transition-transform">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00BCEB] to-[#009ED0] flex items-center justify-center text-3xl shadow-lg shadow-[#00BCEB]/30 group-hover:scale-110 transition-transform">
                   🎨
                 </div>
                 <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1">
@@ -187,7 +187,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 </span>
               </div>
 
-              <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-cyan-300 transition-colors">
+              <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#00BCEB] transition-colors">
                 PINTURILLO
               </h2>
               <p className="text-slate-300 text-base sm:text-lg font-medium leading-snug">
@@ -201,10 +201,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             </div>
 
             <div className="relative z-10 mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between">
-              <span className="text-sm font-bold text-cyan-400 group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
+              <span className="text-sm font-bold text-[#00BCEB] group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
                 Entrar a la sala <ArrowRight className="w-4 h-4" />
               </span>
-              <div className="w-10 h-10 rounded-full bg-cyan-500 group-hover:bg-cyan-400 text-slate-950 flex items-center justify-center font-black shadow-md transition-all">
+              <div className="w-10 h-10 rounded-full bg-[#00BCEB] group-hover:bg-[#009ED0] text-slate-950 flex items-center justify-center font-black shadow-md shadow-[#00BCEB]/25 transition-all">
                 <Play className="w-5 h-5 fill-current ml-0.5" />
               </div>
             </div>

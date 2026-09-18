@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Users, Wifi } from 'lucide-react';
 import { motion } from 'motion/react';
+import { GameSlug } from '../../styles/gameThemes';
 
 export interface GameLobbyLayoutProps {
   title: string;
@@ -9,6 +10,7 @@ export interface GameLobbyLayoutProps {
   minPlayers: number;
   maxPlayers: number;
   accentColor?: 'amber' | 'orange' | 'rose' | 'indigo';
+  gameType?: GameSlug;
   onBack: () => void;
   backLabel?: string;
   roomCode?: string;
@@ -23,6 +25,7 @@ export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = ({
   description,
   minPlayers,
   maxPlayers,
+  gameType = 'la-bomba',
   onBack,
   backLabel = 'Volver al menú',
   roomCode,
@@ -30,6 +33,20 @@ export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = ({
   errorMessage,
   children,
 }) => {
+  const roomCodeColor =
+    gameType === 'la-peor-respuesta'
+      ? 'text-[#FF3B4F]'
+      : gameType === 'pinturillo'
+      ? 'text-[#00BCEB]'
+      : 'text-[#FFB000]';
+
+  const usersIconColor =
+    gameType === 'la-peor-respuesta'
+      ? 'text-[#FF3B4F]'
+      : gameType === 'pinturillo'
+      ? 'text-[#00BCEB]'
+      : 'text-[#FFB000]';
+
   return (
     <div className="min-h-screen bg-[#070b14] text-stone-100 flex flex-col p-4 sm:p-6 md:p-8 font-sans select-none relative overflow-x-hidden">
       {/* Top Header Bar */}
@@ -48,7 +65,7 @@ export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = ({
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-900/90 border border-stone-800">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-xs font-medium text-stone-400">
-                Sala <strong className="font-mono font-bold text-amber-400">{roomCode}</strong>
+                Sala <strong className={`font-mono font-bold ${roomCodeColor}`}>{roomCode}</strong>
               </span>
             </div>
           ) : (
@@ -79,7 +96,7 @@ export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = ({
 
           <div className="inline-flex items-center justify-center gap-3 text-xs text-stone-400 font-medium">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/60 border border-stone-800/80">
-              <Users className="w-3.5 h-3.5 text-amber-400" />
+              <Users className={`w-3.5 h-3.5 ${usersIconColor}`} />
               <span>{minPlayers}–{maxPlayers} jugadores</span>
             </span>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/60 border border-stone-800/80">

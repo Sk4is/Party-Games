@@ -71,7 +71,7 @@ export const WhiteCardVisual: React.FC<WhiteCardVisualProps> = ({
         {/* ==================================================== */}
         {/* FACE DOWN (Card Back)                                */}
         {/* ==================================================== */}
-        <div className="absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-4 sm:p-5 bg-gradient-to-br from-stone-900 via-neutral-900 to-black border-2 border-stone-700/80 shadow-xl flex flex-col items-center justify-between backface-hidden overflow-hidden group-hover:border-amber-400/70 group-hover:shadow-amber-500/10 transition-all">
+        <div className="absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-4 sm:p-5 bg-gradient-to-br from-stone-900 via-neutral-900 to-black border-2 border-stone-700/80 shadow-xl flex flex-col items-center justify-between backface-hidden overflow-hidden group-hover:border-[#FF3B4F]/70 group-hover:shadow-[#FF3B4F]/10 transition-all">
           {/* Decorative card pattern */}
           <div className="absolute inset-2 rounded-xl border border-stone-800/80 pointer-events-none flex items-center justify-center">
             <div className="w-20 h-20 rounded-full border border-dashed border-stone-700/60 opacity-40 animate-spin [animation-duration:30s]" />
@@ -84,7 +84,7 @@ export const WhiteCardVisual: React.FC<WhiteCardVisualProps> = ({
 
           {/* Central Logo / Motif */}
           <div className="relative z-10 flex flex-col items-center justify-center text-center my-auto">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-stone-800/80 border border-stone-700 text-stone-300 flex items-center justify-center text-2xl sm:text-3xl font-black font-display shadow-inner group-hover:scale-110 group-hover:text-amber-400 group-hover:border-amber-500/40 transition-all">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-stone-800/80 border border-stone-700 text-stone-300 flex items-center justify-center text-2xl sm:text-3xl font-black font-display shadow-inner group-hover:scale-110 group-hover:text-[#FF3B4F] group-hover:border-[#FF3B4F]/40 transition-all">
               ?
             </div>
             <span className="mt-3 text-xs sm:text-sm font-black font-display tracking-wider text-stone-400 group-hover:text-stone-200">

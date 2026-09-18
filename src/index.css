@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+:root {
+  --bomb-primary: #FFB000;
+  --bomb-secondary: #FF8A00;
+  --bomb-glow: rgba(255, 176, 0, 0.20);
+
+  --worst-primary: #FF3B4F;
+  --worst-secondary: #E6293D;
+  --worst-glow: rgba(255, 59, 79, 0.18);
+
+  --paint-primary: #00BCEB;
+  --paint-secondary: #009ED0;
+  --paint-glow: rgba(0, 188, 235, 0.18);
+}
+
 @layer utilities {
   .font-display {
     font-family: 'Titan One', 'Fredoka', cursive, sans-serif;

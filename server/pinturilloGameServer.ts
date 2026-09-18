@@ -12,6 +12,7 @@ import {
 } from '../src/types/pinturillo';
 import { PINTURILLO_WORDS, getRandomWordOptions, DrawableWord } from '../src/data/pinturilloWords';
 import { roomRegistry } from './roomRegistry';
+import { matchDepartureHandler } from './matchDepartureHandler';
 
 interface ClientConnection {
   ws: WebSocket;
@@ -52,6 +53,8 @@ interface ServerRoom {
   countdownFailSafeTimeout: NodeJS.Timeout | null;
   intermissionTimeout: NodeJS.Timeout | null;
   lastRoundResults?: PinturilloRoomState['lastRoundResults'];
+  abortReason?: string;
+  endMessage?: string;
 }
 
 // Normalize strings for answer comparison (removes accents, punctuation, casing)
@@ -228,7 +231,7 @@ export class PinturilloServer {
       });
 
       ws.on('close', () => {
-        this.handleDisconnect(ws);
+        this.handleSocketClose(ws);
       });
 
       ws.on('error', (err) => {
@@ -339,6 +342,7 @@ export class PinturilloServer {
         // Check if player is reconnecting
         const existingPlayer = room.players.find(p => p.id === message.player.id);
         if (existingPlayer) {
+          matchDepartureHandler.cancelGracePeriod(code, existingPlayer.id);
           existingPlayer.isConnected = true;
           existingPlayer.name = message.player.name.trim() || existingPlayer.name;
           existingPlayer.avatar = message.player.avatar || existingPlayer.avatar;
@@ -750,7 +754,7 @@ export class PinturilloServer {
       }
 
       case 'leave_room': {
-        this.handleDisconnect(ws);
+        this.handleExplicitLeave(ws);
         break;
       }
     }
@@ -993,7 +997,7 @@ export class PinturilloServer {
     this.startWordSelectionPhase(room);
   }
 
-  private handleDisconnect(ws: WebSocket) {
+  private handleSocketClose(ws: WebSocket) {
     const client = this.clients.get(ws);
     if (!client) return;
 
@@ -1001,39 +1005,130 @@ export class PinturilloServer {
     const room = this.rooms.get(client.roomId);
     if (!room) return;
 
-    const player = room.players.find(p => p.id === client.playerId);
+    const player = room.players.find((p) => p.id === client.playerId);
     if (player) {
       player.isConnected = false;
     }
 
-    // In LOBBY phase, remove disconnected player to avoid ghost players
+    // In LOBBY, departures are immediate
     if (room.phase === 'LOBBY') {
-      room.players = room.players.filter(p => p.id !== client.playerId);
-    }
-
-    if (room.players.length === 0) {
-      this.clearAllTimers(room);
-      this.rooms.delete(room.code);
-      roomRegistry.unregister(room.code);
+      this.processPermanentDeparture(client.roomId, client.playerId);
       return;
     }
 
-    // If host left, assign new host
-    if (room.hostId === client.playerId) {
-      const nextConnected = room.players.find(p => p.isConnected) || room.players[0];
-      if (nextConnected) {
-        room.hostId = nextConnected.id;
-        nextConnected.isHost = true;
-      }
+    const isGameActive = room.phase !== 'FINAL_RESULTS' && room.phase !== 'MATCH_ABORTED';
+    if (!isGameActive) {
+      this.processPermanentDeparture(client.roomId, client.playerId);
+      return;
     }
 
-    // If current drawer left during DRAWING, skip round
-    const currentDrawer = room.players[room.currentDrawerIndex];
-    if (currentDrawer && currentDrawer.id === client.playerId && room.phase === 'DRAWING') {
+    this.broadcastRoomState(room);
+
+    matchDepartureHandler.registerDisconnection(client.roomId, client.playerId, 'pinturillo', () => {
+      this.processPermanentDeparture(client.roomId, client.playerId);
+    });
+  }
+
+  private handleExplicitLeave(ws: WebSocket) {
+    const client = this.clients.get(ws);
+    if (!client) return;
+
+    this.clients.delete(ws);
+    const { roomId, playerId } = client;
+    matchDepartureHandler.cancelGracePeriod(roomId, playerId);
+    this.processPermanentDeparture(roomId, playerId);
+  }
+
+  private processPermanentDeparture(roomId: string, playerId: string) {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    const departingPlayer = room.players.find((p) => p.id === playerId);
+    const wasHost = room.hostId === playerId;
+    const isGameActive = room.phase !== 'LOBBY' && room.phase !== 'FINAL_RESULTS' && room.phase !== 'MATCH_ABORTED';
+
+    // 1. In LOBBY phase
+    if (room.phase === 'LOBBY') {
+      room.players = room.players.filter((p) => p.id !== playerId);
+      if (room.players.length === 0) {
+        this.clearAllTimers(room);
+        this.rooms.delete(roomId);
+        roomRegistry.unregister(roomId);
+        matchDepartureHandler.clearRoomGracePeriods(roomId);
+        return;
+      }
+
+      if (wasHost) {
+        const nextHost = matchDepartureHandler.findEarliestConnectedPlayer(room.players) || room.players[0];
+        if (nextHost) {
+          room.hostId = nextHost.id;
+          nextHost.isHost = true;
+          this.broadcastToRoom(room, {
+            type: 'notification',
+            message: `👑 ${nextHost.name} es ahora quien gestiona la sala.`,
+            noticeType: 'info',
+          });
+        }
+      }
+      this.broadcastRoomState(room);
+      return;
+    }
+
+    // 2. In ACTIVE MATCH or FINAL RESULTS
+    const evaluation = matchDepartureHandler.evaluatePermanentDeparture({
+      gameType: 'pinturillo',
+      isGameActive,
+      departingPlayerId: playerId,
+      wasHost,
+      players: room.players,
+    });
+
+    if (evaluation.shouldAbort) {
+      this.clearAllTimers(room);
+      room.phase = 'MATCH_ABORTED';
+      room.abortReason = evaluation.abortReason;
+      room.endMessage = evaluation.endMessage;
+
+      matchDepartureHandler.clearRoomGracePeriods(roomId);
+      this.broadcastRoomState(room);
+
+      setTimeout(() => {
+        this.clearAllTimers(room);
+        this.rooms.delete(roomId);
+        roomRegistry.unregister(roomId);
+      }, 30000);
+      return;
+    }
+
+    // Match continues (at least 2 players connected)
+    if (evaluation.migratedHost) {
+      room.hostId = evaluation.migratedHost.id;
+      const newHost = room.players.find((p) => p.id === evaluation.migratedHost!.id);
+      if (newHost) {
+        newHost.isHost = true;
+      }
+      this.broadcastToRoom(room, {
+        type: 'notification',
+        message: `👑 ${evaluation.migratedHost.name} es ahora quien gestiona la sala.`,
+        noticeType: 'info',
+      });
+    }
+
+    // Remove player from room.players
+    const drawerWasDeparting = room.players[room.currentDrawerIndex]?.id === playerId;
+    room.players = room.players.filter((p) => p.id !== playerId);
+
+    // Adjust currentDrawerIndex if needed
+    if (room.currentDrawerIndex >= room.players.length) {
+      room.currentDrawerIndex = 0;
+    }
+
+    // If departing player was current drawer during active drawing/selection/countdown
+    if (drawerWasDeparting && (room.phase === 'DRAWING' || room.phase === 'WORD_SELECTION' || room.phase === 'COUNTDOWN')) {
       room.chatMessages.push({
         id: `sys-drawer-left-${Date.now()}`,
         playerName: 'Sistema',
-        text: `⚠️ El dibujante ${currentDrawer.name} se ha desconectado. Pasando a la siguiente ronda...`,
+        text: `⚠️ El dibujante ${departingPlayer?.name || 'actual'} ha salido. Pasando a la siguiente ronda...`,
         isSystem: true,
         timestamp: Date.now(),
       });
@@ -1041,18 +1136,15 @@ export class PinturilloServer {
       return;
     }
 
-    // If everyone disconnected, delete room after 5 minutes
-    const anyConnected = room.players.some(p => p.isConnected);
-    if (!anyConnected) {
-      setTimeout(() => {
-        const stillInactive = !room.players.some(p => p.isConnected);
-        if (stillInactive) {
-          this.clearAllTimers(room);
-          this.rooms.delete(room.code);
-          roomRegistry.unregister(room.code);
-          console.log(`[Pinturillo] Sala ${room.code} eliminada por inactividad.`);
-        }
-      }, 300000);
+    // If departing player was a guesser during DRAWING, check if all remaining connected guessers have guessed
+    if (room.phase === 'DRAWING') {
+      const currentDrawer = room.players[room.currentDrawerIndex];
+      const eligibleGuessers = room.players.filter(p => p.id !== currentDrawer?.id && p.isConnected);
+      const allGuessed = eligibleGuessers.length > 0 && eligibleGuessers.every(p => p.hasGuessed);
+      if (allGuessed) {
+        this.endDrawingRound(room);
+        return;
+      }
     }
 
     this.broadcastRoomState(room);
@@ -1111,6 +1203,8 @@ export class PinturilloServer {
           drawingStrokes: room.drawingStrokes,
           chatMessages: room.chatMessages,
           lastRoundResults: room.lastRoundResults,
+          abortReason: room.abortReason,
+          endMessage: room.endMessage,
         };
 
         this.send(ws, {

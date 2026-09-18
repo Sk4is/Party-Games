@@ -15,7 +15,13 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
       <div
         id="how-to-play-modal"
-        className="relative w-full max-w-lg bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-amber-500/10 text-slate-100 max-h-[90vh] overflow-y-auto"
+        className={`relative w-full max-w-lg bg-slate-900 border-2 rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto transition-colors duration-200 ${
+          activeTab === 'bomba'
+            ? 'border-[#FFB000]/50 shadow-[#FFB000]/10'
+            : activeTab === 'lpr'
+            ? 'border-[#FF3B4F]/50 shadow-[#FF3B4F]/10'
+            : 'border-[#00BCEB]/50 shadow-[#00BCEB]/10'
+        }`}
       >
         <button
           id="close-how-to-play-button"
@@ -34,7 +40,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
             onClick={() => setActiveTab('bomba')}
             className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
               activeTab === 'bomba'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+                ? 'bg-[#FFB000] text-slate-950 shadow-md shadow-[#FFB000]/25'
                 : 'text-slate-400 hover:text-white hover:bg-slate-850'
             }`}
           >
@@ -47,7 +53,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
             onClick={() => setActiveTab('lpr')}
             className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
               activeTab === 'lpr'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+                ? 'bg-[#FF3B4F] text-white shadow-md shadow-[#FF3B4F]/25'
                 : 'text-slate-400 hover:text-white hover:bg-slate-850'
             }`}
           >
@@ -60,7 +66,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
             onClick={() => setActiveTab('pinturillo')}
             className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
               activeTab === 'pinturillo'
-                ? 'bg-cyan-500 text-slate-950 shadow-md'
+                ? 'bg-[#00BCEB] text-slate-950 shadow-md shadow-[#00BCEB]/25'
                 : 'text-slate-400 hover:text-white hover:bg-slate-850'
             }`}
           >
@@ -73,29 +79,29 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
         {activeTab === 'bomba' && (
           <div className="space-y-4 text-sm leading-relaxed text-slate-300">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl">
+              <div className="w-10 h-10 rounded-2xl bg-[#FFB000]/20 border border-[#FFB000]/40 flex items-center justify-center text-xl">
                 💣
               </div>
               <div>
-                <h3 className="text-xl font-bold font-display text-amber-400">Reglas de La Bomba</h3>
+                <h3 className="text-xl font-bold font-display text-[#FFB000]">Reglas de La Bomba</h3>
                 <p className="text-xs text-slate-400">Piensa rápido antes de que explote</p>
               </div>
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-              <Flame className="w-6 h-6 text-orange-400 shrink-0 mt-0.5" />
+              <Flame className="w-6 h-6 text-[#FF8A00] shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-slate-100 text-base mb-1">
                   1. Nueva secuencia en cada respuesta válida
                 </h4>
                 <p>
-                  El jugador activo recibe 2 o 3 letras (ej: <span className="text-amber-300 font-bold">«TRA»</span>). Escribe una <strong className="text-white">palabra real en español</strong> que las contenga juntas (ej: <em>«trabajo»</em>). ¡Al acertar pasa al siguiente con nueva secuencia!
+                  El jugador activo recibe 2 o 3 letras (ej: <span className="text-[#FFB000] font-bold">«TRA»</span>). Escribe una <strong className="text-white">palabra real en español</strong> que las contenga juntas (ej: <em>«trabajo»</em>). ¡Al acertar pasa al siguiente con nueva secuencia!
                 </p>
               </div>
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-              <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-6 h-6 text-[#FFB000] shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-slate-100 text-base mb-1">
                   2. Bomba Global Continua
@@ -124,34 +130,43 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
         {activeTab === 'lpr' && (
           <div className="space-y-4 text-sm leading-relaxed text-slate-300">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-2xl bg-stone-800 border border-stone-700 flex items-center justify-center text-xl">
+              <div className="w-10 h-10 rounded-2xl bg-[#FF3B4F]/20 border border-[#FF3B4F]/40 flex items-center justify-center text-xl">
                 💀
               </div>
               <div>
-                <h3 className="text-xl font-bold font-display text-amber-400">Reglas de La Peor Respuesta</h3>
+                <h3 className="text-xl font-bold font-display text-[#FF3B4F]">Reglas de La Peor Respuesta</h3>
                 <p className="text-xs text-slate-400">Cuanto peor, mejor</p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50">
-              <h4 className="font-bold text-slate-100 text-base mb-1">1. Pregunta irreverente</h4>
-              <p>
-                En cada ronda se revela una carta con una situación incómoda, surrealista o absurda.
-              </p>
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
+              <span className="w-6 h-6 rounded-full bg-[#FF3B4F]/20 border border-[#FF3B4F]/40 text-[#FF3B4F] flex items-center justify-center font-black text-xs shrink-0 mt-0.5">1</span>
+              <div>
+                <h4 className="font-bold text-slate-100 text-base mb-1">Pregunta irreverente</h4>
+                <p>
+                  En cada ronda se revela una carta con una situación incómoda, surrealista o absurda.
+                </p>
+              </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50">
-              <h4 className="font-bold text-slate-100 text-base mb-1">2. Respuesta libre secreta</h4>
-              <p>
-                Cada jugador escribe en secreto su respuesta intentando ser lo más divertido, ingenioso o políticamente incorrecto posible.
-              </p>
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
+              <span className="w-6 h-6 rounded-full bg-[#FF3B4F]/20 border border-[#FF3B4F]/40 text-[#FF3B4F] flex items-center justify-center font-black text-xs shrink-0 mt-0.5">2</span>
+              <div>
+                <h4 className="font-bold text-slate-100 text-base mb-1">Respuesta libre secreta</h4>
+                <p>
+                  Cada jugador escribe en secreto su respuesta intentando ser lo más divertido, ingenioso o políticamente incorrecto posible.
+                </p>
+              </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50">
-              <h4 className="font-bold text-slate-100 text-base mb-1">3. Votación anónima</h4>
-              <p>
-                Las respuestas se barajan de forma anónima. Todos votan la que consideren la más graciosa. ¡La más votada se lleva la ronda!
-              </p>
+            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
+              <span className="w-6 h-6 rounded-full bg-[#FF3B4F]/20 border border-[#FF3B4F]/40 text-[#FF3B4F] flex items-center justify-center font-black text-xs shrink-0 mt-0.5">3</span>
+              <div>
+                <h4 className="font-bold text-slate-100 text-base mb-1">Votación anónima</h4>
+                <p>
+                  Las respuestas se barajan de forma anónima. Todos votan la que consideren la más graciosa. ¡La más votada se lleva la ronda!
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -160,17 +175,17 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
         {activeTab === 'pinturillo' && (
           <div className="space-y-4 text-sm leading-relaxed text-slate-300">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-xl">
+              <div className="w-10 h-10 rounded-2xl bg-[#00BCEB]/20 border border-[#00BCEB]/40 flex items-center justify-center text-xl">
                 🎨
               </div>
               <div>
-                <h3 className="text-xl font-bold font-display text-cyan-400">Reglas de Pinturillo Online</h3>
+                <h3 className="text-xl font-bold font-display text-[#00BCEB]">Reglas de Pinturillo Online</h3>
                 <p className="text-xs text-slate-400">Dibuja, adivina y compite en tiempo real</p>
               </div>
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-              <Paintbrush className="w-6 h-6 text-cyan-400 shrink-0 mt-0.5" />
+              <Paintbrush className="w-6 h-6 text-[#00BCEB] shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-slate-100 text-base mb-1">
                   1. Un dibujante con palabra secreta
@@ -182,7 +197,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-              <Award className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+              <Award className="w-6 h-6 text-[#00BCEB] shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-slate-100 text-base mb-1">
                   2. Adivina por chat y suma puntos
@@ -194,13 +209,13 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-              <Clock className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+              <Clock className="w-6 h-6 text-[#00BCEB] shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-slate-100 text-base mb-1">
                   3. Pistas y «¡Casi!»
                 </h4>
                 <p>
-                  A medida que corre el tiempo, se van desvelando letras en el panel de pistas. Y si tu respuesta está a solo una letra de diferencia, recibirás un aviso privado de <strong className="text-amber-400">«🔥 ¡Casi!»</strong> para afinar el tiro.
+                  A medida que corre el tiempo, se van desvelando letras en el panel de pistas. Y si tu respuesta está a solo una letra de diferencia, recibirás un aviso privado de <strong className="text-[#00BCEB]">«🔥 ¡Casi!»</strong> para afinar el tiro.
                 </p>
               </div>
             </div>
