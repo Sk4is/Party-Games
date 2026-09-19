@@ -45,6 +45,7 @@ interface BombaServerRoom {
   processedSubmissionIds: Set<string>;
   pendingSubmissions: Set<string>;
   currentExplosionId: string | null;
+  processedLifeEventIds: Set<string>;
   roundNumber: number;
   bombDurationMs: number;
   bombRemainingMs: number;
@@ -218,6 +219,7 @@ export class PartyGameServer {
         processedSubmissionIds: new Set(),
         pendingSubmissions: new Set(),
         currentExplosionId: null,
+        processedLifeEventIds: new Set(),
         roundNumber: 1,
         bombDurationMs: initialDuration,
         bombRemainingMs: initialDuration,
@@ -348,6 +350,82 @@ export class PartyGameServer {
         ws.send(payload);
       }
     }
+  }
+
+  /**
+   * Single Authoritative Life-Loss Function: applyLifeLoss
+   * Guarantees atomic, idempotent subtraction of exactly 1 life per unique eventId.
+   */
+  private applyLifeLoss(
+    room: BombaServerRoom,
+    targetPlayerId: string,
+    reason: 'EXPLOSION' | 'MISTAKE_LIMIT',
+    eventId: string
+  ): { success: boolean; player: BombaPlayerState | null; previousLives: number; newLives: number } {
+    if (!room.processedLifeEventIds) {
+      room.processedLifeEventIds = new Set<string>();
+    }
+
+    // Idempotency check: exactly 1 life deducted per unique eventId
+    if (room.processedLifeEventIds.has(eventId)) {
+      console.warn(`[LIFE_EVENT] Duplicate life-loss event ignored: ${eventId} in room ${room.code}`);
+      const existingPlayer = room.players.find((p) => p.id === targetPlayerId) || null;
+      return {
+        success: false,
+        player: existingPlayer,
+        previousLives: existingPlayer?.lives ?? 0,
+        newLives: existingPlayer?.lives ?? 0,
+      };
+    }
+
+    const targetPlayer = room.players.find((p) => p.id === targetPlayerId);
+    if (!targetPlayer) {
+      console.error(`[LIFE_EVENT] Player not found: ${targetPlayerId} in room ${room.code}`);
+      return { success: false, player: null, previousLives: 0, newLives: 0 };
+    }
+
+    if (targetPlayer.isEliminated || targetPlayer.lives <= 0) {
+      console.warn(
+        `[LIFE_EVENT] Player ${targetPlayer.name} (${targetPlayer.id}) is already eliminated (lives: ${targetPlayer.lives}). Ignoring.`
+      );
+      return {
+        success: false,
+        player: targetPlayer,
+        previousLives: targetPlayer.lives,
+        newLives: targetPlayer.lives,
+      };
+    }
+
+    const previousLives = targetPlayer.lives;
+    const newLives = Math.max(0, previousLives - 1);
+
+    // Record idempotency token BEFORE state mutation
+    room.processedLifeEventIds.add(eventId);
+
+    // Atomic assignment
+    targetPlayer.lives = newLives;
+    if (newLives === 0) {
+      targetPlayer.isEliminated = true;
+    }
+
+    // Strict assertion
+    if (targetPlayer.lives !== previousLives - 1) {
+      console.error(
+        `[LIFE_EVENT ASSERTION FAILED] Room ${room.code} | Player ${targetPlayer.name} | Expected ${previousLives - 1} lives, got ${targetPlayer.lives}`
+      );
+    }
+
+    // Structured logging
+    console.log(
+      `[LIFE_EVENT] Room ${room.code} | Round ${room.roundNumber} | Player: ${targetPlayer.name} (${targetPlayer.id}) | Reason: ${reason} | EventId: ${eventId} | Lives: ${previousLives} -> ${newLives} | Eliminated: ${targetPlayer.isEliminated}`
+    );
+
+    return {
+      success: true,
+      player: targetPlayer,
+      previousLives,
+      newLives,
+    };
   }
 
   private broadcastBombaState(room: BombaServerRoom) {
@@ -1020,11 +1098,9 @@ export class PartyGameServer {
 
             const allowedMistakes = room.config.allowedMistakesPerRound || 3;
             if (targetPlayer.roundMistakes >= allowedMistakes) {
-              targetPlayer.lives = Math.max(0, targetPlayer.lives - 1);
+              const mistakeEventId = `mistake-r${room.roundNumber}-p${targetPlayer.id}-${Date.now()}`;
+              this.applyLifeLoss(room, targetPlayer.id, 'MISTAKE_LIMIT', mistakeEventId);
               targetPlayer.roundMistakes = 0;
-              if (targetPlayer.lives === 0) {
-                targetPlayer.isEliminated = true;
-              }
             }
 
             this.broadcastToBomba(room, {
@@ -1146,6 +1222,7 @@ export class PartyGameServer {
         for (const p of room.players) {
           p.lives = room.config.startingLives;
           p.mistakes = 0;
+          p.roundMistakes = 0;
           p.multiplier = 1.0;
           p.isEliminated = false;
           p.bombsReceived = 0;
@@ -1156,6 +1233,7 @@ export class PartyGameServer {
           p.alphabetProgress = [];
         }
 
+        room.processedLifeEventIds = new Set<string>();
         room.roundNumber = 1;
         room.totalValidWords = 0;
         room.totalMistakes = 0;
@@ -1434,6 +1512,7 @@ export class PartyGameServer {
     room.currentTurnId = `turn-1-0-${Date.now()}`;
     room.challengeId = `chal-1-0-${Date.now()}`;
     room.currentExplosionId = null;
+    room.processedLifeEventIds = new Set<string>();
     room.processedSubmissionIds.clear();
     room.pendingSubmissions.clear();
     room.roundNumber = 1;
@@ -1540,24 +1619,24 @@ export class PartyGameServer {
       room.timerInterval = null;
     }
 
-    const explosionId = `exp-${room.roundNumber}-${room.currentTurnId}-${Date.now()}`;
-    if (room.currentExplosionId === explosionId) return;
-    room.currentExplosionId = explosionId;
-
     // Strict playerId lookup for the exploding player
     const explodingPlayer =
       (room.activePlayerId ? room.players.find((p) => p.id === room.activePlayerId) : null) ||
       room.players[room.activePlayerIndex];
     if (!explodingPlayer) return;
 
-    room.totalExplosions += 1;
-    // Exactly ONE life deducted
-    explodingPlayer.lives = Math.max(0, explodingPlayer.lives - 1);
-    explodingPlayer.bombsReceived += 1;
-    if (explodingPlayer.lives === 0) {
-      explodingPlayer.isEliminated = true;
-    }
+    // Idempotent eventId uniquely identifying this explosion event by round and player ID
+    const explosionEventId = `exp-r${room.roundNumber}-t${room.currentTurnId}-p${explodingPlayer.id}`;
+    if (room.currentExplosionId === explosionEventId) return;
+    room.currentExplosionId = explosionEventId;
 
+    room.totalExplosions += 1;
+    explodingPlayer.bombsReceived += 1;
+
+    // Single authoritative life-loss invocation: EXACTLY ONE LIFE
+    this.applyLifeLoss(room, explodingPlayer.id, 'EXPLOSION', explosionEventId);
+
+    // Freeze and assign affectedPlayer with authoritative updated state
     room.affectedPlayer = { ...explodingPlayer };
     for (const p of room.players) {
       p.currentTypingWord = '';
@@ -1616,6 +1695,7 @@ export class PartyGameServer {
     // Reset round mistakes and multiplier for all alive players
     for (const p of room.players) {
       p.mistakes = 0;
+      p.roundMistakes = 0;
       p.multiplier = 1.0;
       p.lastValidWord = null;
       p.currentTypingWord = '';

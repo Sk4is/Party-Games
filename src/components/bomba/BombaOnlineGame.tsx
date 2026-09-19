@@ -478,10 +478,11 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
       {roomState.phase === 'EXPLOSION' && roomState.affectedPlayer && (
         <ExplosionOverlay
           affectedPlayer={{
-            ...castActivePlayer,
+            ...(castPlayers.find((p) => p.id === roomState.affectedPlayer!.id) || castActivePlayer),
             ...roomState.affectedPlayer,
           }}
-          isEliminated={roomState.affectedPlayer.isEliminated}
+          maxLives={roomState.config.startingLives || 3}
+          isEliminated={roomState.affectedPlayer.isEliminated || roomState.affectedPlayer.lives <= 0}
           onDismiss={onDismissExplosion}
         />
       )}

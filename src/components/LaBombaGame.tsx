@@ -30,6 +30,7 @@ const getRandomBombDurationMs = () => (60 + Math.random() * 120) * 1000;
 
 export const LaBombaGame: React.FC<LaBombaGameProps> = ({
   initialPlayers,
+  gameConfig,
   onBackToMenu,
 }) => {
   // Game state
@@ -182,18 +183,24 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     const updatedLives = Math.max(0, explodingPlayer.lives - 1);
     const isNowEliminated = updatedLives === 0;
 
+    const updatedPlayer = {
+      ...explodingPlayer,
+      lives: updatedLives,
+      bombsReceived: explodingPlayer.bombsReceived + 1,
+      isEliminated: isNowEliminated,
+    };
+
     const updatedPlayers = players.map((p, idx) => {
       if (idx !== activePlayerIndex) return p;
-      return {
-        ...p,
-        lives: updatedLives,
-        bombsReceived: p.bombsReceived + 1,
-        isEliminated: isNowEliminated,
-      };
+      return updatedPlayer;
     });
 
+    console.log(
+      `[LIFE_EVENT] Local Game | Round explosion | Player: ${explodingPlayer.name} (${explodingPlayer.id}) | Lives: ${explodingPlayer.lives} -> ${updatedLives} | Eliminated: ${isNowEliminated}`
+    );
+
     setPlayers(updatedPlayers);
-    setAffectedPlayer(explodingPlayer);
+    setAffectedPlayer(updatedPlayer);
     setCurrentTypingWord('');
     setPhase('EXPLOSION');
   }, [activePlayerIndex, players]);
@@ -940,7 +947,8 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
       {phase === 'EXPLOSION' && affectedPlayer && (
         <ExplosionOverlay
           affectedPlayer={affectedPlayer}
-          isEliminated={affectedPlayer.lives <= 1}
+          maxLives={gameConfig.startingLives || 3}
+          isEliminated={affectedPlayer.isEliminated || affectedPlayer.lives <= 0}
           onDismiss={handleExplosionDismiss}
         />
       )}

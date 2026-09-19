@@ -6,19 +6,24 @@ import { audio } from '../utils/audio';
 interface ExplosionOverlayProps {
   affectedPlayer: Player;
   isEliminated: boolean;
+  maxLives?: number;
   onDismiss: () => void;
 }
 
 export const ExplosionOverlay: React.FC<ExplosionOverlayProps> = ({
   affectedPlayer,
   isEliminated,
+  maxLives = 3,
   onDismiss,
 }) => {
+  const currentLives = Math.max(0, affectedPlayer.lives);
+  const totalSlots = Math.max(currentLives, maxLives || 3);
+
   useEffect(() => {
     // Sound playback
     audio.playExplosion();
 
-    if (isEliminated) {
+    if (isEliminated || currentLives <= 0) {
       setTimeout(() => {
         audio.playElimination();
       }, 700);
@@ -28,13 +33,17 @@ export const ExplosionOverlay: React.FC<ExplosionOverlayProps> = ({
       }, 600);
     }
 
+    console.log(
+      `[LIFE_UI] ExplosionOverlay displayed for ${affectedPlayer.name} (${affectedPlayer.id}): lives=${currentLives}/${totalSlots}, isEliminated=${isEliminated}`
+    );
+
     // Auto-dismiss after dramatic display so everyone digests what happened
     const dismissTimer = setTimeout(() => {
       onDismiss();
-    }, isEliminated ? 3800 : 3000);
+    }, isEliminated || currentLives <= 0 ? 3800 : 3000);
 
     return () => clearTimeout(dismissTimer);
-  }, [affectedPlayer, isEliminated, onDismiss]);
+  }, [affectedPlayer, isEliminated, currentLives, totalSlots, onDismiss]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-fadeIn select-none">
@@ -117,10 +126,10 @@ export const ExplosionOverlay: React.FC<ExplosionOverlayProps> = ({
                 Vidas restantes:
               </span>
               <span className="text-rose-500">
-                {'❤️'.repeat(Math.max(0, affectedPlayer.lives - 1))}
+                {'❤️'.repeat(currentLives)}
               </span>
               <span className="text-slate-600">
-                {'🖤'.repeat(3 - Math.max(0, affectedPlayer.lives - 1))}
+                {'🖤'.repeat(Math.max(0, totalSlots - currentLives))}
               </span>
             </div>
           )}
