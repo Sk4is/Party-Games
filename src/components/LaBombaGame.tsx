@@ -81,6 +81,8 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
   // Shared across ALL players. ACERTAR UNA PALABRA NO REINICIA LA MECHA.
   const [bombDurationMs, setBombDurationMs] = useState<number>(getRandomBombDurationMs);
   const [bombRemainingMs, setBombRemainingMs] = useState<number>(bombDurationMs);
+  const [roundMistakes, setRoundMistakes] = useState<number>(0);
+  const [speedMultiplier, setSpeedMultiplier] = useState<number>(1.0);
 
   const bombDurationRef = useRef<number>(bombDurationMs);
   const bombRemainingRef = useRef<number>(bombDurationMs);
@@ -116,10 +118,10 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
 
   const activePlayer = players[activePlayerIndex] || players[0];
 
-  // Keep activeMultiplierRef in sync with current player's multiplier
+  // Keep activeMultiplierRef in sync with round speedMultiplier
   useEffect(() => {
-    activeMultiplierRef.current = activePlayer?.multiplier || 1.0;
-  }, [activePlayer?.multiplier]);
+    activeMultiplierRef.current = speedMultiplier;
+  }, [speedMultiplier]);
 
   // Helper to find next surviving player clockwise
   const getNextSurvivingIndex = useCallback((startIndex: number, currentPlayers: Player[]) => {
@@ -274,11 +276,13 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     // RESET WORDS ON NEW ROUND:
     // 1. Clear used words list
     setUsedWords([]);
-    // 2. Reset player mistakes and last valid words for the new round
+    // 2. Reset round mistakes, speed multiplier, and player round state
+    setRoundMistakes(0);
+    setSpeedMultiplier(1.0);
     setPlayers((prev) =>
       prev.map((p) => ({
         ...p,
-        mistakes: 0,
+        roundMistakes: 0,
         multiplier: 1.0,
         lastValidWord: null,
       }))
@@ -327,24 +331,42 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
     if (!validation.valid) {
       audio.playAnswerRejected();
 
-      const newMistakes = activePlayer.mistakes + 1;
-      const newMultiplier = Math.pow(1.5, newMistakes);
+      // 1. Consume elapsed fuse with current speed multiplier up to this instant
+      const now = Date.now();
+      const elapsedRealTime = Math.max(0, now - lastUpdateTimestampRef.current);
+      lastUpdateTimestampRef.current = now;
+      const consumedBombTime = elapsedRealTime * activeMultiplierRef.current;
+      const updatedRemaining = Math.max(0, bombRemainingRef.current - consumedBombTime);
+      bombRemainingRef.current = updatedRemaining;
+      setBombRemainingMs(updatedRemaining);
 
-      setTotalMistakes((prev) => prev + 1);
+      // 2. Increment mistakes and derive speed multiplier
+      const maxMistakes = gameConfig?.allowedMistakesPerRound || 3;
+      const updatedRoundMistakes = Math.min(maxMistakes, roundMistakes + 1);
+      const newMultiplier = Math.min(maxMistakes, Math.max(1, updatedRoundMistakes));
 
-      // Accelerate active multiplier immediately on active player's turn
+      setRoundMistakes(updatedRoundMistakes);
+      setSpeedMultiplier(newMultiplier);
       activeMultiplierRef.current = newMultiplier;
+      setTotalMistakes((prev) => prev + 1);
 
       setPlayers((prev) =>
         prev.map((p, idx) => {
-          if (idx !== activePlayerIndex) return p;
+          if (idx !== activePlayerIndex) return { ...p, multiplier: newMultiplier };
           return {
             ...p,
-            mistakes: newMistakes,
+            mistakes: (p.mistakes || 0) + 1,
+            roundMistakes: updatedRoundMistakes,
             multiplier: newMultiplier,
           };
         })
       );
+
+      // 3. If bomb timer reached zero during submission, trigger explosion
+      if (updatedRemaining <= 0) {
+        triggerExplosion();
+        return;
+      }
 
       setFeedback({
         type: 'error',
@@ -763,7 +785,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
               <BombVisual
                 progress={progress}
                 dangerLevel={dangerLevel}
-                speedMultiplier={activePlayer?.multiplier || 1.0}
+                speedMultiplier={speedMultiplier}
               />
             </div>
           </div>
@@ -884,7 +906,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
             <BombVisual
               progress={progress}
               dangerLevel={dangerLevel}
-              speedMultiplier={activePlayer?.multiplier || 1.0}
+              speedMultiplier={speedMultiplier}
             />
           </div>
         </section>

@@ -60,6 +60,8 @@ export interface BombaRoomState {
   roundNumber: number;
   bombRemainingMs: number;
   bombDurationMs: number;
+  speedMultiplier: number;
+  roundMistakes: number;
   dangerLevel: BombDangerLevel;
   usedWords: UsedWord[];
   acceptedWordBanner: {

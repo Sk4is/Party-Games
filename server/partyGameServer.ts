@@ -49,6 +49,8 @@ interface BombaServerRoom {
   roundNumber: number;
   bombDurationMs: number;
   bombRemainingMs: number;
+  speedMultiplier: number;
+  roundMistakes: number;
   turnStartedAt: number;
   lastUpdateTimestamp: number;
   timerInterval: NodeJS.Timeout | null;
@@ -223,6 +225,8 @@ export class PartyGameServer {
         roundNumber: 1,
         bombDurationMs: initialDuration,
         bombRemainingMs: initialDuration,
+        speedMultiplier: 1.0,
+        roundMistakes: 0,
         turnStartedAt: Date.now(),
         lastUpdateTimestamp: Date.now(),
         timerInterval: null,
@@ -359,7 +363,7 @@ export class PartyGameServer {
   private applyLifeLoss(
     room: BombaServerRoom,
     targetPlayerId: string,
-    reason: 'EXPLOSION' | 'MISTAKE_LIMIT',
+    reason: 'EXPLOSION',
     eventId: string
   ): { success: boolean; player: BombaPlayerState | null; previousLives: number; newLives: number } {
     if (!room.processedLifeEventIds) {
@@ -459,6 +463,8 @@ export class PartyGameServer {
       roundNumber: room.roundNumber,
       bombRemainingMs: Math.max(0, Math.round(room.bombRemainingMs)),
       bombDurationMs: room.bombDurationMs,
+      speedMultiplier: room.speedMultiplier || 1.0,
+      roundMistakes: room.roundMistakes || 0,
       dangerLevel,
       usedWords: room.usedWords,
       acceptedWordBanner: room.acceptedWordBanner,
@@ -1090,17 +1096,36 @@ export class PartyGameServer {
           if (room.activePlayerId !== submittingPlayerId) return;
 
           if (!validation.valid) {
-            // Mistake handling: atomic increment for submitting player
+            // 1. Calculate and consume fuse elapsed with the current multiplier up to this instant
+            const now = Date.now();
+            const elapsed = Math.max(0, now - room.lastUpdateTimestamp);
+            room.lastUpdateTimestamp = now;
+            const consumed = elapsed * (room.speedMultiplier || 1.0);
+            room.bombRemainingMs = Math.max(0, room.bombRemainingMs - consumed);
+
+            // 2. Mistake handling: atomic increment for submitting player & round
+            const maxMistakes = room.config.allowedMistakesPerRound || 3;
             targetPlayer.mistakes += 1;
-            targetPlayer.roundMistakes = (targetPlayer.roundMistakes || 0) + 1;
-            targetPlayer.multiplier = Math.pow(1.5, targetPlayer.mistakes);
+            targetPlayer.roundMistakes = Math.min(maxMistakes, (targetPlayer.roundMistakes || 0) + 1);
             room.totalMistakes += 1;
 
-            const allowedMistakes = room.config.allowedMistakesPerRound || 3;
-            if (targetPlayer.roundMistakes >= allowedMistakes) {
-              const mistakeEventId = `mistake-r${room.roundNumber}-p${targetPlayer.id}-${Date.now()}`;
-              this.applyLifeLoss(room, targetPlayer.id, 'MISTAKE_LIMIT', mistakeEventId);
-              targetPlayer.roundMistakes = 0;
+            // Round-based mistake counter (accumulates during the round, capped at maxMistakes)
+            room.roundMistakes = Math.min(maxMistakes, (room.roundMistakes || 0) + 1);
+
+            // Speed multiplier progression:
+            // 0 mistakes -> x1
+            // 1 mistake -> x1
+            // 2 mistakes -> x2
+            // 3 mistakes -> x3
+            // 4 mistakes -> x4
+            // 5 mistakes -> x5
+            // capped at maxMistakes
+            const newMultiplier = Math.min(maxMistakes, Math.max(1, room.roundMistakes));
+            room.speedMultiplier = newMultiplier;
+
+            // Update all players' multiplier to the single authoritative round bomb multiplier
+            for (const p of room.players) {
+              p.multiplier = newMultiplier;
             }
 
             this.broadcastToBomba(room, {
@@ -1111,20 +1136,13 @@ export class PartyGameServer {
               submissionId,
             });
 
-            // If player was eliminated from reaching the mistake limit
-            if (targetPlayer.isEliminated) {
-              const remainingAlive = room.players.filter((p) => !p.isEliminated);
-              if (remainingAlive.length <= 1) {
-                room.phase = 'GAME_OVER';
-                room.winner = remainingAlive[0] || null;
-                if (room.timerInterval) {
-                  clearInterval(room.timerInterval);
-                  room.timerInterval = null;
-                }
-                this.broadcastBombaState(room);
-                return;
+            // If the elapsed time reached zero, explode now
+            if (room.bombRemainingMs <= 0) {
+              if (room.timerInterval) {
+                clearInterval(room.timerInterval);
+                room.timerInterval = null;
               }
-              this.advanceBombaTurn(room);
+              this.triggerBombaExplosion(room);
               return;
             }
 
@@ -1516,6 +1534,8 @@ export class PartyGameServer {
     room.processedSubmissionIds.clear();
     room.pendingSubmissions.clear();
     room.roundNumber = 1;
+    room.roundMistakes = 0;
+    room.speedMultiplier = 1.0;
     const initialDuration = getRandomBombDurationMs();
     room.bombDurationMs = initialDuration;
     room.bombRemainingMs = initialDuration;
@@ -1597,10 +1617,7 @@ export class PartyGameServer {
       const elapsed = Math.max(0, now - room.lastUpdateTimestamp);
       room.lastUpdateTimestamp = now;
 
-      const activePlayer =
-        (room.activePlayerId ? room.players.find((p) => p.id === room.activePlayerId) : null) ||
-        room.players[room.activePlayerIndex];
-      const multiplier = activePlayer ? activePlayer.multiplier : 1.0;
+      const multiplier = room.speedMultiplier || 1.0;
       const consumed = elapsed * multiplier;
 
       room.bombRemainingMs = Math.max(0, room.bombRemainingMs - consumed);
@@ -1691,10 +1708,11 @@ export class PartyGameServer {
     room.currentSequence = nextSeq;
 
     room.usedWords = [];
+    room.roundMistakes = 0;
+    room.speedMultiplier = 1.0;
 
     // Reset round mistakes and multiplier for all alive players
     for (const p of room.players) {
-      p.mistakes = 0;
       p.roundMistakes = 0;
       p.multiplier = 1.0;
       p.lastValidWord = null;

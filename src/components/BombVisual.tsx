@@ -445,7 +445,7 @@ export const BombVisual: React.FC<BombVisualProps> = ({
         {/* Speed Multiplier Badge */}
         {speedMultiplier > 1.0 && (
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg flex items-center gap-1 border-2 border-amber-300 animate-pulse whitespace-nowrap z-20">
-            <span>⚡ Mecha x{speedMultiplier.toFixed(2).replace('.', ',')}</span>
+            <span>⚡ Velocidad ×{Math.round(speedMultiplier)}</span>
           </div>
         )}
       </div>

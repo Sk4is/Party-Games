@@ -123,8 +123,8 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
     else if (roomState.dangerLevel === 'MIDDLE') tickInterval = 750;
 
     const activePlayer = roomState.players[roomState.activePlayerIndex];
-    const currentMultiplier = activePlayer?.multiplier || 1.0;
-    tickInterval = Math.max(100, Math.round(tickInterval / Math.min(currentMultiplier, 2.5)));
+    const currentMultiplier = roomState.speedMultiplier || activePlayer?.multiplier || 1.0;
+    tickInterval = Math.max(100, Math.round(tickInterval / Math.min(currentMultiplier, 3.0)));
 
     if (now - lastTickRef.current > tickInterval) {
       lastTickRef.current = now;
@@ -364,7 +364,7 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
               <BombVisual
                 progress={progress}
                 dangerLevel={roomState.dangerLevel}
-                speedMultiplier={castActivePlayer.multiplier}
+                speedMultiplier={roomState.speedMultiplier || castActivePlayer.multiplier || 1.0}
               />
             </div>
 
@@ -418,7 +418,7 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
               allowedMistakesPerRound={roomState.config.allowedMistakesPerRound}
               progress={progress}
               dangerLevel={roomState.dangerLevel}
-              speedMultiplier={castActivePlayer.multiplier}
+              speedMultiplier={roomState.speedMultiplier || castActivePlayer.multiplier || 1.0}
               usedWords={roomState.usedWords.map((u) => u.word)}
             />
           </div>
