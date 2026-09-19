@@ -237,38 +237,67 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
   const myAlphabetCount = me?.alphabetProgress?.length || 0;
 
   return (
-    <div className="relative w-full h-screen bg-slate-950 text-slate-100 flex flex-col justify-between overflow-hidden select-none font-sans">
+    <div className="relative w-full min-h-screen min-h-dvh bg-slate-950 text-slate-100 flex flex-col justify-between overflow-x-hidden overflow-y-auto sm:overflow-hidden select-none font-sans">
       {/* BACKGROUND ATMOSPHERE */}
       <div className="absolute inset-0 bg-radial from-slate-900/60 via-slate-950 to-slate-950 pointer-events-none" />
 
       {/* TOP HEADER / STATS BAR */}
-      <header className="relative z-30 w-full px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
-        {/* Left: Back / Abandon Button */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsAbandonModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white border border-slate-800 transition-colors shadow-sm"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Menú</span>
-          </button>
+      <header className="relative z-30 w-full px-3 sm:px-6 py-2 sm:py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+        {/* Row 1 on mobile: Navigation + Room Code & Action Controls */}
+        <div className="flex items-center justify-between w-full sm:w-auto gap-2">
+          {/* Left: Back / Abandon Button */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setIsAbandonModalOpen(true)}
+              aria-label="Volver al menú"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white border border-slate-800 transition-colors shadow-sm active:scale-95 min-h-[36px]"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Menú</span>
+            </button>
 
-          {/* Room Code Badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-stone-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-mono font-bold text-amber-400">{roomState.code}</span>
+            {/* Room Code Badge */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-stone-300 min-h-[36px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="font-mono font-bold text-amber-400">{roomState.code}</span>
+            </div>
+          </div>
+
+          {/* Right: Controls on mobile (Alphabet + Sound + Help) */}
+          <div className="flex sm:hidden items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsMobileAlphabetOpen(true)}
+              aria-label="Ver abecedario"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold shadow-sm min-h-[36px]"
+            >
+              <Trophy className="w-3.5 h-3.5 shrink-0" />
+              <span>{myAlphabetCount}/27</span>
+            </button>
+
+            <SoundToggle compact />
+
+            <button
+              type="button"
+              onClick={() => setIsHowToPlayOpen(true)}
+              className="p-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+              title="Cómo jugar"
+              aria-label="Cómo jugar"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Center: Round & Sequence Indicator */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="px-3 py-1 rounded-full bg-slate-900/90 border border-slate-800 text-xs font-bold text-slate-300 tracking-wider uppercase font-display">
+        {/* Center / Row 2 on mobile: Round & Sequence Indicator */}
+        <div className="flex items-center justify-center sm:justify-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="px-3 py-1 rounded-full bg-slate-900/90 border border-slate-800 text-xs font-bold text-slate-300 tracking-wider uppercase font-display shrink-0">
             Ronda {roomState.roundNumber}
           </div>
 
           <div
-            className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase transition-all duration-300 border flex items-center gap-1.5 ${
+            className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase transition-all duration-300 border flex items-center gap-1.5 shrink-0 ${
               roomState.dangerLevel === 'CRITICAL'
                 ? 'bg-rose-950/80 text-rose-300 border-rose-600 animate-pulse shadow-[0_0_15px_rgba(225,29,72,0.4)]'
                 : roomState.dangerLevel === 'DANGER'
@@ -287,13 +316,13 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
           </div>
         </div>
 
-        {/* Right: Sound & Help */}
-        <div className="flex items-center gap-2">
-          {/* Mobile Alphabet Drawer Button */}
+        {/* Right on Desktop: Sound & Help */}
+        <div className="hidden sm:flex items-center gap-2">
+          {/* Mobile Alphabet Drawer Button (visible only when alphabet sidebar isn't active on tablet) */}
           <button
             type="button"
             onClick={() => setIsMobileAlphabetOpen(true)}
-            className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold shadow-sm"
+            className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold shadow-sm min-h-[36px]"
           >
             <Trophy className="w-3.5 h-3.5" />
             <span>{myAlphabetCount}/27</span>
@@ -304,8 +333,9 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
           <button
             type="button"
             onClick={() => setIsHowToPlayOpen(true)}
-            className="p-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-colors"
+            className="p-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
             title="Cómo jugar"
+            aria-label="Cómo jugar"
           >
             <HelpCircle className="w-4 h-4" />
           </button>

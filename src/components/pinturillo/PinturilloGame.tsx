@@ -418,7 +418,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
   const isTimeCritical = isDrawing && roomState.remainingTime <= 10;
 
   return (
-    <div className="relative h-screen max-h-screen bg-[#050A18] text-white flex flex-col overflow-hidden select-none">
+    <div className="relative min-h-screen min-h-dvh bg-[#050A18] text-white flex flex-col overflow-x-hidden overflow-y-auto lg:h-screen lg:max-h-screen lg:overflow-hidden select-none">
       <PinturilloBackground />
 
       {/* Reconnecting banner during active gameplay */}
@@ -532,68 +532,107 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
       />
 
       {/* Top Header Navigation & Status Bar */}
-      <header className="flex-shrink-0 relative z-20 px-3 sm:px-6 py-2.5 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          {/* Left: Exit & Audio Toggles */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleLeaveRoom}
-              title="Salir de la sala"
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
+      <header className="flex-shrink-0 relative z-20 px-3 sm:px-6 py-2 sm:py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-col gap-2.5 sm:gap-3">
+          {/* Top row: Navigation, Room Code, Turn Info & Audio controls, Timer */}
+          <div className="flex items-center justify-between gap-2 w-full">
+            {/* Left: Back + Room Code + Turn Info */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
+              <button
+                type="button"
+                onClick={handleLeaveRoom}
+                title="Volver al menú"
+                aria-label="Volver al menú"
+                className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700 active:scale-95 text-xs font-bold shrink-0 min-h-[36px]"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline">Menú</span>
+              </button>
 
-            {/* Chill Music Synth Toggle */}
-            <button
-              type="button"
-              onClick={handleToggleMusic}
-              title={isMusicPlaying ? 'Pausar música chill' : 'Activar música chill'}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                isMusicPlaying
-                  ? 'bg-[#00BCEB]/20 border-[#00BCEB]/50 text-cyan-300 shadow-sm'
-                  : 'bg-slate-800 border-slate-700 text-slate-400'
-              }`}
-            >
-              <Music className={`w-4 h-4 ${isMusicPlaying ? 'animate-bounce' : ''}`} />
-            </button>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700 text-xs font-mono shrink-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="font-bold text-[#00BCEB]">{roomState.code}</span>
+              </div>
 
-            {/* Mute SFX Toggle */}
-            <button
-              type="button"
-              onClick={handleToggleMute}
-              title={isMuted ? 'Activar sonido' : 'Silenciar sonido'}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer border border-slate-700"
-            >
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </button>
+              {/* Turn info */}
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg sm:rounded-xl bg-slate-800/80 border border-slate-700 font-bold text-slate-300 text-[10px] sm:text-xs">
+                  Turno <strong className="text-white">{roomState.currentTurn}/{roomState.totalTurns}</strong>
+                </span>
+                <span className="hidden sm:inline-block px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 font-bold text-[#00BCEB] text-xs">
+                  Vuelta <strong className="text-white">{roomState.currentVuelta}/{roomState.config.totalVueltas}</strong>
+                </span>
+              </div>
+            </div>
 
-            {/* Turn info */}
-            <div className="hidden md:flex flex-col ml-2">
-              <span className="text-[10px] uppercase font-bold text-slate-400">
-                Turno {roomState.currentTurn}/{roomState.totalTurns}
-              </span>
-              <span className="text-xs font-black text-[#00BCEB]">
-                Vuelta {roomState.currentVuelta}/{roomState.config.totalVueltas}
-              </span>
+            {/* Right: Audio Toggles & Round Timer */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Chill Music Synth Toggle */}
+              <button
+                type="button"
+                onClick={handleToggleMusic}
+                title={isMusicPlaying ? 'Pausar música chill' : 'Activar música chill'}
+                aria-label="Música chill"
+                className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center ${
+                  isMusicPlaying
+                    ? 'bg-[#00BCEB]/20 border-[#00BCEB]/50 text-cyan-300 shadow-sm'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                }`}
+              >
+                <Music className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isMusicPlaying ? 'animate-bounce' : ''}`} />
+              </button>
+
+              {/* Mute SFX Toggle */}
+              <button
+                type="button"
+                onClick={handleToggleMute}
+                title={isMuted ? 'Activar sonido' : 'Silenciar sonido'}
+                aria-label="Sonido"
+                className="p-1.5 sm:p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer border border-slate-700 min-h-[36px] min-w-[36px] flex items-center justify-center"
+              >
+                {isMuted ? <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              </button>
+
+              {/* Round Timer with multi-tier playful colors */}
+              <div
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl border-2 transition-all shrink-0 min-h-[36px] ${
+                  isTimeCritical
+                    ? 'bg-rose-500/20 border-[#FF6B6B] text-rose-300 shadow-[0_0_15px_rgba(255,107,107,0.4)] animate-pulse'
+                    : roomState.remainingTime <= 25
+                    ? 'bg-amber-500/15 border-amber-400 text-amber-300 shadow-[0_0_10px_rgba(251,191,36,0.25)]'
+                    : 'bg-[#070b18]/90 border-[#00BCEB]/60 text-cyan-200'
+                }`}
+              >
+                <Clock
+                  className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+                    isTimeCritical
+                      ? 'text-[#FF6B6B] animate-spin'
+                      : roomState.remainingTime <= 25
+                      ? 'text-amber-400'
+                      : 'text-[#00BCEB]'
+                  }`}
+                />
+                <span className="font-mono font-black text-xs sm:text-base">
+                  {roomState.remainingTime}s
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Center: Secret Word (Drawer) or Hint (Guesser) */}
-          <div className="flex-1 flex items-center justify-center max-w-xl mx-2">
+          {/* Dedicated Full-Width Row: Secret Word (Drawer) or Word Hint (Guesser) */}
+          <div className="w-full flex items-center justify-center">
             {isDrawer && roomState.secretWord ? (
-              <div className="flex flex-col items-center bg-[#00BCEB]/15 border-2 border-[#00BCEB]/60 px-4 sm:px-6 py-1.5 rounded-2xl shadow-[0_0_20px_rgba(0,188,235,0.2)]">
-                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-[#00BCEB]">
-                  <Eye className="w-3.5 h-3.5" />
+              <div className="w-full flex flex-col items-center bg-[#00BCEB]/15 border-2 border-[#00BCEB]/60 px-3 sm:px-6 py-1.5 sm:py-2 rounded-2xl shadow-[0_0_20px_rgba(0,188,235,0.2)]">
+                <div className="flex flex-wrap items-center justify-center gap-1.5 text-[10px] sm:text-xs font-black uppercase text-[#00BCEB] text-center mb-0.5">
+                  <Eye className="w-3.5 h-3.5 shrink-0" />
                   <span>Tu palabra secreta (¡Solo la ves tú!)</span>
                   {roomState.wordCategory && (
-                    <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-900/80 text-[#00BCEB] text-[10px] font-bold border border-slate-700">
+                    <span className="px-2 py-0.5 rounded-full bg-slate-900/80 text-[#00BCEB] text-[10px] font-bold border border-slate-700">
                       {roomState.wordCategory}
                     </span>
                   )}
                 </div>
-                <span className="text-xl sm:text-3xl font-black font-display tracking-widest text-white uppercase drop-shadow-md">
+                <span className="text-xl sm:text-3xl font-black font-display tracking-widest text-white uppercase drop-shadow-md text-center break-words max-w-full px-2">
                   {roomState.secretWord}
                 </span>
               </div>
@@ -611,8 +650,8 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
                   );
 
                 return (
-                  <div className="flex flex-col items-center bg-[#070b18]/90 border-2 border-slate-700/80 px-3 sm:px-5 py-1.5 rounded-2xl shadow-inner max-w-full">
-                    <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black uppercase text-slate-400 mb-1">
+                  <div className="w-full flex flex-col items-center bg-[#070b18]/90 border-2 border-slate-700/80 px-2.5 sm:px-5 py-1.5 sm:py-2 rounded-2xl shadow-inner max-w-full overflow-hidden">
+                    <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-black uppercase text-slate-400 mb-1 sm:mb-1.5 text-center">
                       <span className="text-slate-300">
                         {roomState.config.hintsEnabled ? '💡 Con pistas' : '🔒 Sin pistas'}{' '}
                         ({wordsCount > 1 ? `${wordsCount} palabras • ${letterCount} letras` : `${letterCount} letras`})
@@ -624,19 +663,19 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
                       )}
                     </div>
 
-                    {/* Word groups with visible spacing between words */}
-                    <div className="flex flex-wrap items-center justify-center gap-x-3.5 sm:gap-x-5 gap-y-2 max-w-full">
+                    {/* Word groups wrapping cleanly between words, keeping each word intact */}
+                    <div className="flex flex-wrap items-center justify-center gap-x-2.5 xs:gap-x-3.5 sm:gap-x-5 gap-y-2 w-full max-w-full px-1">
                       {hintGroups.map((wordGroup, wordIndex) => (
                         <div
                           key={`word-${wordIndex}`}
-                          className="flex items-center gap-1 sm:gap-1.5 flex-nowrap"
+                          className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 flex-nowrap shrink-0"
                         >
                           {wordGroup.map((slot, slotIndex) => {
                             if (slot.type === 'punctuation') {
                               return (
                                 <span
                                   key={`punct-${wordIndex}-${slotIndex}`}
-                                  className="w-3.5 sm:w-4 h-7 sm:h-8 flex items-center justify-center font-black font-mono text-base sm:text-xl text-slate-400 select-none"
+                                  className="w-2.5 xs:w-3 sm:w-4 h-7 xs:h-8 sm:h-9 flex items-center justify-center font-black font-mono text-base sm:text-xl text-slate-400 select-none shrink-0"
                                 >
                                   {slot.char}
                                 </span>
@@ -647,11 +686,16 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
                             return (
                               <span
                                 key={`slot-${wordIndex}-${slotIndex}-${slot.char}`}
-                                className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-lg font-black font-mono text-base sm:text-lg uppercase transition-all select-none ${
+                                className={`flex items-center justify-center rounded-md sm:rounded-lg font-black font-mono uppercase transition-all select-none shrink-0 ${
                                   isLetter
                                     ? 'bg-[#00BCEB]/25 border-2 border-[#00BCEB] text-[#00BCEB] shadow-[0_0_8px_rgba(0,188,235,0.5)] animate-letter-pop'
                                     : 'bg-slate-800/80 border border-slate-700 text-slate-500'
                                 }`}
+                                style={{
+                                  width: 'clamp(22px, 5.2vw, 36px)',
+                                  height: 'clamp(28px, 6.5vw, 42px)',
+                                  fontSize: 'clamp(12px, 3.5vw, 18px)',
+                                }}
                               >
                                 {isLetter ? slot.char : ''}
                               </span>
@@ -664,39 +708,13 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
                 );
               })()}
           </div>
-
-          {/* Right: Round Timer with multi-tier playful colors */}
-          <div className="flex items-center gap-2">
-            <div
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-2xl border-2 transition-all ${
-                isTimeCritical
-                  ? 'bg-rose-500/20 border-[#FF6B6B] text-rose-300 shadow-[0_0_15px_rgba(255,107,107,0.4)] animate-pulse'
-                  : roomState.remainingTime <= 25
-                  ? 'bg-amber-500/15 border-amber-400 text-amber-300 shadow-[0_0_10px_rgba(251,191,36,0.25)]'
-                  : 'bg-[#070b18]/90 border-[#00BCEB]/60 text-cyan-200'
-              }`}
-            >
-              <Clock
-                className={`w-4 h-4 ${
-                  isTimeCritical
-                    ? 'text-[#FF6B6B] animate-spin'
-                    : roomState.remainingTime <= 25
-                    ? 'text-amber-400'
-                    : 'text-[#00BCEB]'
-                }`}
-              />
-              <span className="font-mono font-black text-sm sm:text-base">
-                {roomState.remainingTime}s
-              </span>
-            </div>
-          </div>
         </div>
       </header>
 
-      {/* Main Game Stage: 80% Canvas + 20% Chat Layout */}
-      <main className="relative z-10 flex-1 min-h-0 p-2 sm:p-3 md:p-4 max-w-7xl w-full mx-auto flex flex-col lg:flex-row gap-3 overflow-hidden">
-        {/* Left / Center: Canvas Stage & Toolbar (~80% area) */}
-        <section className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+      {/* Main Game Stage: Canvas + Chat Layout */}
+      <main className="relative z-10 flex-1 min-h-0 p-2 sm:p-3 md:p-4 max-w-7xl w-full mx-auto flex flex-col lg:flex-row gap-3 lg:overflow-hidden">
+        {/* Left / Center: Canvas Stage & Toolbar */}
+        <section className="w-full lg:flex-1 lg:min-h-0 flex flex-col gap-2 shrink-0 lg:shrink">
           {/* Canvas Header info: Active drawer label */}
           <div className="flex-shrink-0 flex items-center justify-between px-2 text-xs">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -730,8 +748,8 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
             )}
           </div>
 
-          {/* The Hero White Canvas Element */}
-          <div className="flex-1 min-h-0 w-full relative rounded-2xl overflow-hidden shadow-2xl">
+          {/* The Hero White Canvas Element: Generous, drawing-friendly aspect ratio on mobile, expanding in desktop */}
+          <div className="w-full aspect-[4/3] xs:aspect-[4/3] min-h-[280px] xs:min-h-[320px] sm:min-h-[380px] md:min-h-[460px] lg:aspect-auto lg:flex-1 lg:min-h-0 relative rounded-2xl overflow-hidden shadow-2xl shrink-0 lg:shrink">
             <PinturilloCanvas
               roundId={roomState.roundId}
               isDrawer={isDrawer && isDrawing}
@@ -770,8 +788,8 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
           )}
         </section>
 
-        {/* Right Column: Chat & Guess Box (~20% desktop area) */}
-        <aside className="w-full lg:w-80 xl:w-96 h-64 sm:h-72 lg:h-full min-h-0 flex-shrink-0 flex flex-col overflow-hidden">
+        {/* Right Column: Chat & Guess Box (Below canvas on mobile, right column on desktop) */}
+        <aside className="w-full lg:w-80 xl:w-96 h-72 sm:h-80 lg:h-full min-h-0 flex-shrink-0 flex flex-col overflow-hidden mb-4 lg:mb-0">
           <PinturilloChat
             messages={roomState.chatMessages}
             players={roomState.players}

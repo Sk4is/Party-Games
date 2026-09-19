@@ -160,22 +160,29 @@ export const LaPeorRespuestaGame: React.FC<LaPeorRespuestaGameProps> = ({
   return (
     <div className="min-h-screen w-full flex flex-col justify-between p-4 sm:p-6 md:p-8 bg-radial from-stone-950 via-slate-950 to-black text-slate-100 selection:bg-amber-400 selection:text-slate-950">
       {/* Top Header Bar */}
-      <header className="flex items-center justify-between w-full max-w-6xl mx-auto pb-4 border-b border-stone-800/80">
-        {/* Discreet Menu Button */}
-        <button
-          type="button"
-          onClick={() => setShowAbandonModal(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-stone-900/90 hover:bg-stone-800 border border-stone-800 hover:border-stone-700 text-stone-400 hover:text-stone-200 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Menú</span>
-        </button>
+      <header className="flex flex-col sm:flex-row items-center justify-between w-full max-w-6xl mx-auto pb-3 sm:pb-4 gap-2 border-b border-stone-800/80">
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          {/* Discreet Menu Button */}
+          <button
+            type="button"
+            onClick={() => setShowAbandonModal(true)}
+            aria-label="Volver al menú"
+            className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full bg-stone-900/90 hover:bg-stone-800 border border-stone-800 hover:border-stone-700 text-stone-400 hover:text-stone-200 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-sm active:scale-95 min-h-[36px]"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Menú</span>
+          </button>
+
+          <div className="sm:hidden">
+            <SoundToggle compact />
+          </div>
+        </div>
 
         {/* Center: Game Title & Round tracker */}
         <div className="flex items-center gap-2.5 text-center">
           <span className="text-xl">💀</span>
           <div>
-            <h1 className="font-display font-black text-sm sm:text-base text-stone-100 tracking-wider">
+            <h1 className="font-display font-black text-xs sm:text-base text-stone-100 tracking-wider">
               LA PEOR RESPUESTA
             </h1>
             <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest block -mt-0.5">
@@ -184,8 +191,10 @@ export const LaPeorRespuestaGame: React.FC<LaPeorRespuestaGameProps> = ({
           </div>
         </div>
 
-        {/* Right: Sound toggle */}
-        <SoundToggle />
+        {/* Right: Sound toggle on desktop */}
+        <div className="hidden sm:block">
+          <SoundToggle />
+        </div>
       </header>
 
       {/* Main Game Phase Content */}

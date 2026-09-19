@@ -160,35 +160,43 @@ export const LPROnlineGame: React.FC<LPROnlineGameProps> = ({
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col justify-between select-none relative overflow-x-hidden font-sans">
       {/* Top Header */}
-      <header className="relative z-30 w-full px-4 sm:px-6 py-3 flex items-center justify-between border-b border-stone-800/80 bg-stone-950/80 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setIsAbandonModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-xs font-semibold text-stone-300 hover:text-white border border-stone-800 transition-colors shadow-sm"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Menú</span>
-          </button>
+      <header className="relative z-30 w-full px-3 sm:px-6 py-2 sm:py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-stone-800/80 bg-stone-950/80 backdrop-blur-md">
+        {/* Row 1 on mobile: Navigation + Room Code & Sound */}
+        <div className="flex items-center justify-between w-full sm:w-auto gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsAbandonModalOpen(true)}
+              aria-label="Volver al menú"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-xs font-semibold text-stone-300 hover:text-white border border-stone-800 transition-colors shadow-sm active:scale-95 min-h-[36px]"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Menú</span>
+            </button>
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-stone-900 border border-stone-800 text-xs text-stone-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-mono font-bold text-[#FF3B4F]">{roomState.code}</span>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-stone-900 border border-stone-800 text-xs text-stone-300 min-h-[36px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="font-mono font-bold text-[#FF3B4F]">{roomState.code}</span>
+            </div>
+          </div>
+
+          <div className="sm:hidden flex items-center gap-1.5">
+            <SoundToggle compact />
           </div>
         </div>
 
-        {/* Center: Round Tracker */}
-        <div className="flex items-center gap-2">
-          <div className="px-3.5 py-1 rounded-full bg-stone-900 border border-stone-800 text-xs font-bold uppercase tracking-wider text-[#FF3B4F] flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" />
+        {/* Center / Row 2 on mobile: Round Tracker */}
+        <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+          <div className="px-3.5 py-1 rounded-full bg-stone-900 border border-stone-800 text-xs font-bold uppercase tracking-wider text-[#FF3B4F] flex items-center gap-1.5 shrink-0">
+            <Sparkles className="w-3.5 h-3.5 shrink-0" />
             <span>
               Ronda {roomState.round} {roomState.config.totalRounds !== -1 && `de ${roomState.config.totalRounds}`}
             </span>
           </div>
         </div>
 
-        {/* Right: Sound */}
-        <div className="flex items-center gap-2">
+        {/* Right on Desktop: Sound */}
+        <div className="hidden sm:flex items-center gap-2">
           <SoundToggle />
         </div>
       </header>
