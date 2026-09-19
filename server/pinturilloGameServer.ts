@@ -11,6 +11,7 @@ import {
   NormalizedPoint,
 } from '../src/types/pinturillo';
 import { PINTURILLO_WORDS, getRandomWordOptions, DrawableWord } from '../src/data/pinturilloWords';
+import { calculateWordLength, buildStructuredHint, buildWordHintString } from '../src/utils/pinturilloHints';
 import { roomRegistry } from './roomRegistry';
 import { matchDepartureHandler } from './matchDepartureHandler';
 
@@ -46,6 +47,7 @@ interface ServerRoom {
   undoStack: DrawStroke[];
   chatMessages: ChatMessage[];
   usedWords: Set<string>;
+  recentlyOfferedWords: Set<string>;
   countdownEndsAt?: number;
   roundStartedAt?: number;
   roundEndsAt?: number;
@@ -196,6 +198,7 @@ export class PinturilloServer {
         },
       ],
       usedWords: new Set(),
+      recentlyOfferedWords: new Set(),
       timerInterval: null,
       selectionInterval: null,
       countdownInterval: null,
@@ -331,6 +334,7 @@ export class PinturilloServer {
             },
           ],
           usedWords: new Set(),
+          recentlyOfferedWords: new Set(),
           timerInterval: null,
           selectionInterval: null,
           countdownInterval: null,
@@ -807,7 +811,13 @@ export class PinturilloServer {
     if (!currentDrawer) return;
 
     // Pick 3 words from word bank according to room categories
-    room.wordOptions = getRandomWordOptions(3, room.usedWords, room.config.categories);
+    room.wordOptions = getRandomWordOptions(3, room.usedWords, room.config.categories, room.recentlyOfferedWords);
+    for (const opt of room.wordOptions) {
+      room.recentlyOfferedWords.add(opt.word.toLowerCase());
+    }
+    if (room.recentlyOfferedWords.size > 80) {
+      room.recentlyOfferedWords.clear();
+    }
     room.selectionRemainingSeconds = 10;
     room.selectionEndsAt = Date.now() + 10000;
 
@@ -993,15 +1003,7 @@ export class PinturilloServer {
   }
 
   private buildWordHint(word: string, revealedIndices: Set<number>): string {
-    return word
-      .split('')
-      .map((char, i) => {
-        if (char === ' ') return '  ';
-        if (char === '-') return '-';
-        if (revealedIndices.has(i)) return char.toUpperCase();
-        return '_';
-      })
-      .join(' ');
+    return buildWordHintString(word, revealedIndices);
   }
 
   private endDrawingRound(room: ServerRoom, expectedRoundId?: string) {
@@ -1255,7 +1257,8 @@ export class PinturilloServer {
           // Private secret word protection:
           secretWord: (isDrawer || isRevealedPhase) ? room.secretWord : null,
           wordHint: room.wordHint,
-          wordLength: room.secretWord ? room.secretWord.replace(/\s+/g, '').length : 0,
+          hintWords: room.secretWord ? buildStructuredHint(room.secretWord, room.revealedIndices) : [],
+          wordLength: calculateWordLength(room.secretWord),
           wordCategory: room.wordCategory,
           wordOptions: (room.phase === 'WORD_SELECTION' && isDrawer) ? room.wordOptions : undefined,
           selectionRemainingSeconds: room.phase === 'WORD_SELECTION' ? room.selectionRemainingSeconds : undefined,

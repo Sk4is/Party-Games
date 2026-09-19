@@ -19,6 +19,7 @@ import { PinturilloResults } from './PinturilloResults';
 import { PinturilloBackground } from './PinturilloBackground';
 import { MatchAbortedModal } from '../common/MatchAbortedModal';
 import { audio } from '../../utils/audio';
+import { parseWordHintToGroups } from '../../utils/pinturilloHints';
 import {
   Clock,
   Volume2,
@@ -653,38 +654,62 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
                   {roomState.secretWord}
                 </span>
               </div>
-            ) : (
-              <div className="flex flex-col items-center bg-[#070b18]/90 border-2 border-slate-700/80 px-4 sm:px-6 py-1.5 rounded-2xl shadow-inner">
-                <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black uppercase text-slate-400 mb-1">
-                  <span className="text-slate-300">
-                    {roomState.config.hintsEnabled ? '💡 Con pistas' : '🔒 Sin pistas'} ({roomState.wordLength} letras)
-                  </span>
-                  {roomState.wordCategory && (
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[#00BCEB] font-bold text-[10px]">
-                      {roomState.wordCategory}
-                    </span>
-                  )}
-                </div>
-                {/* Individual Animated Letter Boxes */}
-                <div className="flex items-center gap-1 sm:gap-1.5">
-                  {(roomState.wordHint || '...').split(' ').map((char, i) => {
-                    const isLetter = char !== '_' && char !== '';
-                    return (
-                      <span
-                        key={`${i}-${char}`}
-                        className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-lg font-black font-mono text-base sm:text-lg uppercase transition-all select-none ${
-                          isLetter
-                            ? 'bg-[#00BCEB]/25 border-2 border-[#00BCEB] text-[#00BCEB] shadow-[0_0_8px_rgba(0,188,235,0.5)] animate-letter-pop'
-                            : 'bg-slate-800/80 border border-slate-700 text-slate-500'
-                        }`}
-                      >
-                        {isLetter ? char : ''}
+            ) : (() => {
+                const hintGroups = parseWordHintToGroups(roomState.hintWords, roomState.wordHint);
+                const wordsCount = hintGroups.length;
+                const letterCount = roomState.wordLength || hintGroups.reduce((acc, g) => acc + g.filter(s => s.type === 'letter').length, 0);
+
+                return (
+                  <div className="flex flex-col items-center bg-[#070b18]/90 border-2 border-slate-700/80 px-3 sm:px-5 py-1.5 rounded-2xl shadow-inner max-w-full">
+                    <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black uppercase text-slate-400 mb-1">
+                      <span className="text-slate-300">
+                        {roomState.config.hintsEnabled ? '💡 Con pistas' : '🔒 Sin pistas'}
+                        {' '}
+                        ({wordsCount > 1 ? `${wordsCount} palabras • ${letterCount} letras` : `${letterCount} letras`})
                       </span>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+                      {roomState.wordCategory && (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[#00BCEB] font-bold text-[10px]">
+                          {roomState.wordCategory}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Word groups with visible spacing between words */}
+                    <div className="flex flex-wrap items-center justify-center gap-x-3.5 sm:gap-x-5 gap-y-2 max-w-full">
+                      {hintGroups.map((wordGroup, wordIndex) => (
+                        <div key={`word-${wordIndex}`} className="flex items-center gap-1 sm:gap-1.5 flex-nowrap">
+                          {wordGroup.map((slot, slotIndex) => {
+                            if (slot.type === 'punctuation') {
+                              return (
+                                <span
+                                  key={`punct-${wordIndex}-${slotIndex}`}
+                                  className="w-3.5 sm:w-4 h-7 sm:h-8 flex items-center justify-center font-black font-mono text-base sm:text-xl text-slate-400 select-none"
+                                >
+                                  {slot.char}
+                                </span>
+                              );
+                            }
+
+                            const isLetter = slot.isRevealed && slot.char !== '';
+                            return (
+                              <span
+                                key={`slot-${wordIndex}-${slotIndex}-${slot.char}`}
+                                className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-lg font-black font-mono text-base sm:text-lg uppercase transition-all select-none ${
+                                  isLetter
+                                    ? 'bg-[#00BCEB]/25 border-2 border-[#00BCEB] text-[#00BCEB] shadow-[0_0_8px_rgba(0,188,235,0.5)] animate-letter-pop'
+                                    : 'bg-slate-800/80 border border-slate-700 text-slate-500'
+                                }`}
+                              >
+                                {isLetter ? slot.char : ''}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
           </div>
 
           {/* Right: Round Timer with multi-tier playful colors */}
