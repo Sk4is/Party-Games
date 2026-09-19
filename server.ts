@@ -200,7 +200,8 @@ app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
 // Create room HTTP endpoint (fast deterministic room generation)
 app.post('/api/rooms/create', (req, res) => {
   try {
-    const { gameType, hostPlayer, config } = req.body;
+    const { gameType, config } = req.body;
+    const hostPlayer = req.body.hostPlayer || req.body.player;
     if (!gameType || !hostPlayer || !hostPlayer.id) {
       return res.status(400).json({ success: false, message: 'Faltan datos requeridos para crear la sala' });
     }
@@ -308,7 +309,7 @@ async function startServer() {
   // Explicit WebSocket upgrade routing
   httpServer.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
-    const pathname = url.pathname;
+    const pathname = url.pathname.replace(/\/+$/, '') || '/';
 
     if (pathname === '/ws/pinturillo') {
       pinturilloServer.wss.handleUpgrade(request, socket, head, (ws) => {

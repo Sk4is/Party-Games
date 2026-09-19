@@ -1,13 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  PinturilloRoomState,
-  PinturilloPlayer,
   PinturilloConfig,
   DrawStroke,
   DrawingTool,
   NormalizedPoint,
-  ServerMessage,
-  ClientMessage,
 } from '../../types/pinturillo';
 import { PinturilloEntry } from './PinturilloEntry';
 import { PinturilloLobby } from './PinturilloLobby';
@@ -20,7 +16,8 @@ import { PinturilloBackground } from './PinturilloBackground';
 import { MatchAbortedModal } from '../common/MatchAbortedModal';
 import { audio } from '../../utils/audio';
 import { parseWordHintToGroups } from '../../utils/pinturilloHints';
-import { sessionRecovery } from '../../services/sessionRecovery';
+import { getOrCreateUserProfile, saveUserProfile } from '../../utils/userProfile';
+import { usePinturilloSocket } from '../../hooks/usePinturilloSocket';
 import {
   Clock,
   Volume2,
@@ -28,43 +25,75 @@ import {
   Music,
   ArrowLeft,
   Eye,
-  Sparkles,
-  HelpCircle,
   AlertCircle,
+  WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 
 interface PinturilloGameProps {
   onBackToMenu: () => void;
+  initialRoomCode?: string;
+  onSwitchGame?: (actualGameType: 'la-bomba' | 'la-peor-respuesta', roomCode: string) => void;
 }
 
-export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) => {
-  // Local player profile
-  const [localPlayer, setLocalPlayer] = useState<{ id: string; name: string; avatar: string; color: string }>(() => {
-    let playerId = localStorage.getItem('pinturillo_playerId');
-    if (!playerId) {
-      playerId = `player-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      localStorage.setItem('pinturillo_playerId', playerId);
-    }
+export const PinturilloGame: React.FC<PinturilloGameProps> = ({
+  onBackToMenu,
+  initialRoomCode: propRoomCode,
+  onSwitchGame,
+}) => {
+  // Check URL query parameters or prop for invitation room code
+  const initialRoomCode =
+    propRoomCode ||
+    (typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('room') || ''
+      : '');
+
+  // Local player profile synchronized with shared userProfile
+  const [localPlayer, setLocalPlayer] = useState<{
+    id: string;
+    name: string;
+    avatar: string;
+    color: string;
+  }>(() => {
+    const saved = getOrCreateUserProfile();
     return {
-      id: playerId,
-      name: localStorage.getItem('pinturillo_playerName') || 'Artista',
-      avatar: localStorage.getItem('pinturillo_playerAvatar') || '🦊',
-      color: localStorage.getItem('pinturillo_playerColor') || '#f59e0b',
+      id: saved.id,
+      name: saved.name || 'Artista',
+      avatar: saved.avatar || '🦊',
+      color: saved.color || '#f59e0b',
     };
   });
 
-  // Check URL query parameters for invitation room code
-  const [initialRoomCode, setInitialRoomCode] = useState<string>(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('room') || '';
+  // Pinturillo Socket Hook with reconnection backoff, REST integration, & state sync
+  const {
+    connectionStatus,
+    roomState,
+    setRoomState,
+    errorMessage,
+    countdownInfo,
+    setCountdownInfo,
+    nearMissAlert,
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    retryConnection,
+    updateConfig,
+    startGame,
+    chooseWord,
+    sendStrokeStart,
+    sendStrokeChunk,
+    sendStrokeEnd,
+    sendFloodFill,
+    sendUndo,
+    sendRedo,
+    sendClearCanvas,
+    sendChat,
+    restartGame,
+  } = usePinturilloSocket({
+    player: localPlayer,
+    initialRoomCode,
+    onWrongGame: onSwitchGame,
   });
-
-  // Room state from server
-  const [roomState, setRoomState] = useState<PinturilloRoomState | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [countdownInfo, setCountdownInfo] = useState<{ count: number; text: string } | null>(null);
-  const [nearMissAlert, setNearMissAlert] = useState(false);
-  const dismissTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Audio / Music states
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
@@ -81,271 +110,12 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
     setIsClearConfirmOpen(false);
   }, [roomState?.currentTurn, roomState?.phase]);
 
-  // WebSocket Ref
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<any>(null);
-  const heartbeatIntervalRef = useRef<any>(null);
-
-  // Send message helper
-  const sendMessage = useCallback((msg: ClientMessage) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(msg));
-    }
-  }, []);
-
-  // Connect to WebSocket Server
-  const connectWebSocket = useCallback((onConnected?: () => void) => {
-    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
-      if (onConnected && wsRef.current.readyState === WebSocket.OPEN) {
-        onConnected();
-      }
-      return;
-    }
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/pinturillo`;
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      console.log('[Pinturillo Client] Conectado al servidor WebSocket');
-      setErrorMessage(null);
-      if (onConnected) onConnected();
-
-      // Start ping heartbeat
-      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'ping' }));
-        }
-      }, 25000);
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const msg: ServerMessage = JSON.parse(event.data);
-
-        switch (msg.type) {
-          case 'room_state':
-            sessionRecovery.saveActiveSession({
-              gameType: 'pinturillo',
-              roomCode: msg.state.code,
-              playerId: localPlayer.id,
-            });
-            setRoomState(msg.state);
-            if (msg.state.phase === 'DRAWING') {
-              if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
-              dismissTimeoutRef.current = setTimeout(() => {
-                setCountdownInfo(null);
-              }, 400);
-            } else if (msg.state.phase !== 'COUNTDOWN') {
-              if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
-              setCountdownInfo(null);
-            }
-            break;
-
-          case 'error':
-            setErrorMessage(msg.message);
-            if (
-              msg.message.toLowerCase().includes('no se ha encontrado') ||
-              msg.message.toLowerCase().includes('ha finalizado') ||
-              msg.message.toLowerCase().includes('completa')
-            ) {
-              sessionRecovery.clearActiveSession();
-            }
-            break;
-
-          case 'countdown_tick':
-            if (msg.count < 0) {
-              // Immediately clear overlay
-              if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
-              setCountdownInfo(null);
-            } else if (msg.count === 0) {
-              // "¡A DIBUJAR!"
-              audio.playPinturilloCountdown(0);
-              setCountdownInfo({ count: 0, text: msg.text || '¡A DIBUJAR!' });
-              if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
-              dismissTimeoutRef.current = setTimeout(() => {
-                setCountdownInfo(null);
-              }, 500);
-            } else {
-              // 3, 2, 1
-              audio.playPinturilloCountdown(msg.count);
-              setCountdownInfo({ count: msg.count, text: msg.text || String(msg.count) });
-            }
-            break;
-
-          case 'tick':
-            setRoomState(prev => {
-              if (!prev) return null;
-              if (msg.roundId && prev.roundId && msg.roundId !== prev.roundId) return prev;
-              return {
-                ...prev,
-                remainingTime: msg.remainingTime,
-                roundEndsAt: msg.roundEndsAt || prev.roundEndsAt,
-              };
-            });
-            if (msg.remainingTime <= 10 && msg.remainingTime > 0) {
-              audio.playPinturilloClockTick(msg.remainingTime <= 5);
-            }
-            break;
-
-          case 'stroke_start':
-            setRoomState(prev => {
-              if (!prev) return null;
-              if (msg.roundId && prev.roundId && msg.roundId !== prev.roundId) return prev;
-              if (prev.drawingStrokes.some(s => s.id === msg.stroke.id)) return prev;
-              return {
-                ...prev,
-                drawingStrokes: [...prev.drawingStrokes, msg.stroke],
-              };
-            });
-            break;
-
-          case 'stroke_chunk':
-            setRoomState(prev => {
-              if (!prev) return null;
-              if (msg.roundId && prev.roundId && msg.roundId !== prev.roundId) return prev;
-              const strokes = [...prev.drawingStrokes];
-              const target = strokes.find(s => s.id === msg.strokeId);
-              if (target) {
-                target.points = [...target.points, ...msg.points];
-              }
-              return { ...prev, drawingStrokes: strokes };
-            });
-            break;
-
-          case 'flood_fill':
-            setRoomState(prev => {
-              if (!prev) return null;
-              if (msg.roundId && prev.roundId && msg.roundId !== prev.roundId) return prev;
-              if (prev.drawingStrokes.some(s => s.id === msg.stroke.id)) return prev;
-              return {
-                ...prev,
-                drawingStrokes: [...prev.drawingStrokes, msg.stroke],
-              };
-            });
-            break;
-
-          case 'undo':
-            setRoomState(prev => {
-              if (!prev) return null;
-              const strokes = [...prev.drawingStrokes];
-              strokes.pop();
-              return { ...prev, drawingStrokes: strokes };
-            });
-            break;
-
-          case 'redo':
-            // Redo strokes are sent via stroke_start / flood_fill
-            break;
-
-          case 'clear_canvas':
-            setRoomState(prev => {
-              if (!prev) return null;
-              return { ...prev, drawingStrokes: [] };
-            });
-            break;
-
-          case 'chat_message':
-            setRoomState(prev => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                chatMessages: [...prev.chatMessages, msg.message],
-              };
-            });
-            break;
-
-          case 'correct_guess':
-            audio.playPinturilloCorrect();
-            break;
-
-          case 'near_miss':
-            audio.playPinturilloNearMiss();
-            setNearMissAlert(true);
-            setTimeout(() => setNearMissAlert(false), 3500);
-            break;
-
-          case 'notification':
-            setRoomState(prev => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                chatMessages: [
-                  ...prev.chatMessages,
-                  {
-                    id: `sys-notif-${Date.now()}`,
-                    playerName: 'Sistema',
-                    text: msg.message,
-                    isSystem: true,
-                    timestamp: Date.now(),
-                  },
-                ],
-              };
-            });
-            break;
-        }
-      } catch (err) {
-        console.error('[Pinturillo Client] Error analizando mensaje del servidor:', err);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('[Pinturillo Client] Conexión cerrada.');
-      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-    };
-
-    ws.onerror = (err) => {
-      console.error('[Pinturillo Client] Error de conexión:', err);
-    };
-  }, []);
-
-  // Clean up socket and timers on unmount, and auto-reconnect on mount/foreground
+  // Clean up audio on unmount
   useEffect(() => {
-    // Auto-reconnect to active session if exists
-    const active = sessionRecovery.getActiveSession();
-    if (active && active.gameType === 'pinturillo' && active.roomCode) {
-      connectWebSocket(() => {
-        sendMessage({
-          type: 'join_room',
-          code: active.roomCode,
-          player: localPlayer,
-        });
-      });
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED || wsRef.current.readyState === WebSocket.CLOSING) {
-          const currentActive = sessionRecovery.getActiveSession();
-          if (currentActive && currentActive.gameType === 'pinturillo' && currentActive.roomCode) {
-            connectWebSocket(() => {
-              sendMessage({
-                type: 'join_room',
-                code: currentActive.roomCode,
-                player: localPlayer,
-              });
-            });
-          }
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
       audio.stopPinturilloMusic();
     };
-  }, [connectWebSocket, sendMessage, localPlayer]);
+  }, []);
 
   // Fail-safe cleanup: Ensure countdown overlay never lingers after DRAWING phase begins
   useEffect(() => {
@@ -357,7 +127,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
     } else if (roomState?.phase && roomState.phase !== 'COUNTDOWN') {
       setCountdownInfo(null);
     }
-  }, [roomState?.phase]);
+  }, [roomState?.phase, setCountdownInfo]);
 
   // Keep remainingTime and selectionRemainingSeconds strictly synchronized with authoritative timestamps
   useEffect(() => {
@@ -367,7 +137,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
       const interval = setInterval(() => {
         const now = Date.now();
         const rem = Math.max(0, Math.ceil((roomState.roundEndsAt! - now) / 1000));
-        setRoomState(prev => {
+        setRoomState((prev) => {
           if (!prev || prev.phase !== 'DRAWING' || prev.remainingTime === rem) return prev;
           return { ...prev, remainingTime: rem };
         });
@@ -379,14 +149,15 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
       const interval = setInterval(() => {
         const now = Date.now();
         const rem = Math.max(0, Math.ceil((roomState.selectionEndsAt! - now) / 1000));
-        setRoomState(prev => {
-          if (!prev || prev.phase !== 'WORD_SELECTION' || prev.selectionRemainingSeconds === rem) return prev;
+        setRoomState((prev) => {
+          if (!prev || prev.phase !== 'WORD_SELECTION' || prev.selectionRemainingSeconds === rem)
+            return prev;
           return { ...prev, selectionRemainingSeconds: rem };
         });
       }, 250);
       return () => clearInterval(interval);
     }
-  }, [roomState?.phase, roomState?.roundEndsAt, roomState?.selectionEndsAt]);
+  }, [roomState?.phase, roomState?.roundEndsAt, roomState?.selectionEndsAt, setRoomState]);
 
   // Handlers for room actions
   const handleCreateRoom = (
@@ -394,63 +165,56 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
     config?: Partial<PinturilloConfig>
   ) => {
     setLocalPlayer(player);
-    connectWebSocket(() => {
-      sendMessage({ type: 'create_room', player });
-      if (config) {
-        sendMessage({ type: 'update_config', config });
-      }
-    });
+    saveUserProfile(player);
+    createRoom(player, config);
   };
 
-  const handleJoinRoom = (code: string, player: { id: string; name: string; avatar: string; color: string }) => {
+  const handleJoinRoom = (
+    code: string,
+    player: { id: string; name: string; avatar: string; color: string }
+  ) => {
     setLocalPlayer(player);
-    connectWebSocket(() => {
-      sendMessage({ type: 'join_room', code, player });
-    });
+    saveUserProfile(player);
+    joinRoom(code, player);
   };
 
   const handleUpdateConfig = (config: Partial<PinturilloConfig>) => {
-    sendMessage({ type: 'update_config', config });
+    updateConfig(config);
   };
 
   const handleStartGame = () => {
-    sendMessage({ type: 'start_game' });
+    startGame();
   };
 
   const handleChooseWord = (word: string) => {
-    sendMessage({ type: 'choose_word', word });
+    chooseWord(word);
   };
 
   const handleLeaveRoom = () => {
-    sessionRecovery.clearActiveSession();
-    sendMessage({ type: 'leave_room' });
-    setRoomState(null);
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
+    leaveRoom();
+    onBackToMenu();
   };
 
   const handleRestartGame = () => {
-    sendMessage({ type: 'restart_game' });
+    restartGame();
   };
 
   // Drawing event handlers
   const handleStrokeStart = (stroke: DrawStroke) => {
-    sendMessage({ type: 'stroke_start', stroke });
-    setRoomState(prev => {
+    sendStrokeStart(stroke);
+    setRoomState((prev) => {
       if (!prev) return null;
-      if (prev.drawingStrokes.some(s => s.id === stroke.id)) return prev;
+      if (prev.drawingStrokes.some((s) => s.id === stroke.id)) return prev;
       return { ...prev, drawingStrokes: [...prev.drawingStrokes, stroke] };
     });
   };
 
   const handleStrokeChunk = (strokeId: string, points: NormalizedPoint[]) => {
-    sendMessage({ type: 'stroke_chunk', strokeId, points });
-    setRoomState(prev => {
+    sendStrokeChunk(strokeId, points);
+    setRoomState((prev) => {
       if (!prev) return null;
       const strokes = [...prev.drawingStrokes];
-      const target = strokes.find(s => s.id === strokeId);
+      const target = strokes.find((s) => s.id === strokeId);
       if (target) {
         target.points = [...target.points, ...points];
       }
@@ -459,11 +223,11 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   };
 
   const handleStrokeEnd = (strokeId: string) => {
-    sendMessage({ type: 'stroke_end', strokeId });
+    sendStrokeEnd(strokeId);
   };
 
   const handleFloodFill = (point: NormalizedPoint, color: string) => {
-    sendMessage({ type: 'flood_fill', point, color });
+    sendFloodFill(point, color);
     const fillStroke: DrawStroke = {
       id: `fill-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       tool: 'fill',
@@ -473,26 +237,26 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
       isFill: true,
       fillPoint: point,
     };
-    setRoomState(prev => {
+    setRoomState((prev) => {
       if (!prev) return null;
       return { ...prev, drawingStrokes: [...prev.drawingStrokes, fillStroke] };
     });
   };
 
   const handleUndo = () => {
-    sendMessage({ type: 'undo' });
+    sendUndo();
   };
 
   const handleRedo = () => {
-    sendMessage({ type: 'redo' });
+    sendRedo();
   };
 
   const handleClear = () => {
-    sendMessage({ type: 'clear_canvas' });
+    sendClearCanvas();
   };
 
   const handleSendMessage = (text: string) => {
-    sendMessage({ type: 'send_chat', text });
+    sendChat(text);
   };
 
   // Music toggle
@@ -509,9 +273,9 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
 
   // Current active roles
   const isHost = Boolean(roomState && roomState.hostId === localPlayer.id);
-  const currentDrawer = roomState?.players.find(p => p.id === roomState.currentDrawerId);
+  const currentDrawer = roomState?.players.find((p) => p.id === roomState.currentDrawerId);
   const isDrawer = Boolean(currentDrawer && currentDrawer.id === localPlayer.id);
-  const meInRoom = roomState?.players.find(p => p.id === localPlayer.id);
+  const meInRoom = roomState?.players.find((p) => p.id === localPlayer.id);
   const hasGuessed = Boolean(meInRoom?.hasGuessed);
 
   // 1. If not in a room, show Entry profile / join / create screen
@@ -519,6 +283,49 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
     return (
       <div className="relative min-h-screen bg-[#050A18] text-white flex flex-col justify-center overflow-x-hidden">
         <PinturilloBackground />
+
+        {/* Reconnecting banner */}
+        {connectionStatus === 'reconnecting' && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-amber-500/90 text-slate-950 font-black text-xs sm:text-sm shadow-xl flex items-center gap-2 animate-pulse">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>RECONECTANDO CON LA PARTIDA...</span>
+          </div>
+        )}
+
+        {/* Failed Connection Modal */}
+        {connectionStatus === 'error' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <div className="max-w-md w-full bg-slate-900 border-2 border-slate-700 rounded-3xl p-6 text-center shadow-2xl space-y-4">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center">
+                <WifiOff className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-black font-display uppercase tracking-wide text-white">
+                NO SE HA PODIDO CONECTAR
+              </h3>
+              <p className="text-sm text-slate-300">
+                No hemos podido conectar con la partida. Comprueba tu conexión e inténtalo de nuevo.
+              </p>
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={onBackToMenu}
+                  className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm transition-all cursor-pointer"
+                >
+                  VOLVER AL MENÚ
+                </button>
+                <button
+                  type="button"
+                  onClick={retryConnection}
+                  className="flex-1 py-3 px-4 rounded-xl bg-[#00BCEB] hover:bg-cyan-400 text-slate-950 font-black text-sm transition-all shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>REINTENTAR</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative z-10">
           {errorMessage && (
             <div className="max-w-md mx-auto mb-4 p-4 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-sm flex items-center gap-2">
@@ -531,6 +338,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
             onBackToMenu={onBackToMenu}
+            errorMessage={errorMessage}
           />
         </div>
       </div>
@@ -542,6 +350,49 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
     return (
       <div className="relative min-h-screen bg-[#050A18] text-white flex flex-col justify-center overflow-x-hidden">
         <PinturilloBackground />
+
+        {/* Reconnecting banner */}
+        {connectionStatus === 'reconnecting' && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-amber-500/90 text-slate-950 font-black text-xs sm:text-sm shadow-xl flex items-center gap-2 animate-pulse">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>RECONECTANDO CON LA SALA...</span>
+          </div>
+        )}
+
+        {/* Failed Connection Modal */}
+        {connectionStatus === 'error' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <div className="max-w-md w-full bg-slate-900 border-2 border-slate-700 rounded-3xl p-6 text-center shadow-2xl space-y-4">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center">
+                <WifiOff className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-black font-display uppercase tracking-wide text-white">
+                NO SE HA PODIDO CONECTAR
+              </h3>
+              <p className="text-sm text-slate-300">
+                No hemos podido conectar con la partida. Comprueba tu conexión e inténtalo de nuevo.
+              </p>
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleLeaveRoom}
+                  className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm transition-all cursor-pointer"
+                >
+                  VOLVER AL MENÚ
+                </button>
+                <button
+                  type="button"
+                  onClick={retryConnection}
+                  className="flex-1 py-3 px-4 rounded-xl bg-[#00BCEB] hover:bg-cyan-400 text-slate-950 font-black text-sm transition-all shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>REINTENTAR</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative z-10">
           {errorMessage && (
             <div className="max-w-md mx-auto mb-4 p-4 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-sm flex items-center gap-2">
@@ -569,6 +420,48 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   return (
     <div className="relative h-screen max-h-screen bg-[#050A18] text-white flex flex-col overflow-hidden select-none">
       <PinturilloBackground />
+
+      {/* Reconnecting banner during active gameplay */}
+      {connectionStatus === 'reconnecting' && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-amber-500/90 text-slate-950 font-black text-xs sm:text-sm shadow-xl flex items-center gap-2 animate-pulse">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          <span>RECONECTANDO... TUS DIBUJOS Y PUNTOS ESTÁN A SALVO</span>
+        </div>
+      )}
+
+      {/* Failed Connection Modal */}
+      {connectionStatus === 'error' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="max-w-md w-full bg-slate-900 border-2 border-slate-700 rounded-3xl p-6 text-center shadow-2xl space-y-4">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center">
+              <WifiOff className="w-7 h-7" />
+            </div>
+            <h3 className="text-xl font-black font-display uppercase tracking-wide text-white">
+              NO SE HA PODIDO CONECTAR
+            </h3>
+            <p className="text-sm text-slate-300">
+              No hemos podido conectar con la partida. Comprueba tu conexión e inténtalo de nuevo.
+            </p>
+            <div className="pt-2 flex gap-3">
+              <button
+                type="button"
+                onClick={handleLeaveRoom}
+                className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm transition-all cursor-pointer"
+              >
+                VOLVER AL MENÚ
+              </button>
+              <button
+                type="button"
+                onClick={retryConnection}
+                className="flex-1 py-3 px-4 rounded-xl bg-[#00BCEB] hover:bg-cyan-400 text-slate-950 font-black text-sm transition-all shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>REINTENTAR</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Countdown 3, 2, 1, ¡A DIBUJAR! Overlay */}
       {countdownInfo && (roomState.phase === 'COUNTDOWN' || roomState.phase === 'DRAWING') && (
@@ -630,7 +523,11 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
       <MatchAbortedModal
         isOpen={roomState.phase === 'MATCH_ABORTED'}
         title="PARTIDA FINALIZADA"
-        message={roomState.endMessage || roomState.abortReason || 'La partida no puede continuar por falta de jugadores suficientes.'}
+        message={
+          roomState.endMessage ||
+          roomState.abortReason ||
+          'La partida no puede continuar por falta de jugadores suficientes.'
+        }
         onReturnToMenu={handleLeaveRoom}
       />
 
@@ -701,16 +598,23 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
                 </span>
               </div>
             ) : (() => {
-                const hintGroups = parseWordHintToGroups(roomState.hintWords, roomState.wordHint);
+                const hintGroups = parseWordHintToGroups(
+                  roomState.hintWords,
+                  roomState.wordHint
+                );
                 const wordsCount = hintGroups.length;
-                const letterCount = roomState.wordLength || hintGroups.reduce((acc, g) => acc + g.filter(s => s.type === 'letter').length, 0);
+                const letterCount =
+                  roomState.wordLength ||
+                  hintGroups.reduce(
+                    (acc, g) => acc + g.filter((s) => s.type === 'letter').length,
+                    0
+                  );
 
                 return (
                   <div className="flex flex-col items-center bg-[#070b18]/90 border-2 border-slate-700/80 px-3 sm:px-5 py-1.5 rounded-2xl shadow-inner max-w-full">
                     <div className="flex items-center gap-2 text-[10px] sm:text-xs font-black uppercase text-slate-400 mb-1">
                       <span className="text-slate-300">
-                        {roomState.config.hintsEnabled ? '💡 Con pistas' : '🔒 Sin pistas'}
-                        {' '}
+                        {roomState.config.hintsEnabled ? '💡 Con pistas' : '🔒 Sin pistas'}{' '}
                         ({wordsCount > 1 ? `${wordsCount} palabras • ${letterCount} letras` : `${letterCount} letras`})
                       </span>
                       {roomState.wordCategory && (
@@ -723,7 +627,10 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
                     {/* Word groups with visible spacing between words */}
                     <div className="flex flex-wrap items-center justify-center gap-x-3.5 sm:gap-x-5 gap-y-2 max-w-full">
                       {hintGroups.map((wordGroup, wordIndex) => (
-                        <div key={`word-${wordIndex}`} className="flex items-center gap-1 sm:gap-1.5 flex-nowrap">
+                        <div
+                          key={`word-${wordIndex}`}
+                          className="flex items-center gap-1 sm:gap-1.5 flex-nowrap"
+                        >
                           {wordGroup.map((slot, slotIndex) => {
                             if (slot.type === 'punctuation') {
                               return (
@@ -802,7 +709,9 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
               >
                 <span className="text-base">{currentDrawer?.avatar || '🎨'}</span>
                 <span>
-                  {isDrawer ? '¡Estás dibujando tú!' : `Dibujando: ${currentDrawer?.name || 'Compañero'}`}
+                  {isDrawer
+                    ? '¡Estás dibujando tú!'
+                    : `Dibujando: ${currentDrawer?.name || 'Compañero'}`}
                 </span>
               </div>
 

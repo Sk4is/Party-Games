@@ -120,7 +120,11 @@ export default function App() {
 
       {/* 3. PINTURILLO (ONLINE MULTIPLAYER) */}
       {currentView === 'PINTURILLO' && (
-        <PinturilloGame onBackToMenu={handleBackToMenu} />
+        <PinturilloGame
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
       )}
 
       {/* OPTIONAL LOCAL PASS-AND-PLAY FALLBACKS */}
