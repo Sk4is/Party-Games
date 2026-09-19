@@ -482,14 +482,8 @@ export class PartyGameServer {
         player.isConnected = false;
       }
 
-      // In LOBBY, departures are immediate
-      if (room.phase === 'LOBBY') {
-        this.processPermanentDeparture(roomId, playerId, gameType);
-        return;
-      }
-
-      const isGameActive = room.phase !== 'MATCH_ABORTED' && room.phase !== 'GAME_OVER';
-      if (!isGameActive) {
+      const isMatchFinished = room.phase === 'MATCH_ABORTED' || room.phase === 'GAME_OVER';
+      if (isMatchFinished) {
         this.processPermanentDeparture(roomId, playerId, gameType);
         return;
       }
@@ -497,7 +491,7 @@ export class PartyGameServer {
       // Broadcast disconnected state to other players
       this.broadcastBombaState(room);
 
-      // Register grace period for reconnection
+      // Register grace period for reconnection (15s)
       matchDepartureHandler.registerDisconnection(roomId, playerId, gameType, () => {
         this.processPermanentDeparture(roomId, playerId, gameType);
       });
@@ -510,13 +504,8 @@ export class PartyGameServer {
         player.isConnected = false;
       }
 
-      if (room.phase === 'LOBBY') {
-        this.processPermanentDeparture(roomId, playerId, gameType);
-        return;
-      }
-
-      const isGameActive = room.phase !== 'MATCH_ABORTED' && room.phase !== 'FINAL_RESULTS';
-      if (!isGameActive) {
+      const isMatchFinished = room.phase === 'MATCH_ABORTED' || room.phase === 'FINAL_RESULTS';
+      if (isMatchFinished) {
         this.processPermanentDeparture(roomId, playerId, gameType);
         return;
       }

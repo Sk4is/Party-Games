@@ -24,7 +24,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
 }) => {
   const totalPlayers = players.length;
   const containerRef = useRef<HTMLDivElement>(null);
-  const [arenaSize, setArenaSize] = useState({ width: 900, height: 450 });
+  const [arenaSize, setArenaSize] = useState({ width: 960, height: 500 });
 
   // Responsive arena measurement
   useEffect(() => {
@@ -43,10 +43,22 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Card dimensions based on player count
-  const isCompact = totalPlayers >= 7;
-  const cardHalfW = isCompact ? 78 : 96;
-  const cardHalfH = isCompact ? 46 : 54;
+  // Adaptive Card Sizing Tiers:
+  // Tier 1 (2-4 players): Regular cards (width ~188px, height ~88px)
+  // Tier 2 (5-7 players): Medium cards (width ~158px, height ~80px)
+  // Tier 3 (8-10 players or constrained arena): Compact cards (width ~138px, height ~72px)
+  const cardTier = useMemo<'regular' | 'medium' | 'compact'>(() => {
+    if (totalPlayers >= 8 || arenaSize.height < 460 || arenaSize.width < 780) {
+      return 'compact';
+    }
+    if (totalPlayers >= 5 || arenaSize.height < 520 || arenaSize.width < 900) {
+      return 'medium';
+    }
+    return 'regular';
+  }, [totalPlayers, arenaSize.height, arenaSize.width]);
+
+  const cardHalfW = cardTier === 'regular' ? 94 : cardTier === 'medium' ? 79 : 69;
+  const cardHalfH = cardTier === 'regular' ? 44 : cardTier === 'medium' ? 40 : 36;
 
   // Exact angles specification:
   // 2 players: 180° (Left) and 0° (Right) - perfectly opposite
@@ -63,29 +75,40 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
     if (totalPlayers === 4) {
       return [-90, 0, 90, 180];
     }
+    if (totalPlayers === 5) {
+      return [-90, -18, 54, 126, 198];
+    }
+    if (totalPlayers === 6) {
+      return [-90, -30, 30, 90, 150, 210];
+    }
     const startAngle = -90;
     const step = 360 / totalPlayers;
     return players.map((_, idx) => startAngle + idx * step);
   }, [totalPlayers, players]);
 
-  // Dynamic elliptical orbital radii based on container size and player count
+  // Dynamic elliptical orbital radii calculation with strict BOMB SAFE ZONE protection:
+  // Bomb body has outer radius ~52px; upward fuse + spark reaches y = -78px.
+  // Minimum safe gap required: 45-70px free corridor between bomb outer edge and card edge.
   const { radiusX, radiusY } = useMemo(() => {
-    const maxRadiusX = Math.max(200, arenaSize.width / 2 - cardHalfW - 14);
-    const maxRadiusY = Math.max(120, arenaSize.height / 2 - cardHalfH - 12);
+    const maxRadiusX = Math.max(180, arenaSize.width / 2 - cardHalfW - 14);
+    const maxRadiusY = Math.max(140, arenaSize.height / 2 - cardHalfH - 12);
 
     if (totalPlayers === 2) {
-      // 2 players only need horizontal distance, vertical offset is 0
-      const rX = Math.min(maxRadiusX, Math.max(240, arenaSize.width * 0.33));
+      const rX = Math.min(maxRadiusX, Math.max(220, arenaSize.width * 0.32));
       return { radiusX: rX, radiusY: 0 };
     }
 
-    let baseTargetX = totalPlayers <= 4 ? 280 : totalPlayers <= 6 ? 320 : 360;
-    let baseTargetY = totalPlayers <= 4 ? 145 : totalPlayers <= 6 ? 160 : 175;
+    // Minimum required radiusY to guarantee top player card never crowds bomb fuse:
+    // Fuse top is at y = -78px. We want at least 50px of clear air + cardHalfH.
+    const minSafeRadiusY = 78 + 50 + cardHalfH; // ~172px for compact, ~178px for regular
 
-    const rX = Math.min(maxRadiusX, Math.max(220, Math.min(baseTargetX, arenaSize.width * 0.35)));
-    const rY = Math.min(maxRadiusY, Math.max(130, Math.min(baseTargetY, arenaSize.height * 0.36)));
+    let targetRadiusY = Math.max(minSafeRadiusY, arenaSize.height * 0.37);
+    targetRadiusY = Math.min(maxRadiusY, targetRadiusY);
 
-    return { radiusX: rX, radiusY: rY };
+    let targetRadiusX = Math.max(250, arenaSize.width * 0.35);
+    targetRadiusX = Math.min(maxRadiusX, targetRadiusX);
+
+    return { radiusX: Math.round(targetRadiusX), radiusY: Math.round(targetRadiusY) };
   }, [totalPlayers, arenaSize, cardHalfW, cardHalfH]);
 
   // Active player center position
@@ -101,29 +124,29 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
   const angleToPlayerRad = Math.atan2(activeCardY, activeCardX);
   const angleToPlayerDeg = (angleToPlayerRad * 180) / Math.PI;
 
-  // Card rectangular boundary calculation to prevent arrow from entering card:
+  // Exact Card rectangular boundary intersection along ray:
   const cosA = Math.abs(Math.cos(angleToPlayerRad)) || 0.001;
   const sinA = Math.abs(Math.sin(angleToPlayerRad)) || 0.001;
   const cardBorderOffset = Math.min(cardHalfW / cosA, cardHalfH / sinA);
   const playerCardEdgeDist = distToPlayer - cardBorderOffset;
 
-  // Bomb visual boundary radius (~52px)
-  const bombOuterEdgeDist = 52;
+  // Bomb visual boundary:
+  // If ray points upward towards the top player (sinA < 0 and angle near -90°), fuse extends to 78px.
+  // Otherwise bomb sphere edge is 54px.
+  const bombOuterEdgeDist = Math.sin(angleToPlayerRad) < -0.2 ? 78 : 54;
 
-  // Arrow size: 48px long, 24px tall
-  const arrowHalfLength = 24;
-  const arrowTipReach = arrowHalfLength + 4; // animation motion travel
-  const safetyGapBeforeCard = 14; // 14px breathing room before card border
+  // Available free corridor between bomb edge and card edge
+  const availableCorridor = Math.max(16, playerCardEdgeDist - bombOuterEdgeDist);
 
-  const maxArrowCenterDist = playerCardEdgeDist - safetyGapBeforeCard - arrowTipReach;
-  const minArrowCenterDist = bombOuterEdgeDist + 12 + arrowHalfLength;
+  // Arrow geometry: adaptively sized to fit corridor without entering card or bomb
+  // Guaranteed gap before card: 12px
+  // Guaranteed gap after bomb: 10px
+  const arrowLength = Math.max(18, Math.min(34, availableCorridor - 22));
+  const arrowTipDist = playerCardEdgeDist - 12; // ALWAYS stops 12px before card border
+  const arrowCenterDist = arrowTipDist - arrowLength / 2;
 
-  // Position arrow cleanly in the space between bomb and player card
-  const idealGapCenter = bombOuterEdgeDist + (playerCardEdgeDist - bombOuterEdgeDist) * 0.5;
-  const finalArrowDist = Math.max(minArrowCenterDist, Math.min(maxArrowCenterDist, idealGapCenter));
-
-  const arrowX = Math.round(Math.cos(angleToPlayerRad) * finalArrowDist);
-  const arrowY = Math.round(Math.sin(angleToPlayerRad) * finalArrowDist);
+  const arrowX = Math.round(Math.cos(angleToPlayerRad) * arrowCenterDist);
+  const arrowY = Math.round(Math.sin(angleToPlayerRad) * arrowCenterDist);
 
   // Smooth shortest-arc rotation angle to prevent awkward 360 spins
   const lastAngleRef = useRef<number>(angleToPlayerDeg);
@@ -153,7 +176,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
         {Array.from({ length: maxLives }).map((_, i) => (
           <span
             key={i}
-            className={`transition-all duration-300 text-xs sm:text-sm ${
+            className={`transition-all duration-300 text-xs ${
               i < lives ? 'text-rose-500 scale-100' : 'text-slate-600 scale-90 grayscale'
             }`}
           >
@@ -171,7 +194,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
       className="absolute inset-0 w-full h-full pointer-events-none flex items-center justify-center overflow-visible"
     >
       {/* ==================================================================== */}
-      {/* TURN ARROW (BETWEEN BOMB AND ACTIVE PLAYER)                          */}
+      {/* TURN ARROW (POSITIONED IN SAFE CORRIDOR BETWEEN BOMB AND ACTIVE CARD) */}
       {/* ==================================================================== */}
       <div
         id="turn-indicator-arrow"
@@ -185,15 +208,15 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
       >
         <motion.div
           className="flex items-center justify-center"
-          animate={{ x: [0, 4, 0] }}
+          animate={{ x: [0, 3, 0] }}
           transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
         >
           <svg
-            width="48"
-            height="24"
-            viewBox="0 0 48 24"
+            width={arrowLength + 4}
+            height="18"
+            viewBox="0 0 38 18"
             fill="none"
-            className="overflow-visible filter drop-shadow-[0_0_12px_rgba(245,158,11,0.85)] drop-shadow-[0_0_20px_rgba(234,88,12,0.6)]"
+            className="overflow-visible filter drop-shadow-[0_0_10px_rgba(245,158,11,0.85)] drop-shadow-[0_0_16px_rgba(234,88,12,0.6)]"
           >
             <defs>
               <linearGradient id="bombaArrowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -209,27 +232,27 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
               </linearGradient>
             </defs>
 
-            {/* Glowing Arrow Path */}
+            {/* Controlled Arrow Shape */}
             <path
-              d="M 4,8 L 24,8 L 24,3 L 45,12 L 24,21 L 24,16 L 4,16 L 8,12 Z"
+              d="M 3,6 L 19,6 L 19,2 L 35,9 L 19,16 L 19,12 L 3,12 Z"
               fill="url(#bombaArrowGrad)"
               stroke="url(#bombaArrowBorder)"
-              strokeWidth="2"
+              strokeWidth="1.5"
               strokeLinejoin="round"
               strokeLinecap="round"
             />
-            {/* Top Shine */}
+            {/* Specular Highlight */}
             <path
-              d="M 8,9 L 24,9 L 24,6 L 40,12 L 24,14 L 24,12 L 8,12 Z"
+              d="M 6,7 L 19,7 L 19,4.5 L 31,9 L 19,10.5 L 19,9 L 6,9 Z"
               fill="#ffffff"
-              opacity="0.65"
+              opacity="0.6"
             />
           </svg>
         </motion.div>
       </div>
 
       {/* ==================================================================== */}
-      {/* RADIAL PLAYER CARDS AROUND BOMB                                     */}
+      {/* RADIAL PLAYER CARDS AROUND BOMB                                      */}
       {/* ==================================================================== */}
       <div className="absolute inset-0">
         {players.map((player, index) => {
@@ -260,12 +283,16 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
             >
               <div
                 className={`relative rounded-2xl transition-all duration-300 select-none ${
-                  isCompact ? 'w-42 lg:w-46 p-2.5' : 'w-48 lg:w-52 p-3.5'
+                  cardTier === 'compact'
+                    ? 'w-[138px] p-2'
+                    : cardTier === 'medium'
+                    ? 'w-[158px] p-2.5'
+                    : 'w-[188px] p-3'
                 } ${
                   player.isEliminated
                     ? 'burnt-effect border-2 border-amber-950/60 shadow-lg opacity-60'
                     : isActive
-                    ? 'bg-slate-900/95 border-2 border-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.55)] ring-2 ring-amber-400/50 scale-105'
+                    ? 'bg-slate-900/95 border-2 border-amber-400 shadow-[0_0_24px_rgba(245,158,11,0.55)] ring-2 ring-amber-400/50 scale-105'
                     : 'bg-slate-900/85 border border-slate-700/80 shadow-md opacity-90 hover:opacity-100'
                 }`}
               >
@@ -286,7 +313,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
                 <div className="flex items-center gap-2">
                   <div
                     className={`${
-                      isCompact ? 'w-8 h-8 text-base' : 'w-9 h-9 text-lg'
+                      cardTier === 'compact' ? 'w-7 h-7 text-sm' : 'w-8 h-8 text-base'
                     } rounded-xl flex items-center justify-center shadow-inner shrink-0 ${
                       player.isEliminated ? 'grayscale brightness-50' : ''
                     }`}
@@ -298,55 +325,57 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
                       <span
-                        className={`font-black truncate ${
-                          isCompact ? 'text-xs' : 'text-sm'
+                        className={`font-display font-bold truncate ${
+                          cardTier === 'compact' ? 'text-xs' : 'text-sm'
                         } ${
-                          player.isEliminated
-                            ? 'text-stone-500 line-through'
-                            : isActive
-                            ? 'text-amber-300 font-display'
-                            : 'text-slate-100 font-bold'
+                          isActive && !player.isEliminated ? 'text-amber-300' : 'text-slate-100'
                         }`}
+                        title={player.name}
                       >
                         {player.name}
                       </span>
                     </div>
 
-                    {/* Lives & Mistakes */}
-                    <div className="mt-0.5 flex items-center justify-between">
+                    {/* Lives and Mistakes */}
+                    <div className="flex items-center justify-between gap-1 mt-0.5">
                       {renderLives(player.lives, player.isEliminated)}
-                      <span className="text-[10px] font-bold text-slate-400">
-                        {player.isEliminated
-                          ? 'RIP'
-                          : `Fallos: ${player.roundMistakes ?? 0}/${allowedMistakesPerRound}`}
-                      </span>
+
+                      {/* Mistakes / Fallos */}
+                      {!player.isEliminated && (
+                        <div className="flex items-center gap-0.5 text-[10px] font-bold text-slate-400">
+                          <span className="text-[9px] uppercase tracking-wider text-slate-400">F:</span>
+                          <span
+                            className={`${
+                              player.mistakesThisRound > 0
+                                ? 'text-rose-400 font-extrabold'
+                                : 'text-slate-400'
+                            }`}
+                          >
+                            {player.mistakesThisRound}/{allowedMistakesPerRound}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Prominent Word Area / Live Typing */}
-                <div
-                  className={`mt-2 px-2.5 py-1.5 rounded-xl flex items-center justify-center text-center transition-all duration-200 min-h-[40px] ${
-                    isActive && !player.isEliminated
-                      ? 'bg-slate-950 border-2 border-amber-400/90 shadow-[inset_0_0_12px_rgba(245,158,11,0.3)]'
-                      : 'bg-slate-950/90 border border-slate-700/80 shadow-inner'
-                  }`}
-                >
+                {/* Dynamic Word Display Area */}
+                <div className="mt-1.5 pt-1 border-t border-slate-800/80 min-h-[22px] flex items-center justify-center">
                   {hasTyping ? (
-                    <div className="flex items-center justify-center gap-0.5 text-amber-300 font-display font-black text-xs sm:text-sm lg:text-base tracking-wider drop-shadow-[0_0_8px_rgba(245,158,11,0.6)] truncate max-w-full">
-                      <span className="truncate">{typingWord.toUpperCase()}</span>
-                      <span className="inline-block w-0.5 h-3.5 bg-amber-400 shrink-0 animate-pulse ml-0.5" />
+                    <div className="flex items-center justify-center gap-1 w-full bg-slate-950/60 rounded px-1.5 py-0.5 border border-amber-500/30">
+                      <span className="font-mono font-bold text-xs text-amber-300 tracking-wider truncate">
+                        {typingWord.toUpperCase()}
+                      </span>
+                      <span className="inline-block w-1.5 h-3 bg-amber-400 shrink-0 animate-pulse" />
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center truncate max-w-full leading-tight">
+                    <div className="w-full flex items-center justify-center text-[10px] text-slate-400 font-mono truncate">
                       {player.lastValidWord ? (
                         <>
-                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                            ÚLTIMA
-                          </span>
+                          <span className="text-[9px] text-slate-400 mr-1">Últ:</span>
                           <span
-                            className={`font-display font-black text-xs sm:text-sm tracking-wider truncate ${
-                              isActive ? 'text-amber-200' : 'text-slate-200'
+                            className={`font-semibold truncate ${
+                              player.isEliminated ? 'text-slate-400' : 'text-emerald-400'
                             }`}
                           >
                             {player.lastValidWord.toUpperCase()}
@@ -356,7 +385,7 @@ export const PlayerRing: React.FC<PlayerRingProps> = ({
                         <div className="flex items-center">
                           <span className="text-slate-600 font-bold text-xs">—</span>
                           {isActive && !player.isEliminated && (
-                            <span className="inline-block w-0.5 h-3.5 bg-amber-400/80 shrink-0 animate-pulse ml-1" />
+                            <span className="inline-block w-0.5 h-3 bg-amber-400/80 shrink-0 animate-pulse ml-1" />
                           )}
                         </div>
                       )}

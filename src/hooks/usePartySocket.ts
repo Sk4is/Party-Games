@@ -12,6 +12,7 @@ import {
   validateJoinOnlineRoom,
   SharedRoomSummary,
 } from '../services/multiplayerRoomService';
+import { sessionRecovery } from '../services/sessionRecovery';
 
 export type SocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -117,12 +118,20 @@ export function usePartySocket(options: UsePartySocketOptions) {
           }
         }, 20000);
 
-        // Auto re-join room if reconnected
-        if (lastActiveRoomRef.current) {
+        // Auto re-join room if reconnected or restoring active session
+        const activeSession = sessionRecovery.getActiveSession();
+        const roomToJoin =
+          lastActiveRoomRef.current ||
+          (activeSession && (!targetGameType || activeSession.gameType === targetGameType)
+            ? { code: activeSession.roomCode, gameType: activeSession.gameType }
+            : null);
+
+        if (roomToJoin) {
+          lastActiveRoomRef.current = roomToJoin;
           socket.send(
             JSON.stringify({
               type: 'join_room',
-              code: lastActiveRoomRef.current.code,
+              code: roomToJoin.code,
               player: currentUser,
             })
           );
@@ -135,6 +144,12 @@ export function usePartySocket(options: UsePartySocketOptions) {
           switch (msg.type) {
             case 'room_state': {
               setIsJoiningOrCreating(false);
+              sessionRecovery.saveActiveSession({
+                gameType: msg.state.gameType as any,
+                roomCode: msg.state.code,
+                playerId: currentUser.id,
+              });
+
               if (msg.state.gameType === 'la-bomba') {
                 const newBombaState = msg.state as BombaRoomState;
                 setBombaState((prev) => {
@@ -159,6 +174,15 @@ export function usePartySocket(options: UsePartySocketOptions) {
             case 'error': {
               setIsJoiningOrCreating(false);
               setErrorMessage(msg.message);
+              // If room doesn't exist or expired, clear session
+              if (
+                msg.message.toLowerCase().includes('no se ha encontrado') ||
+                msg.message.toLowerCase().includes('ha finalizado') ||
+                msg.message.toLowerCase().includes('completa')
+              ) {
+                sessionRecovery.clearActiveSession();
+                lastActiveRoomRef.current = null;
+              }
               setTimeout(() => setErrorMessage(null), 5000);
               break;
             }
@@ -237,10 +261,21 @@ export function usePartySocket(options: UsePartySocketOptions) {
     }
   }, [currentUser]);
 
-  // Connect automatically on mount
+  // Connect automatically on mount and recover on visibilitychange (tab foregrounded)
   useEffect(() => {
     connect();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED || wsRef.current.readyState === WebSocket.CLOSING) {
+          connect();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       isManuallyClosedRef.current = true;
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
@@ -349,6 +384,7 @@ export function usePartySocket(options: UsePartySocketOptions) {
   const leaveRoom = useCallback(() => {
     isManuallyClosedRef.current = false;
     lastActiveRoomRef.current = null;
+    sessionRecovery.clearActiveSession();
     send({ type: 'leave_room' });
     setBombaState(null);
     setLprState(null);

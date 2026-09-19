@@ -13,6 +13,7 @@ import { LaPeorRespuestaGame } from './components/LaPeorRespuestaGame';
 import { LPROnlineContainer } from './components/lpr/LPROnlineContainer';
 import { PinturilloGame } from './components/pinturillo/PinturilloGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
+import { sessionRecovery } from './services/sessionRecovery';
 
 type AppView =
   | 'MENU'
@@ -25,7 +26,10 @@ type AppView =
   | 'LPR_LOCAL_GAME';
 
 export default function App() {
+  const activeSession = sessionRecovery.getActiveSession();
+
   const [urlRoomCode, setUrlRoomCode] = useState<string>(() => {
+    if (activeSession?.roomCode) return activeSession.roomCode;
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       return params.get('room') || '';
@@ -34,6 +38,12 @@ export default function App() {
   });
 
   const [currentView, setCurrentView] = useState<AppView>(() => {
+    if (activeSession) {
+      if (activeSession.gameType === 'la-bomba') return 'BOMBA_ONLINE';
+      if (activeSession.gameType === 'la-peor-respuesta') return 'LPR_ONLINE';
+      if (activeSession.gameType === 'pinturillo') return 'PINTURILLO';
+    }
+
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const game = params.get('game');
@@ -43,7 +53,6 @@ export default function App() {
       if (game === 'la-peor-respuesta') return 'LPR_ONLINE';
       if (game === 'pinturillo') return 'PINTURILLO';
       if (room) {
-        // Default with room parameter: Pinturillo
         return 'PINTURILLO';
       }
     }
@@ -73,11 +82,7 @@ export default function App() {
   };
 
   const handleBackToMenu = () => {
-    // Clear URL parameters if any so user returns cleanly to menu
-    if (window.history.pushState) {
-      const newUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
-      window.history.pushState({ path: newUrl }, '', newUrl);
-    }
+    sessionRecovery.clearActiveSession();
     setUrlRoomCode('');
     setCurrentView('MENU');
   };

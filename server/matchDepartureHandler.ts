@@ -15,7 +15,7 @@ export const GAME_MINIMUM_PLAYERS: Record<SupportedGameType, number> = {
   'pinturillo': 2,
 };
 
-export const RECONNECTION_GRACE_PERIOD_MS = 10000; // 10 seconds grace period (8-15s requirement)
+export const RECONNECTION_GRACE_PERIOD_MS = 15000; // 15 seconds grace period (10-15s requirement)
 
 export type AbortReasonCode =
   | 'HOST_LEFT_NOT_ENOUGH_PLAYERS'

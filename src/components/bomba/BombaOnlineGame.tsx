@@ -350,15 +350,15 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
         {/* 2. MAIN GAME AREA */}
         <main
           id="main-game-area"
-          className="relative flex-1 flex flex-col items-center justify-between h-full min-w-0 px-2 sm:px-4 lg:px-6 py-1 sm:py-2 overflow-hidden"
+          className="relative flex-1 flex flex-col items-center justify-between h-full min-w-0 px-2 sm:px-4 lg:px-6 py-1 sm:py-2 overflow-y-auto overflow-x-hidden"
         >
           {/* TOP: REQUIRED LETTERS BANNER */}
           <div className="w-full shrink-0 z-20">
             <RequiredLettersBanner sequence={roomState.currentSequence?.sequence || ''} />
           </div>
 
-          {/* CENTRE: CENTRAL RADIAL ARENA (BOMB + ORBITING PLAYERS) */}
-          <div className="relative flex-1 w-full max-w-5xl flex items-center justify-center my-1 sm:my-2 min-h-0">
+          {/* DESKTOP/TABLET: CENTRAL RADIAL ARENA (BOMB + ORBITING PLAYERS) */}
+          <div className="hidden md:flex relative flex-1 w-full max-w-5xl items-center justify-center my-1 sm:my-2 min-h-0">
             {/* Central Bomb (Absolute visual centre of main game area) */}
             <div className="relative z-10 flex items-center justify-center pointer-events-none scale-95 sm:scale-100 md:scale-105 transition-transform duration-300">
               <BombVisual
@@ -368,8 +368,8 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
               />
             </div>
 
-            {/* Desktop & Tablet Radial Ring */}
-            <div className="hidden md:block absolute inset-0">
+            {/* Desktop Radial Ring */}
+            <div className="absolute inset-0">
               <PlayerRing
                 players={castPlayers}
                 activePlayerIndex={roomState.activePlayerIndex}
@@ -394,8 +394,8 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
             </div>
           </div>
 
-          {/* MOBILE PLAYERS GRID (Fallback on small mobile screens where radial ring is hidden) */}
-          <div className="md:hidden w-full max-w-md my-1 shrink-0">
+          {/* MOBILE: DEDICATED STRUCTURED COMPOSITION (< md) */}
+          <div className="md:hidden w-full max-w-md my-0.5 shrink-0">
             <MobilePlayerGrid
               players={castPlayers}
               activePlayerIndex={roomState.activePlayerIndex}
@@ -416,6 +416,10 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
               }
               maxLives={roomState.config.startingLives}
               allowedMistakesPerRound={roomState.config.allowedMistakesPerRound}
+              progress={progress}
+              dangerLevel={roomState.dangerLevel}
+              speedMultiplier={castActivePlayer.multiplier}
+              usedWords={roomState.usedWords.map((u) => u.word)}
             />
           </div>
 

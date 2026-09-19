@@ -20,6 +20,7 @@ import { PinturilloBackground } from './PinturilloBackground';
 import { MatchAbortedModal } from '../common/MatchAbortedModal';
 import { audio } from '../../utils/audio';
 import { parseWordHintToGroups } from '../../utils/pinturilloHints';
+import { sessionRecovery } from '../../services/sessionRecovery';
 import {
   Clock,
   Volume2,
@@ -127,6 +128,11 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
 
         switch (msg.type) {
           case 'room_state':
+            sessionRecovery.saveActiveSession({
+              gameType: 'pinturillo',
+              roomCode: msg.state.code,
+              playerId: localPlayer.id,
+            });
             setRoomState(msg.state);
             if (msg.state.phase === 'DRAWING') {
               if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
@@ -141,6 +147,13 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
 
           case 'error':
             setErrorMessage(msg.message);
+            if (
+              msg.message.toLowerCase().includes('no se ha encontrado') ||
+              msg.message.toLowerCase().includes('ha finalizado') ||
+              msg.message.toLowerCase().includes('completa')
+            ) {
+              sessionRecovery.clearActiveSession();
+            }
             break;
 
           case 'countdown_tick':
@@ -289,9 +302,41 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
     };
   }, []);
 
-  // Clean up socket and timers on unmount
+  // Clean up socket and timers on unmount, and auto-reconnect on mount/foreground
   useEffect(() => {
+    // Auto-reconnect to active session if exists
+    const active = sessionRecovery.getActiveSession();
+    if (active && active.gameType === 'pinturillo' && active.roomCode) {
+      connectWebSocket(() => {
+        sendMessage({
+          type: 'join_room',
+          code: active.roomCode,
+          player: localPlayer,
+        });
+      });
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED || wsRef.current.readyState === WebSocket.CLOSING) {
+          const currentActive = sessionRecovery.getActiveSession();
+          if (currentActive && currentActive.gameType === 'pinturillo' && currentActive.roomCode) {
+            connectWebSocket(() => {
+              sendMessage({
+                type: 'join_room',
+                code: currentActive.roomCode,
+                player: localPlayer,
+              });
+            });
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
@@ -300,7 +345,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
       }
       audio.stopPinturilloMusic();
     };
-  }, []);
+  }, [connectWebSocket, sendMessage, localPlayer]);
 
   // Fail-safe cleanup: Ensure countdown overlay never lingers after DRAWING phase begins
   useEffect(() => {
@@ -377,6 +422,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({ onBackToMenu }) 
   };
 
   const handleLeaveRoom = () => {
+    sessionRecovery.clearActiveSession();
     sendMessage({ type: 'leave_room' });
     setRoomState(null);
     if (wsRef.current) {

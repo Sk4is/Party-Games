@@ -1075,14 +1075,8 @@ export class PinturilloServer {
       player.isConnected = false;
     }
 
-    // In LOBBY, departures are immediate
-    if (room.phase === 'LOBBY') {
-      this.processPermanentDeparture(client.roomId, client.playerId);
-      return;
-    }
-
-    const isGameActive = room.phase !== 'FINAL_RESULTS' && room.phase !== 'MATCH_ABORTED';
-    if (!isGameActive) {
+    const isMatchFinished = room.phase === 'FINAL_RESULTS' || room.phase === 'MATCH_ABORTED';
+    if (isMatchFinished) {
       this.processPermanentDeparture(client.roomId, client.playerId);
       return;
     }
