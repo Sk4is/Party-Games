@@ -428,3 +428,105 @@ export const PinturilloSettings: React.FC<PinturilloSettingsProps> = ({
     </div>
   );
 };
+
+/* =========================================================================
+   4. PALABRA SECRETA SETTINGS
+   ========================================================================= */
+export interface PalabraSecretaSettingsProps {
+  timePerTurn: number; // default 120 (2:00)
+  totalRounds: number; // default 3
+  isHost?: boolean;
+  onChangeTime?: (seconds: number) => void;
+  onChangeRounds?: (rounds: number) => void;
+}
+
+const PALABRA_SECRETA_TIME_OPTIONS = [
+  { label: '60s (1:00)', value: 60 },
+  { label: '90s (1:30)', value: 90 },
+  { label: '120s (2:00)', value: 120 },
+  { label: '150s (2:30)', value: 150 },
+];
+
+export const PalabraSecretaSettings: React.FC<PalabraSecretaSettingsProps> = ({
+  timePerTurn = 120,
+  totalRounds = 3,
+  isHost = true,
+  onChangeTime,
+  onChangeRounds,
+}) => {
+  return (
+    <div className="space-y-4">
+      {/* Tiempo por Turno */}
+      <div>
+        <div className="flex items-center justify-between text-xs mb-2">
+          <span className="text-stone-300 font-semibold flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-[#10B981]" />
+            Tiempo por Turno
+          </span>
+          <span className="font-bold text-white font-mono">
+            {timePerTurn >= 60 ? `${Math.floor(timePerTurn / 60)}:${(timePerTurn % 60).toString().padStart(2, '0')}` : `${timePerTurn}s`}
+          </span>
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {PALABRA_SECRETA_TIME_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={!isHost}
+              onClick={() => {
+                if (isHost && onChangeTime) {
+                  audio.playTick();
+                  onChangeTime(opt.value);
+                }
+              }}
+              className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+                timePerTurn === opt.value
+                  ? 'bg-[#10B981] text-slate-950 shadow-md shadow-[#10B981]/25 font-black scale-[1.02]'
+                  : isHost
+                  ? 'bg-stone-950 border border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700 cursor-pointer'
+                  : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Rondas por Partida */}
+      <div>
+        <div className="flex items-center justify-between text-xs mb-2">
+          <span className="text-stone-300 font-semibold flex items-center gap-1.5">
+            <Repeat className="w-3.5 h-3.5 text-[#10B981]" />
+            Rondas por Partida
+          </span>
+          <span className="font-bold text-white font-mono">{totalRounds} rondas</span>
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {[2, 3, 4, 5].map((num) => (
+            <button
+              key={num}
+              type="button"
+              disabled={!isHost}
+              onClick={() => {
+                if (isHost && onChangeRounds) {
+                  audio.playTick();
+                  onChangeRounds(num);
+                }
+              }}
+              className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+                totalRounds === num
+                  ? 'bg-[#10B981] text-slate-950 shadow-md shadow-[#10B981]/25 font-black scale-[1.02]'
+                  : isHost
+                  ? 'bg-stone-950 border border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700 cursor-pointer'
+                  : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
+              }`}
+            >
+              {num} rondas
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};

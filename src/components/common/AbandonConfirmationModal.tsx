@@ -8,6 +8,8 @@ interface AbandonConfirmationModalProps {
   onConfirm: () => void;
   title?: string;
   message?: string;
+  cancelText?: string;
+  confirmText?: string;
 }
 
 export const AbandonConfirmationModal: React.FC<AbandonConfirmationModalProps> = ({
@@ -16,6 +18,8 @@ export const AbandonConfirmationModal: React.FC<AbandonConfirmationModalProps> =
   onConfirm,
   title = '¿Abandonar la partida?',
   message = 'Si sales ahora, saldrás de la sala y perderás tu progreso actual en la partida.',
+  cancelText = 'Cancelar',
+  confirmText = 'Abandonar',
 }) => {
   return (
     <AnimatePresence>
@@ -29,11 +33,11 @@ export const AbandonConfirmationModal: React.FC<AbandonConfirmationModalProps> =
             className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-3xl p-6 shadow-2xl text-stone-100"
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-xl font-bold font-serif tracking-tight text-white">
+                <h3 className="text-xl font-bold font-serif tracking-tight text-white uppercase">
                   {title}
                 </h3>
                 <p className="text-xs text-stone-400">Confirmación de salida</p>
@@ -44,21 +48,21 @@ export const AbandonConfirmationModal: React.FC<AbandonConfirmationModalProps> =
               {message}
             </p>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={onCancel}
-                className="py-3 px-4 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-semibold text-sm transition-colors border border-stone-700"
+                className="w-full py-3 px-4 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-semibold text-sm transition-colors border border-stone-700 cursor-pointer"
               >
-                Seguir jugando
+                {cancelText}
               </button>
               <button
                 type="button"
                 onClick={onConfirm}
-                className="py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-sm transition-colors shadow-lg shadow-red-600/20 flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-sm transition-colors shadow-lg shadow-red-600/20 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                Abandonar
+                {confirmText}
               </button>
             </div>
           </motion.div>

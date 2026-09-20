@@ -7,12 +7,13 @@
  * - Pinturillo (min: 2)
  */
 
-export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo';
+export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta';
 
 export const GAME_MINIMUM_PLAYERS: Record<SupportedGameType, number> = {
   'la-bomba': 2,
   'la-peor-respuesta': 3,
   'pinturillo': 2,
+  'palabra-secreta': 4,
 };
 
 export const RECONNECTION_GRACE_PERIOD_MS = 15000; // 15 seconds grace period (10-15s requirement)

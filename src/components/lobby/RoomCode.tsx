@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Copy, Check, Share2 } from 'lucide-react';
 import { audio } from '../../utils/audio';
+import { GameSlug } from '../../styles/gameThemes';
 
 interface RoomCodeProps {
   code: string;
-  gameSlug: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo';
+  gameSlug: GameSlug;
 }
 
 export const RoomCode: React.FC<RoomCodeProps> = ({ code, gameSlug }) => {
@@ -31,6 +32,8 @@ export const RoomCode: React.FC<RoomCodeProps> = ({ code, gameSlug }) => {
       ? 'text-[#FF3B4F]'
       : gameSlug === 'pinturillo'
       ? 'text-[#00BCEB]'
+      : gameSlug === 'palabra-secreta'
+      ? 'text-[#10B981]'
       : 'text-[#FFB000]';
 
   const shareBtnColor =
@@ -38,6 +41,8 @@ export const RoomCode: React.FC<RoomCodeProps> = ({ code, gameSlug }) => {
       ? 'bg-[#FF3B4F]/15 hover:bg-[#FF3B4F]/25 text-[#FF3B4F] border-[#FF3B4F]/30'
       : gameSlug === 'pinturillo'
       ? 'bg-[#00BCEB]/15 hover:bg-[#00BCEB]/25 text-[#00BCEB] border-[#00BCEB]/30'
+      : gameSlug === 'palabra-secreta'
+      ? 'bg-[#10B981]/15 hover:bg-[#10B981]/25 text-[#10B981] border-[#10B981]/30'
       : 'bg-[#FFB000]/15 hover:bg-[#FFB000]/25 text-[#FFB000] border-[#FFB000]/30';
 
   return (

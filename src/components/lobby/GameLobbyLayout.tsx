@@ -38,6 +38,8 @@ export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = ({
       ? 'text-[#FF3B4F]'
       : gameType === 'pinturillo'
       ? 'text-[#00BCEB]'
+      : gameType === 'palabra-secreta'
+      ? 'text-[#10B981]'
       : 'text-[#FFB000]';
 
   const usersIconColor =
@@ -45,6 +47,8 @@ export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = ({
       ? 'text-[#FF3B4F]'
       : gameType === 'pinturillo'
       ? 'text-[#00BCEB]'
+      : gameType === 'palabra-secreta'
+      ? 'text-[#10B981]'
       : 'text-[#FFB000]';
 
   return (

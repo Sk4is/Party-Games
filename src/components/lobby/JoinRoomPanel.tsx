@@ -41,6 +41,8 @@ export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
       ? 'focus:border-[#FF3B4F] text-[#FF3B4F]'
       : gameType === 'pinturillo'
       ? 'focus:border-[#00BCEB] text-[#00BCEB]'
+      : gameType === 'palabra-secreta'
+      ? 'focus:border-[#10B981] text-[#10B981]'
       : 'focus:border-[#FFB000] text-[#FFB000]';
 
   const btnThemeClass =
@@ -48,6 +50,8 @@ export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
       ? 'bg-[#FF3B4F] hover:bg-[#E6293D] text-white shadow-[#FF3B4F]/25'
       : gameType === 'pinturillo'
       ? 'bg-[#00BCEB] hover:bg-[#009ED0] text-slate-950 shadow-[#00BCEB]/25'
+      : gameType === 'palabra-secreta'
+      ? 'bg-[#10B981] hover:bg-[#059669] text-slate-950 shadow-[#10B981]/25'
       : 'bg-[#FFB000] hover:bg-[#FF8A00] text-stone-950 shadow-[#FFB000]/25';
 
   return (

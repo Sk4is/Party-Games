@@ -4,7 +4,7 @@
  * for all 3 multiplayer games: La Bomba, La Peor Respuesta, and Pinturillo.
  */
 
-export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo';
+export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta';
 
 export interface ActiveSessionData {
   gameType: SupportedGameType;
@@ -80,7 +80,7 @@ export const sessionRecovery = {
       }
 
       // 3. Fallback to URL parameters if valid
-      if (urlRoom && urlGame && ['la-bomba', 'la-peor-respuesta', 'pinturillo'].includes(urlGame)) {
+      if (urlRoom && urlGame && ['la-bomba', 'la-peor-respuesta', 'pinturillo', 'palabra-secreta'].includes(urlGame)) {
         const playerId = localStorage.getItem('fiesta_playerId') || localStorage.getItem('pinturillo_playerId') || '';
         return {
           gameType: urlGame,

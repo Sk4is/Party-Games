@@ -29,6 +29,8 @@ export const CreateRoomPanel: React.FC<CreateRoomPanelProps> = ({
       ? 'bg-[#FF3B4F] hover:bg-[#E6293D] text-white shadow-[#FF3B4F]/25'
       : gameType === 'pinturillo'
       ? 'bg-[#00BCEB] hover:bg-[#009ED0] text-slate-950 shadow-[#00BCEB]/25'
+      : gameType === 'palabra-secreta'
+      ? 'bg-[#10B981] hover:bg-[#059669] text-slate-950 shadow-[#10B981]/25'
       : 'bg-[#FFB000] hover:bg-[#FF8A00] text-stone-950 shadow-[#FFB000]/25';
 
   return (

@@ -1,4 +1,4 @@
-export type GameSlug = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo';
+export type GameSlug = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta';
 
 export interface GameTheme {
   slug: GameSlug;
@@ -87,5 +87,25 @@ export const GAME_THEMES: Record<GameSlug, GameTheme> = {
     cardBorder: 'border-2 border-[#00BCEB]/80 hover:border-[#00BCEB]',
     howToPlayTitleClass: 'text-[#00BCEB]',
     selectedOptionClass: 'bg-[#00BCEB] text-slate-950 shadow-md font-black scale-[1.02]',
+  },
+  'palabra-secreta': {
+    slug: 'palabra-secreta',
+    name: 'Palabra Secreta',
+    primary: '#10B981',
+    secondary: '#059669',
+    glow: 'rgba(16, 185, 129, 0.18)',
+    glowHover: 'rgba(16, 185, 129, 0.32)',
+    borderClass: 'border-[#10B981]/80',
+    hoverBorderClass: 'hover:border-[#10B981]',
+    textClass: 'text-[#10B981]',
+    hoverTextClass: 'hover:text-[#10B981]',
+    bgClass: 'bg-[#10B981]',
+    buttonClass: 'bg-[#10B981] hover:bg-[#059669] text-slate-950 shadow-lg shadow-[#10B981]/25',
+    buttonActiveTab: 'bg-[#10B981] text-slate-950 shadow-md',
+    iconBg: 'bg-gradient-to-br from-[#10B981] to-[#059669]',
+    cardGlow: 'shadow-[0_0_30px_rgba(16,185,129,0.18)]',
+    cardBorder: 'border-2 border-[#10B981]/80 hover:border-[#10B981]',
+    howToPlayTitleClass: 'text-[#10B981]',
+    selectedOptionClass: 'bg-[#10B981] text-slate-950 shadow-md font-black scale-[1.02]',
   },
 };

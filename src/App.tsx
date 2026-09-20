@@ -12,6 +12,7 @@ import { LaPeorRespuestaSetup } from './components/LaPeorRespuestaSetup';
 import { LaPeorRespuestaGame } from './components/LaPeorRespuestaGame';
 import { LPROnlineContainer } from './components/lpr/LPROnlineContainer';
 import { PinturilloGame } from './components/pinturillo/PinturilloGame';
+import { PalabraSecretaGame } from './components/palabra-secreta/PalabraSecretaGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 import { sessionRecovery } from './services/sessionRecovery';
 
@@ -20,6 +21,7 @@ type AppView =
   | 'BOMBA_ONLINE'
   | 'LPR_ONLINE'
   | 'PINTURILLO'
+  | 'PALABRA_SECRETA'
   | 'BOMBA_LOCAL_SETUP'
   | 'BOMBA_LOCAL_GAME'
   | 'LPR_LOCAL_SETUP'
@@ -42,6 +44,7 @@ export default function App() {
       if (activeSession.gameType === 'la-bomba') return 'BOMBA_ONLINE';
       if (activeSession.gameType === 'la-peor-respuesta') return 'LPR_ONLINE';
       if (activeSession.gameType === 'pinturillo') return 'PINTURILLO';
+      if (activeSession.gameType === 'palabra-secreta') return 'PALABRA_SECRETA';
     }
 
     if (typeof window !== 'undefined') {
@@ -52,6 +55,7 @@ export default function App() {
       if (game === 'la-bomba') return 'BOMBA_ONLINE';
       if (game === 'la-peor-respuesta') return 'LPR_ONLINE';
       if (game === 'pinturillo') return 'PINTURILLO';
+      if (game === 'palabra-secreta') return 'PALABRA_SECRETA';
       if (room) {
         return 'PINTURILLO';
       }
@@ -78,6 +82,8 @@ export default function App() {
       setCurrentView('LPR_ONLINE');
     } else if (gameId === 'pinturillo') {
       setCurrentView('PINTURILLO');
+    } else if (gameId === 'palabra-secreta') {
+      setCurrentView('PALABRA_SECRETA');
     }
   };
 
@@ -87,11 +93,15 @@ export default function App() {
     setCurrentView('MENU');
   };
 
-  const handleSwitchGame = (game: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo', code: string) => {
+  const handleSwitchGame = (
+    game: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta',
+    code: string
+  ) => {
     setUrlRoomCode(code);
     if (game === 'la-bomba') setCurrentView('BOMBA_ONLINE');
     else if (game === 'la-peor-respuesta') setCurrentView('LPR_ONLINE');
     else if (game === 'pinturillo') setCurrentView('PINTURILLO');
+    else if (game === 'palabra-secreta') setCurrentView('PALABRA_SECRETA');
   };
 
   return (
@@ -121,6 +131,15 @@ export default function App() {
       {/* 3. PINTURILLO (ONLINE MULTIPLAYER) */}
       {currentView === 'PINTURILLO' && (
         <PinturilloGame
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
+      )}
+
+      {/* 4. PALABRA SECRETA (ONLINE MULTIPLAYER) */}
+      {currentView === 'PALABRA_SECRETA' && (
+        <PalabraSecretaGame
           onBackToMenu={handleBackToMenu}
           initialRoomCode={urlRoomCode}
           onSwitchGame={handleSwitchGame}

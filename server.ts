@@ -8,6 +8,7 @@ import { createServer as createViteServer } from 'vite';
 import spanishWordsRaw from 'an-array-of-spanish-words';
 import { PinturilloServer } from './server/pinturilloGameServer';
 import { PartyGameServer } from './server/partyGameServer';
+import { PalabraSecretaServer } from './server/palabraSecretaGameServer';
 import { roomRegistry } from './server/roomRegistry';
 
 dotenv.config();
@@ -182,6 +183,7 @@ Devuelve JSON: { "isRealWord": boolean, "canonicalWord": string }`;
 // Game servers instances (single source of truth for rooms)
 let pinturilloServer: PinturilloServer;
 let partyGameServer: PartyGameServer;
+let palabraSecretaServer: PalabraSecretaServer;
 
 // Check room info by code
 app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
@@ -193,6 +195,10 @@ app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
   const pinturilloInfo = pinturilloServer?.getRoomInfo(code);
   if (pinturilloInfo) {
     return res.json({ exists: true, room: pinturilloInfo, code: pinturilloInfo.code, gameType: pinturilloInfo.gameType });
+  }
+  const palabraInfo = palabraSecretaServer?.getRoomInfo(code);
+  if (palabraInfo) {
+    return res.json({ exists: true, room: palabraInfo, code: palabraInfo.code, gameType: palabraInfo.gameType });
   }
   return res.status(404).json({ exists: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
 });
@@ -219,6 +225,9 @@ app.post('/api/rooms/create', (req, res) => {
     } else if (gameType === 'pinturillo') {
       const room = pinturilloServer.createRoomDirect(normalizedPlayer as any, config);
       return res.json({ success: true, room });
+    } else if (gameType === 'palabra-secreta') {
+      const room = palabraSecretaServer.createRoomDirect(normalizedPlayer as any, config);
+      return res.json({ success: true, room });
     }
 
     return res.status(400).json({ success: false, message: 'Tipo de juego no soportado' });
@@ -239,7 +248,8 @@ app.post('/api/rooms/validate-join', (req, res) => {
 
     const partyInfo = partyGameServer?.getRoomInfo(code);
     const pinturilloInfo = pinturilloServer?.getRoomInfo(code);
-    const roomInfo = partyInfo || pinturilloInfo;
+    const palabraInfo = palabraSecretaServer?.getRoomInfo(code);
+    const roomInfo = partyInfo || pinturilloInfo || palabraInfo;
 
     if (!roomInfo) {
       return res.status(404).json({ valid: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
@@ -251,7 +261,9 @@ app.post('/api/rooms/validate-join', (req, res) => {
           ? 'LA BOMBA'
           : roomInfo.gameType === 'la-peor-respuesta'
           ? 'LA PEOR RESPUESTA'
-          : 'PINTURILLO';
+          : roomInfo.gameType === 'pinturillo'
+          ? 'PINTURILLO'
+          : 'PALABRA SECRETA';
       return res.status(400).json({
         valid: false,
         wrongGame: true,
@@ -287,6 +299,7 @@ app.post('/api/rooms/validate-join', (req, res) => {
 async function startServer() {
   pinturilloServer = new PinturilloServer();
   partyGameServer = new PartyGameServer();
+  palabraSecretaServer = new PalabraSecretaServer();
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -314,6 +327,10 @@ async function startServer() {
     if (pathname === '/ws/pinturillo') {
       pinturilloServer.wss.handleUpgrade(request, socket, head, (ws) => {
         pinturilloServer.wss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/ws/palabra-secreta') {
+      palabraSecretaServer.wss.handleUpgrade(request, socket, head, (ws) => {
+        palabraSecretaServer.wss.emit('connection', ws, request);
       });
     } else if (pathname === '/ws/party' || pathname === '/ws') {
       partyGameServer.wss.handleUpgrade(request, socket, head, (ws) => {

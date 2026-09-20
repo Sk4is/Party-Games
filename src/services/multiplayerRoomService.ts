@@ -14,7 +14,7 @@ export interface SharedRoomSummary {
   roomId: string;
   roomCode: string;
   code: string;
-  gameType: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo';
+  gameType: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta';
   hostId: string;
   phase: string;
   createdAt: number;
@@ -30,7 +30,7 @@ export interface ValidateJoinResult {
   valid: boolean;
   room?: SharedRoomSummary;
   wrongGame?: boolean;
-  actualGameType?: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo';
+  actualGameType?: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta';
   message?: string;
 }
 
@@ -38,7 +38,7 @@ export interface ValidateJoinResult {
  * Creates an online room on the server and returns its metadata and unique room code.
  */
 export async function createOnlineRoom(
-  gameType: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo',
+  gameType: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta',
   hostPlayer: PlayerProfile,
   config?: any
 ): Promise<SharedRoomSummary> {
@@ -89,7 +89,7 @@ export async function findOnlineRoom(code: string): Promise<SharedRoomSummary> {
  */
 export async function validateJoinOnlineRoom(
   code: string,
-  gameType?: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo',
+  gameType?: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta',
   player?: PlayerProfile
 ): Promise<ValidateJoinResult> {
   const cleanCode = code.trim().toUpperCase();

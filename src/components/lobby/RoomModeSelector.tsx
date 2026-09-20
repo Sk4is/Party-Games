@@ -22,6 +22,8 @@ export const RoomModeSelector: React.FC<RoomModeSelectorProps> = ({
       ? 'bg-[#FF3B4F] text-white shadow-md shadow-[#FF3B4F]/25 scale-[1.01]'
       : gameType === 'pinturillo'
       ? 'bg-[#00BCEB] text-slate-950 shadow-md shadow-[#00BCEB]/25 scale-[1.01]'
+      : gameType === 'palabra-secreta'
+      ? 'bg-[#10B981] text-slate-950 shadow-md shadow-[#10B981]/25 scale-[1.01]'
       : 'bg-[#FFB000] text-stone-950 shadow-md shadow-[#FFB000]/25 scale-[1.01]';
 
   return (

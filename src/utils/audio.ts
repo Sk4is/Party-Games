@@ -169,6 +169,10 @@ class AudioManager {
     osc.stop(now + duration);
   }
 
+  public playCountdownFinal() {
+    this.playCountdownBeep(true);
+  }
+
   // Bomb warning tick (speeding up heartbeat / alarm)
   public playBombWarning(pitchFactor: number = 1.0) {
     if (this.isMuted) return;
