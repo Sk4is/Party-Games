@@ -78,6 +78,14 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
     markGuessed,
     skipWord,
     markTaboo,
+    incrementClueCount,
+    decrementClueCount,
+    markPasswordGuessed,
+    finishPasswordTurn,
+    chooseEmojiOption,
+    updateEmojiClue,
+    markEmojiGuessed,
+    skipEmoji,
     nextTurn,
     playAgain,
     leaveRoom,
@@ -148,90 +156,109 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
 
   return (
     <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-slate-950">
-      {/* Responsive Top Bar / Navigation */}
-      <header className="sticky top-0 z-30 w-full border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-3 sm:px-6 py-2.5 flex items-center justify-between">
-        {/* Left: Back Button & Game Badge */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            id="btn-back-palabra-secreta"
-            type="button"
-            onClick={handleBackClick}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-800"
-            title="Volver"
-          >
-            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
+      {/* Responsive Top Bar / Navigation (Only when in active room) */}
+      {roomState && (
+        <header className="sticky top-0 z-30 w-full border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-2.5 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between min-w-0">
+          {/* Left: Back Button & Game Badge */}
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+            <button
+              id="btn-back-palabra-secreta"
+              type="button"
+              onClick={handleBackClick}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-800 flex items-center justify-center shrink-0"
+              title="Volver"
+              aria-label="Volver"
+            >
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className="text-xl sm:text-2xl">🗣️</span>
-            <div>
-              <div className="font-black text-xs sm:text-sm tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300 font-display">
-                PALABRA SECRETA
-              </div>
-              <div className="text-[10px] text-slate-400 font-semibold hidden sm:block">
-                Juego de palabras en equipo
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+              <span className="text-lg sm:text-2xl shrink-0">🗣️</span>
+              <div className="min-w-0">
+                <div className="font-black text-xs sm:text-sm tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300 font-display truncate">
+                  PALABRA SECRETA
+                </div>
+                <div className="text-[10px] text-slate-400 font-semibold hidden sm:block">
+                  Juego de palabras en equipo
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Center: Room Code (if in room) */}
-        {roomState?.code && (
+          {/* Center: Room Code (if in room, desktop / tablet) */}
+          {roomState?.code && (
+            <button
+              id="header-room-code-badge"
+              type="button"
+              onClick={handleCopyCode}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 transition-all cursor-pointer group shrink-0"
+              title="Copiar código de sala"
+            >
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sala:</span>
+              <span className="font-mono text-xs sm:text-sm font-black text-emerald-400">
+                {roomState.code}
+              </span>
+              {copiedCode ? (
+                <Check className="w-3 h-3 text-emerald-400" />
+              ) : (
+                <Copy className="w-3 h-3 text-slate-500 group-hover:text-emerald-400" />
+              )}
+            </button>
+          )}
+
+          {/* Right: Sound toggle, Rules & User badge */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              id="btn-sound-toggle-palabra"
+              type="button"
+              onClick={handleSoundToggle}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-800 flex items-center justify-center shrink-0"
+              title={soundMuted ? 'Activar sonido' : 'Silenciar sonido'}
+              aria-label={soundMuted ? 'Activar sonido' : 'Silenciar sonido'}
+            >
+              {soundMuted ? (
+                <VolumeX className="w-4 h-4 text-rose-400" />
+              ) : (
+                <Volume2 className="w-4 h-4 text-emerald-400" />
+              )}
+            </button>
+
+            <button
+              id="btn-how-to-play-header"
+              type="button"
+              onClick={() => setShowHowToPlay(true)}
+              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-800 hidden sm:flex items-center gap-1 text-xs font-bold shrink-0"
+              title="Cómo jugar"
+            >
+              <HelpCircle className="w-4 h-4 text-emerald-400" />
+              <span>Reglas</span>
+            </button>
+
+            {/* User profile avatar pill */}
+            <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
+              <span className="text-base">{localPlayer.avatar}</span>
+              <span className="text-xs font-bold text-slate-200 hidden md:inline max-w-[80px] truncate">
+                {localPlayer.name}
+              </span>
+            </div>
+          </div>
+        </header>
+      )}
+
+      {/* Sub-bar for Room Code on mobile if present */}
+      {roomState?.code && (
+        <div className="md:hidden w-full bg-slate-900/90 border-b border-slate-800/80 px-3 py-1 flex items-center justify-between text-xs min-w-0">
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Sala:</span>
           <button
-            id="header-room-code-badge"
             type="button"
             onClick={handleCopyCode}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 transition-all cursor-pointer group"
-            title="Copiar código de sala"
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono font-bold text-xs cursor-pointer active:scale-95"
           >
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sala:</span>
-            <span className="font-mono text-xs sm:text-sm font-black text-emerald-400">
-              {roomState.code}
-            </span>
-            {copiedCode ? (
-              <Check className="w-3 h-3 text-emerald-400" />
-            ) : (
-              <Copy className="w-3 h-3 text-slate-500 group-hover:text-emerald-400" />
-            )}
+            <span>{roomState.code}</span>
+            {copiedCode ? <Check className="w-3 h-3 text-emerald-400 stroke-[3]" /> : <Copy className="w-3 h-3 text-slate-400" />}
           </button>
-        )}
-
-        {/* Right: Sound toggle & User badge */}
-        <div className="flex items-center gap-2">
-          <button
-            id="btn-sound-toggle-palabra"
-            type="button"
-            onClick={handleSoundToggle}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-800"
-            title={soundMuted ? 'Activar sonido' : 'Silenciar sonido'}
-          >
-            {soundMuted ? (
-              <VolumeX className="w-4 h-4 text-rose-400" />
-            ) : (
-              <Volume2 className="w-4 h-4 text-emerald-400" />
-            )}
-          </button>
-
-          <button
-            id="btn-how-to-play-header"
-            type="button"
-            onClick={() => setShowHowToPlay(true)}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-800 hidden sm:flex items-center gap-1 text-xs font-bold"
-            title="Cómo jugar"
-          >
-            <HelpCircle className="w-4 h-4 text-emerald-400" />
-            <span>Reglas</span>
-          </button>
-
-          {/* User profile avatar pill */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="text-base">{localPlayer.avatar}</span>
-            <span className="text-xs font-bold text-slate-200 hidden sm:inline max-w-[90px] truncate">
-              {localPlayer.name}
-            </span>
-          </div>
         </div>
-      </header>
+      )}
 
       {/* Reconnecting / Offline Banner */}
       {connectionStatus === 'reconnecting' && (
@@ -273,7 +300,7 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
       )}
 
       {/* Main Game Screen Router */}
-      <main className="flex-1 flex flex-col justify-center items-center">
+      <main className="flex-1 flex flex-col w-full min-w-0 max-w-full">
         {!roomState ? (
           <PalabraSecretaEntry
             initialRoomCode={initialRoomCode}
@@ -311,6 +338,14 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
             onMarkGuessed={markGuessed}
             onSkipWord={skipWord}
             onMarkTaboo={markTaboo}
+            onIncrementClueCount={incrementClueCount}
+            onDecrementClueCount={decrementClueCount}
+            onMarkPasswordGuessed={markPasswordGuessed}
+            onFinishPasswordTurn={finishPasswordTurn}
+            onChooseEmojiOption={chooseEmojiOption}
+            onUpdateEmojiClue={updateEmojiClue}
+            onMarkEmojiGuessed={markEmojiGuessed}
+            onSkipEmoji={skipEmoji}
           />
         ) : roomState.phase === 'TURN_RESULTS' ? (
           <PalabraSecretaTurnSummary
@@ -326,13 +361,13 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
             onExit={handleConfirmExit}
           />
         ) : roomState.phase === 'MATCH_ABORTED' ? (
-          <div className="w-full max-w-md p-8 rounded-3xl bg-slate-900 border-2 border-rose-500/50 shadow-2xl text-center space-y-5 animate-fade-in mx-4">
-            <div className="w-16 h-16 rounded-3xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto text-3xl">
+          <div className="w-full max-w-md p-5 sm:p-8 rounded-3xl bg-slate-900 border-2 border-rose-500/50 shadow-2xl text-center space-y-4 sm:space-y-5 animate-fade-in mx-3">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto text-2xl sm:text-3xl">
               ⚠️
             </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-black text-white font-display">Partida Cancelada</h2>
-              <p className="text-slate-300 text-sm leading-relaxed">
+            <div className="space-y-1.5 sm:space-y-2">
+              <h2 className="text-xl sm:text-2xl font-black text-white font-display">Partida Cancelada</h2>
+              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
                 {roomState.endMessage ||
                   'No quedan suficientes jugadores conectados para continuar la partida de Palabra Secreta.'}
               </p>
@@ -340,7 +375,7 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
             <button
               type="button"
               onClick={handleConfirmExit}
-              className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm tracking-wide transition-all shadow-lg shadow-emerald-500/25 active:scale-95 cursor-pointer"
+              className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm tracking-wide transition-all shadow-lg shadow-emerald-500/25 active:scale-95 cursor-pointer"
             >
               Volver al Menú Principal
             </button>
@@ -365,52 +400,52 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
 
       {/* How to Play Modal */}
       {showHowToPlay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg p-6 sm:p-8 rounded-3xl bg-slate-900 border-2 border-emerald-500/40 shadow-2xl space-y-5 relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg p-4 xs:p-6 sm:p-8 rounded-3xl bg-slate-900 border-2 border-emerald-500/40 shadow-2xl space-y-4 sm:space-y-5 relative max-h-[90vh] overflow-y-auto min-w-0">
             <button
               type="button"
               onClick={() => setShowHowToPlay(false)}
-              className="absolute top-4 right-4 p-2 rounded-full bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer"
+              className="absolute top-3.5 right-3.5 p-1.5 sm:p-2 rounded-full bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🗣️</span>
-              <div>
-                <h3 className="text-xl font-black text-white font-display">
+            <div className="flex items-center gap-2 pr-6 min-w-0">
+              <span className="text-xl sm:text-2xl shrink-0">🗣️</span>
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-xl font-black text-white font-display truncate">
                   Cómo Jugar a Palabra Secreta
                 </h3>
-                <span className="text-xs text-emerald-400 font-bold">Reglas oficiales del juego</span>
+                <span className="text-[11px] sm:text-xs text-emerald-400 font-bold block">Reglas oficiales del juego</span>
               </div>
             </div>
 
-            <div className="space-y-3.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <div className="space-y-2.5 sm:space-y-3.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
               <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700 space-y-1">
                 <strong className="text-white font-bold block">1. Equipos y Turnos</strong>
                 <p>
-                  Los jugadores se dividen en dos equipos (mínimo 2 jugadores por equipo). En cada turno, un miembro del equipo actúa como <strong>Descriptor</strong> y los demás como <strong>Adivinadores</strong>.
+                  2 equipos (mínimo 2 jugadores por equipo). En cada turno, un miembro actúa como <strong>Descriptor</strong> (rota de forma justa cada ronda) y todos los demás miembros del equipo intentan adivinar simultáneamente.
                 </p>
               </div>
 
-              <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700 space-y-1">
-                <strong className="text-white font-bold block">2. El Descriptor</strong>
-                <p>
-                  El descriptor ve la <strong>Palabra Secreta</strong> y una lista de <strong>Palabras Prohibidas</strong>. Debe explicar la palabra a sus compañeros usando pistas verbales sin pronunciar la palabra ni las prohibidas.
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-1 text-emerald-300">
+                <strong className="text-white font-bold block">🗣️ Modo 1: Clásico</strong>
+                <p className="text-stone-300">
+                  El descriptor ve la palabra secreta y palabras prohibidas. Debe explicar tantas como pueda antes de que se agote el tiempo. Los rivales vigilan como árbitros.
                 </p>
               </div>
 
-              <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700 space-y-1">
-                <strong className="text-white font-bold block">3. Adivinar y Puntuación</strong>
-                <p>
-                  Los compañeros gritan respuestas en voz alta. Cuando aciertan, el descriptor pulsa <strong>¡ACERTADA!</strong> (+1 punto). Si la palabra es muy difícil, puede <strong>PASAR</strong>. Si dice una palabra prohibida, debe pulsar <strong>FALTA / TABÚ</strong> (-1 punto).
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-1 text-amber-300">
+                <strong className="text-white font-bold block">🔑 Modo 2: Contraseña</strong>
+                <p className="text-stone-300">
+                  10 palabras objetivo y un presupuesto de 15 pistas verbales. El descriptor registra cada pista usada con los botones [+] y [-]. Resolver con ≤15 pistas otorga bonificación de eficiencia (hasta x1.5). Cada pista por encima de 15 resta 1 punto.
                 </p>
               </div>
 
-              <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700 space-y-1">
-                <strong className="text-white font-bold block">4. Papel de los Rivales (Árbitros)</strong>
-                <p>
-                  Los integrantes del equipo rival también pueden ver la palabra secreta en su pantalla para vigilar y arbitrar que no se hagan trampas ni se digan palabras prohibidas.
+              <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 space-y-1 text-cyan-300">
+                <strong className="text-white font-bold block">😀 Modo 3: Emoji Misterioso</strong>
+                <p className="text-stone-300">
+                  El descriptor elige 1 de 3 títulos (cine o videojuegos) y compone una pista de hasta 5 emojis en directo. Su equipo adivina en voz alta. Pasar un título resta 1 punto a la puntuación del turno.
                 </p>
               </div>
             </div>
@@ -418,7 +453,7 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
             <button
               type="button"
               onClick={() => setShowHowToPlay(false)}
-              className="w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm uppercase tracking-wide transition-all cursor-pointer"
+              className="w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wide transition-all cursor-pointer"
             >
               ¡Entendido, a jugar!
             </button>

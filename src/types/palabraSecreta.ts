@@ -6,6 +6,10 @@ export type PalabraSecretaPhase =
   | 'PODIUM'
   | 'MATCH_ABORTED';
 
+export type PalabraSecretaGameMode = 'CLASSIC' | 'PASSWORD' | 'EMOJI';
+
+export type EmojiCategory = 'CINEMA' | 'VIDEOGAMES' | 'BOTH';
+
 export interface PalabraSecretaPlayer {
   id: string;
   name: string;
@@ -21,7 +25,7 @@ export interface PalabraSecretaPlayer {
 export interface PalabraSecretaTeam {
   id: 'team-1' | 'team-2';
   name: string;
-  color: string; // e.g. '#10B981' for Emerald, '#06B6D4' for Cyan / '#8B5CF6' for Violet
+  color: string; // e.g. '#10B981' for Emerald, '#06B6D4' for Cyan
   score: number;
   playerIds: string[];
 }
@@ -43,12 +47,30 @@ export interface TurnWordResult {
 }
 
 export interface PalabraSecretaConfig {
-  timePerTurn: number; // 30, 45, 60, 90 (default 60)
+  gameMode: PalabraSecretaGameMode;
+  timePerTurn: number; // 30, 45, 60, 90 (default 60 for Classic and Emoji)
   totalRounds: number; // 2, 3, 4, 5 (default 3)
-  maxSkipsPerTurn: number; // -1 for unlimited, 1, 2, 3 (default 3)
-  penaltyOnSkip: boolean; // false = 0 pts, true = -1 pt (default false)
-  penaltyOnTaboo: boolean; // false = 0 pts, true = -1 pt (default true)
+  maxSkipsPerTurn: number; // -1 for unlimited, 1, 2, 3
+  penaltyOnSkip: boolean; // default true (-1 pt)
+  penaltyOnTaboo: boolean; // default true
   showForbiddenWords: boolean; // default true
+  // Mode 2: Password
+  passwordTargetCount: number; // default 10 targets
+  passwordClueBudget: number; // default 15 clues
+  // Mode 3: Emoji Misterioso
+  emojiCategory: EmojiCategory; // 'CINEMA' | 'VIDEOGAMES' | 'BOTH'
+}
+
+export interface PasswordProgressItem {
+  index: number;
+  isGuessed: boolean;
+  word?: string; // Only descriptor receives this!
+}
+
+export interface EmojiCandidateItem {
+  id: string;
+  title: string;
+  category: 'MOVIE' | 'VIDEOGAME';
 }
 
 export interface PalabraSecretaTurnSummary {
@@ -57,7 +79,28 @@ export interface PalabraSecretaTurnSummary {
   descriptorName: string;
   descriptorAvatar: string;
   pointsGained: number;
-  words: TurnWordResult[];
+  gameMode: PalabraSecretaGameMode;
+  // Classic mode details
+  words?: TurnWordResult[];
+  // Password mode details
+  passwordSummary?: {
+    correctCount: number;
+    totalTargets: number;
+    clueWordCount: number;
+    budget: number;
+    multiplier?: number;
+    overBudgetWords?: number;
+    penalty?: number;
+    basePoints: number;
+    finalPoints: number;
+  };
+  // Emoji mode details
+  emojiSummary?: {
+    correctCount: number;
+    skipCount: number;
+    penalty: number;
+    finalPoints: number;
+  };
   nextTeamId: 'team-1' | 'team-2';
   nextDescriptorName: string;
 }
@@ -82,7 +125,7 @@ export interface PalabraSecretaRoomState {
   turnEndsAt?: number;
   turnRemainingSeconds: number;
   currentWord: SecretWordItem | null;
-  // Masked info for non-descriptors if server chooses to hide
+  // Masked info for non-descriptors
   isDescriptor: boolean;
   isRival: boolean;
   isTeammateGuesser: boolean;
@@ -94,6 +137,26 @@ export interface PalabraSecretaRoomState {
   abortReason?: string;
   endMessage?: string;
   preTurnCountdown?: number;
+
+  // --- PASSWORD MODE FIELDS ---
+  passwordTargetCount?: number;
+  passwordClueBudget?: number;
+  passwordClueWordCount?: number; // Public (e.g. 7 / 15)
+  passwordCorrectCount?: number; // Public (e.g. 4 / 10)
+  passwordCurrentIndex?: number; // Public (0..9)
+  passwordCurrentWord?: string | null; // ONLY for descriptor!
+  passwordTargetsProgress?: PasswordProgressItem[]; // Public list of 10 items (descriptor sees words)
+
+  // --- EMOJI MISTERIOSO FIELDS ---
+  emojiCandidateOptions?: EmojiCandidateItem[]; // ONLY for descriptor!
+  emojiSelectedTargetId?: string | null;
+  emojiSelectedTitle?: string | null; // ONLY for descriptor!
+  emojiSelectedCategory?: 'MOVIE' | 'VIDEOGAME' | null; // Public subtle category icon
+  emojiClue?: string; // Public (up to 5 emojis, e.g. 🚢🧊💔🌊)
+  emojiCount?: number; // Public (0..5)
+  emojiCorrectCount?: number; // Public
+  emojiSkipCount?: number; // Public
+  emojiPhase?: 'CHOOSE_OPTION' | 'COMPOSE_CLUE' | 'GUESSING';
 }
 
 export type PalabraSecretaClientMessage =
@@ -104,9 +167,21 @@ export type PalabraSecretaClientMessage =
   | { type: 'RANDOMIZE_TEAMS' }
   | { type: 'START_GAME' }
   | { type: 'START_TURN_NOW' }
-  | { type: 'MARK_GUESSED' }
-  | { type: 'SKIP_WORD' }
-  | { type: 'MARK_TABOO' }
+  // Classic mode
+  | { type: 'MARK_GUESSED'; actionId?: string }
+  | { type: 'SKIP_WORD'; actionId?: string }
+  | { type: 'MARK_TABOO'; actionId?: string }
+  // Password mode
+  | { type: 'INCREMENT_CLUE_COUNT'; actionId?: string }
+  | { type: 'DECREMENT_CLUE_COUNT'; actionId?: string }
+  | { type: 'PASSWORD_MARK_GUESSED'; actionId?: string }
+  | { type: 'PASSWORD_FINISH_TURN'; actionId?: string }
+  // Emoji mode
+  | { type: 'EMOJI_CHOOSE_OPTION'; optionId: string; actionId?: string }
+  | { type: 'EMOJI_UPDATE_CLUE'; clue: string; actionId?: string }
+  | { type: 'EMOJI_MARK_GUESSED'; actionId?: string }
+  | { type: 'EMOJI_SKIP'; actionId?: string }
+  // General
   | { type: 'NEXT_TURN' }
   | { type: 'PLAY_AGAIN' }
   | { type: 'KICK_PLAYER'; targetPlayerId: string }

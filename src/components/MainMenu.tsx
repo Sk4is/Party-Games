@@ -234,12 +234,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 PALABRA SECRETA
               </h2>
               <p className="text-slate-300 text-base sm:text-lg font-medium leading-snug">
-                &ldquo;Explica rápido sin decir las palabras prohibidas.&rdquo;
+                &ldquo;3 modos de juego: Clásico, Contraseña y Emoji Misterioso.&rdquo;
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
                 <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">4–16 Jugadores</span>
                 <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">Por Equipos</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">Pistas verbales</span>
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold">3 Modos de Juego</span>
               </div>
             </div>
 

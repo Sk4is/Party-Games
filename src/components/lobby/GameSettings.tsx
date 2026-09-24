@@ -441,10 +441,10 @@ export interface PalabraSecretaSettingsProps {
 }
 
 const PALABRA_SECRETA_TIME_OPTIONS = [
-  { label: '60s (1:00)', value: 60 },
-  { label: '90s (1:30)', value: 90 },
-  { label: '120s (2:00)', value: 120 },
-  { label: '150s (2:30)', value: 150 },
+  { label: '60s', sublabel: '1:00', value: 60 },
+  { label: '90s', sublabel: '1:30', value: 90 },
+  { label: '120s', sublabel: '2:00', value: 120 },
+  { label: '150s', sublabel: '2:30', value: 150 },
 ];
 
 export const PalabraSecretaSettings: React.FC<PalabraSecretaSettingsProps> = ({
@@ -467,7 +467,7 @@ export const PalabraSecretaSettings: React.FC<PalabraSecretaSettingsProps> = ({
             {timePerTurn >= 60 ? `${Math.floor(timePerTurn / 60)}:${(timePerTurn % 60).toString().padStart(2, '0')}` : `${timePerTurn}s`}
           </span>
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-2 xs:grid-cols-4 gap-1.5">
           {PALABRA_SECRETA_TIME_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -479,7 +479,7 @@ export const PalabraSecretaSettings: React.FC<PalabraSecretaSettingsProps> = ({
                   onChangeTime(opt.value);
                 }
               }}
-              className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center ${
                 timePerTurn === opt.value
                   ? 'bg-[#10B981] text-slate-950 shadow-md shadow-[#10B981]/25 font-black scale-[1.02]'
                   : isHost
@@ -487,7 +487,8 @@ export const PalabraSecretaSettings: React.FC<PalabraSecretaSettingsProps> = ({
                   : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
               }`}
             >
-              {opt.label}
+              <span>{opt.label}</span>
+              <span className="text-[10px] opacity-70 font-mono">({opt.sublabel})</span>
             </button>
           ))}
         </div>
@@ -502,7 +503,7 @@ export const PalabraSecretaSettings: React.FC<PalabraSecretaSettingsProps> = ({
           </span>
           <span className="font-bold text-white font-mono">{totalRounds} rondas</span>
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-2 xs:grid-cols-4 gap-1.5">
           {[2, 3, 4, 5].map((num) => (
             <button
               key={num}
@@ -522,7 +523,8 @@ export const PalabraSecretaSettings: React.FC<PalabraSecretaSettingsProps> = ({
                   : 'bg-stone-950/60 border border-stone-800/60 text-stone-600 cursor-default'
               }`}
             >
-              {num} rondas
+              <span>{num}</span>
+              <span className="hidden xs:inline ml-1">rondas</span>
             </button>
           ))}
         </div>

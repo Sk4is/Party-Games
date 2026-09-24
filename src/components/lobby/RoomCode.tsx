@@ -46,25 +46,25 @@ export const RoomCode: React.FC<RoomCodeProps> = ({ code, gameSlug }) => {
       : 'bg-[#FFB000]/15 hover:bg-[#FFB000]/25 text-[#FFB000] border-[#FFB000]/30';
 
   return (
-    <div className="bg-stone-900/70 border border-stone-800/90 rounded-3xl p-5 sm:p-6 shadow-xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+    <div className="w-full max-w-full min-w-0 bg-stone-900/70 border border-stone-800/90 rounded-3xl p-3.5 xs:p-4 sm:p-6 shadow-xl box-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 min-w-0">
+        <div className="min-w-0">
+          <span className="text-[10px] xs:text-[11px] font-bold text-stone-400 uppercase tracking-wider block mb-1 truncate">
             Código de la sala
           </span>
-          <div className={`text-3xl sm:text-4xl font-mono font-black tracking-widest ${codeColor}`}>
+          <div className={`text-2xl xs:text-3xl sm:text-4xl font-mono font-black tracking-widest break-all ${codeColor}`}>
             {code}
           </div>
-          <p className="text-xs text-stone-400 mt-1">
+          <p className="text-[11px] xs:text-xs text-stone-400 mt-1 break-words">
             Comparte este código o el enlace con tus amigos para que se unan.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0 min-w-0">
           <button
             type="button"
             onClick={handleCopyCode}
-            className="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white font-bold text-xs flex items-center justify-center gap-2 border border-stone-700 transition-colors cursor-pointer"
+            className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white font-bold text-xs flex items-center justify-center gap-2 border border-stone-700 transition-colors cursor-pointer"
           >
             {copiedCode ? (
               <>
@@ -82,7 +82,7 @@ export const RoomCode: React.FC<RoomCodeProps> = ({ code, gameSlug }) => {
           <button
             type="button"
             onClick={handleCopyLink}
-            className={`flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-colors cursor-pointer ${shareBtnColor}`}
+            className={`w-full sm:w-auto px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-colors cursor-pointer ${shareBtnColor}`}
           >
             {copiedLink ? (
               <>

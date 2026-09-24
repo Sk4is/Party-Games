@@ -388,6 +388,46 @@ export function usePalabraSecretaSocket({
     sendMessage({ type: 'MARK_TABOO' });
   }, [sendMessage]);
 
+  // Mode 2: Password actions
+  const incrementClueCount = useCallback(() => {
+    sendMessage({ type: 'INCREMENT_CLUE_COUNT' });
+  }, [sendMessage]);
+
+  const decrementClueCount = useCallback(() => {
+    sendMessage({ type: 'DECREMENT_CLUE_COUNT' });
+  }, [sendMessage]);
+
+  const markPasswordGuessed = useCallback(() => {
+    sendMessage({ type: 'PASSWORD_MARK_GUESSED' });
+  }, [sendMessage]);
+
+  const finishPasswordTurn = useCallback(() => {
+    sendMessage({ type: 'PASSWORD_FINISH_TURN' });
+  }, [sendMessage]);
+
+  // Mode 3: Emoji actions
+  const chooseEmojiOption = useCallback(
+    (optionId: string) => {
+      sendMessage({ type: 'EMOJI_CHOOSE_OPTION', optionId });
+    },
+    [sendMessage]
+  );
+
+  const updateEmojiClue = useCallback(
+    (clue: string) => {
+      sendMessage({ type: 'EMOJI_UPDATE_CLUE', clue });
+    },
+    [sendMessage]
+  );
+
+  const markEmojiGuessed = useCallback(() => {
+    sendMessage({ type: 'EMOJI_MARK_GUESSED' });
+  }, [sendMessage]);
+
+  const skipEmoji = useCallback(() => {
+    sendMessage({ type: 'EMOJI_SKIP' });
+  }, [sendMessage]);
+
   const nextTurn = useCallback(() => {
     sendMessage({ type: 'NEXT_TURN' });
   }, [sendMessage]);
@@ -456,6 +496,14 @@ export function usePalabraSecretaSocket({
     markGuessed,
     skipWord,
     markTaboo,
+    incrementClueCount,
+    decrementClueCount,
+    markPasswordGuessed,
+    finishPasswordTurn,
+    chooseEmojiOption,
+    updateEmojiClue,
+    markEmojiGuessed,
+    skipEmoji,
     nextTurn,
     playAgain,
     kickPlayer,

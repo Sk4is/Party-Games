@@ -245,43 +245,55 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
                 🗣️
               </div>
               <div>
-                <h3 className="text-xl font-bold font-display text-[#10B981]">Reglas de Palabra Secreta</h3>
-                <p className="text-xs text-slate-400">Juego en equipo de palabras y tabú</p>
+                <h3 className="text-xl font-bold font-display text-[#10B981]">Palabra Secreta (3 Modos)</h3>
+                <p className="text-xs text-slate-400">Juego en equipo: Clásico, Contraseña y Emoji</p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-              <Users className="w-6 h-6 text-[#10B981] shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3">
+              <Users className="w-5 h-5 text-[#10B981] shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-bold text-slate-100 text-base mb-1">
-                  1. Dos equipos enfrentados
+                <h4 className="font-bold text-slate-100 text-sm mb-0.5">
+                  Sistema de Equipos Compartido
                 </h4>
-                <p>
-                  Los jugadores se dividen en dos equipos (mínimo 2 por equipo). En cada turno, un miembro es el <strong className="text-white">Descriptor</strong> y los demás intentan adivinar hablando en voz alta.
+                <p className="text-xs text-slate-300">
+                  2 equipos (mínimo 2 jugadores por equipo). En cada ronda rota el descriptor del equipo y todos los demás compañeros adivinan en voz alta.
                 </p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-              <Mic className="w-6 h-6 text-[#10B981] shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex gap-3">
+              <span className="text-lg shrink-0">🗣️</span>
               <div>
-                <h4 className="font-bold text-slate-100 text-base mb-1">
-                  2. Pistas sin palabras prohibidas
+                <h4 className="font-bold text-emerald-300 text-sm mb-0.5">
+                  Modo 1: Clásico
                 </h4>
-                <p>
-                  El descriptor ve la palabra y sus términos prohibidos. Debe guiar a sus compañeros antes de que se agote el tiempo. Si aciertan, pulsa <strong className="text-[#10B981]">¡ACERTADA!</strong> (+1 punto).
+                <p className="text-xs text-slate-300">
+                  Describe la palabra secreta sin decir los términos prohibidos antes de que se agote el tiempo. Los rivales arbitran como jueces.
                 </p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex gap-3.5">
-              <ShieldAlert className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex gap-3">
+              <span className="text-lg shrink-0">🔑</span>
               <div>
-                <h4 className="font-bold text-slate-100 text-base mb-1">
-                  3. Árbitros rivales y penalizaciones
+                <h4 className="font-bold text-amber-300 text-sm mb-0.5">
+                  Modo 2: Contraseña
                 </h4>
-                <p>
-                  El equipo rival también ve la palabra secreta para vigilar que el descriptor no haga trampas ni diga palabras prohibidas. Si comete falta, se aplica penalización de <strong className="text-rose-400">-1 punto</strong>.
+                <p className="text-xs text-slate-300">
+                  10 palabras objetivo con un presupuesto de 15 pistas verbales en total. El descriptor pulsa [+] y [-] para registrar cada pista. Bonificación de eficiencia (hasta x1.5) si se usan ≤15 pistas; penalización de -1 pt por cada pista extra.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex gap-3">
+              <span className="text-lg shrink-0">😀</span>
+              <div>
+                <h4 className="font-bold text-cyan-300 text-sm mb-0.5">
+                  Modo 3: Emoji Misterioso
+                </h4>
+                <p className="text-xs text-slate-300">
+                  El descriptor elige 1 de 3 títulos de cine o videojuegos y compone una pista en directo de hasta 5 emojis para que su equipo adivine. Pasar resta 1 punto.
                 </p>
               </div>
             </div>

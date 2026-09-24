@@ -34,14 +34,14 @@ export const CreateRoomPanel: React.FC<CreateRoomPanelProps> = ({
       : 'bg-[#FFB000] hover:bg-[#FF8A00] text-stone-950 shadow-[#FFB000]/25';
 
   return (
-    <div className="bg-stone-900/70 border border-stone-800/90 rounded-3xl p-5 sm:p-6 shadow-xl space-y-6">
+    <div className="w-full max-w-full min-w-0 bg-stone-900/70 border border-stone-800/90 rounded-3xl p-3.5 xs:p-4 sm:p-6 shadow-xl space-y-4 sm:space-y-6 box-border">
       {settingsSlot && (
-        <div className="space-y-4">
-          <div className="border-b border-stone-800 pb-3">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-stone-200">
+        <div className="space-y-3 sm:space-y-4 w-full min-w-0">
+          <div className="border-b border-stone-800 pb-2.5 sm:pb-3 min-w-0">
+            <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-stone-200 break-words">
               Configuración Inicial de la Partida
             </h3>
-            <p className="text-xs text-stone-400 mt-0.5">
+            <p className="text-[11px] sm:text-xs text-stone-400 mt-0.5 break-words">
               También podrás ajustar estos parámetros en la sala antes de empezar.
             </p>
           </div>
@@ -49,19 +49,19 @@ export const CreateRoomPanel: React.FC<CreateRoomPanelProps> = ({
         </div>
       )}
 
-      <div>
+      <div className="w-full min-w-0 pt-1">
         <button
           type="button"
           onClick={handleClick}
           disabled={isLoading}
-          className={`w-full py-4 px-6 rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed font-black text-sm sm:text-base uppercase tracking-wider transition-all shadow-xl active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer ${btnThemeClass}`}
+          className={`w-full max-w-full py-3.5 sm:py-4 px-4 sm:px-6 rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed font-black text-xs xs:text-sm sm:text-base uppercase tracking-wider transition-all shadow-xl active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer ${btnThemeClass}`}
         >
           {isLoading ? (
             <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
           ) : (
             <>
-              <Plus className="w-5 h-5 stroke-[3]" />
-              <span>Crear sala</span>
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5 stroke-[3] shrink-0" />
+              <span className="truncate">Crear sala</span>
             </>
           )}
         </button>
