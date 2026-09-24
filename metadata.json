@@ -1,6 +1,6 @@
 {
   "name": "Fiesta de Juegos",
-  "description": "Juegos de fiesta multijugador para jugar con amigos: La Bomba, La Peor Respuesta, Pinturillo Online y Palabra Secreta (juego en equipo de descripción y palabras prohibidas).",
+  "description": "Juegos de fiesta multijugador para jugar con amigos: La Bomba, La Peor Respuesta, Pinturillo Online, Palabra Secreta y Código Rojo (juego cooperativo asimétrico de máquina y manual).",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -252,6 +252,49 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
               </div>
             </div>
           </div>
+
+          {/* CARD 5: CÓDIGO ROJO (COOPERATIVE ASYMMETRIC MACHINE & MANUAL) */}
+          <div
+            id="card-codigo-rojo"
+            onClick={() => handleSelectGame('codigo-rojo')}
+            className="w-full sm:w-[calc(50%-1rem)] lg:w-[calc(33.333%-1.25rem)] max-w-sm sm:max-w-none group relative flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-slate-850 to-slate-900 border-2 border-[#FF3B30]/80 hover:border-[#FF3B30] shadow-2xl hover:shadow-[#FF3B30]/25 transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-98 overflow-hidden"
+          >
+            {/* Ambient crimson glow */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#FF3B30]/15 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FF3B30] to-[#991B1B] flex items-center justify-center text-3xl shadow-lg shadow-[#FF3B30]/30 group-hover:scale-110 transition-transform">
+                  🚨
+                </div>
+                <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  Online
+                </span>
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#FF453A] transition-colors">
+                CÓDIGO ROJO
+              </h2>
+              <p className="text-slate-300 text-base sm:text-lg font-medium leading-snug">
+                &ldquo;Describe la máquina. Sigue el manual. Que no cunda el pánico.&rdquo;
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">2–6 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 font-bold">Cooperativo</span>
+                <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700">Comunicación</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-sm font-bold text-[#FF453A] group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
+                Entrar a la sala <ArrowRight className="w-4 h-4" />
+              </span>
+              <div className="w-10 h-10 rounded-full bg-[#FF3B30] group-hover:bg-[#DC2626] text-white flex items-center justify-center font-black shadow-md shadow-[#FF3B30]/25 transition-all">
+                <Play className="w-5 h-5 fill-current ml-0.5" />
+              </div>
+            </div>
+          </div>
         </div>
       </main>
 

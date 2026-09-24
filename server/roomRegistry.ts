@@ -1,4 +1,4 @@
-export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta';
+export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo';
 
 interface RoomMeta {
   code: string;

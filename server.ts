@@ -9,6 +9,7 @@ import spanishWordsRaw from 'an-array-of-spanish-words';
 import { PinturilloServer } from './server/pinturilloGameServer';
 import { PartyGameServer } from './server/partyGameServer';
 import { PalabraSecretaServer } from './server/palabraSecretaGameServer';
+import { CodigoRojoServer } from './server/codigoRojoGameServer';
 import { roomRegistry } from './server/roomRegistry';
 
 dotenv.config();
@@ -184,6 +185,7 @@ Devuelve JSON: { "isRealWord": boolean, "canonicalWord": string }`;
 let pinturilloServer: PinturilloServer;
 let partyGameServer: PartyGameServer;
 let palabraSecretaServer: PalabraSecretaServer;
+let codigoRojoServer: CodigoRojoServer;
 
 // Check room info by code
 app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
@@ -199,6 +201,10 @@ app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
   const palabraInfo = palabraSecretaServer?.getRoomInfo(code);
   if (palabraInfo) {
     return res.json({ exists: true, room: palabraInfo, code: palabraInfo.code, gameType: palabraInfo.gameType });
+  }
+  const codigoRojoInfo = codigoRojoServer?.getRoomInfo(code);
+  if (codigoRojoInfo) {
+    return res.json({ exists: true, room: codigoRojoInfo, code: codigoRojoInfo.code, gameType: codigoRojoInfo.gameType });
   }
   return res.status(404).json({ exists: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
 });
@@ -228,6 +234,9 @@ app.post('/api/rooms/create', (req, res) => {
     } else if (gameType === 'palabra-secreta') {
       const room = palabraSecretaServer.createRoomDirect(normalizedPlayer as any, config);
       return res.json({ success: true, room });
+    } else if (gameType === 'codigo-rojo') {
+      const room = codigoRojoServer.createRoomDirect(normalizedPlayer as any, config);
+      return res.json({ success: true, room });
     }
 
     return res.status(400).json({ success: false, message: 'Tipo de juego no soportado' });
@@ -249,7 +258,8 @@ app.post('/api/rooms/validate-join', (req, res) => {
     const partyInfo = partyGameServer?.getRoomInfo(code);
     const pinturilloInfo = pinturilloServer?.getRoomInfo(code);
     const palabraInfo = palabraSecretaServer?.getRoomInfo(code);
-    const roomInfo = partyInfo || pinturilloInfo || palabraInfo;
+    const codigoRojoInfo = codigoRojoServer?.getRoomInfo(code);
+    const roomInfo = partyInfo || pinturilloInfo || palabraInfo || codigoRojoInfo;
 
     if (!roomInfo) {
       return res.status(404).json({ valid: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
@@ -263,7 +273,9 @@ app.post('/api/rooms/validate-join', (req, res) => {
           ? 'LA PEOR RESPUESTA'
           : roomInfo.gameType === 'pinturillo'
           ? 'PINTURILLO'
-          : 'PALABRA SECRETA';
+          : roomInfo.gameType === 'palabra-secreta'
+          ? 'PALABRA SECRETA'
+          : 'CÓDIGO ROJO';
       return res.status(400).json({
         valid: false,
         wrongGame: true,
@@ -300,6 +312,7 @@ async function startServer() {
   pinturilloServer = new PinturilloServer();
   partyGameServer = new PartyGameServer();
   palabraSecretaServer = new PalabraSecretaServer();
+  codigoRojoServer = new CodigoRojoServer();
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -331,6 +344,10 @@ async function startServer() {
     } else if (pathname === '/ws/palabra-secreta') {
       palabraSecretaServer.wss.handleUpgrade(request, socket, head, (ws) => {
         palabraSecretaServer.wss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/ws/codigo-rojo') {
+      codigoRojoServer.wss.handleUpgrade(request, socket, head, (ws) => {
+        codigoRojoServer.wss.emit('connection', ws, request);
       });
     } else if (pathname === '/ws/party' || pathname === '/ws') {
       partyGameServer.wss.handleUpgrade(request, socket, head, (ws) => {

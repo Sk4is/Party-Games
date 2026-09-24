@@ -7,7 +7,7 @@ interface HowToPlayModalProps {
 }
 
 export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'bomba' | 'lpr' | 'pinturillo' | 'palabra-secreta'>('bomba');
+  const [activeTab, setActiveTab] = useState<'bomba' | 'lpr' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo'>('bomba');
 
   if (!isOpen) return null;
 
@@ -22,7 +22,9 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
             ? 'border-[#FF3B4F]/50 shadow-[#FF3B4F]/10'
             : activeTab === 'pinturillo'
             ? 'border-[#00BCEB]/50 shadow-[#00BCEB]/10'
-            : 'border-[#10B981]/50 shadow-[#10B981]/10'
+            : activeTab === 'palabra-secreta'
+            ? 'border-[#10B981]/50 shadow-[#10B981]/10'
+            : 'border-[#FF3B30]/50 shadow-[#FF3B30]/10'
         }`}
       >
         <button
@@ -40,20 +42,20 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
           <button
             type="button"
             onClick={() => setActiveTab('bomba')}
-            className={`flex-1 min-w-[75px] py-2 px-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+            className={`flex-1 min-w-[70px] py-2 px-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
               activeTab === 'bomba'
                 ? 'bg-[#FFB000] text-slate-950 shadow-md shadow-[#FFB000]/25'
                 : 'text-slate-400 hover:text-white hover:bg-slate-850'
             }`}
           >
             <span>💣</span>
-            <span>La Bomba</span>
+            <span>Bomba</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('lpr')}
-            className={`flex-1 min-w-[75px] py-2 px-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+            className={`flex-1 min-w-[70px] py-2 px-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
               activeTab === 'lpr'
                 ? 'bg-[#FF3B4F] text-white shadow-md shadow-[#FF3B4F]/25'
                 : 'text-slate-400 hover:text-white hover:bg-slate-850'
@@ -66,7 +68,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
           <button
             type="button"
             onClick={() => setActiveTab('pinturillo')}
-            className={`flex-1 min-w-[75px] py-2 px-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+            className={`flex-1 min-w-[70px] py-2 px-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
               activeTab === 'pinturillo'
                 ? 'bg-[#00BCEB] text-slate-950 shadow-md shadow-[#00BCEB]/25'
                 : 'text-slate-400 hover:text-white hover:bg-slate-850'
@@ -79,7 +81,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
           <button
             type="button"
             onClick={() => setActiveTab('palabra-secreta')}
-            className={`flex-1 min-w-[85px] py-2 px-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+            className={`flex-1 min-w-[75px] py-2 px-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
               activeTab === 'palabra-secreta'
                 ? 'bg-[#10B981] text-slate-950 shadow-md shadow-[#10B981]/25'
                 : 'text-slate-400 hover:text-white hover:bg-slate-850'
@@ -87,6 +89,19 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
           >
             <span>🗣️</span>
             <span>P. Secreta</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('codigo-rojo')}
+            className={`flex-1 min-w-[75px] py-2 px-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+              activeTab === 'codigo-rojo'
+                ? 'bg-[#FF3B30] text-white shadow-md shadow-[#FF3B30]/25'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+          >
+            <span>🚨</span>
+            <span>C. Rojo</span>
           </button>
         </div>
 
@@ -294,6 +309,59 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
                 </h4>
                 <p className="text-xs text-slate-300">
                   El descriptor elige 1 de 3 títulos de cine o videojuegos y compone una pista en directo de hasta 5 emojis para que su equipo adivine. Pasar resta 1 punto.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: CÓDIGO ROJO */}
+        {activeTab === 'codigo-rojo' && (
+          <div className="space-y-4 text-slate-200">
+            <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 flex gap-3">
+              <span className="text-lg shrink-0">🚨</span>
+              <div>
+                <h4 className="font-bold text-red-400 text-sm mb-0.5">
+                  Misión Cooperativa Asimétrica
+                </h4>
+                <p className="text-xs text-slate-300">
+                  Un juego de comunicación pura bajo presión. Exactamente un jugador es el <strong>OPERADOR</strong> (ve y manipula la máquina pero no tiene las instrucciones) y los demás son <strong>GUÍAS</strong> (leen el manual pero no ven la máquina).
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex gap-3">
+              <span className="text-lg shrink-0">🗣️</span>
+              <div>
+                <h4 className="font-bold text-white text-sm mb-0.5">
+                  Comunicación Verbal Estricta
+                </h4>
+                <p className="text-xs text-slate-300">
+                  El Operador describe lo que ve (cables, símbolos, frecuencias, manómetros). Los Guías buscan el módulo en el manual técnico, realizan las preguntas necesarias y dictan las acciones a ejecutar.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex gap-3">
+              <span className="text-lg shrink-0">⚠️</span>
+              <div>
+                <h4 className="font-bold text-amber-300 text-sm mb-0.5">
+                  Strikes y Tiempo Límite
+                </h4>
+                <p className="text-xs text-slate-300">
+                  Cada acción incorrecta suma un <strong>Strike (X)</strong>. Con 3 strikes o si se agota el tiempo antes de desactivar todos los módulos, el sistema colapsará.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex gap-3">
+              <span className="text-lg shrink-0">🔄</span>
+              <div>
+                <h4 className="font-bold text-emerald-300 text-sm mb-0.5">
+                  Rotación Justa de Operador
+                </h4>
+                <p className="text-xs text-slate-300">
+                  En cada nueva misión, el puesto de Operador rota automáticamente entre los participantes para que todos disfruten de ambos roles.
                 </p>
               </div>
             </div>
