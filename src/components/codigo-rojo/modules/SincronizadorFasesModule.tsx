@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Disc, RotateCw } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface SincronizadorFasesModuleProps {
   operatorState: {
     innerAngle: number;
-    phaseMode: 'MODO-RESONANTE' | 'MODO-INVERSO';
+    phaseMode: 'MODO-RESONANTE' | 'MODO-INVERSO' | 'MODO-CUADRATURA';
     currentOuterAngle: number;
   };
   solved: boolean;
@@ -21,11 +22,13 @@ export const SincronizadorFasesModule: React.FC<SincronizadorFasesModuleProps> =
 
   const rotateOuter = (delta: number) => {
     if (solved) return;
+    audio.playDialClick();
     setOuterAngle((prev) => (prev + delta + 360) % 360);
   };
 
   const handleSync = () => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     onAction({ outerAngle });
   };
 

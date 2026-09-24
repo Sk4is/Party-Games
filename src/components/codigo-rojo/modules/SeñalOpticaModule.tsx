@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Radio, RefreshCw } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface SeñalOpticaModuleProps {
   operatorState: {
@@ -61,6 +62,7 @@ export const SeñalOpticaModule: React.FC<SeñalOpticaModuleProps> = ({
 
   const handleTune = () => {
     if (solved || !selectedFreq) return;
+    audio.playMechanicalSwitch();
     onAction({ freq: selectedFreq });
   };
 

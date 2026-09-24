@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Zap } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface MatrizEnergiaModuleProps {
   operatorState: {
-    coreState: 'ESTABLE' | 'CRÍTICO' | 'PURGA_REQUERIDA';
+    coreState: 'ESTABLE' | 'CRÍTICO' | 'PURGA_REQUERIDA' | 'SOBRECALENTAMIENTO';
     activeCells: string[];
   };
   solved: boolean;
@@ -26,6 +27,7 @@ export const MatrizEnergiaModule: React.FC<MatrizEnergiaModuleProps> = ({
 
   const toggleCell = (coord: string) => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     setSelectedCells((prev) =>
       prev.includes(coord) ? prev.filter((c) => c !== coord) : [...prev, coord]
     );
@@ -33,6 +35,7 @@ export const MatrizEnergiaModule: React.FC<MatrizEnergiaModuleProps> = ({
 
   const handleDischarge = () => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     onAction({ activeCells: selectedCells });
   };
 
@@ -41,6 +44,8 @@ export const MatrizEnergiaModule: React.FC<MatrizEnergiaModuleProps> = ({
       ? 'bg-blue-950 border-blue-500/40 text-blue-400'
       : coreState === 'CRÍTICO'
       ? 'bg-red-950 border-red-500/40 text-red-400 animate-pulse'
+      : coreState === 'SOBRECALENTAMIENTO'
+      ? 'bg-orange-950 border-orange-500/40 text-orange-400 animate-pulse'
       : 'bg-amber-950 border-amber-500/40 text-amber-400';
 
   return (

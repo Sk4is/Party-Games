@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Gauge, RotateCw } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface ValvulasPresionModuleProps {
   operatorState: {
     psiA: number;
     psiB: number;
     psiC: number;
-    ledColor: 'VERDE' | 'AMBAR' | 'AZUL';
+    ledColor: 'VERDE' | 'AMBAR' | 'AZUL' | 'ROJO';
     valves: { a: number; b: number; c: number };
   };
   solved: boolean;
@@ -23,6 +24,7 @@ export const ValvulasPresionModule: React.FC<ValvulasPresionModuleProps> = ({
 
   const rotateValve = (valveKey: 'a' | 'b' | 'c') => {
     if (solved) return;
+    audio.playValveTurn();
     setValves((prev) => {
       const nextAngle = (prev[valveKey] + 45) % 135; // 0, 45, 90
       return { ...prev, [valveKey]: nextAngle };
@@ -31,6 +33,7 @@ export const ValvulasPresionModule: React.FC<ValvulasPresionModuleProps> = ({
 
   const handlePurge = () => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     onAction(valves);
   };
 
@@ -39,6 +42,8 @@ export const ValvulasPresionModule: React.FC<ValvulasPresionModuleProps> = ({
       ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]'
       : ledColor === 'AMBAR'
       ? 'bg-amber-500 shadow-[0_0_12px_#f59e0b]'
+      : ledColor === 'ROJO'
+      ? 'bg-red-500 shadow-[0_0_12px_#ef4444] animate-pulse'
       : 'bg-blue-500 shadow-[0_0_12px_#3b82f6]';
 
   return (

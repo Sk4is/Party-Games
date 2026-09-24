@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Cpu } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface CompuertasLogicasModuleProps {
   operatorState: {
     inputA: number;
     inputB: number;
-    gate: 'AND' | 'OR' | 'XOR' | 'NAND';
+    gate: 'AND' | 'OR' | 'XOR' | 'NAND' | 'NOR' | 'XNOR';
     pins: boolean[];
   };
   solved: boolean;
@@ -22,6 +23,7 @@ export const CompuertasLogicasModule: React.FC<CompuertasLogicasModuleProps> = (
 
   const togglePin = (index: number) => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     setPins((prev) => {
       const copy = [...prev];
       copy[index] = !copy[index];
@@ -31,6 +33,7 @@ export const CompuertasLogicasModule: React.FC<CompuertasLogicasModuleProps> = (
 
   const handleEnergize = () => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     onAction({ pins });
   };
 

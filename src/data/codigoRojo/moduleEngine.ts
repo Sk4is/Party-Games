@@ -61,6 +61,7 @@ function generateFilamentos(rng: Mulberry32, difficulty: CodigoRojoDifficulty): 
   const yellowCount = wires.filter((w) => w.color === 'Amarillo').length;
   const greenCount = wires.filter((w) => w.color === 'Verde').length;
   const blackCount = wires.filter((w) => w.color === 'Negro').length;
+  const whiteCount = wires.filter((w) => w.color === 'Blanco').length;
   const lastWire = wires[wires.length - 1];
 
   let targetIndex = 1; // 0-based
@@ -76,6 +77,9 @@ function generateFilamentos(rng: Mulberry32, difficulty: CodigoRojoDifficulty): 
   } else if (yellowCount >= 1 && greenCount === 0) {
     targetIndex = wires.length - 1; // last wire
     appliedRule = 'Hay filamentos amarillos pero ninguno verde: cortar el último filamento.';
+  } else if (sector === 'SEC-B3' && whiteCount >= 1) {
+    targetIndex = wires.length >= 4 ? wires.length - 2 : 0;
+    appliedRule = 'Sector B3 y al menos un filamento blanco: cortar el penúltimo filamento.';
   } else if (blackCount >= 2) {
     targetIndex = 0; // 1st wire
     appliedRule = 'Dos o más filamentos negros: cortar el 1er filamento.';
@@ -106,6 +110,10 @@ function generateFilamentos(rng: Mulberry32, difficulty: CodigoRojoDifficulty): 
       {
         condition: 'Si hay 1 o más filamentos amarillos y NINGÚN filamento verde:',
         action: 'Corta el ÚLTIMO filamento.',
+      },
+      {
+        condition: 'Si la etiqueta del sector es SEC-B3 y hay al menos 1 filamento blanco:',
+        action: 'Corta el PENÚLTIMO filamento.',
       },
       {
         condition: 'Si hay 2 o más filamentos negros:',
@@ -153,23 +161,18 @@ function generateFilamentos(rng: Mulberry32, difficulty: CodigoRojoDifficulty): 
 function generateModuladorFrecuencia(rng: Mulberry32, difficulty: CodigoRojoDifficulty): GeneratedModuleInternal {
   const waveforms = ['SENOIDAL', 'CUADRADA', 'TRIANGULAR', 'DIENTE_SIERRA'] as const;
   const waveform = rng.pick([...waveforms]);
-  const ledChannels = ['CANAL-ALPHA', 'CANAL-BETA', 'CANAL-GAMMA'] as const;
+  const ledChannels = ['CANAL-ALPHA', 'CANAL-BETA', 'CANAL-GAMMA', 'CANAL-DELTA'] as const;
   const channel = rng.pick([...ledChannels]);
 
   // Base frequency displayed (e.g. between 110.0 kHz and 190.0 kHz in 5.0 steps)
   const baseFreq = rng.range(22, 38) * 5; // e.g. 110 to 190
   let targetFreq = baseFreq;
 
-  // Manual lookup matrix
-  // senoidal + alpha = +15, beta = +25, gamma = -10
-  // cuadrada + alpha = -15, beta = +20, gamma = +30
-  // triangular + alpha = +30, beta = -20, gamma = +15
-  // sierra + alpha = -25, beta = -15, gamma = +20
   const matrix: Record<string, Record<string, number>> = {
-    SENOIDAL: { 'CANAL-ALPHA': 15, 'CANAL-BETA': 25, 'CANAL-GAMMA': -10 },
-    CUADRADA: { 'CANAL-ALPHA': -15, 'CANAL-BETA': 20, 'CANAL-GAMMA': 30 },
-    TRIANGULAR: { 'CANAL-ALPHA': 30, 'CANAL-BETA': -20, 'CANAL-GAMMA': 15 },
-    DIENTE_SIERRA: { 'CANAL-ALPHA': -25, 'CANAL-BETA': -15, 'CANAL-GAMMA': 20 },
+    SENOIDAL: { 'CANAL-ALPHA': 15, 'CANAL-BETA': 25, 'CANAL-GAMMA': -10, 'CANAL-DELTA': -20 },
+    CUADRADA: { 'CANAL-ALPHA': -15, 'CANAL-BETA': 20, 'CANAL-GAMMA': 30, 'CANAL-DELTA': 10 },
+    TRIANGULAR: { 'CANAL-ALPHA': 30, 'CANAL-BETA': -20, 'CANAL-GAMMA': 15, 'CANAL-DELTA': -15 },
+    DIENTE_SIERRA: { 'CANAL-ALPHA': -25, 'CANAL-BETA': -15, 'CANAL-GAMMA': 20, 'CANAL-DELTA': 25 },
   };
 
   const delta = matrix[waveform][channel] || 15;
@@ -182,12 +185,12 @@ function generateModuladorFrecuencia(rng: Mulberry32, difficulty: CodigoRojoDiff
     classificationCode: 'DOC-RAD-04',
     description:
       'El osciloscopio táctico emite una portadora desfasada. El Operador debe describir la FORMA DE ONDA y el CANAL LED iluminado. Los Guías deben consultar la tabla armónica y sumar o restar el ajuste indicado a la frecuencia base mostrada.',
-    tableHeaders: ['Forma de Onda', 'CANAL-ALPHA', 'CANAL-BETA', 'CANAL-GAMMA'],
+    tableHeaders: ['Forma de Onda', 'CANAL-ALPHA', 'CANAL-BETA', 'CANAL-GAMMA', 'CANAL-DELTA'],
     tableRows: [
-      ['Senoidal (onda suave)', '+15 kHz', '+25 kHz', '-10 kHz'],
-      ['Cuadrada (bloques rectos)', '-15 kHz', '+20 kHz', '+30 kHz'],
-      ['Triangular (picos agudos)', '+30 kHz', '-20 kHz', '+15 kHz'],
-      ['Diente de Sierra (rampa)', '-25 kHz', '-15 kHz', '+20 kHz'],
+      ['Senoidal (onda suave)', '+15 kHz', '+25 kHz', '-10 kHz', '-20 kHz'],
+      ['Cuadrada (bloques rectos)', '-15 kHz', '+20 kHz', '+30 kHz', '+10 kHz'],
+      ['Triangular (picos agudos)', '+30 kHz', '-20 kHz', '+15 kHz', '-15 kHz'],
+      ['Diente de Sierra (rampa)', '-25 kHz', '-15 kHz', '+20 kHz', '+25 kHz'],
     ],
     rules: [
       {

@@ -111,6 +111,7 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
         {/* Player Profile Setup */}
         <PlayerProfileSetup
           profile={profile}
+          onChange={handleUpdateProfile}
           onUpdate={handleUpdateProfile}
           accentColor="#ef4444"
         />

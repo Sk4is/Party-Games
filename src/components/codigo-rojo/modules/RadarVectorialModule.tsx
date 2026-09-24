@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Crosshair } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface RadarVectorialModuleProps {
   operatorState: {
@@ -18,8 +19,15 @@ export const RadarVectorialModule: React.FC<RadarVectorialModuleProps> = ({
   const { sweepDir, blips } = operatorState;
   const [selectedBlip, setSelectedBlip] = useState<string | null>(null);
 
+  const handleSelectBlip = (name: string) => {
+    if (solved) return;
+    audio.playDialClick();
+    setSelectedBlip(name);
+  };
+
   const handleLockVector = () => {
     if (solved || !selectedBlip) return;
+    audio.playMechanicalSwitch();
     onAction({ blipName: selectedBlip });
   };
 
@@ -82,7 +90,7 @@ export const RadarVectorialModule: React.FC<RadarVectorialModuleProps> = ({
             return (
               <g
                 key={blip.name}
-                onClick={() => !solved && setSelectedBlip(blip.name)}
+                onClick={() => handleSelectBlip(blip.name)}
                 className="cursor-pointer"
               >
                 <circle

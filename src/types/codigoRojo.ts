@@ -154,6 +154,12 @@ export type CodigoRojoClientMessage =
       targetPlayerId: string;
     }
   | {
+      type: 'UPDATE_PROFILE';
+      name?: string;
+      avatar?: string;
+      color?: string;
+    }
+  | {
       type: 'PING';
     };
 

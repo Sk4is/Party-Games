@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Cable, Unplug } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface PuertosConexionModuleProps {
   operatorState: {
-    busCode: 'BUS-ALFA' | 'BUS-BETA' | 'BUS-GAMMA';
+    busCode: 'BUS-ALFA' | 'BUS-BETA' | 'BUS-GAMMA' | 'BUS-DELTA';
     ports: string[];
     cables: { red: [string, string] | null; yellow: [string, string] | null };
   };
@@ -25,10 +26,12 @@ export const PuertosConexionModule: React.FC<PuertosConexionModuleProps> = ({
   const handlePortClick = (port: string) => {
     if (solved) return;
 
+    audio.playDialClick();
     if (!pendingStartPort) {
       setPendingStartPort(port);
     } else {
       if (pendingStartPort !== port) {
+        audio.playWireCut();
         if (activeCable === 'red') {
           setRedCable([pendingStartPort, port]);
         } else {
@@ -41,6 +44,7 @@ export const PuertosConexionModule: React.FC<PuertosConexionModuleProps> = ({
 
   const handleClearCable = (color: 'red' | 'yellow') => {
     if (solved) return;
+    audio.playDialClick();
     if (color === 'red') setRedCable(null);
     else setYellowCable(null);
     setPendingStartPort(null);
@@ -48,6 +52,7 @@ export const PuertosConexionModule: React.FC<PuertosConexionModuleProps> = ({
 
   const handleLinkSignal = () => {
     if (solved || !redCable || !yellowCable) return;
+    audio.playMechanicalSwitch();
     onAction({ red: redCable, yellow: yellowCable });
   };
 

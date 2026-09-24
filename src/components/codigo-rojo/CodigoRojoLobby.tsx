@@ -19,8 +19,11 @@ import {
   Info,
   Shield,
   ArrowRight,
+  Edit2,
 } from 'lucide-react';
 import { AvatarPickerModal } from '../AvatarPickerModal';
+import { saveUserProfile } from '../../utils/userProfile';
+import { audio } from '../../utils/audio';
 
 interface CodigoRojoLobbyProps {
   roomState: CodigoRojoRoomState;
@@ -49,6 +52,19 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
 
   const { code, config, players } = roomState;
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
+
+  const handleSelectAvatar = (newAvatar: string) => {
+    if (!currentPlayer) return;
+    saveUserProfile({
+      id: currentPlayer.id,
+      name: currentPlayer.name,
+      avatar: newAvatar,
+      color: currentPlayer.color,
+    });
+    if (onUpdateProfile) {
+      onUpdateProfile(currentPlayer.name, newAvatar, currentPlayer.color);
+    }
+  };
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(code);
@@ -166,15 +182,36 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
                   className="flex items-center justify-between p-4 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all shadow-md"
                 >
                   <div className="flex items-center gap-3">
-                    <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl border"
-                      style={{
-                        backgroundColor: `${p.color}20`,
-                        borderColor: p.color,
-                      }}
-                    >
-                      {p.avatar}
-                    </div>
+                    {p.id === currentPlayerId ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          audio.playClick();
+                          setShowAvatarPicker(true);
+                        }}
+                        className="relative group w-12 h-12 rounded-xl flex items-center justify-center text-2xl border transition-transform hover:scale-105 active:scale-95 cursor-pointer shadow"
+                        style={{
+                          backgroundColor: `${p.color}20`,
+                          borderColor: p.color,
+                        }}
+                        title="Haz clic para cambiar tu avatar"
+                      >
+                        <span>{p.avatar}</span>
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-900 border border-slate-600 flex items-center justify-center text-slate-300 group-hover:text-amber-400 shadow">
+                          <Edit2 className="w-2.5 h-2.5" />
+                        </div>
+                      </button>
+                    ) : (
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl border"
+                        style={{
+                          backgroundColor: `${p.color}20`,
+                          borderColor: p.color,
+                        }}
+                      >
+                        {p.avatar}
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-white text-sm sm:text-base">
@@ -364,6 +401,23 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
       <footer className="relative z-10 w-full max-w-5xl mx-auto text-center text-xs text-slate-500 py-3 border-t border-slate-800/80">
         CÓDIGO ROJO &bull; Comunica lo que ves &bull; No compartas pantalla &bull; 100% en castellano
       </footer>
+
+      {/* Avatar Picker Modal */}
+      {currentPlayer && (
+        <AvatarPickerModal
+          isOpen={showAvatarPicker}
+          onClose={() => setShowAvatarPicker(false)}
+          onSelectAvatar={(av) => {
+            handleSelectAvatar(av);
+            setShowAvatarPicker(false);
+          }}
+          selectedAvatar={currentPlayer.avatar}
+          currentAvatar={currentPlayer.avatar}
+          playerName={currentPlayer.name}
+          playerColorHex={currentPlayer.color}
+          usedAvatars={players.filter((p) => p.id !== currentPlayerId).map((p) => p.avatar)}
+        />
+      )}
 
       {/* Abandon modal */}
       {showAbandonConfirm && (

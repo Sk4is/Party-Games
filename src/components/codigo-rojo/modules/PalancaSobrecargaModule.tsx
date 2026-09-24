@@ -1,9 +1,10 @@
 import React from 'react';
 import { ShieldAlert, ArrowDown } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface PalancaSobrecargaModuleProps {
   operatorState: {
-    chargeColor: 'AZUL' | 'AMARILLO' | 'ROJO';
+    chargeColor: 'AZUL' | 'AMARILLO' | 'ROJO' | 'VIOLETA';
   };
   timeRemainingSeconds: number;
   solved: boolean;
@@ -20,6 +21,7 @@ export const PalancaSobrecargaModule: React.FC<PalancaSobrecargaModuleProps> = (
 
   const handlePullLever = () => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     onAction({ secondRemaining: timeRemainingSeconds });
   };
 
@@ -28,6 +30,8 @@ export const PalancaSobrecargaModule: React.FC<PalancaSobrecargaModuleProps> = (
       ? { bg: 'bg-blue-500', glow: 'shadow-[0_0_20px_#3b82f6]', text: 'text-blue-400' }
       : chargeColor === 'AMARILLO'
       ? { bg: 'bg-amber-500', glow: 'shadow-[0_0_20px_#f59e0b]', text: 'text-amber-400' }
+      : chargeColor === 'VIOLETA'
+      ? { bg: 'bg-purple-500', glow: 'shadow-[0_0_20px_#a855f7]', text: 'text-purple-400' }
       : { bg: 'bg-red-500', glow: 'shadow-[0_0_20px_#ef4444]', text: 'text-red-400' };
 
   const lastDigit = Math.abs(timeRemainingSeconds % 10);

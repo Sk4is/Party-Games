@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ToggleLeft, ToggleRight, Cpu } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface RelesHexadecimalesModuleProps {
   operatorState: {
@@ -20,6 +21,7 @@ export const RelesHexadecimalesModule: React.FC<RelesHexadecimalesModuleProps> =
 
   const toggleSwitch = (idx: number) => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     setSwitches((prev) => {
       const copy = [...prev];
       copy[idx] = copy[idx] === 1 ? 0 : 1;
@@ -29,6 +31,7 @@ export const RelesHexadecimalesModule: React.FC<RelesHexadecimalesModuleProps> =
 
   const handleConfirm = () => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     onAction({ switches });
   };
 

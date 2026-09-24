@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Delete, Check } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface TecladoMaestroModuleProps {
   operatorState: {
@@ -21,16 +22,19 @@ export const TecladoMaestroModule: React.FC<TecladoMaestroModuleProps> = ({
 
   const handleDigit = (digit: string) => {
     if (solved || pin.length >= 4) return;
+    audio.playTerminalBeep();
     setPin((prev) => prev + digit);
   };
 
   const handleClear = () => {
     if (solved) return;
+    audio.playDialClick();
     setPin('');
   };
 
   const handleEnter = () => {
     if (solved || pin.length !== 4) return;
+    audio.playMechanicalSwitch();
     onAction({ pin });
   };
 

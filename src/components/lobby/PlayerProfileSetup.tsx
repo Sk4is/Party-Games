@@ -13,7 +13,8 @@ export interface PlayerProfile {
 
 interface PlayerProfileSetupProps {
   profile: PlayerProfile;
-  onChange: (updated: Partial<PlayerProfile>) => void;
+  onChange?: (updated: Partial<PlayerProfile>) => void;
+  onUpdate?: (updated: Partial<PlayerProfile>) => void;
   accentColor?: string;
 }
 
@@ -23,34 +24,40 @@ const QUICK_AVATARS = ['🐶', '🐱', '🦊', '🐻', '🐼', '🐯', '🦁', '
 export const PlayerProfileSetup: React.FC<PlayerProfileSetupProps> = ({
   profile,
   onChange,
+  onUpdate,
 }) => {
+  const triggerUpdate = (updated: Partial<PlayerProfile>) => {
+    if (onChange) onChange(updated);
+    if (onUpdate) onUpdate(updated);
+  };
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [nameInput, setNameInput] = useState(profile.name);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.slice(0, 16);
     setNameInput(val);
-    onChange({ name: val });
+    triggerUpdate({ name: val });
   };
 
   const handleNameBlur = () => {
     const trimmed = nameInput.trim();
     if (!trimmed) {
       setNameInput('Jugador');
-      onChange({ name: 'Jugador' });
+      triggerUpdate({ name: 'Jugador' });
     } else {
-      onChange({ name: trimmed });
+      triggerUpdate({ name: trimmed });
     }
   };
 
   const handleSelectAvatar = (avatar: string) => {
     audio.playClick();
-    onChange({ avatar });
+    triggerUpdate({ avatar });
   };
 
   const handleSelectColor = (colorHex: string) => {
     audio.playClick();
-    onChange({ color: colorHex });
+    triggerUpdate({ color: colorHex });
   };
 
   return (

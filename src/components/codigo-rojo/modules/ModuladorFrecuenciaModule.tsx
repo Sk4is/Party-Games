@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Activity, Minus, Plus } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface ModuladorFrecuenciaModuleProps {
   operatorState: {
     waveform: 'SENOIDAL' | 'CUADRADA' | 'TRIANGULAR' | 'DIENTE_SIERRA';
-    channel: 'CANAL-ALPHA' | 'CANAL-BETA' | 'CANAL-GAMMA';
+    channel: 'CANAL-ALPHA' | 'CANAL-BETA' | 'CANAL-GAMMA' | 'CANAL-DELTA';
     currentFreq: number;
     baseFreq: number;
   };
@@ -22,11 +23,13 @@ export const ModuladorFrecuenciaModule: React.FC<ModuladorFrecuenciaModuleProps>
 
   const handleAdjust = (delta: number) => {
     if (solved) return;
+    audio.playDialClick();
     setFreq((prev) => Math.max(50, Math.min(300, prev + delta)));
   };
 
   const handleCalibrate = () => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     onAction({ tunedFreq: freq });
   };
 

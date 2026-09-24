@@ -872,6 +872,293 @@ class AudioManager {
     osc.stop(now + 0.04);
   }
 
+  // =========================================================================
+  // CÓDIGO ROJO SOUND EFFECTS
+  // =========================================================================
+
+  private tickToggle: boolean = false;
+
+  // Mechanical operator chronometer tick with independent volume control
+  public playOperatorTick(urgency: 'normal' | 'warning' | 'critical' = 'normal', volume: number = 0.5) {
+    if (volume <= 0.01) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    this.tickToggle = !this.tickToggle;
+
+    // Distinct "tick" vs "tock" frequencies
+    const baseFreq = this.tickToggle ? 2200 : 1600;
+    const urgencyBoost = urgency === 'critical' ? 1.25 : urgency === 'warning' ? 1.1 : 1.0;
+    const freq = baseFreq * urgencyBoost;
+
+    // Short resonant metallic click
+    const osc = this.ctx.createOscillator();
+    const bandpass = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = urgency === 'critical' ? 'square' : 'triangle';
+    osc.frequency.setValueAtTime(freq, now);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.4, now + 0.025);
+
+    bandpass.type = 'bandpass';
+    bandpass.frequency.setValueAtTime(freq, now);
+    bandpass.Q.setValueAtTime(3.5, now);
+
+    const safeVol = Math.max(0, Math.min(1, volume)) * 0.18;
+    gain.gain.setValueAtTime(safeVol, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.025);
+
+    osc.connect(bandpass);
+    bandpass.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.025);
+
+    // If critical, trigger a subtle low-frequency heartbeat undertone
+    if (urgency === 'critical') {
+      const subOsc = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(95, now);
+      subOsc.frequency.exponentialRampToValueAtTime(45, now + 0.06);
+
+      subGain.gain.setValueAtTime(safeVol * 0.8, now);
+      subGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+
+      subOsc.connect(subGain);
+      subGain.connect(this.ctx.destination);
+
+      subOsc.start(now);
+      subOsc.stop(now + 0.06);
+    }
+  }
+
+  // Module Solved: triumphant 4-tone ascending arpeggio with high chime
+  public playModuleSolved() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    notes.forEach((freq, idx) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + idx * 0.07;
+      const dur = 0.28;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0.2, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(start);
+      osc.stop(start + dur);
+    });
+  }
+
+  // Strike / Module Error: abrasive electrical buzz and error tone
+  public playStrike() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc1 = this.ctx.createOscillator();
+    const osc2 = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc1.type = 'sawtooth';
+    osc2.type = 'square';
+
+    // Dissonant minor second buzz
+    osc1.frequency.setValueAtTime(146.83, now); // D3
+    osc1.frequency.setValueAtTime(110.0, now + 0.12);
+
+    osc2.frequency.setValueAtTime(155.56, now); // D#3
+    osc2.frequency.setValueAtTime(116.54, now + 0.12);
+
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.38);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + 0.38);
+    osc2.stop(now + 0.38);
+  }
+
+  // Mechanical industrial toggle switch clack
+  public playMechanicalSwitch() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(750, now);
+    osc.frequency.exponentialRampToValueAtTime(250, now + 0.035);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.035);
+  }
+
+  // Wire cut snip
+  public playWireCut() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(2800, now);
+    osc.frequency.exponentialRampToValueAtTime(800, now + 0.03);
+
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.03);
+  }
+
+  // Rotary dial step click
+  public playDialClick() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1400, now);
+    osc.frequency.exponentialRampToValueAtTime(600, now + 0.02);
+
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.02);
+  }
+
+  // Pneumatic valve hiss
+  public playValveTurn() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(180, now + 0.08);
+
+    gain.gain.setValueAtTime(0.16, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }
+
+  // Keypad terminal digital beep
+  public playTerminalBeep() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1150, now);
+
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.045);
+  }
+
+  // Victory fanfare
+  public playVictoryFanfare() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const chords = [
+      { notes: [261.63, 329.63, 392.0], delay: 0 }, // C4 major
+      { notes: [329.63, 392.0, 523.25], delay: 0.18 }, // E4
+      { notes: [392.0, 523.25, 659.25], delay: 0.36 }, // G4
+      { notes: [523.25, 659.25, 783.99, 1046.5], delay: 0.58 }, // C5 major triumphant
+    ];
+
+    chords.forEach((chord) => {
+      chord.notes.forEach((freq) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const start = now + chord.delay;
+        const dur = chord.delay > 0.5 ? 0.9 : 0.22;
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, start);
+
+        gain.gain.setValueAtTime(0.18, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(start);
+        osc.stop(start + dur);
+      });
+    });
+  }
+
+  // Defeat explosion
+  public playDefeatExplosion() {
+    this.playExplosion();
+  }
+
   // Convenient aliases
   public playTick() {
     this.playClick();

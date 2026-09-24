@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Wind } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface DisipadorTermicoModuleProps {
   operatorState: {
@@ -23,6 +24,7 @@ export const DisipadorTermicoModule: React.FC<DisipadorTermicoModuleProps> = ({
 
   const toggleBaffle = (idx: number) => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     setBaffles((prev) => {
       const copy = [...prev];
       copy[idx] = !copy[idx];
@@ -32,6 +34,7 @@ export const DisipadorTermicoModule: React.FC<DisipadorTermicoModuleProps> = ({
 
   const handleFixBaffles = () => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     onAction({ baffles });
   };
 

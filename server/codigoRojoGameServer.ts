@@ -220,6 +220,18 @@ export class CodigoRojoServer {
           this.kickPlayer(room, msg.targetPlayerId);
         }
         break;
+
+      case 'UPDATE_PROFILE':
+        if (room.phase === 'LOBBY') {
+          const p = room.players.find((pl) => pl.id === conn.playerId);
+          if (p) {
+            if (msg.name && typeof msg.name === 'string') p.name = msg.name.trim().slice(0, 16);
+            if (msg.avatar && typeof msg.avatar === 'string') p.avatar = msg.avatar;
+            if (msg.color && typeof msg.color === 'string') p.color = msg.color;
+            this.broadcastRoom(room);
+          }
+        }
+        break;
     }
   }
 

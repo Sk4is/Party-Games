@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { FlaskConical } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface RefrigeranteQuimicoModuleProps {
   operatorState: {
-    stripColor: 'PÚRPURA' | 'CIAN' | 'NARANJA' | 'LIMA';
+    stripColor: 'PÚRPURA' | 'CIAN' | 'NARANJA' | 'LIMA' | 'MAGENTA' | 'TURQUESA';
     levels: { blue: number; green: number; red: number };
   };
   solved: boolean;
@@ -15,6 +16,8 @@ const STRIP_STYLES: Record<string, { bg: string; border: string }> = {
   CIAN: { bg: 'bg-cyan-500', border: 'border-cyan-300' },
   NARANJA: { bg: 'bg-orange-500', border: 'border-orange-300' },
   LIMA: { bg: 'bg-lime-500', border: 'border-lime-300' },
+  MAGENTA: { bg: 'bg-fuchsia-600', border: 'border-fuchsia-400' },
+  TURQUESA: { bg: 'bg-teal-500', border: 'border-teal-300' },
 };
 
 export const RefrigeranteQuimicoModule: React.FC<RefrigeranteQuimicoModuleProps> = ({
@@ -27,11 +30,13 @@ export const RefrigeranteQuimicoModule: React.FC<RefrigeranteQuimicoModuleProps>
 
   const setLevel = (flask: 'blue' | 'green' | 'red', val: number) => {
     if (solved) return;
+    audio.playValveTurn();
     setLevels((prev) => ({ ...prev, [flask]: val }));
   };
 
   const handleInject = () => {
     if (solved) return;
+    audio.playMechanicalSwitch();
     onAction(levels);
   };
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { KeyRound } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface GlifosCriptograficosModuleProps {
   operatorState: {
@@ -38,7 +39,10 @@ export const GlifosCriptograficosModule: React.FC<GlifosCriptograficosModuleProp
             key={btn.id}
             type="button"
             disabled={solved}
-            onClick={() => onAction({ symbol: btn.symbol })}
+            onClick={() => {
+              audio.playTerminalBeep();
+              onAction({ symbol: btn.symbol });
+            }}
             className={`h-24 sm:h-28 rounded-2xl border-2 flex items-center justify-center text-4xl sm:text-5xl font-mono transition-all transform active:scale-95 cursor-pointer shadow-lg ${
               solved
                 ? 'bg-emerald-950/80 border-emerald-500 text-emerald-400 shadow-emerald-500/20'

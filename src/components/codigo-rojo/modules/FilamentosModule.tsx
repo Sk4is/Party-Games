@@ -1,5 +1,6 @@
 import React from 'react';
 import { Scissors } from 'lucide-react';
+import { audio } from '../../../utils/audio';
 
 interface FilamentosModuleProps {
   operatorState: {
@@ -56,7 +57,10 @@ export const FilamentosModule: React.FC<FilamentosModuleProps> = ({
               <button
                 type="button"
                 disabled={solved || wire.isCut}
-                onClick={() => onAction({ wireIndex: idx })}
+                onClick={() => {
+                  audio.playWireCut();
+                  onAction({ wireIndex: idx });
+                }}
                 className={`group relative w-6 sm:w-8 h-36 sm:h-44 rounded-full transition-all flex items-center justify-center cursor-pointer ${
                   wire.isCut ? 'opacity-30 pointer-events-none' : 'hover:scale-105 active:scale-95'
                 }`}

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { CodigoRojoRoomState } from '../../types/codigoRojo';
 import { CheckCircle2, XCircle, RotateCcw, ArrowRight, Home } from 'lucide-react';
+import { audio } from '../../utils/audio';
 
 interface MissionResultModalProps {
   roomState: CodigoRojoRoomState;
@@ -19,6 +20,14 @@ export const MissionResultModal: React.FC<MissionResultModalProps> = ({
 }) => {
   const { phase, missionNumber, stats, strikes, maxStrikes, players, endMessage } = roomState;
   const isSuccess = phase === 'MISSION_SUCCESS';
+
+  useEffect(() => {
+    if (isSuccess) {
+      audio.playVictoryFanfare();
+    } else {
+      audio.playDefeatExplosion();
+    }
+  }, [isSuccess]);
 
   const formatSecs = (s: number) => {
     const mins = Math.floor(s / 60);

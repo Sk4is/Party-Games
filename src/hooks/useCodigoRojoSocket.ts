@@ -531,6 +531,14 @@ export function useCodigoRojoSocket({
     [sendMessage]
   );
 
+  const updateProfile = useCallback(
+    (name: string, avatar: string, color: string) => {
+      playerRef.current = { ...playerRef.current, name, avatar, color };
+      sendMessage({ type: 'UPDATE_PROFILE', name, avatar, color });
+    },
+    [sendMessage]
+  );
+
   return {
     connectionStatus,
     roomState,
@@ -545,5 +553,6 @@ export function useCodigoRojoSocket({
     restartMatch,
     leaveRoom,
     kickPlayer,
+    updateProfile,
   };
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   CodigoRojoRoomState,
   CodigoRojoModuleState,
@@ -18,7 +18,16 @@ import { RefrigeranteQuimicoModule } from './modules/RefrigeranteQuimicoModule';
 import { PuertosConexionModule } from './modules/PuertosConexionModule';
 import { DisipadorTermicoModule } from './modules/DisipadorTermicoModule';
 import { SincronizadorFasesModule } from './modules/SincronizadorFasesModule';
-import { AlertTriangle, Clock, CheckCircle2, ShieldAlert } from 'lucide-react';
+import {
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  ShieldAlert,
+  Volume2,
+  Volume1,
+  VolumeX,
+} from 'lucide-react';
+import { audio } from '../../utils/audio';
 
 interface CodigoRojoOperatorViewProps {
   roomState: CodigoRojoRoomState;
@@ -33,8 +42,78 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
 }) => {
   const [selectedModuleIndex, setSelectedModuleIndex] = useState(0);
 
+  // Independent ticking tension volume and mute state
+  const [tickingVolume, setTickingVolume] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0.35;
+    const saved = localStorage.getItem('codigo_rojo_ticking_vol');
+    return saved !== null ? parseFloat(saved) : 0.35;
+  });
+
+  const [isTickingMuted, setIsTickingMuted] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('codigo_rojo_ticking_muted') === 'true';
+  });
+
+  const handleTickingVolumeChange = (newVol: number) => {
+    setTickingVolume(newVol);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('codigo_rojo_ticking_vol', newVol.toString());
+    }
+  };
+
+  const handleToggleTickingMute = () => {
+    setIsTickingMuted((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('codigo_rojo_ticking_muted', next.toString());
+      }
+      return next;
+    });
+  };
+
   const { modules, strikes, maxStrikes, timeRemainingSeconds, missionNumber } = roomState;
   const activeModule = modules[selectedModuleIndex] || modules[0];
+
+  // Subtle ticking-clock tension sound for Operator, speeding up when countdown is low
+  useEffect(() => {
+    if (isTickingMuted || tickingVolume <= 0.01) return;
+
+    const urgency =
+      timeRemainingSeconds <= 30
+        ? 'critical'
+        : timeRemainingSeconds <= 60
+        ? 'warning'
+        : 'normal';
+    const intervalMs =
+      timeRemainingSeconds <= 30 ? 500 : timeRemainingSeconds <= 60 ? 750 : 1000;
+
+    const intervalId = setInterval(() => {
+      audio.playOperatorTick(urgency, tickingVolume);
+    }, intervalMs);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [timeRemainingSeconds, isTickingMuted, tickingVolume]);
+
+  // Audio feedback for strikes
+  const prevStrikesRef = useRef(strikes);
+  useEffect(() => {
+    if (strikes > prevStrikesRef.current) {
+      audio.playStrike();
+    }
+    prevStrikesRef.current = strikes;
+  }, [strikes]);
+
+  // Audio feedback when any module is solved
+  const solvedCount = modules.filter((m) => m.solved).length;
+  const prevSolvedCountRef = useRef(solvedCount);
+  useEffect(() => {
+    if (solvedCount > prevSolvedCountRef.current) {
+      audio.playModuleSolved();
+    }
+    prevSolvedCountRef.current = solvedCount;
+  }, [solvedCount]);
 
   const formatTimer = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -68,6 +147,56 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
             <h1 className="text-base sm:text-lg font-black text-white">
               CONSOLA DE LA MÁQUINA
             </h1>
+          </div>
+        </div>
+
+        {/* Tension Sound Controls: Independent Volume & Mute */}
+        <div className="flex items-center gap-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 text-xs font-mono shadow-inner">
+          <button
+            type="button"
+            onClick={handleToggleTickingMute}
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              isTickingMuted || tickingVolume <= 0.01
+                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                : 'bg-slate-800 text-amber-400 hover:text-white'
+            }`}
+            title={
+              isTickingMuted
+                ? 'Activar sonido de tensión (tic-tac)'
+                : 'Silenciar sonido de tensión'
+            }
+          >
+            {isTickingMuted || tickingVolume <= 0.01 ? (
+              <VolumeX className="w-4 h-4" />
+            ) : tickingVolume < 0.5 ? (
+              <Volume1 className="w-4 h-4" />
+            ) : (
+              <Volume2 className="w-4 h-4" />
+            )}
+          </button>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-400 hidden sm:inline uppercase font-bold">
+              TIC-TAC:
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={isTickingMuted ? 0 : tickingVolume}
+              onChange={(e) => {
+                if (isTickingMuted) setIsTickingMuted(false);
+                handleTickingVolumeChange(parseFloat(e.target.value));
+              }}
+              className="w-14 sm:w-20 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-red-500"
+              title={`Volumen del tic-tac: ${Math.round(
+                (isTickingMuted ? 0 : tickingVolume) * 100
+              )}%`}
+            />
+            <span className="text-[10px] text-slate-400 w-7 text-right">
+              {isTickingMuted ? 'OFF' : `${Math.round(tickingVolume * 100)}%`}
+            </span>
           </div>
         </div>
 
