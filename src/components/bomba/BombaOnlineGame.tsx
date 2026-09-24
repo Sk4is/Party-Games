@@ -92,6 +92,55 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
     message: string;
   }>({ type: null, message: '' });
 
+  // Floating temporary correct-answer toast (~1000ms duration, non-blocking)
+  const [successToast, setSuccessToast] = useState<{
+    id: string;
+    word: string;
+    player: string;
+    bonusLetters?: number;
+  } | null>(null);
+  const successToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Synchronize incoming acceptedWordBanner to temporary ~1000ms toast
+  useEffect(() => {
+    if (roomState.acceptedWordBanner) {
+      if (successToastTimerRef.current) {
+        clearTimeout(successToastTimerRef.current);
+        successToastTimerRef.current = null;
+      }
+      setSuccessToast({
+        id: `${Date.now()}_${roomState.acceptedWordBanner.word}`,
+        word: roomState.acceptedWordBanner.word,
+        player: roomState.acceptedWordBanner.player,
+        bonusLetters: roomState.acceptedWordBanner.bonusLetters,
+      });
+      successToastTimerRef.current = setTimeout(() => {
+        setSuccessToast(null);
+        successToastTimerRef.current = null;
+      }, 1000);
+    }
+  }, [roomState.acceptedWordBanner]);
+
+  // Clean up timer on unmount, round change, or game end
+  useEffect(() => {
+    return () => {
+      if (successToastTimerRef.current) {
+        clearTimeout(successToastTimerRef.current);
+        successToastTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (roomState.phase !== 'PLAYING') {
+      if (successToastTimerRef.current) {
+        clearTimeout(successToastTimerRef.current);
+        successToastTimerRef.current = null;
+      }
+      setSuccessToast(null);
+    }
+  }, [roomState.roundNumber, roomState.phase]);
+
   // Reset typing and unlock submissions when turn, activePlayer, or round changes
   useEffect(() => {
     setLocalTypingWord('');
@@ -342,23 +391,24 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
         </div>
       </header>
 
-      {/* FLOATING ACCEPTED WORD BANNER */}
+      {/* TEMPORARY FLOATING ACCEPTED WORD NOTIFICATION (~1s auto-dismiss, never blocks required letters) */}
       <AnimatePresence>
-        {roomState.acceptedWordBanner && (
+        {successToast && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            key={successToast.id}
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -15, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="absolute top-14 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-2xl bg-emerald-950/90 border border-emerald-500 text-emerald-200 text-xs sm:text-sm font-bold shadow-2xl flex items-center gap-2 backdrop-blur-md"
+            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+            transition={{ duration: 0.18 }}
+            className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-50 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-emerald-950/95 border-2 border-emerald-500/90 text-emerald-200 text-xs sm:text-sm font-bold shadow-2xl flex items-center gap-2 backdrop-blur-md pointer-events-none select-none max-w-[92vw] truncate"
           >
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>
-              ¡«<span className="font-mono text-white">{roomState.acceptedWordBanner.word}</span>» aceptada para {roomState.acceptedWordBanner.player}!
+            <span className="truncate">
+              ¡«<span className="font-mono text-white font-black">{successToast.word}</span>» aceptada para {successToast.player}!
             </span>
-            {Boolean(roomState.acceptedWordBanner.bonusLetters) && (
-              <span className="ml-1 px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px] font-black border border-amber-400/30">
-                +{roomState.acceptedWordBanner.bonusLetters} letras
+            {Boolean(successToast.bonusLetters) && (
+              <span className="ml-1 px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px] font-black border border-amber-400/30 shrink-0">
+                +{successToast.bonusLetters} letras
               </span>
             )}
           </motion.div>

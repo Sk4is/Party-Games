@@ -1,7 +1,17 @@
 import { LetterSequence } from '../types';
 import sequencesData from './sequencesData.json';
 
-export const SEQUENCES: LetterSequence[] = sequencesData as LetterSequence[];
+// Filter and ensure 100% viable Spanish combinations (>= 20 real dictionary words, no foreign letters)
+export const SEQUENCES: LetterSequence[] = (sequencesData as LetterSequence[]).filter(
+  (s) =>
+    s &&
+    typeof s.sequence === 'string' &&
+    s.sequence.length >= 2 &&
+    s.sequence.length <= 3 &&
+    s.wordCount >= 20 &&
+    !s.sequence.includes('W') &&
+    !s.sequence.includes('K')
+);
 
 // Precomputed fast index for lookup
 export const SEQUENCE_INDEX: Record<string, LetterSequence> = {};

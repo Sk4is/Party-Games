@@ -81,6 +81,7 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
     incrementClueCount,
     decrementClueCount,
     markPasswordGuessed,
+    skipPasswordWord,
     finishPasswordTurn,
     chooseEmojiOption,
     updateEmojiClue,
@@ -322,7 +323,7 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
             onUpdateTeamName={updateTeamName}
             onRandomizeTeams={randomizeTeams}
             onStartGame={startGame}
-            onLeaveRoom={leaveRoom}
+            onLeaveRoom={handleConfirmExit}
             onOpenHowToPlay={() => setShowHowToPlay(true)}
           />
         ) : roomState.phase === 'PRE_TURN' ? (
@@ -341,6 +342,7 @@ export const PalabraSecretaGame: React.FC<PalabraSecretaGameProps> = ({
             onIncrementClueCount={incrementClueCount}
             onDecrementClueCount={decrementClueCount}
             onMarkPasswordGuessed={markPasswordGuessed}
+            onSkipPasswordWord={skipPasswordWord}
             onFinishPasswordTurn={finishPasswordTurn}
             onChooseEmojiOption={chooseEmojiOption}
             onUpdateEmojiClue={updateEmojiClue}

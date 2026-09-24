@@ -13,6 +13,7 @@ import {
 } from '../services/multiplayerRoomService';
 import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
+import { createConnectionResilience } from '../utils/connectionResilience';
 
 export type PalabraSecretaConnectionStatus =
   | 'idle'
@@ -52,6 +53,7 @@ export function usePalabraSecretaSocket({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isManuallyClosedRef = useRef<boolean>(false);
+  const lastActivityRef = useRef<number>(Date.now());
   const lastActiveRoomRef = useRef<{ code: string } | null>(
     initialRoomCode
       ? { code: initialRoomCode.trim().toUpperCase() }
@@ -141,6 +143,7 @@ export function usePalabraSecretaSocket({
       };
 
       ws.onmessage = (event) => {
+        lastActivityRef.current = Date.now();
         try {
           const data: PalabraSecretaServerMessage = JSON.parse(event.data);
           handleServerMessage(data);
@@ -397,12 +400,16 @@ export function usePalabraSecretaSocket({
     sendMessage({ type: 'DECREMENT_CLUE_COUNT' });
   }, [sendMessage]);
 
-  const markPasswordGuessed = useCallback(() => {
-    sendMessage({ type: 'PASSWORD_MARK_GUESSED' });
+  const markPasswordGuessed = useCallback((targetId?: string, actionId?: string) => {
+    sendMessage({ type: 'PASSWORD_MARK_GUESSED', targetId, actionId });
   }, [sendMessage]);
 
-  const finishPasswordTurn = useCallback(() => {
-    sendMessage({ type: 'PASSWORD_FINISH_TURN' });
+  const skipPasswordWord = useCallback((targetId?: string, actionId?: string) => {
+    sendMessage({ type: 'PASSWORD_SKIP_WORD', targetId, actionId });
+  }, [sendMessage]);
+
+  const finishPasswordTurn = useCallback((actionId?: string) => {
+    sendMessage({ type: 'PASSWORD_FINISH_TURN', actionId });
   }, [sendMessage]);
 
   // Mode 3: Emoji actions
@@ -448,7 +455,14 @@ export function usePalabraSecretaSocket({
     if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     if (wsRef.current) {
-      wsRef.current.close();
+      if (wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
+        } catch (e) {
+          // Ignore
+        }
+      }
+      wsRef.current.close(1000, 'User left room');
       wsRef.current = null;
     }
     lastActiveRoomRef.current = null;
@@ -470,7 +484,24 @@ export function usePalabraSecretaSocket({
       }
     }
 
+    // Setup mobile background and connection resilience
+    const cleanupResilience = createConnectionResilience({
+      getSocket: () => wsRef.current,
+      onReconnect: () => {
+        reconnectAttemptsRef.current = 0;
+        connect();
+      },
+      sendPing: () => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'PING' }));
+        }
+      },
+      getLastActivityTime: () => lastActivityRef.current,
+      logTag: '[PalabraSecreta Client]',
+    });
+
     return () => {
+      cleanupResilience();
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (wsRef.current) {
@@ -499,6 +530,7 @@ export function usePalabraSecretaSocket({
     incrementClueCount,
     decrementClueCount,
     markPasswordGuessed,
+    skipPasswordWord,
     finishPasswordTurn,
     chooseEmojiOption,
     updateEmojiClue,

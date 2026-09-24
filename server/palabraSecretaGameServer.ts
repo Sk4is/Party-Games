@@ -65,10 +65,11 @@ interface ServerRoom {
   endMessage?: string;
 
   // Mode 2: Password
-  passwordTargets: { id: string; word: string; isGuessed: boolean }[];
+  passwordTargets: { id: string; word: string; status: 'PENDING' | 'CURRENT' | 'CORRECT' | 'SKIPPED'; isGuessed: boolean }[];
   passwordCurrentIndex: number;
   passwordClueWordCount: number;
   passwordCorrectCount: number;
+  processedActionIds: Set<string>;
 
   // Mode 3: Emoji
   emojiCandidateOptions: EmojiCandidateItem[];
@@ -274,6 +275,7 @@ export class PalabraSecretaServer {
       passwordCurrentIndex: 0,
       passwordClueWordCount: 0,
       passwordCorrectCount: 0,
+      processedActionIds: new Set<string>(),
 
       // Emoji
       emojiCandidateOptions: [],
@@ -368,10 +370,13 @@ export class PalabraSecretaServer {
         this.handlePasswordDecrementClue(room, conn.playerId);
         break;
       case 'PASSWORD_MARK_GUESSED':
-        this.handlePasswordMarkGuessed(room, conn.playerId);
+        this.handlePasswordMarkGuessed(room, conn.playerId, message.targetId, message.actionId);
+        break;
+      case 'PASSWORD_SKIP_WORD':
+        this.handlePasswordSkipWord(room, conn.playerId, message.targetId, message.actionId);
         break;
       case 'PASSWORD_FINISH_TURN':
-        this.handlePasswordFinishTurn(room, conn.playerId);
+        this.handlePasswordFinishTurn(room, conn.playerId, message.actionId);
         break;
 
       // Emoji actions
@@ -397,6 +402,9 @@ export class PalabraSecretaServer {
         break;
       case 'KICK_PLAYER':
         this.handleKickPlayer(room, conn.playerId, message.targetPlayerId);
+        break;
+      case 'LEAVE_ROOM':
+        this.handleExplicitLeave(ws);
         break;
     }
   }
@@ -454,6 +462,16 @@ export class PalabraSecretaServer {
     matchDepartureHandler.cancelGracePeriod(room.code, player.id);
     console.log(`[PalabraSecretaServer] Player ${player.name} joined room ${room.code} on ${player.teamId}`);
     this.broadcastRoomState(room);
+  }
+
+  private handleExplicitLeave(ws: WebSocket) {
+    const conn = this.connections.get(ws);
+    if (!conn) return;
+
+    this.connections.delete(ws);
+    const { roomId, playerId } = conn;
+    matchDepartureHandler.cancelGracePeriod(roomId, playerId);
+    this.processPermanentDeparture(roomId, playerId);
   }
 
   private handleDisconnect(ws: WebSocket) {
@@ -517,6 +535,10 @@ export class PalabraSecretaServer {
     }
 
     // 2. In active game
+    room.players = room.players.filter((p) => p.id !== playerId);
+    room.teams['team-1'].playerIds = room.teams['team-1'].playerIds.filter((id) => id !== playerId);
+    room.teams['team-2'].playerIds = room.teams['team-2'].playerIds.filter((id) => id !== playerId);
+
     const evaluation = matchDepartureHandler.evaluatePermanentDeparture({
       gameType: 'palabra-secreta',
       isGameActive,
@@ -542,6 +564,14 @@ export class PalabraSecretaServer {
         newHost.isHost = true;
         room.hostId = newHost.id;
       }
+    }
+
+    // Critical fix: If the departing player was the active descriptor in an active match,
+    // advance or end turn immediately so the game does not freeze.
+    if (room.activeDescriptorId === playerId && isGameActive) {
+      console.log(`[PalabraSecretaServer] Active descriptor ${playerId} left match. Ending active turn.`);
+      this.endActiveTurn(room);
+      return;
     }
 
     this.broadcastRoomState(room);
@@ -737,12 +767,13 @@ export class PalabraSecretaServer {
         }
       }, 1000);
     } else if (mode === 'PASSWORD') {
-      // 10 targets generated for descriptor
+      // 10 targets generated for descriptor with stable IDs and status
       const rawTargets = getPasswordTargets(room.config.passwordTargetCount || 10, room.usedWordIds);
       rawTargets.forEach((t) => room.usedWordIds.add(t.id));
-      room.passwordTargets = rawTargets.map((t) => ({
-        id: t.id,
+      room.passwordTargets = rawTargets.map((t, idx) => ({
+        id: t.id || `target_${idx}_${Date.now()}`,
         word: t.word,
+        status: idx === 0 ? 'CURRENT' : 'PENDING',
         isGuessed: false,
       }));
       room.passwordCurrentIndex = 0;
@@ -917,38 +948,117 @@ export class PalabraSecretaServer {
     }
   }
 
-  private handlePasswordMarkGuessed(room: ServerRoom, playerId: string) {
+  private handlePasswordMarkGuessed(
+    room: ServerRoom,
+    playerId: string,
+    targetId?: string,
+    actionId?: string
+  ) {
     if (room.phase !== 'ACTIVE_TURN' || room.config.gameMode !== 'PASSWORD') return;
     if (playerId !== room.activeDescriptorId) return;
 
-    const currIdx = room.passwordCurrentIndex;
-    if (currIdx >= room.passwordTargets.length) return;
+    if (actionId) {
+      if (room.processedActionIds.has(actionId)) return;
+      room.processedActionIds.add(actionId);
+    }
 
-    const target = room.passwordTargets[currIdx];
-    if (!target || target.isGuessed) return;
+    let target = room.passwordTargets[room.passwordCurrentIndex];
+    if (targetId) {
+      const found = room.passwordTargets.find((t) => t.id === targetId);
+      if (found && found.status === 'CURRENT') {
+        target = found;
+      }
+    }
 
+    if (!target || target.status !== 'CURRENT') return;
+
+    target.status = 'CORRECT';
     target.isGuessed = true;
     room.passwordCorrectCount += 1;
-    room.passwordCurrentIndex += 1;
 
-    this.broadcast({
-      type: 'ACTION_FEEDBACK',
-      action: 'GUESSED',
-      word: target.word,
-      points: 1,
-    }, room);
-
-    // If solved all 10 targets, end the turn challenge successfully!
-    if (room.passwordCorrectCount >= room.passwordTargets.length || room.passwordCurrentIndex >= room.passwordTargets.length) {
-      this.endActiveTurn(room);
-    } else {
+    // Advance to next pending target
+    const nextPendingIdx = room.passwordTargets.findIndex((t) => t.status === 'PENDING');
+    if (nextPendingIdx !== -1) {
+      room.passwordCurrentIndex = nextPendingIdx;
+      room.passwordTargets[nextPendingIdx].status = 'CURRENT';
+      this.broadcast({
+        type: 'ACTION_FEEDBACK',
+        action: 'GUESSED',
+        word: target.word,
+        points: 1,
+      }, room);
       this.broadcastRoomState(room);
+    } else {
+      // All targets resolved! End turn
+      this.broadcast({
+        type: 'ACTION_FEEDBACK',
+        action: 'GUESSED',
+        word: target.word,
+        points: 1,
+      }, room);
+      this.endActiveTurn(room);
     }
   }
 
-  private handlePasswordFinishTurn(room: ServerRoom, playerId: string) {
+  private handlePasswordSkipWord(
+    room: ServerRoom,
+    playerId: string,
+    targetId?: string,
+    actionId?: string
+  ) {
+    if (room.phase !== 'ACTIVE_TURN' || room.config.gameMode !== 'PASSWORD') return;
+    if (playerId !== room.activeDescriptorId) return;
+
+    if (actionId) {
+      if (room.processedActionIds.has(actionId)) return;
+      room.processedActionIds.add(actionId);
+    }
+
+    let target = room.passwordTargets[room.passwordCurrentIndex];
+    if (targetId) {
+      const found = room.passwordTargets.find((t) => t.id === targetId);
+      if (found && found.status === 'CURRENT') {
+        target = found;
+      }
+    }
+
+    if (!target || target.status !== 'CURRENT') return;
+
+    target.status = 'SKIPPED';
+    target.isGuessed = false;
+
+    // Advance to next pending target
+    const nextPendingIdx = room.passwordTargets.findIndex((t) => t.status === 'PENDING');
+    if (nextPendingIdx !== -1) {
+      room.passwordCurrentIndex = nextPendingIdx;
+      room.passwordTargets[nextPendingIdx].status = 'CURRENT';
+      this.broadcast({
+        type: 'ACTION_FEEDBACK',
+        action: 'SKIPPED',
+        word: target.word,
+        points: 0,
+      }, room);
+      this.broadcastRoomState(room);
+    } else {
+      // All targets resolved! End turn
+      this.broadcast({
+        type: 'ACTION_FEEDBACK',
+        action: 'SKIPPED',
+        word: target.word,
+        points: 0,
+      }, room);
+      this.endActiveTurn(room);
+    }
+  }
+
+  private handlePasswordFinishTurn(room: ServerRoom, playerId: string, actionId?: string) {
     if (room.phase !== 'ACTIVE_TURN' || room.config.gameMode !== 'PASSWORD') return;
     if (playerId !== room.activeDescriptorId && playerId !== room.hostId) return;
+
+    if (actionId) {
+      if (room.processedActionIds.has(actionId)) return;
+      room.processedActionIds.add(actionId);
+    }
 
     this.endActiveTurn(room);
   }
@@ -1297,7 +1407,9 @@ export class PalabraSecretaServer {
         passwordCurrentWord = currentTarget.word;
       }
       passwordTargetsProgress = room.passwordTargets.map((t, idx) => ({
+        id: t.id,
         index: idx,
+        status: t.status,
         isGuessed: t.isGuessed,
         word: isDescriptor ? t.word : undefined, // Only descriptor sees target words!
       }));

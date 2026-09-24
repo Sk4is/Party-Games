@@ -61,8 +61,12 @@ export interface PalabraSecretaConfig {
   emojiCategory: EmojiCategory; // 'CINEMA' | 'VIDEOGAMES' | 'BOTH'
 }
 
+export type PasswordTargetStatus = 'PENDING' | 'CURRENT' | 'CORRECT' | 'SKIPPED';
+
 export interface PasswordProgressItem {
+  id: string;
   index: number;
+  status: PasswordTargetStatus;
   isGuessed: boolean;
   word?: string; // Only descriptor receives this!
 }
@@ -174,7 +178,8 @@ export type PalabraSecretaClientMessage =
   // Password mode
   | { type: 'INCREMENT_CLUE_COUNT'; actionId?: string }
   | { type: 'DECREMENT_CLUE_COUNT'; actionId?: string }
-  | { type: 'PASSWORD_MARK_GUESSED'; actionId?: string }
+  | { type: 'PASSWORD_MARK_GUESSED'; targetId?: string; actionId?: string }
+  | { type: 'PASSWORD_SKIP_WORD'; targetId?: string; actionId?: string }
   | { type: 'PASSWORD_FINISH_TURN'; actionId?: string }
   // Emoji mode
   | { type: 'EMOJI_CHOOSE_OPTION'; optionId: string; actionId?: string }
@@ -185,6 +190,7 @@ export type PalabraSecretaClientMessage =
   | { type: 'NEXT_TURN' }
   | { type: 'PLAY_AGAIN' }
   | { type: 'KICK_PLAYER'; targetPlayerId: string }
+  | { type: 'LEAVE_ROOM' }
   | { type: 'PING' };
 
 export type PalabraSecretaServerMessage =

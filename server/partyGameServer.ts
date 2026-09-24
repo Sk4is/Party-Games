@@ -62,6 +62,7 @@ interface BombaServerRoom {
     player: string;
     bonusLetters?: number;
   } | null;
+  acceptedWordBannerTimeout: NodeJS.Timeout | null;
   affectedPlayer: BombaPlayerState | null;
   winner: BombaPlayerState | null;
   totalValidWords: number;
@@ -234,6 +235,7 @@ export class PartyGameServer {
         explosionTimeout: null,
         usedWords: [],
         acceptedWordBanner: null,
+        acceptedWordBannerTimeout: null,
         affectedPlayer: null,
         winner: null,
         totalValidWords: 0,
@@ -1203,13 +1205,27 @@ export class PartyGameServer {
           };
           room.usedWords = [newUsedWord, ...room.usedWords];
 
+          if (room.acceptedWordBannerTimeout) {
+            clearTimeout(room.acceptedWordBannerTimeout);
+            room.acceptedWordBannerTimeout = null;
+          }
+
           room.acceptedWordBanner = {
             word: acceptedWord.toUpperCase(),
             player: targetPlayer.name,
             bonusLetters: alphabetUpdate.newLetters.length,
           };
 
-          // Advance turn clockwise
+          // Automatically clear the correct-answer notification after ~1 second (1000ms)
+          room.acceptedWordBannerTimeout = setTimeout(() => {
+            if (room.acceptedWordBanner) {
+              room.acceptedWordBanner = null;
+              room.acceptedWordBannerTimeout = null;
+              this.broadcastBombaState(room);
+            }
+          }, 1000);
+
+          // Advance turn clockwise immediately (gameplay never waits on notification)
           this.advanceBombaTurn(room);
         } finally {
           room.pendingSubmissions.delete(submittingPlayerId);
@@ -1541,6 +1557,10 @@ export class PartyGameServer {
     room.bombRemainingMs = initialDuration;
     room.turnStartedAt = Date.now();
     room.lastUpdateTimestamp = Date.now();
+    if (room.acceptedWordBannerTimeout) {
+      clearTimeout(room.acceptedWordBannerTimeout);
+      room.acceptedWordBannerTimeout = null;
+    }
     room.acceptedWordBanner = null;
     room.usedWords = [];
 
@@ -1635,6 +1655,11 @@ export class PartyGameServer {
       clearInterval(room.timerInterval);
       room.timerInterval = null;
     }
+    if (room.acceptedWordBannerTimeout) {
+      clearTimeout(room.acceptedWordBannerTimeout);
+      room.acceptedWordBannerTimeout = null;
+    }
+    room.acceptedWordBanner = null;
 
     // Strict playerId lookup for the exploding player
     const explodingPlayer =
@@ -1723,6 +1748,10 @@ export class PartyGameServer {
     const newDuration = getRandomBombDurationMs();
     room.bombDurationMs = newDuration;
     room.bombRemainingMs = newDuration;
+    if (room.acceptedWordBannerTimeout) {
+      clearTimeout(room.acceptedWordBannerTimeout);
+      room.acceptedWordBannerTimeout = null;
+    }
     room.acceptedWordBanner = null;
     room.affectedPlayer = null;
     room.phase = 'ROUND_INTRO';

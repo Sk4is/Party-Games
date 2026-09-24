@@ -29,6 +29,7 @@ interface PalabraSecretaActiveTurnProps {
   onIncrementClueCount?: () => void;
   onDecrementClueCount?: () => void;
   onMarkPasswordGuessed?: () => void;
+  onSkipPasswordWord?: () => void;
   onFinishPasswordTurn?: () => void;
   // Mode 3: Emoji actions
   onChooseEmojiOption?: (optionId: string) => void;
@@ -54,12 +55,14 @@ export const PalabraSecretaActiveTurn: React.FC<PalabraSecretaActiveTurnProps> =
   onIncrementClueCount,
   onDecrementClueCount,
   onMarkPasswordGuessed,
+  onSkipPasswordWord,
   onFinishPasswordTurn,
   onChooseEmojiOption,
   onUpdateEmojiClue,
   onMarkEmojiGuessed,
   onSkipEmoji,
 }) => {
+  const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
   const activeTeam = roomState.teams[roomState.activeTeamId];
   const descriptor = roomState.players.find((p) => p.id === roomState.activeDescriptorId);
 
@@ -108,6 +111,9 @@ export const PalabraSecretaActiveTurn: React.FC<PalabraSecretaActiveTurnProps> =
         if (e.code === 'Space' || e.code === 'Enter') {
           e.preventDefault();
           onMarkPasswordGuessed?.();
+        } else if (e.code === 'KeyS' || e.code === 'ArrowRight') {
+          e.preventDefault();
+          onSkipPasswordWord?.();
         } else if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.code === 'KeyP') {
           e.preventDefault();
           onIncrementClueCount?.();
@@ -127,6 +133,7 @@ export const PalabraSecretaActiveTurn: React.FC<PalabraSecretaActiveTurnProps> =
     onSkipWord,
     onMarkTaboo,
     onMarkPasswordGuessed,
+    onSkipPasswordWord,
     onIncrementClueCount,
     onDecrementClueCount,
   ]);
@@ -442,23 +449,48 @@ export const PalabraSecretaActiveTurn: React.FC<PalabraSecretaActiveTurnProps> =
                 </div>
               </div>
 
-              {/* Target progress indicator (1 to 10 checklist) */}
+              {/* Target progress indicator (1 to 10 checklist with stable status) */}
               <div className="flex items-center justify-center gap-1 sm:gap-2 flex-wrap">
-                {Array.from({ length: 10 }).map((_, idx) => {
-                  const isCurrent = idx === (roomState.passwordCurrentIndex ?? 0);
-                  const isPastGuessed = idx < (roomState.passwordCurrentIndex ?? 0);
+                {(roomState.passwordTargetsProgress && roomState.passwordTargetsProgress.length > 0
+                  ? roomState.passwordTargetsProgress
+                  : Array.from({ length: 10 }).map((_, idx) => ({
+                      id: `t_${idx}`,
+                      index: idx,
+                      status:
+                        idx === (roomState.passwordCurrentIndex ?? 0)
+                          ? ('CURRENT' as const)
+                          : idx < (roomState.passwordCurrentIndex ?? 0)
+                          ? ('CORRECT' as const)
+                          : ('PENDING' as const),
+                      isGuessed: idx < (roomState.passwordCurrentIndex ?? 0),
+                    }))
+                ).map((targetItem, idx) => {
+                  const isCurrent = targetItem.status === 'CURRENT' || idx === (roomState.passwordCurrentIndex ?? 0);
+                  const isCorrect = targetItem.status === 'CORRECT' || targetItem.isGuessed;
+                  const isSkipped = targetItem.status === 'SKIPPED';
                   return (
                     <div
-                      key={idx}
-                      className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold border transition-all ${
-                        isPastGuessed
-                          ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                      key={targetItem.id || idx}
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold border transition-all ${
+                        isCorrect
+                          ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black shadow-sm'
+                          : isSkipped
+                          ? 'bg-slate-800 text-slate-400 border-slate-700/80'
                           : isCurrent
-                          ? 'bg-amber-400 text-slate-950 border-amber-300 font-black scale-110 shadow-md'
-                          : 'bg-slate-800 text-slate-500 border-slate-700'
+                          ? 'bg-amber-400 text-slate-950 border-amber-300 font-black scale-110 shadow-md ring-2 ring-amber-400/40'
+                          : 'bg-slate-900 text-slate-500 border-slate-800'
                       }`}
+                      title={
+                        isCorrect
+                          ? `Palabra ${idx + 1}: Acertada`
+                          : isSkipped
+                          ? `Palabra ${idx + 1}: Pasada`
+                          : isCurrent
+                          ? `Palabra ${idx + 1}: En curso`
+                          : `Palabra ${idx + 1}: Pendiente`
+                      }
                     >
-                      {isPastGuessed ? '✓' : idx + 1}
+                      {isCorrect ? '✓' : isSkipped ? '↷' : idx + 1}
                     </div>
                   );
                 })}
@@ -510,29 +542,40 @@ export const PalabraSecretaActiveTurn: React.FC<PalabraSecretaActiveTurnProps> =
                 </div>
               </div>
 
-              {/* Action Buttons: Mark Guessed & Finish Turn */}
+              {/* Action Buttons: Mark Guessed, Skip Word & Finish Turn */}
               <div className="space-y-2 pt-1 sm:pt-2">
-                <button
-                  id="btn-password-guessed"
-                  type="button"
-                  onClick={() => {
-                    audio.playAnswerAccepted();
-                    onMarkPasswordGuessed?.();
-                  }}
-                  className="w-full py-3.5 sm:py-4 px-4 sm:px-6 rounded-2xl bg-[#10B981] hover:bg-[#059669] text-slate-950 font-black text-xs xs:text-sm sm:text-base uppercase tracking-wider transition-all shadow-xl shadow-[#10B981]/25 active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Check className="w-5 h-5 sm:w-6 sm:h-6 stroke-[3] shrink-0" />
-                  <span>✓ Acertada (Siguiente Palabra)</span>
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    id="btn-password-guessed"
+                    type="button"
+                    onClick={() => {
+                      audio.playAnswerAccepted();
+                      onMarkPasswordGuessed?.();
+                    }}
+                    className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-[#10B981] hover:bg-[#059669] text-slate-950 font-black text-xs xs:text-sm sm:text-base uppercase tracking-wider transition-all shadow-xl shadow-[#10B981]/25 active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Check className="w-5 h-5 sm:w-6 sm:h-6 stroke-[3] shrink-0" />
+                    <span>✓ Acertada</span>
+                  </button>
+
+                  <button
+                    id="btn-password-skip"
+                    type="button"
+                    onClick={() => {
+                      audio.playTurnChange();
+                      onSkipPasswordWord?.();
+                    }}
+                    className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs xs:text-sm sm:text-base uppercase tracking-wider transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <SkipForward className="w-5 h-5 stroke-[2.5] shrink-0 text-slate-400" />
+                    <span>Pasar palabra</span>
+                  </button>
+                </div>
 
                 <div className="flex justify-center pt-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.confirm('¿Seguro que deseas terminar el turno con las palabras acertadas hasta ahora?')) {
-                        onFinishPasswordTurn?.();
-                      }
-                    }}
+                    onClick={() => setIsFinishModalOpen(true)}
                     className="text-xs font-bold text-slate-400 hover:text-slate-200 underline cursor-pointer py-1"
                   >
                     Terminar turno antes de tiempo
@@ -559,6 +602,29 @@ export const PalabraSecretaActiveTurn: React.FC<PalabraSecretaActiveTurnProps> =
                   Escuchad cada pista que os dé {descriptor?.name}. ¡Cuantas menos palabras use para las 10 contraseñas, mayor será la bonificación de puntos!
                 </p>
               </div>
+
+              {/* Teammates checklist */}
+              <div className="pt-2 border-t border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-2">Progreso de la ronda:</span>
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
+                  {(roomState.passwordTargetsProgress || []).map((targetItem, idx) => (
+                    <div
+                      key={targetItem.id || idx}
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold border transition-all ${
+                        targetItem.status === 'CORRECT'
+                          ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black'
+                          : targetItem.status === 'SKIPPED'
+                          ? 'bg-slate-800 text-slate-400 border-slate-700'
+                          : targetItem.status === 'CURRENT'
+                          ? 'bg-amber-400 text-slate-950 border-amber-300 font-black scale-110 ring-2 ring-amber-400/40'
+                          : 'bg-slate-900 text-slate-500 border-slate-800'
+                      }`}
+                    >
+                      {targetItem.status === 'CORRECT' ? '✓' : targetItem.status === 'SKIPPED' ? '↷' : idx + 1}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -572,6 +638,29 @@ export const PalabraSecretaActiveTurn: React.FC<PalabraSecretaActiveTurnProps> =
               <p className="text-slate-300 text-xs sm:text-sm sm:text-base">
                 {descriptor?.name} está dando pistas a su equipo. Observa si logran adivinar las 10 palabras dentro del presupuesto de 15 pistas.
               </p>
+
+              {/* Rivals checklist */}
+              <div className="pt-2 border-t border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-2">Progreso del rival:</span>
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
+                  {(roomState.passwordTargetsProgress || []).map((targetItem, idx) => (
+                    <div
+                      key={targetItem.id || idx}
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold border transition-all ${
+                        targetItem.status === 'CORRECT'
+                          ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black'
+                          : targetItem.status === 'SKIPPED'
+                          ? 'bg-slate-800 text-slate-400 border-slate-700'
+                          : targetItem.status === 'CURRENT'
+                          ? 'bg-amber-400 text-slate-950 border-amber-300 font-black scale-110 ring-2 ring-amber-400/40'
+                          : 'bg-slate-900 text-slate-500 border-slate-800'
+                      }`}
+                    >
+                      {targetItem.status === 'CORRECT' ? '✓' : targetItem.status === 'SKIPPED' ? '↷' : idx + 1}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -805,6 +894,44 @@ export const PalabraSecretaActiveTurn: React.FC<PalabraSecretaActiveTurnProps> =
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Finish Turn Confirmation Modal (accessible, clean Spanish UI, no window.confirm) */}
+      {isFinishModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md p-5 sm:p-6 rounded-3xl bg-slate-900 border-2 border-amber-500/40 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto text-2xl">
+              ⏱️
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg sm:text-xl font-black text-white font-display">
+                ¿Terminar turno ahora?
+              </h3>
+              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
+                Se contabilizarán los <strong>{roomState.passwordCorrectCount ?? 0} aciertos</strong> conseguidos hasta este momento y se aplicará la bonificación o penalización según las pistas usadas ({clueWordCount} / {clueBudget}).
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsFinishModalOpen(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm cursor-pointer"
+              >
+                Continuar jugando
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFinishModalOpen(false);
+                  onFinishPasswordTurn?.();
+                }}
+                className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm cursor-pointer shadow-lg shadow-amber-500/25 active:scale-95"
+              >
+                Terminar turno
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -15,6 +15,7 @@ import {
 } from '../services/multiplayerRoomService';
 import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
+import { createConnectionResilience } from '../utils/connectionResilience';
 
 export type PinturilloConnectionStatus =
   | 'idle'
@@ -50,6 +51,7 @@ export function usePinturilloSocket({
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownDismissTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isManuallyClosedRef = useRef<boolean>(false);
+  const lastActivityRef = useRef<number>(Date.now());
   const lastActiveRoomRef = useRef<{ code: string } | null>(() => {
     if (initialRoomCode) return { code: initialRoomCode.trim().toUpperCase() };
     const saved = sessionRecovery.getActiveSession();
@@ -150,6 +152,7 @@ export function usePinturilloSocket({
       };
 
       socket.onmessage = (event: MessageEvent) => {
+        lastActivityRef.current = Date.now();
         try {
           const msg: ServerMessage = JSON.parse(event.data);
 
@@ -409,24 +412,25 @@ export function usePinturilloSocket({
       connect();
     }
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        if (
-          !wsRef.current ||
-          wsRef.current.readyState === WebSocket.CLOSED ||
-          wsRef.current.readyState === WebSocket.CLOSING
-        ) {
-          console.log('[Pinturillo Client] Tab foregrounded: resuming connection');
-          reconnectAttemptsRef.current = 0;
-          connect();
+    // Mobile background & connection resilience manager
+    const cleanupResilience = createConnectionResilience({
+      getSocket: () => wsRef.current,
+      onReconnect: () => {
+        isManuallyClosedRef.current = false;
+        reconnectAttemptsRef.current = 0;
+        connect();
+      },
+      sendPing: () => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'ping' }));
         }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+      },
+      getLastActivityTime: () => lastActivityRef.current,
+      logTag: '[Pinturillo Client]',
+    });
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      cleanupResilience();
       isManuallyClosedRef.current = true;
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);

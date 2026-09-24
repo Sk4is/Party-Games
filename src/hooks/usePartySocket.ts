@@ -13,6 +13,7 @@ import {
   SharedRoomSummary,
 } from '../services/multiplayerRoomService';
 import { sessionRecovery } from '../services/sessionRecovery';
+import { createConnectionResilience } from '../utils/connectionResilience';
 
 export type SocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -76,7 +77,8 @@ export function usePartySocket(options: UsePartySocketOptions) {
   const messageQueueRef = useRef<PartyClientMessage[]>([]);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isManuallyClosedRef = useRef(false);
+  const isManuallyClosedRef = useRef<boolean>(false);
+  const lastActivityRef = useRef<number>(Date.now());
   const lastActiveRoomRef = useRef<{ code: string; gameType: string } | null>(null);
 
   const connect = useCallback(() => {
@@ -139,6 +141,7 @@ export function usePartySocket(options: UsePartySocketOptions) {
       };
 
       socket.onmessage = (event) => {
+        lastActivityRef.current = Date.now();
         try {
           const msg: PartyServerMessage = JSON.parse(event.data);
           switch (msg.type) {
@@ -261,21 +264,27 @@ export function usePartySocket(options: UsePartySocketOptions) {
     }
   }, [currentUser]);
 
-  // Connect automatically on mount and recover on visibilitychange (tab foregrounded)
+  // Connect automatically on mount and recover on mobile foreground / tab switch
   useEffect(() => {
     connect();
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED || wsRef.current.readyState === WebSocket.CLOSING) {
-          connect();
+    const cleanupResilience = createConnectionResilience({
+      getSocket: () => wsRef.current,
+      onReconnect: () => {
+        isManuallyClosedRef.current = false;
+        connect();
+      },
+      sendPing: () => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'ping' }));
         }
-      }
-    };
+      },
+      getLastActivityTime: () => lastActivityRef.current,
+      logTag: '[PartySocket Client]',
+    });
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      cleanupResilience();
       isManuallyClosedRef.current = true;
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
