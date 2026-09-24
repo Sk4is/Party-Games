@@ -880,6 +880,14 @@ class AudioManager {
   public playError() {
     this.playAnswerRejected();
   }
+
+  public playCorrect() {
+    this.playAnswerAccepted();
+  }
+
+  public playKeyboardTick() {
+    this.playClick();
+  }
 }
 
 export const audio = new AudioManager();

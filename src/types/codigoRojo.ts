@@ -96,6 +96,8 @@ export interface CodigoRojoRoomState {
   maxStrikes: number;
   timeRemainingSeconds: number;
   totalTimeSeconds: number;
+  missionStartedAt?: number;
+  missionEndsAt?: number;
   modules: CodigoRojoModuleState[];
   activeModuleIndex: number;
   lastEvent?: {

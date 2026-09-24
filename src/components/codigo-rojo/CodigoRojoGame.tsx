@@ -7,6 +7,7 @@ import { CodigoRojoOperatorView } from './CodigoRojoOperatorView';
 import { CodigoRojoGuideView } from './CodigoRojoGuideView';
 import { MissionResultModal } from './MissionResultModal';
 import { AbandonConfirmationModal } from '../common/AbandonConfirmationModal';
+import { MatchAbortedModal } from '../common/MatchAbortedModal';
 import { audio } from '../../utils/audio';
 
 interface CodigoRojoGameProps {
@@ -63,8 +64,8 @@ export const CodigoRojoGame: React.FC<CodigoRojoGameProps> = ({
   });
 
   const handleConfirmExit = () => {
+    setShowAbandonModal(false);
     leaveRoom();
-    onBackToMenu();
   };
 
   // If not connected to any room yet, render entry screen
@@ -95,6 +96,14 @@ export const CodigoRojoGame: React.FC<CodigoRojoGameProps> = ({
 
   return (
     <div className="relative min-h-screen w-full bg-slate-950 text-slate-100 select-none">
+      {/* Reconnecting banner overlay */}
+      {connectionStatus === 'reconnecting' && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-xl backdrop-blur animate-pulse">
+          <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping" />
+          <span>RECONECTANDO…</span>
+        </div>
+      )}
+
       {/* 1. LOBBY PHASE */}
       {roomState.phase === 'LOBBY' && (
         <CodigoRojoLobby
@@ -109,7 +118,7 @@ export const CodigoRojoGame: React.FC<CodigoRojoGameProps> = ({
       )}
 
       {/* 2. ACTIVE MISSION PHASE or RESULTS PHASE */}
-      {roomState.phase !== 'LOBBY' && (
+      {roomState.phase !== 'LOBBY' && roomState.phase !== 'MATCH_ABORTED' && (
         <>
           {isOperator ? (
             <CodigoRojoOperatorView
@@ -131,10 +140,26 @@ export const CodigoRojoGame: React.FC<CodigoRojoGameProps> = ({
               isHost={isHost}
               onNextMission={nextMission}
               onRestartMatch={restartMatch}
-              onBackToMenu={handleConfirmExit}
+              onBackToMenu={leaveRoom}
             />
           )}
         </>
+      )}
+
+      {/* 3. MATCH ABORTED (e.g. only 1 player remains in 2-player match) */}
+      {roomState.phase === 'MATCH_ABORTED' && (
+        <MatchAbortedModal
+          isOpen={true}
+          title="PARTIDA FINALIZADA"
+          message={
+            roomState.endMessage ||
+            (roomState.players.filter((p) => p.isConnected).length < 2
+              ? 'El otro jugador ha abandonado la partida.'
+              : 'No quedan suficientes jugadores para continuar.')
+          }
+          onReturnToMenu={leaveRoom}
+          autoReturnSeconds={5}
+        />
       )}
 
       {/* Abandon Confirmation Modal */}
@@ -142,8 +167,10 @@ export const CodigoRojoGame: React.FC<CodigoRojoGameProps> = ({
         isOpen={showAbandonModal}
         onConfirm={handleConfirmExit}
         onCancel={() => setShowAbandonModal(false)}
-        title="¿Abandonar Misión?"
-        description="Si sales de la sala, dejarás al equipo sin tu puesto en la misión."
+        title="¿Salir de la sala?"
+        message="Si sales de la sala, dejarás al equipo sin tu puesto en la misión."
+        confirmText="Salir de la sala"
+        cancelText="Permanecer"
       />
     </div>
   );

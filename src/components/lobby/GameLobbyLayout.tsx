@@ -7,11 +7,13 @@ export interface GameLobbyLayoutProps {
   title: string;
   icon: React.ReactNode;
   description?: string;
-  minPlayers: number;
-  maxPlayers: number;
-  accentColor?: 'amber' | 'orange' | 'rose' | 'indigo';
+  subtitle?: string;
+  minPlayers?: number;
+  maxPlayers?: number;
+  accentColor?: 'amber' | 'orange' | 'rose' | 'indigo' | string;
   gameType?: GameSlug;
-  onBack: () => void;
+  onBack?: () => void;
+  onBackToMenu?: () => void;
   backLabel?: string;
   roomCode?: string;
   isOnlineLobby?: boolean;
@@ -19,20 +21,26 @@ export interface GameLobbyLayoutProps {
   children: React.ReactNode;
 }
 
-export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = ({
-  title,
-  icon,
-  description,
-  minPlayers,
-  maxPlayers,
-  gameType = 'la-bomba',
-  onBack,
-  backLabel = 'Volver al menú',
-  roomCode,
-  isOnlineLobby = false,
-  errorMessage,
-  children,
-}) => {
+export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = (props) => {
+  const {
+    title,
+    icon,
+    description,
+    subtitle,
+    minPlayers = 2,
+    maxPlayers = 10,
+    gameType = 'la-bomba',
+    onBack,
+    onBackToMenu,
+    backLabel = 'Volver al menú',
+    roomCode,
+    isOnlineLobby = false,
+    errorMessage,
+    children,
+  } = props;
+
+  const handleBack = onBack || onBackToMenu || (() => {});
+  const displayDescription = description || subtitle;
   const roomCodeColor =
     gameType === 'la-peor-respuesta'
       ? 'text-[#FF3B4F]'
@@ -57,7 +65,7 @@ export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = ({
       <header className="w-full max-w-3xl mx-auto flex items-center justify-between gap-2 pb-3 sm:pb-4 mb-2 border-b border-stone-800/60 min-w-0">
         <button
           type="button"
-          onClick={onBack}
+          onClick={handleBack}
           className="inline-flex items-center gap-1.5 px-2.5 xs:px-3 py-1.5 xs:py-2 rounded-xl text-xs font-semibold bg-stone-900/90 text-stone-300 hover:text-white hover:bg-stone-800 border border-stone-800 transition-colors cursor-pointer shrink-0"
         >
           <ArrowLeft className="w-4 h-4 shrink-0" />
@@ -94,9 +102,9 @@ export const GameLobbyLayout: React.FC<GameLobbyLayoutProps> = ({
             {title}
           </h1>
 
-          {description && (
+          {displayDescription && (
             <p className="max-w-xl mx-auto text-xs sm:text-sm text-stone-400 leading-relaxed font-medium mb-3 break-words">
-              {description}
+              {displayDescription}
             </p>
           )}
 

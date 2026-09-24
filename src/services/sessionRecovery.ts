@@ -118,4 +118,34 @@ export const sessionRecovery = {
       // Ignore
     }
   },
+
+  /**
+   * Backward-compatible aliases
+   */
+  save(gameTypeOrData: SupportedGameType | { gameType: SupportedGameType; roomCode: string; playerId: string }, data?: { code?: string; roomCode?: string; playerId: string; gameType?: SupportedGameType }) {
+    if (typeof gameTypeOrData === 'object') {
+      this.saveActiveSession(gameTypeOrData);
+    } else if (data) {
+      this.saveActiveSession({
+        gameType: gameTypeOrData,
+        roomCode: data.code || data.roomCode || '',
+        playerId: data.playerId || '',
+      });
+    }
+  },
+
+  get(gameType?: SupportedGameType): { code: string; playerId?: string; gameType?: SupportedGameType } | null {
+    const session = this.getActiveSession();
+    if (!session) return null;
+    if (gameType && session.gameType !== gameType) return null;
+    return {
+      code: session.roomCode,
+      playerId: session.playerId,
+      gameType: session.gameType,
+    };
+  },
+
+  clear(_gameType?: SupportedGameType) {
+    this.clearActiveSession();
+  },
 };

@@ -93,10 +93,12 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
   return (
     <GameLobbyLayout
       title="CÓDIGO ROJO"
-      subtitle="Juego cooperativo asimétrico de comunicación bajo presión."
-      accentColor="#ef4444"
+      description="Juego cooperativo asimétrico de comunicación bajo presión."
       icon="🚨"
-      onBackToMenu={onBackToMenu}
+      minPlayers={2}
+      maxPlayers={6}
+      onBack={onBackToMenu}
+      backLabel="Menú Principal"
     >
       <div className="w-full max-w-xl mx-auto flex flex-col gap-6">
         {errorMessage && (

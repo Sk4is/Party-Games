@@ -35,6 +35,8 @@ interface ServerRoom {
   maxStrikes: number;
   timeRemainingSeconds: number;
   totalTimeSeconds: number;
+  missionStartedAt?: number;
+  missionEndsAt?: number;
   modules: CodigoRojoModuleState[];
   activeModuleIndex: number;
   lastEvent?: CodigoRojoRoomState['lastEvent'];
@@ -240,7 +242,7 @@ export class CodigoRojoServer {
     }
 
     // Cancel pending departure if rejoining
-    matchDepartureHandler.cancelPendingDeparture(playerData.id);
+    matchDepartureHandler.cancelGracePeriod(room.code, playerData.id);
 
     let player = room.players.find((p) => p.id === playerData.id);
     if (!player) {
@@ -285,7 +287,7 @@ export class CodigoRojoServer {
       return;
     }
 
-    matchDepartureHandler.cancelPendingDeparture(playerId);
+    matchDepartureHandler.cancelGracePeriod(room.code, playerId);
 
     const player = room.players.find((p) => p.id === playerId);
     if (!player) {
@@ -295,6 +297,17 @@ export class CodigoRojoServer {
 
     player.isConnected = true;
     this.clients.set(ws, { ws, playerId, roomId: room.code });
+
+    // Recalculate remaining time if mission is active
+    if (room.phase === 'ACTIVE_MISSION' && room.missionEndsAt) {
+      const remainingMs = Math.max(0, room.missionEndsAt - Date.now());
+      room.timeRemainingSeconds = Math.ceil(remainingMs / 1000);
+      if (remainingMs <= 0) {
+        this.handleMissionFailure(room, 'TIEMPO AGOTADO — COLAPSO DEL SISTEMA');
+        return;
+      }
+    }
+
     this.sendToClient(ws, { type: 'ROOM_STATE', room: this.serializeRoom(room) });
     this.broadcastRoom(room);
   }
@@ -326,6 +339,9 @@ export class CodigoRojoServer {
       timeSeconds = Math.max(60, room.config.customTimeMinutes * 60);
     }
 
+    const now = Date.now();
+    room.missionStartedAt = now;
+    room.missionEndsAt = now + timeSeconds * 1000;
     room.timeRemainingSeconds = timeSeconds;
     room.totalTimeSeconds = timeSeconds;
     room.strikes = 0;
@@ -388,11 +404,20 @@ export class CodigoRojoServer {
       return;
     }
 
-    room.timeRemainingSeconds = Math.max(0, room.timeRemainingSeconds - 1);
-
-    if (room.timeRemainingSeconds <= 0) {
-      this.handleMissionFailure(room, 'TIEMPO AGOTADO — COLAPSO DEL SISTEMA');
-      return;
+    const now = Date.now();
+    if (room.missionEndsAt) {
+      const remainingMs = Math.max(0, room.missionEndsAt - now);
+      room.timeRemainingSeconds = Math.ceil(remainingMs / 1000);
+      if (remainingMs <= 0) {
+        this.handleMissionFailure(room, 'TIEMPO AGOTADO — COLAPSO DEL SISTEMA');
+        return;
+      }
+    } else {
+      room.timeRemainingSeconds = Math.max(0, room.timeRemainingSeconds - 1);
+      if (room.timeRemainingSeconds <= 0) {
+        this.handleMissionFailure(room, 'TIEMPO AGOTADO — COLAPSO DEL SISTEMA');
+        return;
+      }
     }
 
     // Broadcast tick or state every few seconds, or tick message
@@ -566,7 +591,7 @@ export class CodigoRojoServer {
       this.broadcastRoom(room);
 
       // Grace period for reconnection before removing
-      matchDepartureHandler.scheduleDeparture(player.id, () => {
+      matchDepartureHandler.registerDisconnection(conn.roomId, conn.playerId, 'codigo-rojo', () => {
         const currentRoom = this.rooms.get(conn.roomId);
         if (!currentRoom) return;
         const p = currentRoom.players.find((pl) => pl.id === conn.playerId);
@@ -585,12 +610,12 @@ export class CodigoRojoServer {
     const room = this.rooms.get(conn.roomId);
     if (!room) return;
 
-    matchDepartureHandler.cancelPendingDeparture(conn.playerId);
+    matchDepartureHandler.cancelGracePeriod(conn.roomId, conn.playerId);
     this.removePlayer(room, conn.playerId);
   }
 
   private kickPlayer(room: ServerRoom, targetPlayerId: string) {
-    matchDepartureHandler.cancelPendingDeparture(targetPlayerId);
+    matchDepartureHandler.cancelGracePeriod(room.code, targetPlayerId);
     this.removePlayer(room, targetPlayerId);
   }
 
@@ -609,20 +634,55 @@ export class CodigoRojoServer {
     }
 
     // Transfer host if host left
-    if (removedPlayer.isHost) {
-      room.players[0].isHost = true;
-      room.hostId = room.players[0].id;
+    if (removedPlayer.isHost && room.players.length > 0) {
+      const nextHost = room.players.find((p) => p.isConnected) || room.players[0];
+      nextHost.isHost = true;
+      room.hostId = nextHost.id;
     }
 
-    // If Operator left during active mission, abort or transfer
-    if (room.operatorId === playerId && room.phase === 'ACTIVE_MISSION') {
-      this.handleMissionFailure(room, 'EL OPERADOR SE HA DESCONECTADO DE LA MÁQUINA');
+    const isGameActive = room.phase !== 'LOBBY' && room.phase !== 'MATCH_ABORTED';
+    if (isGameActive) {
+      const activeConnectedCount = room.players.filter((p) => p.isConnected).length;
+      // If match loses players below the minimum of 2, abort match authoritatively!
+      if (activeConnectedCount < 2) {
+        if (room.timerInterval) {
+          clearInterval(room.timerInterval);
+          room.timerInterval = null;
+        }
+        room.phase = 'MATCH_ABORTED';
+        room.abortReason = 'INSUFFICIENT_PLAYERS';
+        room.endMessage = 'El otro jugador ha abandonado la partida.';
+        this.broadcastRoom(room);
+        return;
+      }
+
+      // If at least 2 players remain and the Operator permanently left, promote next connected player to Operator
+      if (room.operatorId === playerId) {
+        const nextOperator = room.players.find((p) => p.isConnected);
+        if (nextOperator) {
+          room.operatorId = nextOperator.id;
+          room.operatorHistory.push(nextOperator.id);
+          room.players.forEach((p) => {
+            p.role = p.id === nextOperator.id ? 'OPERADOR' : 'GUIA';
+          });
+          room.lastEvent = {
+            type: 'MODULE_SOLVED',
+            message: `${removedPlayer.name} ha abandonado la partida. ${nextOperator.name} asume los mandos como Operador.`,
+            timestamp: Date.now(),
+          };
+        }
+      }
     }
 
     this.broadcastRoom(room);
   }
 
   private serializeRoom(room: ServerRoom): CodigoRojoRoomState {
+    let timeRemainingSeconds = room.timeRemainingSeconds;
+    if (room.phase === 'ACTIVE_MISSION' && room.missionEndsAt) {
+      timeRemainingSeconds = Math.max(0, Math.ceil((room.missionEndsAt - Date.now()) / 1000));
+    }
+
     return {
       code: room.code,
       gameType: room.gameType,
@@ -636,8 +696,10 @@ export class CodigoRojoServer {
       operatorHistory: room.operatorHistory,
       strikes: room.strikes,
       maxStrikes: room.maxStrikes,
-      timeRemainingSeconds: room.timeRemainingSeconds,
+      timeRemainingSeconds,
       totalTimeSeconds: room.totalTimeSeconds,
+      missionStartedAt: room.missionStartedAt,
+      missionEndsAt: room.missionEndsAt,
       modules: room.modules,
       activeModuleIndex: room.activeModuleIndex,
       lastEvent: room.lastEvent,

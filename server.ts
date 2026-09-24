@@ -314,9 +314,10 @@ async function startServer() {
   palabraSecretaServer = new PalabraSecretaServer();
   codigoRojoServer = new CodigoRojoServer();
 
+  let vite: any = null;
   if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
+    vite = await createViteServer({
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -353,6 +354,8 @@ async function startServer() {
       partyGameServer.wss.handleUpgrade(request, socket, head, (ws) => {
         partyGameServer.wss.emit('connection', ws, request);
       });
+    } else if (vite && (request.headers['sec-websocket-protocol'] === 'vite-hmr' || pathname.includes('vite'))) {
+      vite.ws?.handleUpgrade(request, socket, head);
     } else {
       socket.destroy();
     }
