@@ -22,13 +22,16 @@ export const GlifosCriptograficosModule: React.FC<GlifosCriptograficosModuleProp
     <div className="flex flex-col items-center justify-between w-full h-full p-6 bg-slate-900/90 rounded-2xl border border-slate-700 select-none">
       <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <KeyRound className="w-4 h-4 text-amber-400" />
-          <span className="text-xs uppercase font-mono tracking-widest text-slate-400">
-            Sellos Rúnicos Criptográficos
+          <KeyRound className="w-4 h-4 text-purple-400" />
+          <span className="text-xs uppercase font-mono font-bold tracking-widest text-purple-300">
+            SISTEMAS
+          </span>
+          <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+            // TERMINAL AUX
           </span>
         </div>
-        <span className="text-xs font-mono text-amber-400 font-bold">
-          4 GLIFOS ACTIVOS
+        <span className="text-xs font-mono text-slate-400 font-bold">
+          BLOQUE ACTIVO
         </span>
       </div>
 

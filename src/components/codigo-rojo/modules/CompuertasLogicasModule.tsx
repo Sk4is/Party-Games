@@ -41,12 +41,15 @@ export const CompuertasLogicasModule: React.FC<CompuertasLogicasModuleProps> = (
     <div className="flex flex-col items-center justify-between w-full h-full p-6 bg-slate-900/90 rounded-2xl border border-slate-700 select-none">
       <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <Cpu className="w-4 h-4 text-blue-400" />
-          <span className="text-xs uppercase font-mono tracking-widest text-slate-400">
-            Compuerta Lógica Integrada
+          <Cpu className="w-4 h-4 text-purple-400" />
+          <span className="text-xs uppercase font-mono font-bold tracking-widest text-purple-300">
+            SISTEMAS
+          </span>
+          <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+            // CIRCUITO INTEGRADO
           </span>
         </div>
-        <span className="px-2.5 py-0.5 bg-blue-950 border border-blue-500/40 rounded text-blue-400 font-mono text-xs font-bold">
+        <span className="px-2.5 py-0.5 bg-purple-950 border border-purple-500/40 rounded text-purple-300 font-mono text-xs font-bold">
           CHIP-{gate}
         </span>
       </div>

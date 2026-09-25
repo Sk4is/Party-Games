@@ -39,12 +39,15 @@ export const RelesHexadecimalesModule: React.FC<RelesHexadecimalesModuleProps> =
     <div className="flex flex-col items-center justify-between w-full h-full p-6 bg-slate-900/90 rounded-2xl border border-slate-700 select-none">
       <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <Cpu className="w-4 h-4 text-purple-400" />
-          <span className="text-xs uppercase font-mono tracking-widest text-slate-400">
-            Relés Hexadecimales
+          <Cpu className="w-4 h-4 text-blue-400" />
+          <span className="text-xs uppercase font-mono font-bold tracking-widest text-blue-300">
+            ELECTRICIDAD
+          </span>
+          <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+            // SUB-BUS 04
           </span>
         </div>
-        <span className="text-xs font-mono text-purple-400 font-bold">BUS LÓGICO</span>
+        <span className="text-xs font-mono text-blue-400 font-bold">REGISTRO AUX</span>
       </div>
 
       {/* 4 Relays */}

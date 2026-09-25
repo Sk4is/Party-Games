@@ -39,8 +39,11 @@ export const ModuladorFrecuenciaModule: React.FC<ModuladorFrecuenciaModuleProps>
       <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-emerald-400" />
-          <span className="text-xs uppercase font-mono tracking-widest text-slate-400">
-            Osciloscopio Armónico
+          <span className="text-xs uppercase font-mono font-bold tracking-widest text-emerald-300">
+            SEÑAL
+          </span>
+          <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+            // MONITOR AUX
           </span>
         </div>
         <div className="flex items-center gap-2">

@@ -4,11 +4,41 @@ import {
   CodigoRojoModuleState,
   CodigoRojoManualSection,
 } from '../../types/codigoRojo';
+import {
+  MASTER_MANUAL_SECTIONS,
+  ALL_28_GLYPHS,
+  GLYPH_COLUMNS_EXPANDED,
+} from './masterManualCatalog';
 
 export interface GeneratedModuleInternal {
   moduleState: CodigoRojoModuleState;
   internalSolution: any;
   validateAction: (action: any, currentProgress: any) => { valid: boolean; solved: boolean; updatedProgress?: any };
+}
+
+export function generateMachineSerial(rng: Mulberry32): string {
+  const prefixes = ['CR', 'NX', 'TX', 'ALFA', 'BETA', 'SEC'];
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const prefix = rng.pick(prefixes);
+  const num1 = rng.range(1, 9);
+  const num2 = rng.range(0, 9);
+  const num3 = rng.range(0, 9);
+  const letter = letters[rng.range(0, letters.length - 1)];
+  const lastDigit = rng.range(1, 9);
+  return `${prefix}-${num1}${num2}${num3}-${letter}${lastDigit}`;
+}
+
+export function getSerialLastDigit(serial: string): number {
+  const match = serial.match(/\d(?=\D*$)/);
+  return match ? parseInt(match[0], 10) : 4;
+}
+
+export function isSerialLastDigitEven(serial: string): boolean {
+  return getSerialLastDigit(serial) % 2 === 0;
+}
+
+export function doesSerialContainVowel(serial: string): boolean {
+  return /[AEIOUaeiou]/.test(serial);
 }
 
 // Pseudo-random deterministic PRNG based on seed
@@ -42,94 +72,115 @@ class Mulberry32 {
 // =========================================================================
 // 1. FILAMENTOS DE POTENCIA (Filament wire array)
 // =========================================================================
-function generateFilamentos(rng: Mulberry32, difficulty: CodigoRojoDifficulty): GeneratedModuleInternal {
+function generateFilamentos(
+  rng: Mulberry32,
+  difficulty: CodigoRojoDifficulty,
+  serial: string = 'CR-4821-X7'
+): GeneratedModuleInternal {
   const wireColors = ['Rojo', 'Azul', 'Amarillo', 'Verde', 'Blanco', 'Negro'] as const;
   type WireColor = typeof wireColors[number];
 
-  const wireCount = difficulty === 'NORMAL' ? 4 : difficulty === 'DIFICIL' ? 5 : 6;
-  const sectors = ['SEC-R7', 'SEC-B3', 'SEC-X0', 'SEC-M9'];
-  const sector = rng.pick(sectors);
+  // Cable count: 3, 4, 5, or 6
+  let wireCount = 4;
+  if (difficulty === 'NORMAL') wireCount = rng.pick([3, 4]);
+  else if (difficulty === 'DIFICIL') wireCount = rng.pick([4, 5]);
+  else wireCount = rng.pick([5, 6]);
 
-  const wires: { id: number; color: WireColor; isCut: boolean }[] = [];
+  const sectors = ['C-14', 'SEC-R7', 'SEC-B3', 'SEC-X0', 'SEC-M9', 'P-22'];
+  const sector = rng.pick(sectors);
+  const leds = ['Ámbar', 'Verde', 'Rojo', 'Apagado'] as const;
+  const indicatorLed = rng.pick([...leds]);
+
+  const wires: {
+    id: number;
+    color: WireColor;
+    hasStripe: boolean;
+    stripeColor?: string;
+    isCut: boolean;
+    gauge: 'estandar' | 'grueso';
+  }[] = [];
+
   for (let i = 0; i < wireCount; i++) {
-    wires.push({ id: i, color: rng.pick([...wireColors]), isCut: false });
+    const color = rng.pick([...wireColors]);
+    const hasStripe = rng.next() > 0.5;
+    const stripeColor = hasStripe ? (color === 'Blanco' ? 'Negro' : 'Blanco') : undefined;
+    const gauge = rng.next() > 0.75 ? 'grueso' : 'estandar';
+    wires.push({ id: i, color, hasStripe, stripeColor, isCut: false, gauge });
   }
 
-  // Count colors
   const redCount = wires.filter((w) => w.color === 'Rojo').length;
   const blueCount = wires.filter((w) => w.color === 'Azul').length;
   const yellowCount = wires.filter((w) => w.color === 'Amarillo').length;
-  const greenCount = wires.filter((w) => w.color === 'Verde').length;
   const blackCount = wires.filter((w) => w.color === 'Negro').length;
   const whiteCount = wires.filter((w) => w.color === 'Blanco').length;
+  const stripedCount = wires.filter((w) => w.hasStripe).length;
   const lastWire = wires[wires.length - 1];
+  const isSerialOdd = !isSerialLastDigitEven(serial);
 
-  let targetIndex = 1; // 0-based
-  let appliedRule = '';
+  let targetIndex = 0; // 0-based
 
-  if (redCount === 1 && sector === 'SEC-R7') {
-    targetIndex = 2; // 3rd wire
-    appliedRule = 'Un solo filamento rojo y Sector R7: cortar el 3er filamento.';
-  } else if (blueCount > 1 && lastWire.color !== 'Negro') {
-    const firstBlue = wires.findIndex((w) => w.color === 'Azul');
-    targetIndex = firstBlue >= 0 ? firstBlue : 0;
-    appliedRule = 'Más de un filamento azul y el último no es negro: cortar el primer filamento azul.';
-  } else if (yellowCount >= 1 && greenCount === 0) {
-    targetIndex = wires.length - 1; // last wire
-    appliedRule = 'Hay filamentos amarillos pero ninguno verde: cortar el último filamento.';
-  } else if (sector === 'SEC-B3' && whiteCount >= 1) {
-    targetIndex = wires.length >= 4 ? wires.length - 2 : 0;
-    appliedRule = 'Sector B3 y al menos un filamento blanco: cortar el penúltimo filamento.';
-  } else if (blackCount >= 2) {
-    targetIndex = 0; // 1st wire
-    appliedRule = 'Dos o más filamentos negros: cortar el 1er filamento.';
+  if (wireCount === 3) {
+    if (stripedCount > 0 && indicatorLed === 'Ámbar') {
+      targetIndex = 1; // 2nd wire
+    } else if (redCount === 0) {
+      const secondBlue = wires.filter((w) => w.color === 'Azul')[1];
+      targetIndex = secondBlue ? wires.indexOf(secondBlue) : wires.findIndex((w) => w.color === 'Azul');
+      if (targetIndex < 0) targetIndex = 0;
+    } else if (lastWire.color === 'Blanco' && !lastWire.hasStripe) {
+      targetIndex = wires.length - 1;
+    } else {
+      targetIndex = 0;
+    }
+  } else if (wireCount === 4) {
+    if (stripedCount >= 2) {
+      if (isSerialOdd) {
+        const firstBlue = wires.findIndex((w) => w.color === 'Azul');
+        targetIndex = firstBlue >= 0 ? firstBlue : 1;
+      } else {
+        targetIndex = 1;
+      }
+    } else if (redCount === 1 && yellowCount > 1) {
+      const firstStriped = wires.findIndex((w) => w.hasStripe);
+      targetIndex = firstStriped >= 0 ? firstStriped : 3;
+    } else if (redCount === 0 && !lastWire.hasStripe) {
+      if (!isSerialOdd) {
+        targetIndex = 1;
+      } else {
+        const firstBlue = wires.findIndex((w) => w.color === 'Azul');
+        targetIndex = firstBlue >= 0 ? firstBlue : 1;
+      }
+    } else {
+      targetIndex = wires.length >= 2 ? wires.length - 2 : 0;
+    }
+  } else if (wireCount === 5) {
+    if (lastWire.color === 'Negro' && isSerialOdd) {
+      targetIndex = 3;
+    } else if (redCount === 2 && stripedCount >= 1) {
+      const secondStriped = wires.filter((w) => w.hasStripe)[1];
+      targetIndex = secondStriped ? wires.indexOf(secondStriped) : wires.findIndex((w) => w.hasStripe);
+      if (targetIndex < 0) targetIndex = wires.findIndex((w) => w.color === 'Rojo');
+    } else if (yellowCount > 0 && blackCount === 0) {
+      targetIndex = 0;
+    } else {
+      targetIndex = 1;
+    }
   } else {
-    targetIndex = 1; // 2nd wire
-    appliedRule = 'En cualquier otro caso: cortar el 2º filamento.';
+    // 6 cables
+    if (yellowCount === 0 && isSerialOdd) {
+      targetIndex = 2;
+    } else if (yellowCount === 1 && whiteCount >= 2) {
+      targetIndex = 3;
+    } else if (stripedCount >= 3) {
+      targetIndex = wires.findIndex((w) => w.hasStripe);
+      if (targetIndex < 0) targetIndex = 0;
+    } else {
+      targetIndex = wires.length - 1;
+    }
   }
 
-  // Clamp within bounds
-  if (targetIndex >= wires.length) targetIndex = wires.length - 1;
+  if (targetIndex < 0 || targetIndex >= wires.length) targetIndex = 0;
 
-  const manualSection: CodigoRojoManualSection = {
-    moduleType: 'FILAMENTOS',
-    title: 'Filamentos de Potencia',
-    subtitle: 'Protocolo de Corte Eléctrico de Emergencia',
-    classificationCode: 'DOC-ELE-01',
-    description:
-      'Un banco de filamentos conduce energía de reserva al núcleo. Cortar el filamento erróneo provocará una sobrecarga inmediata (Strike). Los filamentos se cuentan de izquierda a derecha (1 a N).',
-    rules: [
-      {
-        condition: 'Si hay exactamente 1 filamento rojo y la etiqueta del sector es SEC-R7:',
-        action: 'Corta el 3er filamento.',
-      },
-      {
-        condition: 'Si hay 2 o más filamentos azules y el último filamento NO es negro:',
-        action: 'Corta el PRIMER filamento azul.',
-      },
-      {
-        condition: 'Si hay 1 o más filamentos amarillos y NINGÚN filamento verde:',
-        action: 'Corta el ÚLTIMO filamento.',
-      },
-      {
-        condition: 'Si la etiqueta del sector es SEC-B3 y hay al menos 1 filamento blanco:',
-        action: 'Corta el PENÚLTIMO filamento.',
-      },
-      {
-        condition: 'Si hay 2 o más filamentos negros:',
-        action: 'Corta el 1ER filamento.',
-      },
-      {
-        condition: 'En cualquier otro caso que no cumpla las anteriores:',
-        action: 'Corta el 2º filamento.',
-      },
-    ],
-    notes: [
-      'Identifica primero la etiqueta de SECTOR en la esquina superior del módulo.',
-      'Cuenta y enumera todos los colores antes de tomar una decisión.',
-      'Sigue estrictamente el orden de las reglas de arriba a abajo. Detente en la primera que se cumpla.',
-    ],
-  };
+  const manualSection = MASTER_MANUAL_SECTIONS.find((s) => s.moduleType === 'FILAMENTOS')!;
 
   return {
     moduleState: {
@@ -138,14 +189,15 @@ function generateFilamentos(rng: Mulberry32, difficulty: CodigoRojoDifficulty): 
       title: 'Filamentos de Potencia',
       solved: false,
       strikes: 0,
-      estimatedSolveSeconds: 35,
+      estimatedSolveSeconds: 40,
       operatorState: {
         sector,
-        wires: wires.map((w) => ({ id: w.id, color: w.color, isCut: false })),
+        indicatorLed,
+        wires,
       },
       manualSection,
     },
-    internalSolution: { targetIndex, appliedRule },
+    internalSolution: { targetIndex },
     validateAction: (action: { wireIndex: number }) => {
       if (action.wireIndex === targetIndex) {
         return { valid: true, solved: true };
@@ -237,74 +289,20 @@ function generateModuladorFrecuencia(rng: Mulberry32, difficulty: CodigoRojoDiff
 // =========================================================================
 // 3. GLIFOS CRIPTOGRÁFICOS
 // =========================================================================
-const ALL_GLYPHS = [
-  { id: 'g1', symbol: '⍾', name: 'Bobina' },
-  { id: 'g2', symbol: '⎈', name: 'Timón' },
-  { id: 'g3', symbol: '⌬', name: 'Benceno' },
-  { id: 'g4', symbol: '⏣', name: 'Hexágono Nuclear' },
-  { id: 'g5', symbol: '⍰', name: 'Interrogante Cuántico' },
-  { id: 'g6', symbol: '⎊', name: 'Triángulo Ocular' },
-  { id: 'g7', symbol: '⎇', name: 'Bifurcación' },
-  { id: 'g8', symbol: '⌖', name: 'Mira Vectorial' },
-  { id: 'g9', symbol: '⍲', name: 'Omega Invertida' },
-  { id: 'g10', symbol: '⍚', name: 'Prisma' },
-  { id: 'g11', symbol: '⏚', name: 'Toma de Tierra' },
-  { id: 'g12', symbol: '⍡', name: 'Emisor Pulsante' },
-];
-
-const GLYPH_COLUMNS = [
-  ['⍾', '⎈', '⌬', '⍰', '⌖', '⍚'],
-  ['⎊', '⍾', '⎇', '⏣', '⍲', '⎈'],
-  ['⏚', '⍡', '⎊', '⌬', '⌖', '⍰'],
-  ['⏣', '⍚', '⍲', '⏚', '⎇', '⍡'],
-  ['⎈', '⌖', '⍡', '⍾', '⎊', '⌬'],
-  ['⍰', '⏣', '⍚', '⎇', '⏚', '⍲'],
-];
-
 function generateGlifosCriptograficos(rng: Mulberry32): GeneratedModuleInternal {
   // Pick one column that will contain our 4 chosen glyphs
-  const columnIndex = rng.range(0, GLYPH_COLUMNS.length - 1);
-  const selectedColumn = GLYPH_COLUMNS[columnIndex];
+  const columnIndex = rng.range(0, GLYPH_COLUMNS_EXPANDED.length - 1);
+  const selectedColumn = GLYPH_COLUMNS_EXPANDED[columnIndex];
 
   // Pick 4 distinct symbols from this column preserving their vertical order
-  const indices = [0, 1, 2, 3, 4, 5];
-  const shuffledIndices = rng.shuffle(indices).slice(0, 4).sort((a, b) => a - b);
+  const colIndices = Array.from({ length: selectedColumn.length }, (_, i) => i);
+  const shuffledIndices = rng.shuffle(colIndices).slice(0, 4).sort((a, b) => a - b);
   const correctSymbolsInOrder = shuffledIndices.map((i) => selectedColumn[i]);
 
   // Display the 4 symbols on the machine scrambled
   const displaySymbols = rng.shuffle(correctSymbolsInOrder);
 
-  const manualSection: CodigoRojoManualSection = {
-    moduleType: 'GLIFOS_CRIPTOGRAFICOS',
-    title: 'Glifos Criptográficos',
-    subtitle: 'Secuencia de Desbloqueo de Sellos Rúnicos',
-    classificationCode: 'DOC-CRY-07',
-    description:
-      'Cuatro teclas exhiben glifos de autorización. Solo una de las 6 columnas clasificadas contiene los 4 glifos presentes en el panel. El Operador debe pulsar los 4 glifos en el orden estricto de ARRIBA a ABAJO según aparezcan en esa columna.',
-    tableHeaders: ['Columna 1', 'Columna 2', 'Columna 3', 'Columna 4', 'Columna 5', 'Columna 6'],
-    tableRows: [
-      ['1. ⍾ Bobina', '1. ⎊ Triángulo', '1. ⏚ Tierra', '1. ⏣ Hexágono', '1. ⎈ Timón', '1. ⍰ Interrog.'],
-      ['2. ⎈ Timón', '2. ⍾ Bobina', '2. ⍡ Emisor', '2. ⍚ Prisma', '2. ⌖ Mira', '2. ⏣ Hexágono'],
-      ['3. ⌬ Benceno', '3. ⎇ Bifurcación', '3. ⎊ Triángulo', '3. ⍲ Omega', '3. ⍡ Emisor', '3. ⍚ Prisma'],
-      ['4. ⍰ Interrog.', '4. ⏣ Hexágono', '4. ⌬ Benceno', '4. ⏚ Tierra', '4. ⍾ Bobina', '4. ⎇ Bifurcación'],
-      ['5. ⌖ Mira', '5. ⍲ Omega', '5. ⌖ Mira', '5. ⎇ Bifurcación', '5. ⎊ Triángulo', '5. ⏚ Tierra'],
-      ['6. ⍚ Prisma', '6. ⎈ Timón', '6. ⍰ Interrog.', '6. ⍡ Emisor', '6. ⌬ Benceno', '6. ⍲ Omega'],
-    ],
-    rules: [
-      {
-        condition: 'Paso 1: El Operador describe los 4 glifos visibles en sus botones.',
-        action: 'Los Guías buscan cuál de las 6 columnas contiene los 4 glifos a la vez.',
-      },
-      {
-        condition: 'Paso 2: Una vez identificada la columna única:',
-        action: 'El Operador debe pulsar los glifos siguiendo su orden de arriba abajo en dicha columna.',
-      },
-    ],
-    notes: [
-      'Si se pulsa un glifo fuera de orden, el módulo emitirá un fallo (Strike) y reiniciará la secuencia.',
-      'Si un glifo ya ha sido pulsado correctamente, se encenderá en verde en la botonera.',
-    ],
-  };
+  const manualSection = MASTER_MANUAL_SECTIONS.find((s) => s.moduleType === 'GLIFOS_CRIPTOGRAFICOS')!;
 
   return {
     moduleState: {
@@ -322,9 +320,10 @@ function generateGlifosCriptograficos(rng: Mulberry32): GeneratedModuleInternal 
     },
     internalSolution: { correctSymbolsInOrder, progressIndex: 0 },
     validateAction: (action: { symbol: string }, currentProgress: { progressIndex: number }) => {
-      const expectedSymbol = correctSymbolsInOrder[currentProgress.progressIndex];
+      const currentIndex = currentProgress?.progressIndex || 0;
+      const expectedSymbol = correctSymbolsInOrder[currentIndex];
       if (action.symbol === expectedSymbol) {
-        const nextIndex = currentProgress.progressIndex + 1;
+        const nextIndex = currentIndex + 1;
         const isSolved = nextIndex === correctSymbolsInOrder.length;
         return { valid: true, solved: isSolved, updatedProgress: { progressIndex: nextIndex } };
       }
@@ -1286,7 +1285,368 @@ function generateSincronizadorFases(rng: Mulberry32): GeneratedModuleInternal {
 }
 
 // =========================================================================
-// AUTHORITATIVE GENERATOR & VALIDATOR REGISTRY
+// 16. CALIBRADOR GIROSCÓPICO INERCIAL (NUEVO)
+// =========================================================================
+function generateCalibradorGiroscopio(rng: Mulberry32, serial: string): GeneratedModuleInternal {
+  const axes = ['Eje X', 'Eje Y', 'Eje Z'] as const;
+  const pitches = ['Subiendo (+)', 'Bajando (-)', 'Estable (=)'] as const;
+  const leds = ['Ámbar', 'Verde', 'Apagado'] as const;
+
+  const axis = rng.pick([...axes]);
+  const pitch = rng.pick([...pitches]);
+  const led = rng.pick([...leds]);
+  const currentBearing = rng.range(0, 35) * 10;
+  const isSerialOdd = !isSerialLastDigitEven(serial);
+
+  let baseDrift = 0;
+  if (axis === 'Eje X') {
+    baseDrift = isSerialOdd ? currentBearing + 45 : currentBearing + 90;
+  } else if (axis === 'Eje Y') {
+    baseDrift = isSerialOdd ? currentBearing + 180 : currentBearing + 30;
+  } else {
+    baseDrift = isSerialOdd ? currentBearing + 60 : currentBearing + 120;
+  }
+
+  let pitchComp = 0;
+  if (pitch === 'Subiendo (+)') pitchComp = 15;
+  else if (pitch === 'Bajando (-)') pitchComp = -15;
+
+  if (led === 'Ámbar') {
+    pitchComp = -pitchComp;
+  }
+
+  let targetHeading = (baseDrift + pitchComp) % 360;
+  if (targetHeading < 0) targetHeading += 360;
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find((s) => s.moduleType === 'CALIBRADOR_GIROSCOPIO')!;
+
+  return {
+    moduleState: {
+      id: `mod-giro-${rng.range(1000, 9999)}`,
+      moduleType: 'CALIBRADOR_GIROSCOPIO',
+      title: 'Calibrador Giroscópico',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 50,
+      operatorState: {
+        axis,
+        pitch,
+        led,
+        currentBearing,
+        selectedHeading: currentBearing,
+      },
+      manualSection,
+    },
+    internalSolution: { targetHeading },
+    validateAction: (action: { lockedHeading: number }) => {
+      const diff = Math.abs(((action.lockedHeading - targetHeading + 180) % 360) - 180);
+      if (diff <= 2) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 17. CONTENCIÓN DE PLASMA CUÁNTICO (NUEVO)
+// =========================================================================
+function generateReactorPlasma(rng: Mulberry32, serial: string): GeneratedModuleInternal {
+  const isotopes = ['Azul Neón', 'Púrpura Iónico', 'Verde Tóxico', 'Ámbar Solar'] as const;
+  const isotope = rng.pick([...isotopes]);
+  const temperatureK = rng.range(32, 55) * 100;
+  const hasVowel = doesSerialContainVowel(serial);
+  const isSerialOdd = !isSerialLastDigitEven(serial);
+
+  let targetAlpha = 3;
+  let targetBeta = 3;
+  let targetGamma = 3;
+
+  if (isotope === 'Azul Neón') {
+    targetAlpha = 4;
+    if (hasVowel) {
+      targetBeta = 2;
+      targetGamma = 3;
+    } else {
+      targetBeta = 3;
+      targetGamma = 1;
+    }
+  } else if (isotope === 'Púrpura Iónico') {
+    targetBeta = 5;
+    if (isSerialOdd) {
+      targetAlpha = 2;
+      targetGamma = 4;
+    } else {
+      targetAlpha = 3;
+      targetGamma = 2;
+    }
+  } else if (isotope === 'Verde Tóxico') {
+    targetGamma = 4;
+    if (temperatureK > 4000) {
+      targetAlpha = 3;
+      targetBeta = 2;
+    } else {
+      targetAlpha = 1;
+      targetBeta = 5;
+    }
+  } else {
+    // Ámbar Solar
+    targetAlpha = 4;
+    targetBeta = 2;
+    targetGamma = 3;
+  }
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find((s) => s.moduleType === 'REACTOR_PLASMA')!;
+
+  return {
+    moduleState: {
+      id: `mod-plasma-${rng.range(1000, 9999)}`,
+      moduleType: 'REACTOR_PLASMA',
+      title: 'Contención de Plasma',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 50,
+      operatorState: {
+        isotope,
+        temperatureK,
+        initialAlpha: 1,
+        initialBeta: 1,
+        initialGamma: 1,
+      },
+      manualSection,
+    },
+    internalSolution: { alpha: targetAlpha, beta: targetBeta, gamma: targetGamma },
+    validateAction: (action: { alpha: number; beta: number; gamma: number }) => {
+      if (
+        action.alpha === targetAlpha &&
+        action.beta === targetBeta &&
+        action.gamma === targetGamma
+      ) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 18. ATENUADOR ACÚSTICO DE RESONANCIA (NUEVO)
+// =========================================================================
+function generateFrecuenciaResonancia(rng: Mulberry32, serial: string): GeneratedModuleInternal {
+  const peakFrequencies = ['60 Hz', '250 Hz', '1 kHz', '4 kHz', '8 kHz', '16 kHz'] as const;
+  const chamberStates = ['ALTA PRESIÓN', 'VACÍO PARCIAL'] as const;
+  const peakFreq = rng.pick([...peakFrequencies]);
+  const chamber = rng.pick([...chamberStates]);
+  const isSerialOdd = !isSerialLastDigitEven(serial);
+  const containsCR = /[CRcr]/.test(serial);
+
+  let targetFilters: number[] = [];
+
+  if (peakFreq === '60 Hz') {
+    targetFilters = chamber === 'ALTA PRESIÓN' ? [1, 4] : [1, 2];
+  } else if (peakFreq === '250 Hz') {
+    targetFilters = isSerialOdd ? [1, 3] : [2, 3];
+  } else if (peakFreq === '1 kHz') {
+    targetFilters = containsCR ? [2, 4] : [3, 4];
+  } else if (peakFreq === '4 kHz') {
+    targetFilters = [1, 2, 4];
+  } else if (peakFreq === '8 kHz') {
+    targetFilters = [1, 4];
+  } else {
+    // 16 kHz
+    targetFilters = isSerialOdd ? [3, 4] : [1, 4];
+  }
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find((s) => s.moduleType === 'FRECUENCIA_RESONANCIA')!;
+
+  return {
+    moduleState: {
+      id: `mod-res-${rng.range(1000, 9999)}`,
+      moduleType: 'FRECUENCIA_RESONANCIA',
+      title: 'Atenuador Acústico',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 45,
+      operatorState: {
+        peakFreq,
+        chamber,
+        activeFilters: [],
+      },
+      manualSection,
+    },
+    internalSolution: { targetFilters: targetFilters.sort((a, b) => a - b) },
+    validateAction: (action: { activeFilters: number[] }) => {
+      const sortedAct = [...action.activeFilters].sort((a, b) => a - b);
+      const isMatch =
+        sortedAct.length === targetFilters.length &&
+        sortedAct.every((v, i) => v === targetFilters[i]);
+      if (isMatch) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 19. BLOQUEO DE PISTONES CINÉTICOS (NUEVO)
+// =========================================================================
+function generateSecuenciaCinetica(rng: Mulberry32, serial: string): GeneratedModuleInternal {
+  const collarColors = ['Dorado', 'Carmesí', 'Cobalto', 'Esmeralda'] as const;
+  const strokeDepths = ['Corto', 'Medio', 'Largo'] as const;
+
+  const pistons = [1, 2, 3, 4].map((id) => ({
+    id,
+    collar: rng.pick([...collarColors]),
+    stroke: rng.pick([...strokeDepths]),
+    pressed: false,
+  }));
+
+  const lastDigit = getSerialLastDigit(serial);
+
+  // Step 1:
+  let p1Id = 1;
+  const goldenPistons = pistons.filter((p) => p.collar === 'Dorado');
+  const crimsonPistons = pistons.filter((p) => p.collar === 'Carmesí');
+  const cobaltPistons = pistons.filter((p) => p.collar === 'Cobalto');
+
+  if (goldenPistons.length > 0) {
+    const strokeRank: Record<string, number> = { Largo: 3, Medio: 2, Corto: 1 };
+    const sorted = [...goldenPistons].sort((a, b) => strokeRank[b.stroke] - strokeRank[a.stroke]);
+    p1Id = sorted[0].id;
+  } else if (crimsonPistons.length >= 2) {
+    p1Id = crimsonPistons[crimsonPistons.length - 1].id;
+  } else if (cobaltPistons.length > 0) {
+    p1Id = cobaltPistons[0].id;
+  } else {
+    p1Id = 1;
+  }
+
+  // Step 2:
+  const p4 = pistons.find((p) => p.id === 4)!;
+  let p2Id = 2;
+  if (p4.collar === 'Esmeralda' && p1Id !== 1) {
+    p2Id = 1;
+  } else if (lastDigit > 4) {
+    let candidate = p1Id === 4 ? 1 : p1Id + 1;
+    if (candidate === p1Id) candidate = candidate === 4 ? 1 : candidate + 1;
+    p2Id = candidate;
+  } else {
+    p2Id = p1Id === 3 ? 2 : 3;
+  }
+
+  // Step 3:
+  const remainingAfterStep2 = pistons.filter((p) => p.id !== p1Id && p.id !== p2Id);
+  const primaryRemaining = remainingAfterStep2.filter(
+    (p) => p.collar === 'Carmesí' || p.collar === 'Cobalto'
+  );
+  let p3Id = remainingAfterStep2[0].id;
+  if (primaryRemaining.length === 1) {
+    p3Id = primaryRemaining[0].id;
+  } else {
+    p3Id = Math.min(remainingAfterStep2[0].id, remainingAfterStep2[1].id);
+  }
+
+  // Step 4:
+  const p4Id = pistons.find((p) => p.id !== p1Id && p.id !== p2Id && p.id !== p3Id)!.id;
+
+  const sequence = [p1Id, p2Id, p3Id, p4Id];
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find((s) => s.moduleType === 'SECUENCIA_CINETICA')!;
+
+  return {
+    moduleState: {
+      id: `mod-cin-${rng.range(1000, 9999)}`,
+      moduleType: 'SECUENCIA_CINETICA',
+      title: 'Pistones Cinéticos',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 50,
+      operatorState: {
+        pistons,
+        pressedPistonIds: [],
+        stepProgress: 0,
+      },
+      manualSection,
+    },
+    internalSolution: { sequence },
+    validateAction: (action: { pressedPistonId: number }, currentProgress: any) => {
+      const stepIndex = currentProgress?.stepProgress || 0;
+      const expectedPiston = sequence[stepIndex];
+
+      if (action.pressedPistonId === expectedPiston) {
+        const nextStep = stepIndex + 1;
+        const isSolved = nextStep >= 4;
+        const pressedList = [...(currentProgress?.pressedPistonIds || []), action.pressedPistonId];
+        return {
+          valid: true,
+          solved: isSolved,
+          updatedProgress: { stepProgress: nextStep, pressedPistonIds: pressedList },
+        };
+      } else {
+        return {
+          valid: false,
+          solved: false,
+          updatedProgress: { stepProgress: 0, pressedPistonIds: [] },
+        };
+      }
+    },
+  };
+}
+
+// =========================================================================
+// 20. PUENTE POTENCIOMÉTRICO DE PRECISIÓN (NUEVO)
+// =========================================================================
+function generateDivisorVoltaje(rng: Mulberry32, serial: string): GeneratedModuleInternal {
+  const deflectionMV = rng.pick([-42, -35, -28, -20, -14, 16, 22, 28, 36, 44]);
+  const scales = ['R1 (x1)', 'R2 (x2)', 'R3 (x3)'] as const;
+  const scale = rng.pick([...scales]);
+  const isSerialOdd = !isSerialLastDigitEven(serial);
+  const hasXK = /[XKxk]/.test(serial);
+
+  const multiplier = scale === 'R1 (x1)' ? 1 : scale === 'R2 (x2)' ? 2 : 3;
+  const absVal = Math.abs(deflectionMV) * multiplier;
+
+  let targetValue = 50;
+  if (deflectionMV > 0) {
+    let prelim = absVal + 15;
+    if (isSerialOdd) prelim += 10;
+    targetValue = prelim % 100;
+  } else {
+    let prelim = (100 - (absVal % 100)) % 100;
+    if (hasXK) prelim = (prelim - 5 + 100) % 100;
+    targetValue = prelim % 100;
+  }
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find((s) => s.moduleType === 'DIVISOR_VOLTAJE')!;
+
+  return {
+    moduleState: {
+      id: `mod-volt-${rng.range(1000, 9999)}`,
+      moduleType: 'DIVISOR_VOLTAJE',
+      title: 'Puente Potenciométrico',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 45,
+      operatorState: {
+        deflectionMV,
+        scale,
+        dialValue: 50,
+      },
+      manualSection,
+    },
+    internalSolution: { targetValue },
+    validateAction: (action: { dialValue: number }) => {
+      if (action.dialValue === targetValue) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// AUTHORITATIVE GENERATOR & VALIDATOR REGISTRY (20 MODULE FAMILIES)
 // =========================================================================
 export const ALL_MODULE_TYPES: CodigoRojoModuleType[] = [
   'FILAMENTOS',
@@ -1304,18 +1664,24 @@ export const ALL_MODULE_TYPES: CodigoRojoModuleType[] = [
   'PUERTOS_CONEXION',
   'DISIPADOR_TERMICO',
   'SINCRONIZADOR_FASES',
+  'CALIBRADOR_GIROSCOPIO',
+  'REACTOR_PLASMA',
+  'FRECUENCIA_RESONANCIA',
+  'SECUENCIA_CINETICA',
+  'DIVISOR_VOLTAJE',
 ];
 
 export function generateModuleInstance(
   type: CodigoRojoModuleType,
   seed: number,
-  difficulty: CodigoRojoDifficulty
+  difficulty: CodigoRojoDifficulty,
+  serial: string = 'CR-4821-X7'
 ): GeneratedModuleInternal {
   const rng = new Mulberry32(seed);
 
   switch (type) {
     case 'FILAMENTOS':
-      return generateFilamentos(rng, difficulty);
+      return generateFilamentos(rng, difficulty, serial);
     case 'MODULADOR_FRECUENCIA':
       return generateModuladorFrecuencia(rng, difficulty);
     case 'GLIFOS_CRIPTOGRAFICOS':
@@ -1344,8 +1710,18 @@ export function generateModuleInstance(
       return generateDisipadorTermico(rng);
     case 'SINCRONIZADOR_FASES':
       return generateSincronizadorFases(rng);
+    case 'CALIBRADOR_GIROSCOPIO':
+      return generateCalibradorGiroscopio(rng, serial);
+    case 'REACTOR_PLASMA':
+      return generateReactorPlasma(rng, serial);
+    case 'FRECUENCIA_RESONANCIA':
+      return generateFrecuenciaResonancia(rng, serial);
+    case 'SECUENCIA_CINETICA':
+      return generateSecuenciaCinetica(rng, serial);
+    case 'DIVISOR_VOLTAJE':
+      return generateDivisorVoltaje(rng, serial);
     default:
-      return generateFilamentos(rng, difficulty);
+      return generateFilamentos(rng, difficulty, serial);
   }
 }
 
@@ -1366,9 +1742,11 @@ export function validateModuleInstance(instance: GeneratedModuleInternal): boole
 export function generateMissionModules(
   count: number,
   difficulty: CodigoRojoDifficulty,
-  seed: number
-): { modules: GeneratedModuleInternal[]; totalEstimatedSeconds: number } {
+  seed: number,
+  existingSerial?: string
+): { modules: GeneratedModuleInternal[]; totalEstimatedSeconds: number; machineSerial: string } {
   const rng = new Mulberry32(seed);
+  const machineSerial = existingSerial || generateMachineSerial(rng);
   const shuffledTypes = rng.shuffle(ALL_MODULE_TYPES);
   const selectedTypes = shuffledTypes.slice(0, Math.min(count, ALL_MODULE_TYPES.length));
 
@@ -1382,7 +1760,7 @@ export function generateMissionModules(
 
     while (attempts < 10 && !validModule) {
       const subSeed = rng.range(100000, 999999) + attempts * 37;
-      const mod = generateModuleInstance(type, subSeed, difficulty);
+      const mod = generateModuleInstance(type, subSeed, difficulty, machineSerial);
       if (validateModuleInstance(mod)) {
         validModule = mod;
       }
@@ -1402,5 +1780,6 @@ export function generateMissionModules(
   return {
     modules: resultModules,
     totalEstimatedSeconds: Math.max(120, totalEstimated),
+    machineSerial,
   };
 }

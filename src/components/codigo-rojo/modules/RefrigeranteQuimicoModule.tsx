@@ -46,9 +46,12 @@ export const RefrigeranteQuimicoModule: React.FC<RefrigeranteQuimicoModuleProps>
     <div className="flex flex-col items-center justify-between w-full h-full p-6 bg-slate-900/90 rounded-2xl border border-slate-700 select-none">
       <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <FlaskConical className="w-4 h-4 text-emerald-400" />
-          <span className="text-xs uppercase font-mono tracking-widest text-slate-400">
-            Mezclador de Refrigerante
+          <FlaskConical className="w-4 h-4 text-red-400" />
+          <span className="text-xs uppercase font-mono font-bold tracking-widest text-red-300">
+            ENERGÍA
+          </span>
+          <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+            // MEZCLA CRIOGÉNICA
           </span>
         </div>
         <div className="flex items-center gap-2">

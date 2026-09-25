@@ -28,7 +28,12 @@ export type CodigoRojoModuleType =
   | 'REFRIGERANTE_QUIMICO'
   | 'PUERTOS_CONEXION'
   | 'DISIPADOR_TERMICO'
-  | 'SINCRONIZADOR_FASES';
+  | 'SINCRONIZADOR_FASES'
+  | 'CALIBRADOR_GIROSCOPIO'
+  | 'REACTOR_PLASMA'
+  | 'FRECUENCIA_RESONANCIA'
+  | 'SECUENCIA_CINETICA'
+  | 'DIVISOR_VOLTAJE';
 
 export interface CodigoRojoPlayer {
   id: string;
@@ -50,6 +55,15 @@ export interface CodigoRojoConfig {
   modulesCount: number; // calculated or customized (2-6)
 }
 
+export type CodigoRojoCategory =
+  | 'ELECTRICIDAD'
+  | 'CONTROL'
+  | 'SEÑAL'
+  | 'NAVEGACIÓN'
+  | 'ENERGÍA'
+  | 'SISTEMAS'
+  | 'COMUNICACIONES';
+
 export interface CodigoRojoManualRule {
   condition: string;
   action: string;
@@ -57,9 +71,13 @@ export interface CodigoRojoManualRule {
 
 export interface CodigoRojoManualSection {
   moduleType: CodigoRojoModuleType;
+  category?: CodigoRojoCategory;
   title: string;
   subtitle: string;
   classificationCode: string;
+  division?: string;
+  visualIdentification?: string;
+  identificationChecklist?: string[];
   description: string;
   diagramSvgKey?: string;
   rules: CodigoRojoManualRule[];
@@ -67,6 +85,7 @@ export interface CodigoRojoManualSection {
   tableRows?: string[][];
   notes?: string[];
   protocolSteps?: string[];
+  extraContent?: any;
 }
 
 export interface CodigoRojoModuleState {
@@ -98,6 +117,7 @@ export interface CodigoRojoRoomState {
   totalTimeSeconds: number;
   missionStartedAt?: number;
   missionEndsAt?: number;
+  machineSerial?: string;
   modules: CodigoRojoModuleState[];
   activeModuleIndex: number;
   lastEvent?: {

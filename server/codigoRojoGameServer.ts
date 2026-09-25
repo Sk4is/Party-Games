@@ -37,6 +37,7 @@ interface ServerRoom {
   totalTimeSeconds: number;
   missionStartedAt?: number;
   missionEndsAt?: number;
+  machineSerial?: string;
   modules: CodigoRojoModuleState[];
   activeModuleIndex: number;
   lastEvent?: CodigoRojoRoomState['lastEvent'];
@@ -344,6 +345,7 @@ export class CodigoRojoServer {
 
     room.internalModules = generated.modules;
     room.modules = generated.modules.map((m) => m.moduleState);
+    room.machineSerial = generated.machineSerial;
 
     // Determine time
     let timeSeconds = generated.totalEstimatedSeconds;
@@ -712,6 +714,7 @@ export class CodigoRojoServer {
       totalTimeSeconds: room.totalTimeSeconds,
       missionStartedAt: room.missionStartedAt,
       missionEndsAt: room.missionEndsAt,
+      machineSerial: room.machineSerial,
       modules: room.modules,
       activeModuleIndex: room.activeModuleIndex,
       lastEvent: room.lastEvent,

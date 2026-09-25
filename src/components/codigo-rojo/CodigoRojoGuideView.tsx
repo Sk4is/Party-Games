@@ -1,17 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   CodigoRojoRoomState,
   CodigoRojoManualSection,
+  CodigoRojoCategory,
 } from '../../types/codigoRojo';
+import {
+  MASTER_MANUAL_SECTIONS,
+  ALL_28_GLYPHS,
+  GLYPH_COLUMNS_EXPANDED,
+} from '../../data/codigoRojo/masterManualCatalog';
+import {
+  ALL_CATEGORIES,
+  CATEGORY_META,
+  getModuleCategory,
+} from '../../data/codigoRojo/categoryMapping';
+import { ModuleTechnicalSketch } from './components/ModuleTechnicalSketch';
 import {
   BookOpen,
   Clock,
   Search,
-  CheckCircle2,
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
+  FileText,
+  KeyRound,
+  Filter,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface CodigoRojoGuideViewProps {
@@ -23,9 +38,11 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
   roomState,
   onAbandon,
 }) => {
-  const { modules, strikes, maxStrikes, timeRemainingSeconds, missionNumber } = roomState;
-  const [selectedPageIndex, setSelectedPageIndex] = useState(0);
+  const { strikes, maxStrikes, timeRemainingSeconds, missionNumber } = roomState;
+  const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('TODOS');
+  const [operatorNotes, setOperatorNotes] = useState<string>('');
 
   const formatTimer = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -35,21 +52,39 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
 
   const isLowTime = timeRemainingSeconds <= 60;
 
-  // Filter modules by search query
-  const filteredModules = modules.filter(
-    (m) =>
-      m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.manualSection.subtitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.manualSection.classificationCode.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter sections by search query and category
+  const filteredSections = useMemo(() => {
+    return MASTER_MANUAL_SECTIONS.filter((sec) => {
+      const secCategory = sec.category || getModuleCategory(sec.moduleType);
+      const matchesCategory =
+        selectedCategory === 'TODOS' || secCategory === selectedCategory;
+      if (!matchesCategory) return false;
 
-  const activeModule = modules[selectedPageIndex] || modules[0];
-  const section: CodigoRojoManualSection | undefined = activeModule?.manualSection;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        sec.title.toLowerCase().includes(q) ||
+        sec.subtitle.toLowerCase().includes(q) ||
+        secCategory.toLowerCase().includes(q) ||
+        sec.classificationCode.toLowerCase().includes(q) ||
+        (sec.visualIdentification && sec.visualIdentification.toLowerCase().includes(q)) ||
+        (sec.identificationChecklist &&
+          sec.identificationChecklist.some((item) => item.toLowerCase().includes(q))) ||
+        sec.description.toLowerCase().includes(q)
+      );
+    });
+  }, [searchQuery, selectedCategory]);
+
+  // Current active section
+  const currentSection: CodigoRojoManualSection =
+    filteredSections[selectedSectionIndex] ||
+    MASTER_MANUAL_SECTIONS[0];
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between bg-slate-950 text-slate-100 p-3 sm:p-6 overflow-x-hidden font-['Plus_Jakarta_Sans',sans-serif]">
       {/* Top Tactical Status Bar */}
-      <header className="w-full max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border-2 border-red-500/40 shadow-2xl mb-4">
+      <header className="w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border-2 border-amber-500/40 shadow-2xl mb-4">
+        {/* Mission & Guide Role */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/60 flex items-center justify-center text-xl">
             📋
@@ -64,12 +99,25 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
               </span>
             </div>
             <h1 className="text-base sm:text-lg font-black text-white">
-              MANUAL DE DESACTIVACIÓN CLASIFICADO
+              MANUAL DE DESACTIVACIÓN (20 PROTOCOLOS)
             </h1>
           </div>
         </div>
 
-        {/* Strikes */}
+        {/* Scratchpad note helper for Guide */}
+        <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-mono">
+          <span className="text-slate-400 font-bold hidden sm:inline">Nº SERIE:</span>
+          <input
+            type="text"
+            placeholder="Anotar nº serie..."
+            value={operatorNotes}
+            onChange={(e) => setOperatorNotes(e.target.value.toUpperCase())}
+            className="w-28 sm:w-36 bg-slate-900 border border-slate-700 px-2 py-1 rounded text-amber-300 font-mono font-bold text-xs uppercase focus:outline-none focus:border-amber-400 placeholder-slate-600"
+            title="Anota aquí la serie que te dicte el Operador (ej. CR-4821-X7)"
+          />
+        </div>
+
+        {/* Strikes Display */}
         <div className="flex items-center gap-2 bg-slate-950 px-4 py-2 rounded-xl border border-red-950">
           <span className="text-xs font-mono text-slate-400 font-bold mr-1">STRIKES:</span>
           {Array.from({ length: maxStrikes }).map((_, idx) => {
@@ -89,7 +137,7 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
           })}
         </div>
 
-        {/* Timer */}
+        {/* Digital Countdown Timer */}
         <div
           className={`flex items-center gap-2 px-5 py-2 rounded-xl border-2 font-mono font-black text-xl sm:text-2xl ${
             isLowTime
@@ -102,111 +150,259 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
         </div>
       </header>
 
-      {/* Manual Layout: Sidebar Tabs + Paper Document */}
-      <main className="flex-1 w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-4 mb-4">
-        {/* Left Sidebar: Table of contents & Search */}
-        <aside className="w-full md:w-72 flex flex-col gap-3">
+      {/* Main Content: 20-Module Manual Index + Classified Technical Document */}
+      <main className="flex-1 w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-col md:flex-row gap-4 mb-4">
+        {/* Left Sidebar: 20-Module Index & Search */}
+        <aside className="w-full md:w-80 flex flex-col gap-3">
           {/* Quick Search */}
           <div className="relative w-full">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar en el manual..."
+              placeholder="Buscar por categoría, título o elemento..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSelectedSectionIndex(0);
+              }}
               className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
             />
           </div>
 
-          {/* Module Pages List */}
-          <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-y-auto max-h-[500px] p-1 scrollbar-none">
-            {modules.map((mod, idx) => {
-              const isSelected = selectedPageIndex === idx;
+          {/* Broad Category Filter Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[10px] font-mono">
+            {['TODOS', ...ALL_CATEGORIES].map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setSelectedSectionIndex(0);
+                }}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                  selectedCategory === cat
+                    ? 'bg-amber-500 text-slate-950 font-black border-amber-400 shadow-sm'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* 20-Module Manual Entries List */}
+          <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-y-auto max-h-[580px] p-1 scrollbar-none">
+            {filteredSections.map((sec, idx) => {
+              const isSelected = selectedSectionIndex === idx;
+              const secCategory = sec.category || getModuleCategory(sec.moduleType);
+              const meta = CATEGORY_META[secCategory];
               return (
                 <button
-                  key={mod.id}
+                  key={sec.classificationCode}
                   type="button"
-                  onClick={() => setSelectedPageIndex(idx)}
-                  className={`flex-shrink-0 text-left p-3 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-1 ${
+                  onClick={() => setSelectedSectionIndex(idx)}
+                  className={`flex-shrink-0 text-left p-3 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-1.5 ${
                     isSelected
                       ? 'bg-amber-100 text-slate-950 border-amber-500 shadow-md font-bold'
                       : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] uppercase tracking-wider opacity-70">
-                      PÁGINA {idx + 1} &bull; {mod.manualSection.classificationCode}
+                    <span
+                      className={`font-mono text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                        isSelected
+                          ? 'bg-amber-950 text-amber-200 border-amber-800'
+                          : `${meta.badgeBg} ${meta.badgeText} ${meta.badgeBorder}`
+                      }`}
+                    >
+                      {secCategory}
                     </span>
-                    {mod.solved && (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    )}
+                    <span className="text-[9px] font-mono opacity-60">
+                      {sec.classificationCode}
+                    </span>
                   </div>
                   <span className="text-xs sm:text-sm font-bold line-clamp-1">
-                    {mod.title}
+                    {sec.title}
                   </span>
                 </button>
               );
             })}
+
+            {filteredSections.length === 0 && (
+              <div className="p-4 text-center text-xs font-mono text-slate-500">
+                No se encontraron protocolos con «{searchQuery}»
+              </div>
+            )}
           </div>
         </aside>
 
-        {/* Right Main Area: The Classified Document Paper */}
-        <div className="flex-1 bg-[#FBF8EF] text-slate-900 rounded-2xl border-4 border-amber-900/20 shadow-2xl p-6 sm:p-8 flex flex-col justify-between overflow-y-auto max-h-[640px]">
-          {section ? (
+        {/* Right Main Area: Classified Technical Document Paper */}
+        <div className="flex-1 bg-[#FBF8EF] text-slate-900 rounded-2xl border-4 border-amber-900/30 shadow-2xl p-5 sm:p-8 flex flex-col justify-between overflow-y-auto max-h-[720px]">
+          {currentSection && (
             <div>
-              {/* Classified Header */}
+              {/* Classified Top Stamp Header */}
               <div className="flex flex-wrap items-center justify-between pb-4 border-b-2 border-slate-300 gap-2">
                 <div>
-                  <span className="px-2 py-0.5 bg-red-600 text-white font-mono text-[10px] font-black uppercase tracking-widest rounded">
-                    ALTO SECRETO // NIVEL 4
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-red-600 text-white font-mono text-[10px] font-black uppercase tracking-widest rounded">
+                      DOCUMENTO CLASIFICADO // NIVEL 4
+                    </span>
+                    <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-950 font-mono text-[10px] font-black uppercase rounded border border-amber-500/40">
+                      CATEGORÍA: {currentSection.category || getModuleCategory(currentSection.moduleType)}
+                    </span>
+                  </div>
                   <div className="text-[11px] font-mono text-slate-500 mt-1">
-                    REF: {section.classificationCode} &bull; MÓDULO #{selectedPageIndex + 1}
+                    CÓDIGO: {currentSection.classificationCode} &bull; SECCIÓN #{selectedSectionIndex + 1} DE {filteredSections.length}
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="text-xs font-mono text-slate-500">
-                    ESTADO EN OPERACIÓN:
+                  <div className="text-xs font-mono text-slate-600 font-bold">
+                    INSPECCIÓN TÉCNICA
                   </div>
-                  <span
-                    className={`font-mono text-xs font-bold ${
-                      activeModule.solved ? 'text-emerald-700' : 'text-red-700'
-                    }`}
-                  >
-                    {activeModule.solved ? '✓ NEUTRALIZADO' : '● ACTIVO EN MÁQUINA'}
-                  </span>
+                  <div className="text-[10px] font-mono text-slate-500">
+                    DISCIPLINA DE COMUNICACIÓN VERBAL
+                  </div>
                 </div>
               </div>
 
               {/* Title & Subtitle */}
               <div className="my-5">
+                <div className="text-xs font-mono font-black uppercase tracking-wider text-amber-800 mb-1">
+                  CATEGORÍA DE PANEL: {currentSection.category}
+                </div>
                 <h2 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-slate-950">
-                  {section.title}
+                  {currentSection.title}
                 </h2>
                 <p className="text-sm font-semibold text-amber-900 mt-0.5 font-mono">
-                  {section.subtitle}
+                  {currentSection.subtitle}
                 </p>
                 <p className="text-sm text-slate-700 mt-3 leading-relaxed">
-                  {section.description}
+                  {currentSection.description}
                 </p>
               </div>
 
-              {/* Table if present */}
-              {section.tableHeaders && section.tableRows && (
-                <div className="my-5 overflow-x-auto rounded-lg border border-slate-300">
+              {/* TECHNICAL SKETCH (Crucial for visual Operator/Guide verification) */}
+              <div className="my-4">
+                <ModuleTechnicalSketch moduleType={currentSection.moduleType} />
+              </div>
+
+              {/* Visual Identification Guide Box & Checklist */}
+              <div className="my-4 p-4 bg-amber-100/80 border-2 border-dashed border-amber-400 rounded-xl flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 font-mono text-xs font-black uppercase tracking-wider text-amber-950">
+                  <span>🔍</span>
+                  <span>CLAVES VISUALES DE IDENTIFICACIÓN (PÍDELO AL OPERADOR):</span>
+                </div>
+                {currentSection.identificationChecklist && currentSection.identificationChecklist.length > 0 && (
+                  <ul className="list-disc list-inside text-xs sm:text-sm text-amber-950 font-medium space-y-1 my-1">
+                    {currentSection.identificationChecklist.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+                {currentSection.visualIdentification && (
+                  <p className="text-xs text-amber-900/90 font-mono italic mt-1 pt-1 border-t border-amber-300">
+                    Aspecto global del panel: {currentSection.visualIdentification}
+                  </p>
+                )}
+              </div>
+
+              {/* SPECIAL EXPANDED GLYPH RENDERING FOR GLIFOS_CRIPTOGRAFICOS */}
+              {currentSection.moduleType === 'GLIFOS_CRIPTOGRAFICOS' && (
+                <div className="my-6 flex flex-col gap-6">
+                  {/* Columns Table with Large, High-Contrast Glyphs */}
+                  <div>
+                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 mb-2">
+                      COLUMNAS DE REFERENCIA (ORDEN ESTRICTO DE ARRIBA A ABAJO):
+                    </h3>
+                    <div className="overflow-x-auto rounded-xl border-2 border-slate-400 bg-white shadow">
+                      <table className="w-full text-center border-collapse">
+                        <thead>
+                          <tr className="bg-amber-200/80 text-slate-900 border-b-2 border-slate-300 font-mono text-xs">
+                            {GLYPH_COLUMNS_EXPANDED.map((_, colIdx) => (
+                              <th key={colIdx} className="p-2 font-black border-r border-slate-300 last:border-r-0">
+                                COL {colIdx + 1}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from({ length: 7 }).map((_, rowIdx) => (
+                            <tr key={rowIdx} className="border-b border-slate-200 last:border-b-0 hover:bg-amber-50/50">
+                              {GLYPH_COLUMNS_EXPANDED.map((col, colIdx) => {
+                                const symbol = col[rowIdx];
+                                const glyphMeta = ALL_28_GLYPHS.find((g) => g.symbol === symbol);
+                                return (
+                                  <td
+                                    key={colIdx}
+                                    className="p-3 border-r border-slate-200 last:border-r-0 align-middle"
+                                  >
+                                    {symbol ? (
+                                      <div className="flex flex-col items-center gap-1">
+                                        <span className="text-4xl sm:text-5xl font-mono text-slate-950 font-bold select-none leading-none">
+                                          {symbol}
+                                        </span>
+                                        <span className="text-[9px] font-mono text-slate-600 font-medium">
+                                          {glyphMeta?.name || ''}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-300">-</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* 28 Glyphs Illustrated Glossary */}
+                  <div className="bg-amber-50/80 p-4 rounded-xl border border-amber-300">
+                    <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-amber-950 mb-3">
+                      CATÁLOGO DESCRIPTIVO DE GLIFOS (PARA ACLARAR DUDAS AL OPERADOR):
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {ALL_28_GLYPHS.map((glyph) => (
+                        <div
+                          key={glyph.id}
+                          className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 shadow-sm"
+                        >
+                          <span className="text-3xl font-mono text-slate-900 leading-none">
+                            {glyph.symbol}
+                          </span>
+                          <div className="flex flex-col overflow-hidden">
+                            <span className="text-[11px] font-bold text-slate-900 leading-tight">
+                              {glyph.name}
+                            </span>
+                            <span className="text-[9px] text-slate-500 leading-tight line-clamp-1">
+                              {glyph.description}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Standard Table if present */}
+              {currentSection.tableHeaders && currentSection.tableRows && (
+                <div className="my-5 overflow-x-auto rounded-lg border border-slate-300 bg-white">
                   <table className="w-full text-left text-xs font-mono">
                     <thead className="bg-amber-200/60 text-slate-900 border-b border-slate-300">
                       <tr>
-                        {section.tableHeaders.map((header, hIdx) => (
+                        {currentSection.tableHeaders.map((header, hIdx) => (
                           <th key={hIdx} className="p-2.5 font-bold">
                             {header}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white/70">
-                      {section.tableRows.map((row, rIdx) => (
+                    <tbody className="divide-y divide-slate-200">
+                      {currentSection.tableRows.map((row, rIdx) => (
                         <tr key={rIdx} className="hover:bg-amber-50">
                           {row.map((cell, cIdx) => (
                             <td key={cIdx} className="p-2.5 font-medium text-slate-800">
@@ -222,41 +418,37 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
 
               {/* Rules List */}
               <div className="my-5 flex flex-col gap-3">
-                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">
-                  INSTRUCCIONES DE DESACTIVACIÓN:
+                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-700">
+                  INSTRUCCIONES Y ÁRBOL DE DECISIÓN:
                 </h3>
-                {section.rules.map((rule, rIdx) => (
+                {currentSection.rules.map((rule, rIdx) => (
                   <div
                     key={rIdx}
-                    className="p-3 rounded-lg bg-amber-50/80 border-l-4 border-amber-600 text-xs sm:text-sm leading-snug"
+                    className="p-3.5 rounded-xl bg-amber-50/90 border-l-4 border-amber-600 text-xs sm:text-sm leading-relaxed shadow-sm"
                   >
-                    <span className="font-bold text-slate-900 block mb-1">
+                    <span className="font-bold text-slate-950 block mb-1">
                       {rule.condition}
                     </span>
-                    <span className="text-slate-800 font-medium">
+                    <span className="text-slate-850 font-medium whitespace-pre-line">
                       👉 {rule.action}
                     </span>
                   </div>
                 ))}
               </div>
 
-              {/* Notes */}
-              {section.notes && section.notes.length > 0 && (
-                <div className="my-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-950">
+              {/* Notes & Warnings */}
+              {currentSection.notes && currentSection.notes.length > 0 && (
+                <div className="my-4 p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-950">
                   <span className="font-bold font-mono uppercase block mb-1">
-                    AVISO DE SEGURIDAD:
+                    AVISO DE SEGURIDAD OPERATIVA:
                   </span>
                   <ul className="list-disc list-inside space-y-1">
-                    {section.notes.map((note, nIdx) => (
+                    {currentSection.notes.map((note, nIdx) => (
                       <li key={nIdx}>{note}</li>
                     ))}
                   </ul>
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="text-center py-16 text-slate-500 font-mono text-sm">
-              Selecciona una página del manual en la barra lateral
             </div>
           )}
 
@@ -264,32 +456,32 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
           <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-xs font-mono text-slate-600 mt-6">
             <button
               type="button"
-              disabled={selectedPageIndex <= 0}
-              onClick={() => setSelectedPageIndex((p) => p - 1)}
+              disabled={selectedSectionIndex <= 0}
+              onClick={() => setSelectedSectionIndex((p) => p - 1)}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-200 cursor-pointer disabled:opacity-30"
             >
-              <ChevronLeft className="w-3.5 h-3.5" /> Módulo Anterior
+              <ChevronLeft className="w-3.5 h-3.5" /> Protocolo Anterior
             </button>
             <span className="font-bold">
-              Página {selectedPageIndex + 1} de {modules.length}
+              Protocolo {selectedSectionIndex + 1} de {filteredSections.length}
             </span>
             <button
               type="button"
-              disabled={selectedPageIndex >= modules.length - 1}
-              onClick={() => setSelectedPageIndex((p) => p + 1)}
+              disabled={selectedSectionIndex >= filteredSections.length - 1}
+              onClick={() => setSelectedSectionIndex((p) => p + 1)}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-200 cursor-pointer disabled:opacity-30"
             >
-              Módulo Siguiente <ChevronRight className="w-3.5 h-3.5" />
+              Protocolo Siguiente <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       </main>
 
       {/* Footer bar */}
-      <footer className="w-full max-w-5xl mx-auto flex items-center justify-between text-xs text-slate-500 py-2">
+      <footer className="w-full max-w-6xl xl:max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-500 py-2">
         <span className="flex items-center gap-1.5">
           <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-          <span>Pregunta al Operador sobre lo que ve en su máquina para dar con la regla adecuada.</span>
+          <span>Pregunta al Operador sobre la forma de la máquina, colores, bornes y LEDs para localizar el protocolo adecuado.</span>
         </span>
         <button
           type="button"

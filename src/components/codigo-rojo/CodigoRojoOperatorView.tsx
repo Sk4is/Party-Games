@@ -3,6 +3,7 @@ import {
   CodigoRojoRoomState,
   CodigoRojoModuleState,
 } from '../../types/codigoRojo';
+import { getModuleCategory } from '../../data/codigoRojo/categoryMapping';
 import { FilamentosModule } from './modules/FilamentosModule';
 import { ModuladorFrecuenciaModule } from './modules/ModuladorFrecuenciaModule';
 import { GlifosCriptograficosModule } from './modules/GlifosCriptograficosModule';
@@ -18,6 +19,11 @@ import { RefrigeranteQuimicoModule } from './modules/RefrigeranteQuimicoModule';
 import { PuertosConexionModule } from './modules/PuertosConexionModule';
 import { DisipadorTermicoModule } from './modules/DisipadorTermicoModule';
 import { SincronizadorFasesModule } from './modules/SincronizadorFasesModule';
+import { CalibradorGiroscopioModule } from './modules/CalibradorGiroscopioModule';
+import { ReactorPlasmaModule } from './modules/ReactorPlasmaModule';
+import { FrecuenciaResonanciaModule } from './modules/FrecuenciaResonanciaModule';
+import { SecuenciaCineticaModule } from './modules/SecuenciaCineticaModule';
+import { DivisorVoltajeModule } from './modules/DivisorVoltajeModule';
 import {
   AlertTriangle,
   Clock,
@@ -129,7 +135,7 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Control Room Top Header */}
-      <header className="relative z-10 w-full max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/90 border-2 border-red-500/40 shadow-2xl backdrop-blur">
+      <header className="relative z-10 w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/90 border-2 border-red-500/40 shadow-2xl backdrop-blur">
         {/* Mission & Role */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/60 flex items-center justify-center text-xl">
@@ -148,6 +154,20 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
               CONSOLA DE LA MÁQUINA
             </h1>
           </div>
+        </div>
+
+        {/* Machine Stamped Serial Number Plate */}
+        <div className="flex items-center gap-2.5 bg-gradient-to-r from-stone-900 via-stone-800 to-stone-900 px-3.5 py-1.5 rounded-xl border-2 border-stone-600/80 shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] font-mono">
+          <span className="w-2 h-2 rounded-full bg-stone-500 border border-stone-400 shadow-sm" />
+          <div className="flex flex-col">
+            <span className="text-[9px] uppercase font-bold text-stone-400 tracking-wider">
+              Nº SERIE MÁQUINA
+            </span>
+            <span className="text-xs sm:text-sm font-black text-amber-300 tracking-widest font-mono">
+              {roomState.machineSerial || 'CR-4821-X7'}
+            </span>
+          </div>
+          <span className="w-2 h-2 rounded-full bg-stone-500 border border-stone-400 shadow-sm" />
         </div>
 
         {/* Tension Sound Controls: Independent Volume & Mute */}
@@ -234,17 +254,18 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
       </header>
 
       {/* Main Console Body */}
-      <main className="relative z-10 flex-1 w-full max-w-5xl mx-auto flex flex-col my-4 gap-4">
+      <main className="relative z-10 flex-1 w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-col my-4 gap-4">
         {/* Module Rack Selector Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
           {modules.map((mod, idx) => {
             const isSelected = selectedModuleIndex === idx;
+            const category = getModuleCategory(mod.moduleType);
             return (
               <button
                 key={mod.id}
                 type="button"
                 onClick={() => setSelectedModuleIndex(idx)}
-                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 font-mono text-xs font-bold transition-all cursor-pointer ${
+                className={`flex-shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-xl border-2 font-mono text-xs font-bold transition-all cursor-pointer ${
                   mod.solved
                     ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300'
                     : isSelected
@@ -257,9 +278,9 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
                 ) : (
                   <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
                 )}
-                <span>MÓDULO {idx + 1}</span>
-                <span className="hidden sm:inline font-sans font-medium text-slate-300">
-                  ({mod.title})
+                <span>PANEL {idx + 1}</span>
+                <span className="font-mono text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-950/90 border border-slate-700/60 text-cyan-300">
+                  {category}
                 </span>
               </button>
             );
@@ -267,7 +288,32 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
         </div>
 
         {/* Active Module Panel */}
-        <div className="flex-1 w-full min-h-[460px] bg-slate-900/80 rounded-3xl border-2 border-slate-800 p-2 sm:p-4 shadow-2xl relative flex flex-col justify-between">
+        <div className="flex-1 w-full min-h-[480px] bg-slate-900/80 rounded-3xl border-2 border-slate-800 p-2 sm:p-5 shadow-2xl relative flex flex-col justify-between">
+          {/* Broad Category Industrial Banner (NO EXACT MANUAL TITLE) */}
+          {activeModule && (
+            <div className="w-full flex items-center justify-between px-3.5 py-2 mb-3 rounded-xl bg-slate-950/90 border border-slate-800 text-xs font-mono select-none">
+              <div className="flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                  CATEGORÍA DEL PANEL:
+                </span>
+                <span className="px-2.5 py-0.5 rounded-md font-mono font-black tracking-widest text-xs uppercase bg-cyan-950/80 text-cyan-300 border border-cyan-500/50 shadow-sm">
+                  {getModuleCategory(activeModule.moduleType)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-mono">
+                <span className="text-slate-500">ESTADO:</span>
+                <span
+                  className={`font-black uppercase tracking-wider ${
+                    activeModule.solved ? 'text-emerald-400' : 'text-amber-400'
+                  }`}
+                >
+                  {activeModule.solved ? '✓ NEUTRALIZADO' : '● ACTIVO'}
+                </span>
+              </div>
+            </div>
+          )}
+
           {activeModule && (
             <>
               {activeModule.moduleType === 'FILAMENTOS' && (
@@ -376,13 +422,48 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
                   onAction={(act) => onSubmitAction(activeModule.id, act)}
                 />
               )}
+              {activeModule.moduleType === 'CALIBRADOR_GIROSCOPIO' && (
+                <CalibradorGiroscopioModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'REACTOR_PLASMA' && (
+                <ReactorPlasmaModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'FRECUENCIA_RESONANCIA' && (
+                <FrecuenciaResonanciaModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'SECUENCIA_CINETICA' && (
+                <SecuenciaCineticaModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'DIVISOR_VOLTAJE' && (
+                <DivisorVoltajeModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
             </>
           )}
         </div>
       </main>
 
       {/* Footer bar with role reminder & leave option */}
-      <footer className="relative z-10 w-full max-w-5xl mx-auto flex items-center justify-between text-xs text-slate-500 py-2">
+      <footer className="relative z-10 w-full max-w-6xl xl:max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-500 py-2">
         <span className="flex items-center gap-1.5">
           <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
           <span>¡No mires el manual de los Guías! Comunica verbalmente lo que ves.</span>

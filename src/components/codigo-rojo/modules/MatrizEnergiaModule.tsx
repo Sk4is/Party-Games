@@ -52,9 +52,12 @@ export const MatrizEnergiaModule: React.FC<MatrizEnergiaModuleProps> = ({
     <div className="flex flex-col items-center justify-between w-full h-full p-6 bg-slate-900/90 rounded-2xl border border-slate-700 select-none">
       <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-cyan-400" />
-          <span className="text-xs uppercase font-mono tracking-widest text-slate-400">
-            Matriz de Celdas de Energía
+          <Zap className="w-4 h-4 text-amber-400" />
+          <span className="text-xs uppercase font-mono font-bold tracking-widest text-amber-300">
+            CONTROL
+          </span>
+          <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+            // BANCO C-03
           </span>
         </div>
         <span className={`px-2.5 py-0.5 border rounded font-mono text-xs font-bold ${badgeColor}`}>

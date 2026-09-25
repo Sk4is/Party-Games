@@ -60,9 +60,12 @@ export const PuertosConexionModule: React.FC<PuertosConexionModuleProps> = ({
     <div className="flex flex-col items-center justify-between w-full h-full p-6 bg-slate-900/90 rounded-2xl border border-slate-700 select-none">
       <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <Cable className="w-4 h-4 text-amber-400" />
-          <span className="text-xs uppercase font-mono tracking-widest text-slate-400">
-            Placa de Parcheo Auxiliar
+          <Cable className="w-4 h-4 text-blue-400" />
+          <span className="text-xs uppercase font-mono font-bold tracking-widest text-blue-300">
+            ELECTRICIDAD
+          </span>
+          <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+            // MATRIZ JACK
           </span>
         </div>
         <span className="px-2.5 py-0.5 bg-slate-950 border border-slate-700 rounded text-amber-400 font-mono text-xs font-bold">
