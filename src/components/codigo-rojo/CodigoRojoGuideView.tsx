@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   CodigoRojoRoomState,
   CodigoRojoManualSection,
@@ -28,6 +28,7 @@ import {
   Filter,
   CheckCircle2,
 } from 'lucide-react';
+import { audio } from '../../utils/audio';
 
 interface CodigoRojoGuideViewProps {
   roomState: CodigoRojoRoomState;
@@ -43,6 +44,30 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('TODOS');
   const [operatorNotes, setOperatorNotes] = useState<string>('');
+
+  // Audio feedback for strikes on the Guide console as well
+  const prevStrikesRef = useRef(strikes);
+  useEffect(() => {
+    if (strikes > prevStrikesRef.current) {
+      audio.playStrike();
+    }
+    prevStrikesRef.current = strikes;
+  }, [strikes]);
+
+  const handleSelectSection = (idx: number) => {
+    if (idx !== selectedSectionIndex) {
+      audio.playPaperPageTurn();
+      setSelectedSectionIndex(idx);
+    }
+  };
+
+  const handleSelectCategory = (cat: string) => {
+    if (cat !== selectedCategory) {
+      audio.playPaperPageTurn();
+      setSelectedCategory(cat);
+      setSelectedSectionIndex(0);
+    }
+  };
 
   const formatTimer = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -175,11 +200,8 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
               <button
                 key={cat}
                 type="button"
-                onClick={() => {
-                  setSelectedCategory(cat);
-                  setSelectedSectionIndex(0);
-                }}
-                className={`flex-shrink-0 px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                onClick={() => handleSelectCategory(cat)}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-lg border transition-all active:scale-95 cursor-pointer ${
                   selectedCategory === cat
                     ? 'bg-amber-500 text-slate-950 font-black border-amber-400 shadow-sm'
                     : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
@@ -200,8 +222,8 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
                 <button
                   key={sec.classificationCode}
                   type="button"
-                  onClick={() => setSelectedSectionIndex(idx)}
-                  className={`flex-shrink-0 text-left p-3 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-1.5 ${
+                  onClick={() => handleSelectSection(idx)}
+                  className={`flex-shrink-0 text-left p-3 rounded-xl border-2 transition-all active:scale-[0.98] cursor-pointer flex flex-col gap-1.5 ${
                     isSelected
                       ? 'bg-amber-100 text-slate-950 border-amber-500 shadow-md font-bold'
                       : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700'
@@ -237,7 +259,7 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
         </aside>
 
         {/* Right Main Area: Classified Technical Document Paper */}
-        <div className="flex-1 bg-[#FBF8EF] text-slate-900 rounded-2xl border-4 border-amber-900/30 shadow-2xl p-5 sm:p-8 flex flex-col justify-between overflow-y-auto max-h-[720px]">
+        <div className="flex-1 bg-[#FBF8EF] text-slate-900 rounded-2xl border-4 border-amber-900/30 shadow-2xl p-5 sm:p-8 flex flex-col justify-between overflow-y-auto max-h-[720px] relative">
           {currentSection && (
             <div>
               {/* Classified Top Stamp Header */}
@@ -256,12 +278,18 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <div className="text-xs font-mono text-slate-600 font-bold">
-                    INSPECCIÓN TÉCNICA
+                {/* Tactical Rubber Stamped Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="hidden sm:inline-block animate-cr-stamp border-2 border-red-700/80 text-red-700 font-mono font-black text-[10px] tracking-widest px-2 py-0.5 rounded rotate-[-6deg] select-none shadow-sm uppercase">
+                    COPIA OFICIAL AUTORIZADA
                   </div>
-                  <div className="text-[10px] font-mono text-slate-500">
-                    DISCIPLINA DE COMUNICACIÓN VERBAL
+                  <div className="text-right">
+                    <div className="text-xs font-mono text-slate-600 font-bold">
+                      INSPECCIÓN TÉCNICA
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-500">
+                      DISCIPLINA VERBAL
+                    </div>
                   </div>
                 </div>
               </div>
@@ -457,8 +485,8 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
             <button
               type="button"
               disabled={selectedSectionIndex <= 0}
-              onClick={() => setSelectedSectionIndex((p) => p - 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-200 cursor-pointer disabled:opacity-30"
+              onClick={() => handleSelectSection(selectedSectionIndex - 1)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-200 active:scale-95 cursor-pointer disabled:opacity-30"
             >
               <ChevronLeft className="w-3.5 h-3.5" /> Protocolo Anterior
             </button>
@@ -468,8 +496,8 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
             <button
               type="button"
               disabled={selectedSectionIndex >= filteredSections.length - 1}
-              onClick={() => setSelectedSectionIndex((p) => p + 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-200 cursor-pointer disabled:opacity-30"
+              onClick={() => handleSelectSection(selectedSectionIndex + 1)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-200 active:scale-95 cursor-pointer disabled:opacity-30"
             >
               Protocolo Siguiente <ChevronRight className="w-3.5 h-3.5" />
             </button>

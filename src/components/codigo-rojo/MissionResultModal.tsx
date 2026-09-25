@@ -24,8 +24,12 @@ export const MissionResultModal: React.FC<MissionResultModalProps> = ({
   useEffect(() => {
     if (isSuccess) {
       audio.playVictoryFanfare();
+      const timer = setTimeout(() => audio.playStampImpact(), 380);
+      return () => clearTimeout(timer);
     } else {
       audio.playDefeatExplosion();
+      const timer = setTimeout(() => audio.playStampImpact(), 420);
+      return () => clearTimeout(timer);
     }
   }, [isSuccess]);
 
@@ -35,6 +39,9 @@ export const MissionResultModal: React.FC<MissionResultModalProps> = ({
     return `${mins}m ${secs}s`;
   };
 
+  const solvedModulesCount = roomState.modules.filter((m) => m.solved).length;
+  const totalModulesCount = roomState.modules.length;
+
   // Identify who the next operator will be based on operator rotation
   const connected = players.filter((p) => p.isConnected);
   const nextOp = connected.find((p) => p.id !== roomState.operatorId) || connected[0];
@@ -42,16 +49,45 @@ export const MissionResultModal: React.FC<MissionResultModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in font-['Plus_Jakarta_Sans',sans-serif]">
       <div
-        className={`w-full max-w-lg rounded-3xl p-6 sm:p-8 border-2 shadow-2xl flex flex-col items-center text-center ${
+        className={`w-full max-w-lg rounded-3xl p-6 sm:p-8 border-2 shadow-2xl flex flex-col items-center text-center relative overflow-hidden ${
           isSuccess
             ? 'bg-slate-900 border-emerald-500 shadow-emerald-500/20'
             : 'bg-slate-900 border-red-500 shadow-red-500/20'
         }`}
       >
+        {/* Physical Simulated Corner Screws */}
+        <div className="absolute top-3 left-3 w-3 h-3 rounded-full bg-stone-700 border border-stone-500/70 shadow-inner flex items-center justify-center text-[7px] text-stone-400 font-mono -rotate-45 pointer-events-none select-none">
+          +
+        </div>
+        <div className="absolute top-3 right-3 w-3 h-3 rounded-full bg-stone-700 border border-stone-500/70 shadow-inner flex items-center justify-center text-[7px] text-stone-400 font-mono rotate-45 pointer-events-none select-none">
+          +
+        </div>
+        <div className="absolute bottom-3 left-3 w-3 h-3 rounded-full bg-stone-700 border border-stone-500/70 shadow-inner flex items-center justify-center text-[7px] text-stone-400 font-mono rotate-12 pointer-events-none select-none">
+          +
+        </div>
+        <div className="absolute bottom-3 right-3 w-3 h-3 rounded-full bg-stone-700 border border-stone-500/70 shadow-inner flex items-center justify-center text-[7px] text-stone-400 font-mono -rotate-30 pointer-events-none select-none">
+          +
+        </div>
+
+        {/* Tactical Rubber Stamped Badge */}
+        <div
+          className={`animate-cr-stamp border-4 font-mono font-black text-xs sm:text-sm tracking-widest px-3.5 py-1 rounded-lg uppercase select-none shadow-lg mb-4 ${
+            isSuccess
+              ? 'border-emerald-500/90 text-emerald-400 bg-emerald-950/40 rotate-[-6deg]'
+              : 'border-red-600/90 text-red-400 bg-red-950/40 rotate-[-8deg]'
+          }`}
+        >
+          {isSuccess
+            ? '✓ SISTEMA NEUTRALIZADO'
+            : '✖ FALLO CRÍTICO // DETONACIÓN'}
+        </div>
+
         {/* Result Icon */}
         <div
-          className={`w-20 h-20 rounded-3xl flex items-center justify-center text-4xl mb-4 shadow-xl ${
-            isSuccess ? 'bg-emerald-500/20 border border-emerald-400' : 'bg-red-500/20 border border-red-400'
+          className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mb-3 shadow-xl ${
+            isSuccess
+              ? 'bg-emerald-500/20 border border-emerald-400'
+              : 'bg-red-500/20 border border-red-400'
           }`}
         >
           {isSuccess ? '🏆' : '💥'}
@@ -59,31 +95,42 @@ export const MissionResultModal: React.FC<MissionResultModalProps> = ({
 
         {/* Title */}
         <h2 className="text-3xl sm:text-4xl font-black font-display tracking-tight text-white mb-1">
-          {isSuccess ? '¡MISIÓN CUMPLIDA!' : '¡FALLO CRÍTICO!'}
+          {isSuccess ? '¡MISIÓN CUMPLIDA!' : '¡MISIÓN FALLIDA!'}
         </h2>
-        <p className="text-sm font-mono uppercase tracking-wider text-slate-400 mb-6">
-          MISIÓN {missionNumber} &bull; {isSuccess ? 'MÁQUINA NEUTRALIZADA' : 'COLAPSO DEL SISTEMA'}
+        <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-slate-400 mb-5">
+          MISIÓN {missionNumber} &bull; {isSuccess ? 'MÁQUINA COMPLETAMENTE DESACTIVADA' : 'COLAPSO DEL SISTEMA'}
         </p>
 
         {endMessage && !isSuccess && (
-          <div className="w-full p-3 bg-red-950/60 border border-red-500/40 rounded-xl text-red-300 text-xs font-mono font-bold mb-6">
+          <div className="w-full p-3 bg-red-950/70 border border-red-500/50 rounded-xl text-red-300 text-xs font-mono font-bold mb-5 shadow-inner">
             CAUSA: {endMessage}
           </div>
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3 w-full mb-6 font-mono">
+        <div className="grid grid-cols-3 gap-2.5 w-full mb-6 font-mono text-center">
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
             <span className="text-[10px] text-slate-500 block">DURACIÓN</span>
-            <span className="text-lg font-bold text-white">
+            <span className="text-base sm:text-lg font-bold text-white">
               {formatSecs(stats.missionDurationSeconds || 0)}
+            </span>
+          </div>
+
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span className="text-[10px] text-slate-500 block">MÓDULOS</span>
+            <span
+              className={`text-base sm:text-lg font-bold ${
+                isSuccess ? 'text-emerald-400' : 'text-amber-400'
+              }`}
+            >
+              {solvedModulesCount}/{totalModulesCount}
             </span>
           </div>
 
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
             <span className="text-[10px] text-slate-500 block">STRIKES</span>
             <span
-              className={`text-lg font-bold ${
+              className={`text-base sm:text-lg font-bold ${
                 strikes > 0 ? 'text-red-400' : 'text-emerald-400'
               }`}
             >

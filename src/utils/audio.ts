@@ -1117,6 +1117,154 @@ class AudioManager {
     osc.stop(now + 0.045);
   }
 
+  // Operator machine atmospheric startup sequence (transformer hum + mechanical relay snap + CRT charge)
+  public playStartupPowerOn() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+
+    // 1. Deep low-frequency transformer power engagement hum
+    const humOsc = this.ctx.createOscillator();
+    const humGain = this.ctx.createGain();
+    humOsc.type = 'sawtooth';
+    humOsc.frequency.setValueAtTime(55, now);
+    humOsc.frequency.exponentialRampToValueAtTime(110, now + 0.6);
+
+    const humFilter = this.ctx.createBiquadFilter();
+    humFilter.type = 'lowpass';
+    humFilter.frequency.setValueAtTime(120, now);
+    humFilter.frequency.exponentialRampToValueAtTime(260, now + 0.6);
+
+    humGain.gain.setValueAtTime(0.01, now);
+    humGain.gain.linearRampToValueAtTime(0.18, now + 0.25);
+    humGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+
+    humOsc.connect(humFilter);
+    humFilter.connect(humGain);
+    humGain.connect(this.ctx.destination);
+
+    humOsc.start(now);
+    humOsc.stop(now + 0.9);
+
+    // 2. High-voltage capacitor charging rising whine
+    const capOsc = this.ctx.createOscillator();
+    const capGain = this.ctx.createGain();
+    capOsc.type = 'sine';
+    capOsc.frequency.setValueAtTime(240, now + 0.15);
+    capOsc.frequency.exponentialRampToValueAtTime(1400, now + 0.85);
+
+    capGain.gain.setValueAtTime(0.001, now + 0.15);
+    capGain.gain.linearRampToValueAtTime(0.08, now + 0.65);
+    capGain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+
+    capOsc.connect(capGain);
+    capGain.connect(this.ctx.destination);
+
+    capOsc.start(now + 0.15);
+    capOsc.stop(now + 0.95);
+
+    // 3. Crisp mechanical master relay click at t = 0.4s
+    const relayOsc = this.ctx.createOscillator();
+    const relayGain = this.ctx.createGain();
+    relayOsc.type = 'triangle';
+    relayOsc.frequency.setValueAtTime(800, now + 0.4);
+    relayOsc.frequency.exponentialRampToValueAtTime(120, now + 0.44);
+
+    relayGain.gain.setValueAtTime(0.22, now + 0.4);
+    relayGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+    relayOsc.connect(relayGain);
+    relayGain.connect(this.ctx.destination);
+
+    relayOsc.start(now + 0.4);
+    relayOsc.stop(now + 0.45);
+  }
+
+  // Crisp mechanical relay latch sound
+  public playRelayLatch() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(950, now);
+    osc.frequency.exponentialRampToValueAtTime(200, now + 0.04);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.045);
+  }
+
+  // Crisp paper page turn / technical binder rustle for Guide
+  public playPaperPageTurn() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.12);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.sin((i / bufferSize) * Math.PI);
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1200, now);
+    filter.frequency.exponentialRampToValueAtTime(650, now + 0.12);
+    filter.Q.setValueAtTime(1.5, now);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.09, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    noise.start(now);
+    noise.stop(now + 0.12);
+  }
+
+  // Official document stamp / rubber punch impact sound
+  public playStampImpact() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.07);
+
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }
+
   // Victory fanfare
   public playVictoryFanfare() {
     if (this.isMuted) return;

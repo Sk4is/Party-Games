@@ -212,4 +212,106 @@
   animation: guess-sparkle 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* =========================================================================
+   CÓDIGO ROJO ATMOSPHERIC VISUALS & MICRO-INTERACTIONS
+   ========================================================================= */
+
+@keyframes cr-startup-glow {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.08;
+  }
+  28% {
+    opacity: 0.42;
+  }
+  32% {
+    opacity: 0.15; /* single realistic momentary fluorescent flicker */
+  }
+  48% {
+    opacity: 0.82;
+  }
+  75% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes cr-strike-shake {
+  0%, 100% { transform: translate(0, 0); }
+  15% { transform: translate(-5px, 2px); }
+  35% { transform: translate(5px, -3px); }
+  55% { transform: translate(-4px, -1px); }
+  75% { transform: translate(4px, 2px); }
+  90% { transform: translate(-1px, -1px); }
+}
+
+@keyframes cr-solved-flash {
+  0% {
+    box-shadow: inset 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+  35% {
+    box-shadow: inset 0 0 35px 8px rgba(16, 185, 129, 0.35), 0 0 25px rgba(16, 185, 129, 0.4);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(16, 185, 129, 0), 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes cr-stamp-drop {
+  0% {
+    transform: scale(2.2) rotate(-14deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.94) rotate(-7deg);
+    opacity: 0.95;
+  }
+  80% {
+    transform: scale(1.03) rotate(-8.5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(-8deg);
+    opacity: 1;
+  }
+}
+
+.animate-cr-startup {
+  animation: cr-startup-glow 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-cr-strike {
+  animation: cr-strike-shake 0.32s ease-in-out;
+}
+
+.animate-cr-solved {
+  animation: cr-solved-flash 0.85s ease-out;
+}
+
+.animate-cr-stamp {
+  animation: cr-stamp-drop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* CRT monitor subtle scanline overlay for terminal displays */
+.cr-crt-screen {
+  position: relative;
+}
+.cr-crt-screen::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%);
+  background-size: 100% 4px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.38;
+  border-radius: inherit;
+}
+
+
 

@@ -48,6 +48,18 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
 }) => {
   const [selectedModuleIndex, setSelectedModuleIndex] = useState(0);
 
+  // Atmospheric startup sequence state
+  const [powerStage, setPowerStage] = useState<
+    'darkness' | 'hum' | 'emergency_light' | 'flicker' | 'illuminated' | 'displays' | 'ready'
+  >('darkness');
+
+  // Strike & error impact states
+  const [isShaking, setIsShaking] = useState(false);
+  const [showStrikeFlash, setShowStrikeFlash] = useState(false);
+
+  // Solved module visual feedback
+  const [justSolvedModuleId, setJustSolvedModuleId] = useState<string | null>(null);
+
   // Independent ticking tension volume and mute state
   const [tickingVolume, setTickingVolume] = useState<number>(() => {
     if (typeof window === 'undefined') return 0.35;
@@ -80,6 +92,47 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
   const { modules, strikes, maxStrikes, timeRemainingSeconds, missionNumber } = roomState;
   const activeModule = modules[selectedModuleIndex] || modules[0];
 
+  // Operator mission entrance sequence: 0.0s darkness -> 0.2s hum -> 0.45s light -> 0.75s flicker -> 1.3s displays -> 1.8s ready
+  useEffect(() => {
+    const t1 = setTimeout(() => {
+      audio.playStartupPowerOn();
+      setPowerStage('hum');
+    }, 200);
+
+    const t2 = setTimeout(() => {
+      setPowerStage('emergency_light');
+    }, 450);
+
+    const t3 = setTimeout(() => {
+      setPowerStage('flicker');
+    }, 750);
+
+    const t4 = setTimeout(() => {
+      setPowerStage('illuminated');
+    }, 870);
+
+    const t5 = setTimeout(() => {
+      setPowerStage('displays');
+    }, 1300);
+
+    const t6 = setTimeout(() => {
+      setPowerStage('ready');
+    }, 1800);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      clearTimeout(t5);
+      clearTimeout(t6);
+    };
+  }, []);
+
+  const handleSkipEntrance = () => {
+    setPowerStage('ready');
+  };
+
   // Subtle ticking-clock tension sound for Operator, speeding up when countdown is low
   useEffect(() => {
     if (isTickingMuted || tickingVolume <= 0.01) return;
@@ -102,24 +155,54 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
     };
   }, [timeRemainingSeconds, isTickingMuted, tickingVolume]);
 
-  // Audio feedback for strikes
+  // Audio & visual impact feedback for strikes
   const prevStrikesRef = useRef(strikes);
   useEffect(() => {
     if (strikes > prevStrikesRef.current) {
       audio.playStrike();
+      setIsShaking(true);
+      setShowStrikeFlash(true);
+      const shakeTimer = setTimeout(() => setIsShaking(false), 320);
+      const flashTimer = setTimeout(() => setShowStrikeFlash(false), 420);
+      return () => {
+        clearTimeout(shakeTimer);
+        clearTimeout(flashTimer);
+      };
     }
     prevStrikesRef.current = strikes;
   }, [strikes]);
 
-  // Audio feedback when any module is solved
+  // Audio & visual feedback when any module is solved
   const solvedCount = modules.filter((m) => m.solved).length;
   const prevSolvedCountRef = useRef(solvedCount);
+  const prevModulesSolvedRef = useRef<Set<string>>(
+    new Set(modules.filter((m) => m.solved).map((m) => m.id))
+  );
+
   useEffect(() => {
     if (solvedCount > prevSolvedCountRef.current) {
       audio.playModuleSolved();
+      const newlySolved = modules.find(
+        (m) => m.solved && !prevModulesSolvedRef.current.has(m.id)
+      );
+      if (newlySolved) {
+        setJustSolvedModuleId(newlySolved.id);
+        const timer = setTimeout(() => setJustSolvedModuleId(null), 1200);
+        return () => clearTimeout(timer);
+      }
     }
     prevSolvedCountRef.current = solvedCount;
-  }, [solvedCount]);
+    prevModulesSolvedRef.current = new Set(
+      modules.filter((m) => m.solved).map((m) => m.id)
+    );
+  }, [solvedCount, modules]);
+
+  const handleSelectModule = (idx: number) => {
+    if (idx !== selectedModuleIndex) {
+      audio.playRelayLatch();
+      setSelectedModuleIndex(idx);
+    }
+  };
 
   const formatTimer = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -128,14 +211,87 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
   };
 
   const isLowTime = timeRemainingSeconds <= 60;
+  const isCriticalTime = timeRemainingSeconds <= 30;
+
+  // Power stage visual calculation for atmospheric entrance
+  const isPoweringUp = powerStage !== 'ready';
+  const showDarknessOverlay = powerStage === 'darkness' || powerStage === 'hum';
+  const showFlicker = powerStage === 'flicker';
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between bg-slate-950 text-slate-100 p-3 sm:p-6 overflow-x-hidden font-['Plus_Jakarta_Sans',sans-serif]">
-      {/* Tactical Ambient Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+    <div
+      className={`relative min-h-screen w-full flex flex-col justify-between bg-slate-950 text-slate-100 p-3 sm:p-6 overflow-x-hidden font-['Plus_Jakarta_Sans',sans-serif] ${
+        isShaking ? 'animate-cr-strike' : ''
+      }`}
+    >
+      {/* Red Emergency Strike Flash Vignette */}
+      {showStrikeFlash && (
+        <div className="fixed inset-0 z-50 pointer-events-none bg-red-600/25 shadow-[inset_0_0_100px_rgba(239,68,68,0.8)] transition-opacity duration-300" />
+      )}
+
+      {/* Atmospheric Startup Entrance Sequence Overlay */}
+      {isPoweringUp && (
+        <div
+          onClick={handleSkipEntrance}
+          className="fixed inset-0 z-40 flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-500"
+          style={{
+            backgroundColor: showDarknessOverlay
+              ? 'rgba(2, 6, 23, 0.98)'
+              : showFlicker
+              ? 'rgba(2, 6, 23, 0.88)'
+              : 'rgba(2, 6, 23, 0.35)',
+          }}
+        >
+          {/* Spatial Emergency Light Beam */}
+          <div
+            className={`w-[600px] h-[600px] rounded-full blur-3xl pointer-events-none transition-opacity duration-500 ${
+              powerStage === 'darkness'
+                ? 'opacity-0'
+                : powerStage === 'hum'
+                ? 'opacity-10 bg-amber-500/10'
+                : powerStage === 'flicker'
+                ? 'opacity-25 bg-red-600/30'
+                : 'opacity-50 bg-red-600/40'
+            }`}
+          />
+
+          <div className="relative z-10 flex flex-col items-center gap-3 font-mono text-center">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+              <span className="text-xs uppercase tracking-widest text-red-400 font-bold">
+                {powerStage === 'darkness' || powerStage === 'hum'
+                  ? 'ALIMENTACIÓN PRINCIPAL: CONECTANDO...'
+                  : powerStage === 'emergency_light' || powerStage === 'flicker'
+                  ? 'ILUMINACIÓN TÁCTICA: ACTIVANDO...'
+                  : 'CONSOLA DE LA MÁQUINA: EN LÍNEA'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 uppercase tracking-widest">
+              Toca la pantalla para omitir la secuencia
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tactical Ambient Lighting Glow */}
+      <div
+        className={`absolute top-0 left-1/2 -translate-x-1/2 w-[850px] h-[340px] rounded-full blur-3xl pointer-events-none transition-all duration-700 ${
+          isCriticalTime
+            ? 'bg-red-600/25 animate-pulse'
+            : isLowTime
+            ? 'bg-red-600/15'
+            : 'bg-red-600/10'
+        }`}
+      />
 
       {/* Control Room Top Header */}
-      <header className="relative z-10 w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/90 border-2 border-red-500/40 shadow-2xl backdrop-blur">
+      <header
+        className={`relative z-10 w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/90 border-2 shadow-2xl backdrop-blur transition-colors ${
+          isCriticalTime
+            ? 'border-red-500/70 shadow-red-500/20'
+            : 'border-red-500/40'
+        }`}
+      >
         {/* Mission & Role */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/60 flex items-center justify-center text-xl">
@@ -264,8 +420,8 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
               <button
                 key={mod.id}
                 type="button"
-                onClick={() => setSelectedModuleIndex(idx)}
-                className={`flex-shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-xl border-2 font-mono text-xs font-bold transition-all cursor-pointer ${
+                onClick={() => handleSelectModule(idx)}
+                className={`flex-shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-xl border-2 font-mono text-xs font-bold transition-all active:scale-95 cursor-pointer ${
                   mod.solved
                     ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300'
                     : isSelected
@@ -287,8 +443,30 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
           })}
         </div>
 
-        {/* Active Module Panel */}
-        <div className="flex-1 w-full min-h-[480px] bg-slate-900/80 rounded-3xl border-2 border-slate-800 p-2 sm:p-5 shadow-2xl relative flex flex-col justify-between">
+        {/* Active Module Panel with physical chassis & CRT screen scanline */}
+        <div
+          className={`flex-1 w-full min-h-[480px] bg-slate-900/90 rounded-3xl border-2 p-2 sm:p-5 shadow-2xl relative flex flex-col justify-between transition-all cr-crt-screen ${
+            activeModule?.solved
+              ? 'border-emerald-500/50 shadow-emerald-950/30'
+              : 'border-slate-800 shadow-black'
+          } ${
+            justSolvedModuleId === activeModule?.id ? 'animate-cr-solved' : ''
+          }`}
+        >
+          {/* Physical simulated hex screws on 4 corners */}
+          <div className="absolute top-2.5 left-2.5 w-3 h-3 rounded-full bg-stone-700 border border-stone-500/70 shadow-inner flex items-center justify-center text-[7px] text-stone-400 font-mono -rotate-45 pointer-events-none select-none z-10">
+            +
+          </div>
+          <div className="absolute top-2.5 right-2.5 w-3 h-3 rounded-full bg-stone-700 border border-stone-500/70 shadow-inner flex items-center justify-center text-[7px] text-stone-400 font-mono rotate-45 pointer-events-none select-none z-10">
+            +
+          </div>
+          <div className="absolute bottom-2.5 left-2.5 w-3 h-3 rounded-full bg-stone-700 border border-stone-500/70 shadow-inner flex items-center justify-center text-[7px] text-stone-400 font-mono rotate-12 pointer-events-none select-none z-10">
+            +
+          </div>
+          <div className="absolute bottom-2.5 right-2.5 w-3 h-3 rounded-full bg-stone-700 border border-stone-500/70 shadow-inner flex items-center justify-center text-[7px] text-stone-400 font-mono -rotate-30 pointer-events-none select-none z-10">
+            +
+          </div>
+
           {/* Broad Category Industrial Banner (NO EXACT MANUAL TITLE) */}
           {activeModule && (
             <div className="w-full flex items-center justify-between px-3.5 py-2 mb-3 rounded-xl bg-slate-950/90 border border-slate-800 text-xs font-mono select-none">
