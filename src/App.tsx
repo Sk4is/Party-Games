@@ -14,6 +14,7 @@ import { LPROnlineContainer } from './components/lpr/LPROnlineContainer';
 import { PinturilloGame } from './components/pinturillo/PinturilloGame';
 import { PalabraSecretaGame } from './components/palabra-secreta/PalabraSecretaGame';
 import { CodigoRojoGame } from './components/codigo-rojo/CodigoRojoGame';
+import { CoartadaGame } from './components/coartada/CoartadaGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 import { sessionRecovery } from './services/sessionRecovery';
 
@@ -24,6 +25,7 @@ type AppView =
   | 'PINTURILLO'
   | 'PALABRA_SECRETA'
   | 'CODIGO_ROJO'
+  | 'COARTADA'
   | 'BOMBA_LOCAL_SETUP'
   | 'BOMBA_LOCAL_GAME'
   | 'LPR_LOCAL_SETUP'
@@ -48,6 +50,7 @@ export default function App() {
       if (activeSession.gameType === 'pinturillo') return 'PINTURILLO';
       if (activeSession.gameType === 'palabra-secreta') return 'PALABRA_SECRETA';
       if ((activeSession.gameType as string) === 'codigo-rojo') return 'CODIGO_ROJO';
+      if ((activeSession.gameType as string) === 'coartada') return 'COARTADA';
     }
 
     if (typeof window !== 'undefined') {
@@ -60,6 +63,7 @@ export default function App() {
       if (game === 'pinturillo') return 'PINTURILLO';
       if (game === 'palabra-secreta') return 'PALABRA_SECRETA';
       if (game === 'codigo-rojo') return 'CODIGO_ROJO';
+      if (game === 'coartada') return 'COARTADA';
       if (room) {
         return 'PINTURILLO';
       }
@@ -90,6 +94,8 @@ export default function App() {
       setCurrentView('PALABRA_SECRETA');
     } else if (gameId === 'codigo-rojo') {
       setCurrentView('CODIGO_ROJO');
+    } else if (gameId === 'coartada') {
+      setCurrentView('COARTADA');
     }
   };
 
@@ -100,7 +106,7 @@ export default function App() {
   };
 
   const handleSwitchGame = (
-    game: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo',
+    game: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada',
     code: string
   ) => {
     setUrlRoomCode(code);
@@ -109,6 +115,7 @@ export default function App() {
     else if (game === 'pinturillo') setCurrentView('PINTURILLO');
     else if (game === 'palabra-secreta') setCurrentView('PALABRA_SECRETA');
     else if (game === 'codigo-rojo') setCurrentView('CODIGO_ROJO');
+    else if (game === 'coartada') setCurrentView('COARTADA');
   };
 
   return (
@@ -156,6 +163,15 @@ export default function App() {
       {/* 5. CÓDIGO ROJO (ONLINE MULTIPLAYER COOPERATIVE) */}
       {currentView === 'CODIGO_ROJO' && (
         <CodigoRojoGame
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
+      )}
+
+      {/* 6. COARTADA (ONLINE MULTIPLAYER NOIR DEDUCTION 1v1) */}
+      {currentView === 'COARTADA' && (
+        <CoartadaGame
           onBackToMenu={handleBackToMenu}
           initialRoomCode={urlRoomCode}
           onSwitchGame={handleSwitchGame}

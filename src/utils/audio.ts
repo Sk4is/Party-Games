@@ -1305,6 +1305,185 @@ class AudioManager {
   public playKeyboardTick() {
     this.playClick();
   }
+
+  // Coartada Noir & Detective Sound Effects
+  private rainNode: AudioBufferSourceNode | null = null;
+  private rainGain: GainNode | null = null;
+
+  public playPaperSlide() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.18);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.4));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(800, now);
+      filter.Q.setValueAtTime(1.2, now);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      noise.start(now);
+    } catch {
+      // ignore
+    }
+  }
+
+  public playStampHeavy() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Heavy thump
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(130, now);
+      osc.frequency.exponentialRampToValueAtTime(35, now + 0.16);
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.22);
+
+      // Ink slap
+      this.playPaperSlide();
+    } catch {
+      // ignore
+    }
+  }
+
+  public playTypewriterKey() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1200 + Math.random() * 400, now);
+      osc.frequency.exponentialRampToValueAtTime(300, now + 0.04);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    } catch {
+      // ignore
+    }
+  }
+
+  public playEvidenceReveal() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    try {
+      this.playPaperSlide();
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(380, now + 0.05);
+      osc.frequency.exponentialRampToValueAtTime(540, now + 0.22);
+      gain.gain.setValueAtTime(0.09, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now + 0.05);
+      osc.stop(now + 0.35);
+    } catch {
+      // ignore
+    }
+  }
+
+  public playThunderDistant() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const dur = 1.4;
+      const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.sin((i / bufferSize) * Math.PI);
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(140, now);
+      filter.frequency.linearRampToValueAtTime(70, now + dur);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      noise.start(now);
+    } catch {
+      // ignore
+    }
+  }
+
+  public startRainAmbience() {
+    if (this.isMuted || this.rainNode) return;
+    this.initContext();
+    if (!this.ctx) return;
+    try {
+      const bufferLength = Math.floor(this.ctx.sampleRate * 2.0);
+      const buffer = this.ctx.createBuffer(1, bufferLength, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferLength; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.3;
+      }
+      this.rainNode = this.ctx.createBufferSource();
+      this.rainNode.buffer = buffer;
+      this.rainNode.loop = true;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(450, this.ctx.currentTime);
+
+      this.rainGain = this.ctx.createGain();
+      this.rainGain.gain.setValueAtTime(0.015, this.ctx.currentTime); // Very quiet atmospheric hum
+
+      this.rainNode.connect(filter);
+      filter.connect(this.rainGain);
+      this.rainGain.connect(this.ctx.destination);
+      this.rainNode.start();
+    } catch {
+      // ignore
+    }
+  }
+
+  public stopRainAmbience() {
+    if (this.rainNode) {
+      try {
+        this.rainNode.stop();
+        this.rainNode.disconnect();
+      } catch {
+        // ignore
+      }
+      this.rainNode = null;
+    }
+  }
 }
 
 export const audio = new AudioManager();
