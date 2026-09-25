@@ -24,6 +24,7 @@ import { ReactorPlasmaModule } from './modules/ReactorPlasmaModule';
 import { FrecuenciaResonanciaModule } from './modules/FrecuenciaResonanciaModule';
 import { SecuenciaCineticaModule } from './modules/SecuenciaCineticaModule';
 import { DivisorVoltajeModule } from './modules/DivisorVoltajeModule';
+import { CodigoRojoLampEntrance } from './components/CodigoRojoLampEntrance';
 import {
   AlertTriangle,
   Clock,
@@ -48,10 +49,8 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
 }) => {
   const [selectedModuleIndex, setSelectedModuleIndex] = useState(0);
 
-  // Atmospheric startup sequence state
-  const [powerStage, setPowerStage] = useState<
-    'darkness' | 'hum' | 'emergency_light' | 'flicker' | 'illuminated' | 'displays' | 'ready'
-  >('darkness');
+  // Atmospheric overhead lamp entrance sequence
+  const [isEntranceActive, setIsEntranceActive] = useState(true);
 
   // Strike & error impact states
   const [isShaking, setIsShaking] = useState(false);
@@ -91,47 +90,6 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
 
   const { modules, strikes, maxStrikes, timeRemainingSeconds, missionNumber } = roomState;
   const activeModule = modules[selectedModuleIndex] || modules[0];
-
-  // Operator mission entrance sequence: 0.0s darkness -> 0.2s hum -> 0.45s light -> 0.75s flicker -> 1.3s displays -> 1.8s ready
-  useEffect(() => {
-    const t1 = setTimeout(() => {
-      audio.playStartupPowerOn();
-      setPowerStage('hum');
-    }, 200);
-
-    const t2 = setTimeout(() => {
-      setPowerStage('emergency_light');
-    }, 450);
-
-    const t3 = setTimeout(() => {
-      setPowerStage('flicker');
-    }, 750);
-
-    const t4 = setTimeout(() => {
-      setPowerStage('illuminated');
-    }, 870);
-
-    const t5 = setTimeout(() => {
-      setPowerStage('displays');
-    }, 1300);
-
-    const t6 = setTimeout(() => {
-      setPowerStage('ready');
-    }, 1800);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
-      clearTimeout(t5);
-      clearTimeout(t6);
-    };
-  }, []);
-
-  const handleSkipEntrance = () => {
-    setPowerStage('ready');
-  };
 
   // Subtle ticking-clock tension sound for Operator, speeding up when countdown is low
   useEffect(() => {
@@ -213,64 +171,24 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
   const isLowTime = timeRemainingSeconds <= 60;
   const isCriticalTime = timeRemainingSeconds <= 30;
 
-  // Power stage visual calculation for atmospheric entrance
-  const isPoweringUp = powerStage !== 'ready';
-  const showDarknessOverlay = powerStage === 'darkness' || powerStage === 'hum';
-  const showFlicker = powerStage === 'flicker';
-
   return (
     <div
       className={`relative min-h-screen w-full flex flex-col justify-between bg-slate-950 text-slate-100 p-3 sm:p-6 overflow-x-hidden font-['Plus_Jakarta_Sans',sans-serif] ${
         isShaking ? 'animate-cr-strike' : ''
       }`}
     >
-      {/* Red Emergency Strike Flash Vignette */}
+      {/* Red Emergency Strike Flash Vignette (only for strikes during gameplay) */}
       {showStrikeFlash && (
         <div className="fixed inset-0 z-50 pointer-events-none bg-red-600/25 shadow-[inset_0_0_100px_rgba(239,68,68,0.8)] transition-opacity duration-300" />
       )}
 
-      {/* Atmospheric Startup Entrance Sequence Overlay */}
-      {isPoweringUp && (
-        <div
-          onClick={handleSkipEntrance}
-          className="fixed inset-0 z-40 flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-500"
-          style={{
-            backgroundColor: showDarknessOverlay
-              ? 'rgba(2, 6, 23, 0.98)'
-              : showFlicker
-              ? 'rgba(2, 6, 23, 0.88)'
-              : 'rgba(2, 6, 23, 0.35)',
-          }}
-        >
-          {/* Spatial Emergency Light Beam */}
-          <div
-            className={`w-[600px] h-[600px] rounded-full blur-3xl pointer-events-none transition-opacity duration-500 ${
-              powerStage === 'darkness'
-                ? 'opacity-0'
-                : powerStage === 'hum'
-                ? 'opacity-10 bg-amber-500/10'
-                : powerStage === 'flicker'
-                ? 'opacity-25 bg-red-600/30'
-                : 'opacity-50 bg-red-600/40'
-            }`}
-          />
-
-          <div className="relative z-10 flex flex-col items-center gap-3 font-mono text-center">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-              <span className="text-xs uppercase tracking-widest text-red-400 font-bold">
-                {powerStage === 'darkness' || powerStage === 'hum'
-                  ? 'ALIMENTACIÓN PRINCIPAL: CONECTANDO...'
-                  : powerStage === 'emergency_light' || powerStage === 'flicker'
-                  ? 'ILUMINACIÓN TÁCTICA: ACTIVANDO...'
-                  : 'CONSOLA DE LA MÁQUINA: EN LÍNEA'}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 uppercase tracking-widest">
-              Toca la pantalla para omitir la secuencia
-            </p>
-          </div>
-        </div>
+      {/* Cinematic Overhead Lamp Reveal Entrance (Black -> Overhead Lamp -> Full Panel) */}
+      {isEntranceActive && (
+        <CodigoRojoLampEntrance
+          roomCode={roomState.roomCode}
+          missionNumber={missionNumber}
+          onComplete={() => setIsEntranceActive(false)}
+        />
       )}
 
       {/* Tactical Ambient Lighting Glow */}

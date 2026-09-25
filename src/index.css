@@ -216,30 +216,6 @@
    CÓDIGO ROJO ATMOSPHERIC VISUALS & MICRO-INTERACTIONS
    ========================================================================= */
 
-@keyframes cr-startup-glow {
-  0% {
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.08;
-  }
-  28% {
-    opacity: 0.42;
-  }
-  32% {
-    opacity: 0.15; /* single realistic momentary fluorescent flicker */
-  }
-  48% {
-    opacity: 0.82;
-  }
-  75% {
-    opacity: 0.95;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
 @keyframes cr-strike-shake {
   0%, 100% { transform: translate(0, 0); }
   15% { transform: translate(-5px, 2px); }
@@ -278,10 +254,6 @@
     transform: scale(1) rotate(-8deg);
     opacity: 1;
   }
-}
-
-.animate-cr-startup {
-  animation: cr-startup-glow 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-cr-strike {

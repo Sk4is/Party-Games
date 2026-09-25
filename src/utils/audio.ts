@@ -1119,67 +1119,49 @@ class AudioManager {
 
   // Operator machine atmospheric startup sequence (transformer hum + mechanical relay snap + CRT charge)
   public playStartupPowerOn() {
+    this.playOverheadLampOn();
+  }
+
+  // Overhead lamp switch-on for Operator entrance (soft switch click + gentle warm filament glow)
+  public playOverheadLampOn() {
     if (this.isMuted) return;
     this.initContext();
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
 
-    // 1. Deep low-frequency transformer power engagement hum
+    // 1. Tactile mechanical switch click (no alarm, no explosion)
+    const clickOsc = this.ctx.createOscillator();
+    const clickGain = this.ctx.createGain();
+    clickOsc.type = 'triangle';
+    clickOsc.frequency.setValueAtTime(680, now);
+    clickOsc.frequency.exponentialRampToValueAtTime(160, now + 0.035);
+
+    clickGain.gain.setValueAtTime(0.14, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+    clickOsc.connect(clickGain);
+    clickGain.connect(this.ctx.destination);
+
+    clickOsc.start(now);
+    clickOsc.stop(now + 0.04);
+
+    // 2. Very soft warm filament ignition hum
     const humOsc = this.ctx.createOscillator();
     const humGain = this.ctx.createGain();
-    humOsc.type = 'sawtooth';
-    humOsc.frequency.setValueAtTime(55, now);
-    humOsc.frequency.exponentialRampToValueAtTime(110, now + 0.6);
+    humOsc.type = 'sine';
+    humOsc.frequency.setValueAtTime(118, now + 0.03);
+    humOsc.frequency.linearRampToValueAtTime(100, now + 0.35);
 
-    const humFilter = this.ctx.createBiquadFilter();
-    humFilter.type = 'lowpass';
-    humFilter.frequency.setValueAtTime(120, now);
-    humFilter.frequency.exponentialRampToValueAtTime(260, now + 0.6);
+    humGain.gain.setValueAtTime(0.001, now + 0.03);
+    humGain.gain.linearRampToValueAtTime(0.06, now + 0.08);
+    humGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
 
-    humGain.gain.setValueAtTime(0.01, now);
-    humGain.gain.linearRampToValueAtTime(0.18, now + 0.25);
-    humGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
-
-    humOsc.connect(humFilter);
-    humFilter.connect(humGain);
+    humOsc.connect(humGain);
     humGain.connect(this.ctx.destination);
 
-    humOsc.start(now);
-    humOsc.stop(now + 0.9);
-
-    // 2. High-voltage capacitor charging rising whine
-    const capOsc = this.ctx.createOscillator();
-    const capGain = this.ctx.createGain();
-    capOsc.type = 'sine';
-    capOsc.frequency.setValueAtTime(240, now + 0.15);
-    capOsc.frequency.exponentialRampToValueAtTime(1400, now + 0.85);
-
-    capGain.gain.setValueAtTime(0.001, now + 0.15);
-    capGain.gain.linearRampToValueAtTime(0.08, now + 0.65);
-    capGain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
-
-    capOsc.connect(capGain);
-    capGain.connect(this.ctx.destination);
-
-    capOsc.start(now + 0.15);
-    capOsc.stop(now + 0.95);
-
-    // 3. Crisp mechanical master relay click at t = 0.4s
-    const relayOsc = this.ctx.createOscillator();
-    const relayGain = this.ctx.createGain();
-    relayOsc.type = 'triangle';
-    relayOsc.frequency.setValueAtTime(800, now + 0.4);
-    relayOsc.frequency.exponentialRampToValueAtTime(120, now + 0.44);
-
-    relayGain.gain.setValueAtTime(0.22, now + 0.4);
-    relayGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-
-    relayOsc.connect(relayGain);
-    relayGain.connect(this.ctx.destination);
-
-    relayOsc.start(now + 0.4);
-    relayOsc.stop(now + 0.45);
+    humOsc.start(now + 0.03);
+    humOsc.stop(now + 0.45);
   }
 
   // Crisp mechanical relay latch sound
