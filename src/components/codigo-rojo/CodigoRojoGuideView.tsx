@@ -45,6 +45,34 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('TODOS');
   const [operatorNotes, setOperatorNotes] = useState<string>('');
 
+  // Round transition state for Guide: plays once per new round/mission
+  const lastGuideMissionRef = useRef<number | null>(null);
+  const [showRoundIntro, setShowRoundIntro] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const sessionKey = `cr_guide_seen_${roomState.code}_m${missionNumber}`;
+    return sessionStorage.getItem(sessionKey) !== 'true';
+  });
+
+  useEffect(() => {
+    const sessionKey = `cr_guide_seen_${roomState.code}_m${missionNumber}`;
+    const alreadySeen = typeof window !== 'undefined' && sessionStorage.getItem(sessionKey) === 'true';
+
+    if (!alreadySeen && lastGuideMissionRef.current !== missionNumber) {
+      setShowRoundIntro(true);
+      try {
+        sessionStorage.setItem(sessionKey, 'true');
+      } catch {
+        // ignore
+      }
+      lastGuideMissionRef.current = missionNumber;
+      audio.playPaperPageTurn();
+      const timer = setTimeout(() => setShowRoundIntro(false), 1400);
+      return () => clearTimeout(timer);
+    } else if (alreadySeen) {
+      setShowRoundIntro(false);
+    }
+  }, [roomState.code, missionNumber]);
+
   // Audio feedback for strikes on the Guide console as well
   const prevStrikesRef = useRef(strikes);
   useEffect(() => {
@@ -107,6 +135,25 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between bg-slate-950 text-slate-100 p-3 sm:p-6 overflow-x-hidden font-['Plus_Jakarta_Sans',sans-serif]">
+      {/* Cinematic Round Opening Transition for Guide */}
+      {showRoundIntro && (
+        <div className="fixed inset-0 z-50 pointer-events-none bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in transition-opacity">
+          <div className="flex flex-col items-center gap-3 p-6 rounded-3xl bg-slate-900 border-2 border-amber-500/80 shadow-[0_0_50px_rgba(245,158,11,0.3)]">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-3xl">
+              📋
+            </div>
+            <div className="text-center font-mono">
+              <span className="text-xs uppercase font-bold text-amber-400 tracking-widest block">
+                CÓDIGO ROJO &bull; MISIÓN {missionNumber}
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                MANUAL TÉCNICO DESCLASIFICADO
+              </h2>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Tactical Status Bar */}
       <header className="w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border-2 border-amber-500/40 shadow-2xl mb-4">
         {/* Mission & Guide Role */}

@@ -350,16 +350,13 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
                 <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider mb-1">
                   Tiempo
                 </span>
-                <span className="text-xs font-bold font-mono text-slate-200">
-                  {config.timeMode === 'AUTO' ? (
-                    <span>
-                      Auto <strong className="text-red-400">(~{getEstimatedAutoTime(config.difficulty, config.modulesCount)})</strong>
-                    </span>
-                  ) : (
-                    <span className="text-amber-300 font-bold">
-                      {config.customTimeMinutes || 5} min
-                    </span>
-                  )}
+                <span className="text-sm font-black font-mono text-red-400">
+                  {(() => {
+                    const secs = config.durationSeconds || (config.customTimeMinutes ? Math.round(config.customTimeMinutes * 60) : 270);
+                    const m = Math.floor(secs / 60);
+                    const s = secs % 60;
+                    return `${m}:${s.toString().padStart(2, '0')}`;
+                  })()}
                 </span>
               </div>
 

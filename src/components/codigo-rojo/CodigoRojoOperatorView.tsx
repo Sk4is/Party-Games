@@ -49,8 +49,36 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
 }) => {
   const [selectedModuleIndex, setSelectedModuleIndex] = useState(0);
 
-  // Atmospheric overhead lamp entrance sequence
-  const [isEntranceActive, setIsEntranceActive] = useState(true);
+  // Atmospheric overhead lamp entrance sequence: triggered once per new round/mission
+  const lastAnimatedMissionRef = useRef<number | null>(null);
+  const [isEntranceActive, setIsEntranceActive] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const sessionKey = `cr_lamp_seen_${roomState.code}_m${roomState.missionNumber}`;
+    return sessionStorage.getItem(sessionKey) !== 'true';
+  });
+
+  useEffect(() => {
+    const currentMission = roomState.missionNumber;
+    const sessionKey = `cr_lamp_seen_${roomState.code}_m${currentMission}`;
+    const alreadySeen = typeof window !== 'undefined' && sessionStorage.getItem(sessionKey) === 'true';
+
+    if (!alreadySeen && lastAnimatedMissionRef.current !== currentMission) {
+      setIsEntranceActive(true);
+    } else if (alreadySeen && lastAnimatedMissionRef.current === currentMission) {
+      setIsEntranceActive(false);
+    }
+  }, [roomState.code, roomState.missionNumber]);
+
+  const handleEntranceComplete = () => {
+    const currentMission = roomState.missionNumber;
+    try {
+      sessionStorage.setItem(`cr_lamp_seen_${roomState.code}_m${currentMission}`, 'true');
+    } catch {
+      // ignore
+    }
+    lastAnimatedMissionRef.current = currentMission;
+    setIsEntranceActive(false);
+  };
 
   // Strike & error impact states
   const [isShaking, setIsShaking] = useState(false);
@@ -185,9 +213,10 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
       {/* Cinematic Overhead Lamp Reveal Entrance (Black -> Overhead Lamp -> Full Panel) */}
       {isEntranceActive && (
         <CodigoRojoLampEntrance
-          roomCode={roomState.roomCode}
+          key={`lamp-${roomState.code}-m${missionNumber}`}
+          roomCode={roomState.code}
           missionNumber={missionNumber}
-          onComplete={() => setIsEntranceActive(false)}
+          onComplete={handleEntranceComplete}
         />
       )}
 

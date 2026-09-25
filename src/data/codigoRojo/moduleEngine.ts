@@ -1147,50 +1147,129 @@ function generateRefrigeranteQuimico(rng: Mulberry32): GeneratedModuleInternal {
 // =========================================================================
 // 13. PLACA DE CONEXIONES AUXILIARES (Patch Bay)
 // =========================================================================
-function generatePuertosConexion(rng: Mulberry32): GeneratedModuleInternal {
-  const ports = ['J1', 'J2', 'J3', 'J4', 'J5', 'J6'];
-  const busCodes = ['BUS-ALFA', 'BUS-BETA', 'BUS-GAMMA'] as const;
+export interface PuertosCableDef {
+  id: 'red' | 'yellow' | 'blue' | 'green' | 'white';
+  name: string;
+  color: string;
+}
+
+export const PUERTOS_CABLES: PuertosCableDef[] = [
+  { id: 'red', name: 'Rojo', color: '#ef4444' },
+  { id: 'yellow', name: 'Amarillo', color: '#eab308' },
+  { id: 'blue', name: 'Azul', color: '#3b82f6' },
+  { id: 'green', name: 'Verde', color: '#22c55e' },
+  { id: 'white', name: 'Blanco', color: '#f8fafc' },
+];
+
+export const PUERTOS_ROUTING_TABLE: Record<
+  'EVEN' | 'ODD',
+  Record<'BUS-ALFA' | 'BUS-BETA' | 'BUS-GAMMA' | 'BUS-DELTA', Record<string, string>>
+> = {
+  EVEN: {
+    'BUS-ALFA': { red: 'J1', yellow: 'J4', blue: 'J6', green: 'J2', white: 'J7' },
+    'BUS-BETA': { red: 'J3', yellow: 'J1', blue: 'J5', green: 'J7', white: 'J2' },
+    'BUS-GAMMA': { red: 'J5', yellow: 'J2', blue: 'J7', green: 'J4', white: 'J9' },
+    'BUS-DELTA': { red: 'J2', yellow: 'J6', blue: 'J3', green: 'J8', white: 'J10' },
+  },
+  ODD: {
+    'BUS-ALFA': { red: 'J4', yellow: 'J2', blue: 'J7', green: 'J5', white: 'J8' },
+    'BUS-BETA': { red: 'J6', yellow: 'J3', blue: 'J1', green: 'J2', white: 'J9' },
+    'BUS-GAMMA': { red: 'J2', yellow: 'J7', blue: 'J5', green: 'J1', white: 'J10' },
+    'BUS-DELTA': { red: 'J7', yellow: 'J1', blue: 'J4', green: 'J6', white: 'J3' },
+  },
+};
+
+function generatePuertosConexion(
+  rng: Mulberry32,
+  difficulty: CodigoRojoDifficulty = 'NORMAL',
+  serial: string = 'CR-4821-X7'
+): GeneratedModuleInternal {
+  // Determine cables and jacks by difficulty:
+  // NORMAL: 3 cables (Rojo, Amarillo, Azul), 7 jacks (J1..J7)
+  // DIFICIL: 4 cables (Rojo, Amarillo, Azul, Verde), 8 jacks (J1..J8)
+  // EXTREMO: 5 cables (Rojo, Amarillo, Azul, Verde, Blanco), 10 jacks (J1..J10)
+  let cableCount = 3;
+  let jackCount = 7;
+  if (difficulty === 'DIFICIL') {
+    cableCount = 4;
+    jackCount = 8;
+  } else if (difficulty === 'EXTREMO') {
+    cableCount = 5;
+    jackCount = 10;
+  }
+
+  const activeCables = PUERTOS_CABLES.slice(0, cableCount);
+  const jacks = Array.from({ length: jackCount }, (_, i) => `J${i + 1}`);
+
+  const busCodes = ['BUS-ALFA', 'BUS-BETA', 'BUS-GAMMA', 'BUS-DELTA'] as const;
   const busCode = rng.pick([...busCodes]);
 
-  let targetCableRed: [string, string] = ['J1', 'J4'];
-  let targetCableYellow: [string, string] = ['J2', 'J5'];
+  const lastDigit = getSerialLastDigit(serial);
+  const parity = lastDigit % 2 === 0 ? 'EVEN' : 'ODD';
+  const routing = PUERTOS_ROUTING_TABLE[parity][busCode];
 
-  if (busCode === 'BUS-ALFA') {
-    targetCableRed = ['J1', 'J5'];
-    targetCableYellow = ['J2', 'J6'];
-  } else if (busCode === 'BUS-BETA') {
-    targetCableRed = ['J2', 'J4'];
-    targetCableYellow = ['J3', 'J5'];
-  } else {
-    // BUS-GAMMA
-    targetCableRed = ['J3', 'J6'];
-    targetCableYellow = ['J1', 'J4'];
-  }
+  const targetConnections: Record<string, string> = {};
+  activeCables.forEach((c) => {
+    targetConnections[c.id] = routing[c.id];
+  });
 
   const manualSection: CodigoRojoManualSection = {
     moduleType: 'PUERTOS_CONEXION',
+    category: 'ELECTRICIDAD',
     title: 'Placa de Conexiones Auxiliares',
-    subtitle: 'Puenteado de Jacks de Señal',
-    classificationCode: 'DOC-JCK-42',
+    subtitle: 'Enrutamiento de Parcheo Auxiliar',
+    classificationCode: 'DOC-NET-13',
+    division: 'Electricidad y Circuitos',
+    visualIdentification:
+      'Panel frontal con terminales de cable fuente a la izquierda (Rojo, Amarillo, Azul, Verde*, Blanco*), placa indicadora de bus (BUS-ALFA, BUS-BETA, BUS-GAMMA o BUS-DELTA) y un banco de clavijas jack hembra numeradas (J1 a J7, J8 o J10). Botón «ENLAZAR SEÑAL».',
+    identificationChecklist: [
+      'Terminales de cable fuente rotulados por color a la izquierda.',
+      'Banco de clavijas jack de destino rotuladas (J1..J10).',
+      'Placa indicadora del bus activo: BUS-ALFA, BUS-BETA, BUS-GAMMA o BUS-DELTA.',
+      'Botón inferior de verificación «ENLAZAR SEÑAL».',
+    ],
     description:
-      'Seis conectores jack de audio/datos rotulados de J1 a J6 permiten desviar el flujo de señal mediante dos cables de parcheo: un Cable Rojo y un Cable Amarillo.',
+      'El cuadro de conmutación auxiliar desvía las líneas de potencia del sistema. El Operador debe comunicar el código del bus y los cables presentes. Los Guías determinan la clavija destino para cada cable consultando la tabla de paridad de la cifra final del número de serie.',
     rules: [
       {
-        condition: 'Si el rótulo del bus indica BUS-ALFA:',
-        action: 'Conecta Cable Rojo de J1 a J5. Conecta Cable Amarillo de J2 a J6.',
+        condition: '1. Comprobación de la última cifra del número de serie:',
+        action:
+          'Localiza la última cifra numérica del número de serie de la máquina (0-9). Determina si es PAR (0, 2, 4, 6, 8) o IMPAR (1, 3, 5, 7, 9) para seleccionar la tabla de enrutamiento aplicable.',
       },
       {
-        condition: 'Si el rótulo del bus indica BUS-BETA:',
-        action: 'Conecta Cable Rojo de J2 a J4. Conecta Cable Amarillo de J3 a J5.',
+        condition: '2. Identificación del bus de señal activo:',
+        action:
+          'El Operador comunica el código del bus (BUS-ALFA, BUS-BETA, BUS-GAMMA o BUS-DELTA).',
       },
       {
-        condition: 'Si el rótulo del bus indica BUS-GAMMA:',
-        action: 'Conecta Cable Rojo de J3 a J6. Conecta Cable Amarillo de J1 a J4.',
+        condition: '3. Enrutamiento físico de cada cable fuente:',
+        action:
+          'Para cada cable presente en el panel, el Operador arrastra el conector del extremo libre y lo enchufa en la clavija jack especificada en la fila del bus correspondiente. Cada jack admite como máximo 1 cable.',
+      },
+      {
+        condition: '4. Enlace y confirmación del circuito:',
+        action:
+          'Una vez conectados TODOS los cables requeridos en sus respectivas clavijas, el Operador presiona «ENLAZAR SEÑAL». Si la configuración es correcta el panel quedará estabilizado.',
       },
     ],
+    tableHeaders: ['Bus Señal', 'C. Rojo', 'C. Amarillo', 'C. Azul', 'C. Verde*', 'C. Blanco*'],
+    tableRows: [
+      ['[SERIE PAR]', '---', '---', '---', '---', '---'],
+      ['BUS-ALFA', 'J1', 'J4', 'J6', 'J2', 'J7'],
+      ['BUS-BETA', 'J3', 'J1', 'J5', 'J7', 'J2'],
+      ['BUS-GAMMA', 'J5', 'J2', 'J7', 'J4', 'J9'],
+      ['BUS-DELTA', 'J2', 'J6', 'J3', 'J8', 'J10'],
+      ['[SERIE IMPAR]', '---', '---', '---', '---', '---'],
+      ['BUS-ALFA', 'J4', 'J2', 'J7', 'J5', 'J8'],
+      ['BUS-BETA', 'J6', 'J3', 'J1', 'J2', 'J9'],
+      ['BUS-GAMMA', 'J2', 'J7', 'J5', 'J1', 'J10'],
+      ['BUS-DELTA', 'J7', 'J1', 'J4', 'J6', 'J3'],
+    ],
     notes: [
-      'El orden de los extremos de un mismo cable no altera el circuito (J1 a J5 es idéntico a J5 a J1).',
-      'Una vez conectados ambos cables, el Operador pulsa «ENLAZAR SEÑAL».',
+      '(*) Los cables Verde y Blanco se incorporan únicamente en dificultades avanzadas.',
+      'El Operador puede mover, corregir y recolocar cualquier cable libremente antes de pulsar «ENLAZAR SEÑAL» sin penalización.',
+      'Pulsar «ENLAZAR SEÑAL» con una disposición errónea provocará 1 Strike de aviso.',
+      'Ejemplo didáctico: En una máquina con serie terminada en 8 (par) y BUS-BETA, el Cable Rojo se conecta a J3, el Cable Amarillo a J1 y el Cable Azul a J5.',
     ],
   };
 
@@ -1201,29 +1280,32 @@ function generatePuertosConexion(rng: Mulberry32): GeneratedModuleInternal {
       title: 'Placa de Conexiones Auxiliares',
       solved: false,
       strikes: 0,
-      estimatedSolveSeconds: 40,
+      estimatedSolveSeconds: 45,
       operatorState: {
         busCode,
-        ports,
-        cables: {
-          red: null,
-          yellow: null,
-        },
+        cables: activeCables,
+        jacks,
+        connectedJacks: {},
       },
       manualSection,
     },
-    internalSolution: { targetCableRed, targetCableYellow },
-    validateAction: (action: { red: [string, string]; yellow: [string, string] }) => {
-      const isRedValid =
-        action.red &&
-        ((action.red[0] === targetCableRed[0] && action.red[1] === targetCableRed[1]) ||
-          (action.red[0] === targetCableRed[1] && action.red[1] === targetCableRed[0]));
-      const isYellowValid =
-        action.yellow &&
-        ((action.yellow[0] === targetCableYellow[0] && action.yellow[1] === targetCableYellow[1]) ||
-          (action.yellow[0] === targetCableYellow[1] && action.yellow[1] === targetCableYellow[0]));
+    internalSolution: { targetConnections },
+    validateAction: (action: { connections: Record<string, string> }) => {
+      if (!action || !action.connections || typeof action.connections !== 'object') {
+        return { valid: false, solved: false };
+      }
+      const allCablesConnected = activeCables.every(
+        (c) => action.connections[c.id] && typeof action.connections[c.id] === 'string'
+      );
+      if (!allCablesConnected) {
+        return { valid: false, solved: false };
+      }
 
-      if (isRedValid && isYellowValid) {
+      const isCorrect = activeCables.every(
+        (c) => action.connections[c.id] === targetConnections[c.id]
+      );
+
+      if (isCorrect) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -1801,7 +1883,7 @@ export function generateModuleInstance(
     case 'REFRIGERANTE_QUIMICO':
       return generateRefrigeranteQuimico(rng);
     case 'PUERTOS_CONEXION':
-      return generatePuertosConexion(rng);
+      return generatePuertosConexion(rng, difficulty, serial);
     case 'DISIPADOR_TERMICO':
       return generateDisipadorTermico(rng);
     case 'SINCRONIZADOR_FASES':

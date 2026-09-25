@@ -51,6 +51,7 @@ export interface CodigoRojoConfig {
   difficulty: CodigoRojoDifficulty;
   timeMode: CodigoRojoTimeMode;
   customTimeMinutes: number; // e.g. 5
+  durationSeconds?: number; // Exact authoritative duration in seconds (e.g. 270 for 4:30)
   maxStrikes: number; // default 3
   modulesCount: number; // calculated or customized (2-6)
 }

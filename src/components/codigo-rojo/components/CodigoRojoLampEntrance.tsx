@@ -17,11 +17,7 @@ export const CodigoRojoLampEntrance: React.FC<CodigoRojoLampEntranceProps> = ({
     if (typeof window === 'undefined') return true;
     try {
       const sessionKey = `cr_lamp_seen_${roomCode}_m${missionNumber}`;
-      if (sessionStorage.getItem(sessionKey) === 'true') {
-        return false;
-      }
-      sessionStorage.setItem(sessionKey, 'true');
-      return true;
+      return sessionStorage.getItem(sessionKey) !== 'true';
     } catch {
       return true;
     }
@@ -42,6 +38,12 @@ export const CodigoRojoLampEntrance: React.FC<CodigoRojoLampEntranceProps> = ({
   const handleFinish = () => {
     if (isFinishedRef.current) return;
     isFinishedRef.current = true;
+    try {
+      const sessionKey = `cr_lamp_seen_${roomCode}_m${missionNumber}`;
+      sessionStorage.setItem(sessionKey, 'true');
+    } catch {
+      // ignore
+    }
     onCompleteRef.current();
   };
 

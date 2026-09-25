@@ -53,7 +53,8 @@ interface ServerRoom {
 const DEFAULT_CONFIG: CodigoRojoConfig = {
   difficulty: 'NORMAL',
   timeMode: 'AUTO',
-  customTimeMinutes: 5,
+  customTimeMinutes: 4.5,
+  durationSeconds: 270,
   maxStrikes: 3,
   modulesCount: 3,
 };
@@ -125,6 +126,10 @@ export class CodigoRojoServer {
       missionsGuidedCount: 0,
     };
 
+    const initialTime = finalConfig.durationSeconds && finalConfig.durationSeconds > 0
+      ? finalConfig.durationSeconds
+      : (finalConfig.customTimeMinutes ? Math.round(finalConfig.customTimeMinutes * 60) : 270);
+
     const room: ServerRoom = {
       code,
       gameType: 'codigo-rojo',
@@ -138,8 +143,8 @@ export class CodigoRojoServer {
       operatorHistory: [],
       strikes: 0,
       maxStrikes: finalConfig.maxStrikes,
-      timeRemainingSeconds: 300,
-      totalTimeSeconds: 300,
+      timeRemainingSeconds: initialTime,
+      totalTimeSeconds: initialTime,
       modules: [],
       activeModuleIndex: 0,
       stats: {
@@ -360,10 +365,12 @@ export class CodigoRojoServer {
     room.modules = generated.modules.map((m) => m.moduleState);
     room.machineSerial = generated.machineSerial;
 
-    // Determine time
-    let timeSeconds = generated.totalEstimatedSeconds;
-    if (room.config.timeMode === 'CUSTOM') {
-      timeSeconds = Math.max(60, room.config.customTimeMinutes * 60);
+    // Determine authoritative mission time: exactly match configured durationSeconds
+    let timeSeconds = 270;
+    if (room.config.durationSeconds && room.config.durationSeconds > 0) {
+      timeSeconds = room.config.durationSeconds;
+    } else if (room.config.timeMode === 'CUSTOM' && room.config.customTimeMinutes) {
+      timeSeconds = Math.max(60, Math.round(room.config.customTimeMinutes * 60));
     }
 
     const now = Date.now();
@@ -478,6 +485,7 @@ export class CodigoRojoServer {
     if (result.valid) {
       if (result.updatedProgress) {
         internalMod.internalSolution = { ...internalMod.internalSolution, ...result.updatedProgress };
+        moduleState.operatorState = { ...moduleState.operatorState, ...result.updatedProgress };
       }
 
       if (result.solved) {
@@ -517,6 +525,7 @@ export class CodigoRojoServer {
 
       if (result.updatedProgress) {
         internalMod.internalSolution = { ...internalMod.internalSolution, ...result.updatedProgress };
+        moduleState.operatorState = { ...moduleState.operatorState, ...result.updatedProgress };
       }
 
       room.lastEvent = {
@@ -598,6 +607,9 @@ export class CodigoRojoServer {
     room.modules = [];
     room.internalModules = [];
     room.strikes = 0;
+    const dur = room.config.durationSeconds || 270;
+    room.timeRemainingSeconds = dur;
+    room.totalTimeSeconds = dur;
     this.broadcastRoom(room);
   }
 

@@ -578,36 +578,59 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     moduleType: 'PUERTOS_CONEXION',
     category: 'ELECTRICIDAD',
     title: 'Placa de Conexiones Auxiliares',
-    subtitle: 'Puenteado de Jacks de Señal',
+    subtitle: 'Enrutamiento de Parcheo Auxiliar',
     classificationCode: 'DOC-NET-13',
     division: 'Electricidad y Circuitos',
     visualIdentification:
-      'Panel frontal con 6 conectores jack hembra rotulados de J1 a J6, un rótulo de bus de señal (BUS-ALFA, BUS-BETA o BUS-GAMMA) y dos cables de parcheo (un Cable Rojo y un Cable Amarillo). Botón «ENLAZAR SEÑAL».',
+      'Panel frontal con terminales de cable fuente a la izquierda (Rojo, Amarillo, Azul, Verde*, Blanco*), placa indicadora de bus (BUS-ALFA, BUS-BETA, BUS-GAMMA o BUS-DELTA) y un banco de clavijas jack hembra numeradas (J1 a J7, J8 o J10). Botón «ENLAZAR SEÑAL».',
     identificationChecklist: [
-      'Seis conectores jack de audio rotulados J1 a J6.',
-      'Placa indicadora de código de bus: BUS-ALFA, BUS-BETA o BUS-GAMMA.',
-      'Dos cables de conexión: Cable Rojo y Cable Amarillo.',
-      'Botón de confirmación «ENLAZAR SEÑAL».',
+      'Terminales de cable fuente rotulados por color a la izquierda.',
+      'Banco de clavijas jack de destino rotuladas (J1..J10).',
+      'Placa indicadora del bus activo: BUS-ALFA, BUS-BETA, BUS-GAMMA o BUS-DELTA.',
+      'Botón inferior de verificación «ENLAZAR SEÑAL».',
     ],
     description:
-      'El puente telefónico desvía señales de control. El Operador debe comunicar el código del bus y conectar los dos cables patch entre el par de clavijas correcto.',
+      'El cuadro de conmutación auxiliar desvía las líneas de potencia del sistema. El Operador debe comunicar el código del bus y los cables presentes. Los Guías determinan la clavija destino para cada cable consultando la tabla de paridad de la cifra final del número de serie.',
     rules: [
       {
-        condition: 'Si el rótulo del bus indica BUS-ALFA:',
-        action: 'Conecta Cable Rojo de J1 a J5. Conecta Cable Amarillo de J2 a J6.',
+        condition: '1. Comprobación de la última cifra del número de serie:',
+        action:
+          'Localiza la última cifra numérica del número de serie de la máquina (0-9). Determina si es PAR (0, 2, 4, 6, 8) o IMPAR (1, 3, 5, 7, 9) para seleccionar la tabla de enrutamiento aplicable.',
       },
       {
-        condition: 'Si el rótulo del bus indica BUS-BETA:',
-        action: 'Conecta Cable Rojo de J2 a J4. Conecta Cable Amarillo de J3 a J5.',
+        condition: '2. Identificación del bus de señal activo:',
+        action:
+          'El Operador comunica el código del bus (BUS-ALFA, BUS-BETA, BUS-GAMMA o BUS-DELTA).',
       },
       {
-        condition: 'Si el rótulo del bus indica BUS-GAMMA:',
-        action: 'Conecta Cable Rojo de J3 a J6. Conecta Cable Amarillo de J1 a J4.',
+        condition: '3. Enrutamiento físico de cada cable fuente:',
+        action:
+          'Para cada cable presente en el panel, el Operador arrastra el conector del extremo libre y lo enchufa en la clavija jack especificada en la fila del bus correspondiente. Cada jack admite como máximo 1 cable.',
+      },
+      {
+        condition: '4. Enlace y confirmación del circuito:',
+        action:
+          'Una vez conectados TODOS los cables requeridos en sus respectivas clavijas, el Operador presiona «ENLAZAR SEÑAL». Si la configuración es correcta el panel quedará estabilizado.',
       },
     ],
+    tableHeaders: ['Bus Señal', 'C. Rojo', 'C. Amarillo', 'C. Azul', 'C. Verde*', 'C. Blanco*'],
+    tableRows: [
+      ['[SERIE PAR]', '---', '---', '---', '---', '---'],
+      ['BUS-ALFA', 'J1', 'J4', 'J6', 'J2', 'J7'],
+      ['BUS-BETA', 'J3', 'J1', 'J5', 'J7', 'J2'],
+      ['BUS-GAMMA', 'J5', 'J2', 'J7', 'J4', 'J9'],
+      ['BUS-DELTA', 'J2', 'J6', 'J3', 'J8', 'J10'],
+      ['[SERIE IMPAR]', '---', '---', '---', '---', '---'],
+      ['BUS-ALFA', 'J4', 'J2', 'J7', 'J5', 'J8'],
+      ['BUS-BETA', 'J6', 'J3', 'J1', 'J2', 'J9'],
+      ['BUS-GAMMA', 'J2', 'J7', 'J5', 'J1', 'J10'],
+      ['BUS-DELTA', 'J7', 'J1', 'J4', 'J6', 'J3'],
+    ],
     notes: [
-      'El orden de los extremos de un mismo cable no altera el circuito (J1 a J5 es idéntico a J5 a J1).',
-      'Una vez conectados ambos cables, el Operador pulsa «ENLAZAR SEÑAL». Un conexionado erróneo sumará 1 Strike.',
+      '(*) Los cables Verde y Blanco se incorporan únicamente en dificultades avanzadas.',
+      'El Operador puede mover, corregir y recolocar cualquier cable libremente antes de pulsar «ENLAZAR SEÑAL» sin penalización.',
+      'Pulsar «ENLAZAR SEÑAL» con una disposición errónea provocará 1 Strike de aviso.',
+      'Ejemplo didáctico: En una máquina con serie terminada en 8 (par) y BUS-BETA, el Cable Rojo se conecta a J3, el Cable Amarillo a J1 y el Cable Azul a J5.',
     ],
   },
 

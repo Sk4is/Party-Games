@@ -413,31 +413,65 @@ function renderSketchSvg(type: CodigoRojoModuleType) {
         </svg>
       );
 
-    // 13. PUERTOS_CONEXION (Dos filas de 4 conectores jack redondos con cables de parcheo)
+    // 13. PUERTOS_CONEXION (Terminales de cables fuente a la izquierda + banco de clavijas jack a la derecha)
     case 'PUERTOS_CONEXION':
       return (
         <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
           <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
-          <text x="25" y="24" fill="#fbbf24" stroke="none" fontWeight="bold">PANEL DE PARCHEO // 8 CONECTORES JACK</text>
-          {/* Top Row: A, B, C, D */}
-          {[60, 120, 180, 240].map((cx, i) => (
-            <g key={`top-${i}`}>
-              <circle cx={cx} cy="42" r="10" fill="#1e293b" stroke="#f59e0b" strokeWidth="1.5" />
-              <circle cx={cx} cy="42" r="4" fill="#020617" />
-              <text x={cx - 3} y="30" fill="#94a3b8" stroke="none">{['A', 'B', 'C', 'D'][i]}</text>
-            </g>
-          ))}
-          {/* Bottom Row: 1, 2, 3, 4 */}
-          {[60, 120, 180, 240].map((cx, i) => (
-            <g key={`bot-${i}`}>
-              <circle cx={cx} cy="88" r="10" fill="#1e293b" stroke="#f59e0b" strokeWidth="1.5" />
-              <circle cx={cx} cy="88" r="4" fill="#020617" />
-              <text x={cx - 3} y="108" fill="#94a3b8" stroke="none">{i + 1}</text>
-            </g>
-          ))}
-          {/* Patch cable curves */}
-          <path d="M 60 42 C 70 65, 110 65, 120 88" stroke="#ef4444" strokeWidth="2.5" fill="none" />
-          <path d="M 180 42 C 190 70, 230 70, 240 88" stroke="#eab308" strokeWidth="2.5" fill="none" strokeDasharray="4 2" />
+          <text x="25" y="24" fill="#fbbf24" stroke="none" fontWeight="bold">ENRUTAMIENTO // FUENTES Y BANCO DE JACKS</text>
+          
+          {/* Left Column: Source Terminals (Rojo, Amarillo, Azul, Verde) */}
+          <g transform="translate(25, 34)">
+            <text x="0" y="0" fill="#94a3b8" stroke="none" fontSize="8" fontWeight="bold">FUENTES</text>
+            {[
+              { label: 'ROJO', color: '#ef4444', y: 14 },
+              { label: 'AMAR.', color: '#eab308', y: 32 },
+              { label: 'AZUL', color: '#3b82f6', y: 50 },
+              { label: 'VERD.', color: '#22c55e', y: 68 },
+            ].map((src, i) => (
+              <g key={`src-${i}`}>
+                <circle cx="5" cy={src.y} r="5" fill="#1e293b" stroke={src.color} strokeWidth="2" />
+                <circle cx="5" cy={src.y} r="2" fill={src.color} />
+                <text x="14" y={src.y + 3} fill={src.color} stroke="none" fontSize="7.5" fontWeight="bold">{src.label}</text>
+              </g>
+            ))}
+          </g>
+
+          {/* Right Area: Bank of Destination Jacks (J1..J8 in 2 rows of 4) */}
+          <g transform="translate(130, 34)">
+            <text x="0" y="0" fill="#94a3b8" stroke="none" fontSize="8" fontWeight="bold">BANCO DE JACKS</text>
+            {/* Row 1: J1..J4 */}
+            {[0, 1, 2, 3].map((col) => {
+              const cx = col * 40 + 15;
+              const cy = 22;
+              const num = col + 1;
+              return (
+                <g key={`jack-${num}`}>
+                  <circle cx={cx} cy={cy} r="8.5" fill="#1e293b" stroke="#64748b" strokeWidth="1.5" />
+                  <circle cx={cx} cy={cy} r="3" fill="#020617" />
+                  <text x={cx - 5} y={cy + 17} fill="#94a3b8" stroke="none" fontSize="7.5">J{num}</text>
+                </g>
+              );
+            })}
+            {/* Row 2: J5..J8 */}
+            {[0, 1, 2, 3].map((col) => {
+              const cx = col * 40 + 15;
+              const cy = 54;
+              const num = col + 5;
+              return (
+                <g key={`jack-${num}`}>
+                  <circle cx={cx} cy={cy} r="8.5" fill="#1e293b" stroke="#64748b" strokeWidth="1.5" />
+                  <circle cx={cx} cy={cy} r="3" fill="#020617" />
+                  <text x={cx - 5} y={cy + 17} fill="#94a3b8" stroke="none" fontSize="7.5">J{num}</text>
+                </g>
+              );
+            })}
+          </g>
+
+          {/* Physical Patch Cable curves from source terminals into destination jacks */}
+          <path d="M 30 48 C 65 48, 105 56, 145 56" stroke="#ef4444" strokeWidth="2.5" fill="none" />
+          <path d="M 30 66 C 70 80, 140 90, 185 88" stroke="#eab308" strokeWidth="2.5" fill="none" />
+          <path d="M 30 84 C 80 95, 170 65, 225 56" stroke="#3b82f6" strokeWidth="2.5" fill="none" />
         </svg>
       );
 

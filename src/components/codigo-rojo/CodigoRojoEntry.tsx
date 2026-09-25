@@ -52,20 +52,35 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
   // Configuration for room creation
   const [difficulty, setDifficulty] = useState<CodigoRojoDifficulty>('NORMAL');
   const [modulesCount, setModulesCount] = useState<number>(3);
-  const [timeMode, setTimeMode] = useState<CodigoRojoTimeMode>('AUTO');
-  const [customMinutes, setCustomMinutes] = useState<number>(5);
+  const [durationSeconds, setDurationSeconds] = useState<number>(270); // Default: 4:30 (270 seconds)
+  const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
+
+  const getRecommendedSeconds = (diff: CodigoRojoDifficulty, count: number): number => {
+    if (diff === 'NORMAL') return count === 2 ? 210 : 270; // 3:30 or 4:30
+    if (diff === 'DIFICIL') return count === 4 ? 360 : 450; // 6:00 or 7:30
+    return count === 5 ? 450 : 480; // 7:30 or 8:00
+  };
 
   const handleDifficultyChange = (d: CodigoRojoDifficulty) => {
     setDifficulty(d);
-    if (d === 'NORMAL') setModulesCount(3);
-    else if (d === 'DIFICIL') setModulesCount(4);
-    else if (d === 'EXTREMO') setModulesCount(5);
+    const newCount = d === 'NORMAL' ? 3 : d === 'DIFICIL' ? 4 : 5;
+    setModulesCount(newCount);
+    if (!isCustomMode) {
+      setDurationSeconds(getRecommendedSeconds(d, newCount));
+    }
   };
 
-  const getEstimatedAutoTime = (diff: CodigoRojoDifficulty, count: number) => {
-    if (diff === 'NORMAL') return count === 2 ? '3:30' : '4:30';
-    if (diff === 'DIFICIL') return count === 5 ? '6:45' : '5:45';
-    return count === 6 ? '7:30' : '6:30';
+  const handleModuleCountChange = (count: number) => {
+    setModulesCount(count);
+    if (!isCustomMode) {
+      setDurationSeconds(getRecommendedSeconds(difficulty, count));
+    }
+  };
+
+  const formatDuration = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   const getAvailableModuleCounts = (diff: CodigoRojoDifficulty): number[] => {
@@ -89,8 +104,9 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
     try {
       onCreateRoom(profile, {
         difficulty,
-        timeMode,
-        customTimeMinutes: customMinutes,
+        timeMode: 'CUSTOM',
+        customTimeMinutes: durationSeconds / 60,
+        durationSeconds,
         modulesCount,
         maxStrikes: 3,
       });
@@ -206,7 +222,7 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
                       <button
                         key={count}
                         type="button"
-                        onClick={() => setModulesCount(count)}
+                        onClick={() => handleModuleCountChange(count)}
                         className={`py-2 px-3 rounded-xl text-xs font-mono font-bold transition-all flex items-center justify-between ${
                           isSelected
                             ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
@@ -233,45 +249,73 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
 
               {/* Time System */}
               <div>
-                <label className="text-xs font-mono text-slate-400 block mb-2 font-bold">
-                  CRONÓMETRO:
-                </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-mono text-slate-400 font-bold">
+                    CRONÓMETRO DE MISIÓN:
+                  </label>
+                  <span className="text-xs font-mono font-black text-red-400 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    {formatDuration(durationSeconds)}
+                  </span>
+                </div>
+
+                {/* Common Presets Grid (3:00, 3:30, 4:00, 4:30, 5:00, 6:00, 7:30) */}
+                <div className="grid grid-cols-4 sm:grid-cols-4 gap-2 mb-2">
+                  {[180, 210, 240, 270, 300, 360, 450].map((secs) => {
+                    const isSelected = !isCustomMode && durationSeconds === secs;
+                    const recSecs = getRecommendedSeconds(difficulty, modulesCount);
+                    const isRecommended = recSecs === secs;
+
+                    return (
+                      <button
+                        key={secs}
+                        type="button"
+                        onClick={() => {
+                          setIsCustomMode(false);
+                          setDurationSeconds(secs);
+                        }}
+                        className={`relative py-2 px-1 rounded-xl text-xs font-mono font-bold transition-all flex flex-col items-center justify-center cursor-pointer ${
+                          isSelected
+                            ? 'bg-red-600 text-white shadow-md shadow-red-600/30 ring-1 ring-white/50'
+                            : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        <span>{formatDuration(secs)}</span>
+                        {isRecommended && (
+                          <span className="text-[8px] font-sans font-black uppercase text-amber-300">
+                            Rec.
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+
+                  {/* Custom Option Button */}
                   <button
                     type="button"
-                    onClick={() => setTimeMode('AUTO')}
-                    className={`py-2 px-2 rounded-xl text-xs font-mono font-bold transition-all ${
-                      timeMode === 'AUTO'
-                        ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
+                    onClick={() => setIsCustomMode(true)}
+                    className={`py-2 px-1 rounded-xl text-xs font-mono font-bold transition-all flex flex-col items-center justify-center cursor-pointer ${
+                      isCustomMode
+                        ? 'bg-red-600 text-white shadow-md shadow-red-600/30 ring-1 ring-white/50'
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
                     }`}
                   >
-                    Automático (~{getEstimatedAutoTime(difficulty, modulesCount)})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTimeMode('CUSTOM')}
-                    className={`py-2 px-2 rounded-xl text-xs font-mono font-bold transition-all ${
-                      timeMode === 'CUSTOM'
-                        ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
-                        : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                  >
-                    Personalizado
+                    <span>Otro</span>
+                    <span className="text-[8px] font-sans uppercase text-slate-400">Manual</span>
                   </button>
                 </div>
 
-                {timeMode === 'CUSTOM' && (
+                {isCustomMode && (
                   <div className="mt-3 flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs">
-                    <span className="text-slate-400">DURACIÓN (MINUTOS):</span>
+                    <span className="text-slate-400">DURACIÓN PERSONALIZADA:</span>
                     <select
-                      value={customMinutes}
-                      onChange={(e) => setCustomMinutes(parseInt(e.target.value, 10))}
+                      value={durationSeconds}
+                      onChange={(e) => setDurationSeconds(parseInt(e.target.value, 10))}
                       className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1 font-mono font-bold text-sm"
                     >
-                      {[3, 4, 5, 6, 7, 8, 10].map((m) => (
-                        <option key={m} value={m}>
-                          {m} minutos
+                      {[120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480, 540, 600].map((s) => (
+                        <option key={s} value={s}>
+                          {formatDuration(s)} ({Math.floor(s / 60)} min {s % 60 ? `${s % 60}s` : ''})
                         </option>
                       ))}
                     </select>
