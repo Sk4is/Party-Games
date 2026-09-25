@@ -56,12 +56,12 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     classificationCode: 'DOC-ELE-01',
     division: 'Electricidad y Circuitos',
     visualIdentification:
-      'Panel rectangular con entre 3 y 6 cables verticales suspendidos entre bornes metálicos. Los cables pueden ser lisos o tener franjas de color. Hay un indicador luminoso LED y una placa de sector (ej. C-14 o SEC-R7).',
+      'Panel rectangular con entre 3 y 6 cables verticales suspendidos entre bornes metálicos. Los cables pueden ser lisos o tener franjas bicolor. Hay un indicador luminoso LED piloto en la parte superior.',
     identificationChecklist: [
       'Entre 3 y 6 cables verticales suspendidos entre bornes superior e inferior.',
       'Cables de colores lisos o con franjas bicolores.',
-      'Diodo LED piloto superior de color Ámbar/Verde/Rojo.',
-      'Chapa metálica de sector de alta tensión.',
+      'Diodo LED piloto superior de color Ámbar/Verde/Rojo/Apagado.',
+      'Corte irreversible al hacer clic sobre cualquier cable con la cizalla.',
     ],
     description:
       'Un banco de filamentos conduce energía de reserva al núcleo. Cortar el filamento erróneo provocará una sobrecarga inmediata (Strike). Los filamentos se cuentan de izquierda a derecha (1 a N).',
@@ -99,44 +99,43 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     moduleType: 'MODULADOR_FRECUENCIA',
     category: 'SEÑAL',
     title: 'Modulador de Frecuencia',
-    subtitle: 'Sintonización Armónica de Canales Portadores',
+    subtitle: 'Calibración Armónica del Osciloscopio',
     classificationCode: 'DOC-WAV-02',
     division: 'Transmisiones y Señales',
     visualIdentification:
-      'Pantalla de osciloscopio verde con forma de onda visible (Senoide, Triangular, Cuadrada o Diente de Sierra), visor digital de frecuencia en kHz, selector de canal (CH-1 a CH-4) y botones [-] [+] con tecla «CALIBRAR».',
+      'Pantalla de osciloscopio verde CRT con forma de onda oscilante (SENOIDAL, CUADRADA, TRIANGULAR o DIENTE_SIERRA), visor digital de frecuencia base en kHz, indicador de canal (CANAL-ALPHA, CANAL-BETA, CANAL-GAMMA, CANAL-DELTA) y mandos [-] [+] con tecla «CALIBRAR».',
     identificationChecklist: [
-      'Pantalla verde de osciloscopio con retícula milimétrica.',
-      'Forma de onda oscilante visible (Senoide, Triangular, Cuadrada, Diente Sierra).',
-      'Visor numérico digital de frecuencia base en kHz.',
-      'Selector de canales CH-1 a CH-4 y pulsador «CALIBRAR».',
+      'Pantalla verde de osciloscopio con retícula de barrido.',
+      'Forma de onda visible: SENOIDAL, CUADRADA, TRIANGULAR o DIENTE_SIERRA.',
+      'Canal LED activo en la esquina superior (CANAL-ALPHA a CANAL-DELTA).',
+      'Visor de frecuencia base en kHz y botones [-] [+] con tecla «CALIBRAR».',
     ],
     description:
-      'El oscilador genera una portadora desfasada. Consulta la tabla de compensación según el canal y la onda para calcular la frecuencia de calibración exacta.',
-    tableHeaders: ['Forma de Onda', 'CH-1', 'CH-2', 'CH-3', 'CH-4'],
+      'El osciloscopio táctico emite una portadora desfasada. El Operador debe comunicar la FORMA DE ONDA y el CANAL LED iluminado. Los Guías deben consultar la tabla armónica y sumar o restar el ajuste indicado a la frecuencia base mostrada.',
+    tableHeaders: ['Forma de Onda', 'CANAL-ALPHA', 'CANAL-BETA', 'CANAL-GAMMA', 'CANAL-DELTA'],
     tableRows: [
-      ['Senoide (~)', '+25 kHz', '-15 kHz', '+40 kHz', '+10 kHz'],
-      ['Triangular (/\\)', '+10 kHz', '+30 kHz', '-20 kHz', '+35 kHz'],
-      ['Cuadrada (П)', '-30 kHz', '+20 kHz', '+15 kHz', '-10 kHz'],
-      ['Diente Sierra (/|)', '+45 kHz', '-25 kHz', '+10 kHz', '+50 kHz'],
+      ['Senoidal (onda suave)', '+15 kHz', '+25 kHz', '-10 kHz', '-20 kHz'],
+      ['Cuadrada (bloques rectos)', '-15 kHz', '+20 kHz', '+30 kHz', '+10 kHz'],
+      ['Triangular (picos agudos)', '+30 kHz', '-20 kHz', '+15 kHz', '-15 kHz'],
+      ['Diente de Sierra (rampa)', '-25 kHz', '-15 kHz', '+20 kHz', '+25 kHz'],
     ],
     rules: [
       {
-        condition: '1. Identifica el canal y la forma de onda que ve el Operador.',
-        action: 'Cruza fila y columna en la tabla superior para obtener el desfase base en kHz.',
+        condition: '1. Identificación de Onda y Canal:',
+        action: 'Cruza la forma de onda del osciloscopio con la columna del canal activo en la tabla armónica superior.',
       },
       {
-        condition: '2. Corrección por número de serie:',
-        action:
-          'Si el número de serie de la máquina termina en cifra PAR, suma +5 kHz al desfase. Si termina en IMPAR, resta -5 kHz.',
+        condition: '2. Cálculo de la Frecuencia Objetivo:',
+        action: 'Frecuencia Objetivo = Frecuencia Base indicada en pantalla + Desfase armónico en kHz.',
       },
       {
-        condition: '3. Frecuencia final de sintonización:',
-        action:
-          'Frecuencia Objetivo = Frecuencia Base indicada en pantalla + Desfase corregido. El Operador ajusta los mandos y pulsa «CALIBRAR».',
+        condition: '3. Calibración en consola:',
+        action: 'El Operador utiliza los mandos [-] [+] para ajustar la frecuencia en pantalla al valor exacto y pulsa «CALIBRAR».',
       },
     ],
     notes: [
-      'Pulsar «CALIBRAR» con una frecuencia desviada provocará una ruptura por resonancia (Strike).',
+      'La frecuencia final calculada siempre terminará en un múltiplo de 5.',
+      'Pulsar «CALIBRAR» con una frecuencia incorrecta provocará un fallo de resonancia (Strike).',
     ],
   },
 
@@ -185,38 +184,42 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
   {
     moduleType: 'MATRIZ_ENERGIA',
     category: 'CONTROL',
-    title: 'Matriz de Energía',
-    subtitle: 'Conmutación de Relés de Alta Capacidad',
+    title: 'Matriz de Celdas de Energía',
+    subtitle: 'Disipación de Carga Residual en Matriz 3x3',
     classificationCode: 'DOC-PWR-04',
     division: 'Electricidad y Circuitos',
     visualIdentification:
-      'Cuadrícula metálica de 3x3 interruptores basculantes (posiciones ON/OFF) con LEDs indicadores de estado y etiqueta de banco alfa-numérica (ej. BANCO-ALPHA o BANCO-GAMMA).',
+      'Retícula cuadrada 3x3 de nueve celdas magnéticas identificadas de A1 a C3. En la parte superior se indica el ESTADO DEL NÚCLEO (ESTABLE, CRÍTICO, PURGA_REQUERIDA o SOBRECALENTAMIENTO). En la base se ubica el pulsador «DESCARGAR MATRIZ».',
     identificationChecklist: [
-      'Cuadrícula cuadrada 3x3 con 9 pulsadores o interruptores.',
-      'Indicador de estado del núcleo (Estable / Crítico).',
-      'Botón grande de ejecución «DESCARGAR» en esquina inferior.',
-      'Conmutación independiente de celdas A1..C3.',
+      'Cuadrícula 3x3 con 9 celdas magnéticas conmutables (A1..C3).',
+      'Indicador de diagnóstico del núcleo: ESTABLE, CRÍTICO, PURGA_REQUERIDA o SOBRECALENTAMIENTO.',
+      'Botón inferior de descarga «DESCARGAR MATRIZ».',
     ],
     description:
-      'La matriz regula el flujo de carga a las celdas principales. Para estabilizar el banco de potencia, se deben encender únicamente los interruptores requeridos por la máscara lógica.',
+      'La matriz regula el flujo de carga a las celdas principales. Para estabilizar el banco de potencia sin cortocircuitar el reactor, las celdas activas finales deben coincidir exactamente con el patrón de seguridad correspondiente al estado del núcleo.',
     rules: [
       {
-        condition: 'Regla 1: Banco ALPHA o BETA',
-        action:
-          'El objetivo es encender todos los interruptores que formen una cruz (+) centrada en la celda (2,2) más las esquinas activas indicadas por el banco.',
+        condition: 'Si el núcleo indica «ESTABLE»:',
+        action: 'Activa únicamente la diagonal principal: A1, B2 y C3. Apaga todas las demás celdas.',
       },
       {
-        condition: 'Regla 2: Banco GAMMA o DELTA',
-        action:
-          'Si la última cifra de la serie es impar, invierte el estado de las celdas periféricas (1,1), (1,3), (3,1), (3,3).',
+        condition: 'Si el núcleo indica «CRÍTICO»:',
+        action: 'Forma la cruz de emergencia activando: B2 (centro), A2, C2, B1 y B3. Apaga las cuatro esquinas.',
       },
       {
-        condition: 'Regla 3: Verificación de Carga',
-        action:
-          'Una vez configurada la combinación exacta, el Operador pulsa «ENCLAVAR MATRIZ».',
+        condition: 'Si el núcleo indica «PURGA_REQUERIDA»:',
+        action: 'Activa únicamente las cuatro esquinas: A1, A3, C1 y C3. Apaga todas las celdas centrales y de cruz.',
+      },
+      {
+        condition: 'Si el núcleo indica «SOBRECALENTAMIENTO»:',
+        action: 'Activa el rombo perimétrico: A2, B1, B3 y C2. Apaga el centro (B2) y las cuatro esquinas.',
       },
     ],
-    notes: ['Enclavar una combinación inestable causará un arco voltaico y un Strike.'],
+    notes: [
+      'El Operador puede hacer clic sobre cualquier celda para encenderla o apagarla libremente.',
+      'Una vez configurado el patrón deseado, debe presionar el botón «DESCARGAR MATRIZ».',
+      'Pulsar «DESCARGAR MATRIZ» con un patrón incorrecto producirá una sobretensión y 1 Strike.',
+    ],
   },
 
   // 5. VÁLVULAS DE PRESIÓN
@@ -228,30 +231,37 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     classificationCode: 'DOC-FLU-05',
     division: 'Fluidos y Termodinámica',
     visualIdentification:
-      'Manómetro analógico central con aguja indicadora de PSI/Bar, tres válvulas rotativas etiquetadas V-1, V-2, V-3, y palanca de descarga «PURGA MAESTRA».',
+      'Un gran manómetro central indica la PRESIÓN DEL SISTEMA en PSI. Debajo se encuentran tres válvulas rotativas rotuladas como VÁLVULA A, VÁLVULA B y VÁLVULA C, ajustables exclusivamente a 0°, 45° o 90°. En la base se ubica el mando de purga «PURGAR PRESIÓN».',
     identificationChecklist: [
-      'Tres manómetros circulares analógicos con agujas de presión (A, B, C).',
-      'Tres ruedas de válvula giratorias situadas debajo de cada reloj.',
-      'Indicador LED de modo de presión (Verde, Ámbar, Rojo).',
-      'Pulsador de purga neumática general.',
+      'Un único manómetro central indicador de la PRESIÓN DEL SISTEMA en PSI.',
+      'Tres ruedas de válvula giratorias: VÁLVULA A, VÁLVULA B y VÁLVULA C.',
+      'Tres únicas posiciones angulares por válvula: 0° (horizontal), 45° (diagonal) y 90° (vertical).',
+      'Pulsador de descarga «PURGAR PRESIÓN».',
     ],
     description:
-      'Las líneas hidráulicas están bajo sobrepresión crítica. El Operador debe ajustar las aperturas de las tres válvulas al valor combinado que equilibre la aguja en el punto óptimo.',
+      'Las líneas hidráulicas del núcleo están bajo presión. El Operador debe comunicar la PRESIÓN DEL SISTEMA en PSI leída en el manómetro central. Los Guías determinan la zona de presión y dictan los ángulos exactos (0°, 45° o 90°) a los que deben orientarse la VÁLVULA A, la VÁLVULA B y la VÁLVULA C antes de accionar la purga.',
     rules: [
       {
-        condition: 'Presión en zona ROJA (> 80 PSI):',
-        action: 'Abre V-1 al 100%, V-2 al 50% y mantén V-3 cerrada (0%). Luego acciona «PURGA».',
+        condition: 'CASO 1: PRESIÓN DEL SISTEMA > 80 PSI (ZONA ROJA)',
+        action:
+          '• Si la última cifra del número de serie de la máquina es PAR:\n  Coloca VÁLVULA A a 90°, VÁLVULA B a 45° y VÁLVULA C a 0°.\n• Si la última cifra es IMPAR:\n  Coloca VÁLVULA A a 90°, VÁLVULA B a 0° y VÁLVULA C a 45°.\nDespués acciona «PURGAR PRESIÓN».',
       },
       {
-        condition: 'Presión en zona ÁMBAR (40 - 80 PSI):',
-        action: 'Abre V-2 al 75%, V-3 al 25% y V-1 cerrada. Luego acciona «PURGA».',
+        condition: 'CASO 2: PRESIÓN DEL SISTEMA DE 40 A 80 PSI (ZONA ÁMBAR)',
+        action:
+          '• Si la última cifra del número de serie es PAR:\n  Coloca VÁLVULA A a 45°, VÁLVULA B a 90° y VÁLVULA C a 45°.\n• Si la última cifra es IMPAR:\n  Coloca VÁLVULA A a 0°, VÁLVULA B a 45° y VÁLVULA C a 90°.\nDespués acciona «PURGAR PRESIÓN».',
       },
       {
-        condition: 'Presión en zona VERDE / BAJA (< 40 PSI):',
-        action: 'Ajusta V-1 al 30%, V-2 al 30% y V-3 al 30%. Luego acciona «PURGA».',
+        condition: 'CASO 3: PRESIÓN DEL SISTEMA < 40 PSI (ZONA VERDE)',
+        action:
+          '• Si la última cifra del número de serie es PAR:\n  Coloca VÁLVULA A a 0°, VÁLVULA B a 0° y VÁLVULA C a 90°.\n• Si la última cifra es IMPAR:\n  Coloca VÁLVULA A a 45°, VÁLVULA B a 0° y VÁLVULA C a 45°.\nDespués acciona «PURGAR PRESIÓN».',
       },
     ],
-    notes: ['Purgar con la configuración incorrecta reventará los sellos de seguridad (Strike).'],
+    notes: [
+      'Las únicas posiciones válidas para cada válvula son 0°, 45° y 90°.',
+      'El Operador puede girar las válvulas libremente sin penalización.',
+      'La evaluación se realiza únicamente al pulsar «PURGAR PRESIÓN». Un intento incorrecto sumará como máximo 1 Strike.',
+    ],
   },
 
   // 6. RELÉS HEXADECIMALES
@@ -259,127 +269,181 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     moduleType: 'RELES_HEXADECIMALES',
     category: 'ELECTRICIDAD',
     title: 'Relés Hexadecimales',
-    subtitle: 'Decodificación de Registros en Base 16',
+    subtitle: 'Decodificación Lógica de Registro Base 16',
     classificationCode: 'DOC-LOG-06',
     division: 'Lógica Digital y Cómputo',
     visualIdentification:
-      'Pantalla alfanumérica mostrando un registro HEX de 2 caracteres (ej. 0x3F, 0xA8, 0xC4), banco de 4 interruptores biestables (Bits 0 a 3) y botón «ENVIAR REGISTRO».',
+      'El panel contiene UNA única pantalla central con un Registro Hexadecimal (ej. 0x3A, 0x7F, 0xC4) y debajo un banco de CUATRO interruptores de relé biestables etiquetados R1, R2, R3 y R4. Cada relé puede conmutarse a ARRIBA (1) o ABAJO (0). En la parte inferior se encuentra el pulsador «ENCLAVAR RELÉS».',
     identificationChecklist: [
-      'Banco de 4 módulos de relé verticales (R1, R2, R3, R4).',
-      'Pantallas de lectura hexadecimal de 2 dígitos (ej. 0x4, 0xA, 0xF).',
-      'Interruptores basculantes de posición ARRIBA (1) / ABAJO (0).',
-      'Indicador superior de bus lógico.',
+      'UNA sola pantalla digital con un registro hexadecimal (0x00 a 0xFF).',
+      'CUATRO interruptores de palanca verticales: R1, R2, R3, R4.',
+      'Dos posiciones por interruptor: ARRIBA (1) y ABAJO (0).',
+      'Pulsador de confirmación «ENCLAVAR RELÉS».',
     ],
     description:
-      'El microcontrolador auxiliar se encuentra bloqueado en un registro hexadecimal. Se debe calcular la máscara binaria aplicando la tabla de paridad de sector.',
+      'El bus de datos está bloqueado en un registro hexadecimal. Los Guías deben aplicar la regla correspondiente según el primer carácter del registro y la serie de la máquina para obtener un valor final de 4 bits. Dichos 4 bits determinan la posición de los cuatro relés (R1 a R4).',
+    tableHeaders: ['HEX', 'Binario (R1-R2-R3-R4)', 'HEX', 'Binario (R1-R2-R3-R4)'],
+    tableRows: [
+      ['0', '0000 (Abajo-Abajo-Abajo-Abajo)', '8', '1000 (Arriba-Abajo-Abajo-Abajo)'],
+      ['1', '0001 (Abajo-Abajo-Abajo-Arriba)', '9', '1001 (Arriba-Abajo-Abajo-Arriba)'],
+      ['2', '0010 (Abajo-Abajo-Arriba-Abajo)', 'A', '1010 (Arriba-Abajo-Arriba-Abajo)'],
+      ['3', '0011 (Abajo-Abajo-Arriba-Arriba)', 'B', '1011 (Arriba-Abajo-Arriba-Arriba)'],
+      ['4', '0100 (Abajo-Arriba-Abajo-Abajo)', 'C', '1100 (Arriba-Arriba-Abajo-Abajo)'],
+      ['5', '0101 (Abajo-Arriba-Abajo-Arriba)', 'D', '1101 (Arriba-Arriba-Abajo-Arriba)'],
+      ['6', '0110 (Abajo-Arriba-Arriba-Abajo)', 'E', '1110 (Arriba-Arriba-Arriba-Abajo)'],
+      ['7', '0111 (Abajo-Arriba-Arriba-Arriba)', 'F', '1111 (Arriba-Arriba-Arriba-Arriba)'],
+    ],
     rules: [
       {
-        condition: 'Si el primer carácter es número (0-9):',
-        action: 'Aplica operación AND con la máscara fija 0x0F.',
+        condition: 'CASO 1: EL PRIMER CARÁCTER TRAS «0x» ES UN NÚMERO (0 al 9):',
+        action:
+          '• Si la última cifra del número de serie de la máquina es PAR:\n  Aplica operación AND con 0x0F (toma directamente el segundo dígito hexadecimal).\n• Si la última cifra del número de serie es IMPAR:\n  Aplica operación XOR entre el segundo dígito hexadecimal y la última cifra de la serie (módulo 16).',
       },
       {
-        condition: 'Si el primer carácter es letra (A-F):',
-        action: 'Aplica operación XOR con el último dígito del número de serie de la máquina.',
+        condition: 'CASO 2: EL PRIMER CARÁCTER TRAS «0x» ES UNA LETRA (A a la F):',
+        action:
+          '• Si la última cifra del número de serie es PAR:\n  Aplica operación XOR entre el primer dígito hexadecimal y el segundo dígito hexadecimal.\n• Si la última cifra del número de serie es IMPAR:\n  Invierte los 4 bits del segundo dígito hexadecimal (resta el valor del segundo dígito a 15: ej. 15 - F = 0, 15 - A = 5).',
       },
       {
-        condition: 'Configuración de bits:',
-        action: 'Ajusta los 4 interruptores al valor binario resultante (1 = ARRIBA, 0 = ABAJO).',
+        condition: 'CONFIGURACIÓN DE LOS 4 RELÉS (1 = ARRIBA, 0 = ABAJO):',
+        action:
+          'Localiza el valor hexadecimal obtenido (0 a F) en la tabla de referencia superior:\n• R1 = Primer bit (Bit más significativo)\n• R2 = Segundo bit\n• R3 = Tercer bit\n• R4 = Cuarto bit (Bit menos significativo)\nColoca cada interruptor en su posición y pulsa «ENCLAVAR RELÉS».',
       },
     ],
-    notes: ['Un registro mal validado provocará un reinicio forzado del bus de datos (Strike).'],
+    notes: [
+      'Ejemplo: Registro 0x3A con número de serie terminado en 4 (PAR). El primer carácter «3» es numérico y la serie es par → resultado = A (segundo dígito). Según la tabla, A = 1010 → R1 = ARRIBA, R2 = ABAJO, R3 = ARRIBA, R4 = ABAJO.',
+      'El Operador puede conmutar los relés libremente sin penalización. La validación ocurre solo al pulsar «ENCLAVAR RELÉS». Un envío erróneo sumará como máximo 1 Strike.',
+    ],
   },
 
   // 7. RADAR VECTORIAL
   {
     moduleType: 'RADAR_VECTORIAL',
     category: 'NAVEGACIÓN',
-    title: 'Radar Vectorial',
-    subtitle: 'Triangulación de Coordenadas de Interferencia',
+    title: 'Radar de Coordenadas Tácticas',
+    subtitle: 'Identificación de Baliza de Intercepción',
     classificationCode: 'DOC-NAV-07',
     division: 'Navegación y Radares',
     visualIdentification:
-      'Pantalla de radar circular verde con barrido continuo en 360°, ecos o contactos marcados con coordenadas polares, selector de cuadrante (Q1-Q4) y mando «ENGANCHE».',
+      'Una pantalla CRT táctica circular muestra un haz de barrido giratorio y cuatro contactos de radar: TANGO (Noroeste), SIERRA (Noreste), BRAVO (Sureste) y ECHO (Suroeste). Los 3 anillos concéntricos marcan la distancia (1 = interior, 3 = exterior).',
     identificationChecklist: [
-      'Pantalla circular verde de radar con retícula polar de barrido.',
-      '3 anillos concéntricos marcados (1, 2, 3).',
-      'Haz de barrido giratorio con eco de contacto (blip rojo).',
-      'Selector de cuadrantes (NO, NE, SO, SE) y botón «ENGANCHE».',
+      'Pantalla circular de radar con haz giratorio HORARIO o ANTIHORARIO.',
+      'Cuatro contactos tácticos rotulados: TANGO, SIERRA, BRAVO y ECHO.',
+      'Tres anillos concéntricos numerados del 1 (interior) al 3 (exterior).',
+      'Pulsador de fijación «BLOQUEAR VECTOR».',
     ],
     description:
-      'Un eco espurio interfiere las señales de navegación. El Operador debe seleccionar el cuadrante correcto y el ángulo azimutal del contacto verificado.',
+      'Un contacto espurio interfiere el sistema de navegación. El Operador comunica el sentido de giro del haz (HORARIO o ANTIHORARIO) y la posición en anillos de cada contacto. Los Guías determinan cuál es el objetivo auténtico y el Operador pulsa sobre él antes de bloquear el vector.',
     rules: [
       {
-        condition: 'Eco detectado en Cuadrante Norte (0° - 90°):',
-        action: 'Si el barrido es horario, fija ángulo en 45°. Si es antihorario, fija en 60°.',
+        condition: 'Si el haz gira en sentido HORARIO:',
+        action: 'El objetivo auténtico es el contacto en el anillo MÁS EXTERIOR (mayor número). En caso de empate, prioriza el orden horario tras el Norte: SIERRA > BRAVO > ECHO > TANGO.',
       },
       {
-        condition: 'Eco detectado en otros cuadrantes:',
-        action: 'Aplica la regla de desvío polar indicada en la subsección de navegación.',
+        condition: 'Si el haz gira en sentido ANTIHORARIO:',
+        action: 'El objetivo auténtico es el contacto en el anillo MÁS INTERIOR (menor número). En caso de empate, prioriza los contactos del hemisferio Sur: BRAVO > ECHO > TANGO > SIERRA.',
       },
     ],
-    notes: ['Disparar el enganche fuera de rumbo causará una pérdida de señal (Strike).'],
+    notes: [
+      'El Operador debe pulsar sobre la baliza correcta en la pantalla y confirmar con «BLOQUEAR VECTOR».',
+      'Bloquear un señuelo falso activará la contramedida defensiva (Strike).',
+    ],
   },
 
   // 8. SEÑAL ÓPTICA
   {
     moduleType: 'SEÑAL_OPTICA',
     category: 'COMUNICACIONES',
-    title: 'Señal Óptica Pulsante',
-    subtitle: 'Intercepción y Traducción de Destellos Luminosos',
+    title: 'Transmisor Óptico',
+    subtitle: 'Decodificación de Pulsos de Baliza',
     classificationCode: 'DOC-OPT-08',
     division: 'Transmisiones y Señales',
     visualIdentification:
-      'Lámpara estroboscópica ámbar que parpadea a intervalos rítmicos (cortos y largos), selector de código de 3 caracteres y pulsador «TRANSMITIR ACUSE».',
+      'Lámpara estroboscópica ámbar central grande que parpadea emitiendo un patrón rítmico repetitivo de 3 destellos (Cortos o Largos), sintonizador selector de frecuencia y pulsador «TRANSMITIR».',
     identificationChecklist: [
-      'Foco o cúpula estroboscópica ámbar central grande.',
-      'Emisión rítmica periódica de pulsos de luz cortos y largos.',
-      'Barra medidora de frecuencia luminosa.',
-      'Botón de sintonización y transmisión de respuesta.',
+      'Foco o cúpula estroboscópica ámbar central.',
+      'Emisión rítmica periódica de 3 pulsos (Cortos ~0.3s y Largos ~1.0s con pausa de 2s).',
+      'Selector de frecuencia en MHz con menú desplegable o selector de dial.',
+      'Botón de confirmación «TRANSMITIR».',
     ],
     description:
-      'Una baliza óptica emite un mensaje codificado en pulsos de luz. El Operador debe contar la duración de los destellos y la pausa larga para descifrar la clave.',
+      'Una baliza óptica emite un mensaje codificado en 3 pulsos lumínicos. El Operador describe la secuencia de destellos a los Guías para que identifiquen la frecuencia de radio correcta en la tabla y la sintonice.',
+    tableHeaders: ['Estación', 'Frecuencia', 'Patrón de Destellos'],
+    tableRows: [
+      ['CENTINELA', '88.4 MHz', 'Corto - Largo - Corto ( • ▬ • )'],
+      ['VANGUARDIA', '92.1 MHz', 'Largo - Largo - Corto ( ▬ ▬ • )'],
+      ['FARO NORTE', '96.5 MHz', 'Corto - Corto - Largo ( • • ▬ )'],
+      ['OMEGA', '101.8 MHz', 'Largo - Corto - Largo ( ▬ • ▬ )'],
+      ['CONDOR', '104.2 MHz', 'Corto - Largo - Largo ( • ▬ ▬ )'],
+      ['METEORO', '107.9 MHz', 'Largo - Corto - Corto ( ▬ • • )'],
+    ],
     rules: [
       {
-        condition: 'Secuencia de destellos:',
-        action: 'Pulsos cortos = Punto (•), Pulsos largos = Raya (—). Identifica la letra o dígito emitido.',
+        condition: '1. El Operador cuenta la duración de los 3 pulsos luminosos sucesivos.',
+        action: 'Un pulso CORTO dura ~0.3s. Un pulso LARGO dura ~1.0s. Hay una pausa larga entre ciclos.',
       },
       {
-        condition: 'Respuesta requerida:',
-        action: 'El manual traduce la letra recibida a la clave de respuesta correspondiente.',
+        condition: '2. Los Guías localizan la estación en la tabla y dictan su frecuencia exacta.',
+        action: 'El Operador selecciona la frecuencia en el sintonizador y presiona «TRANSMITIR».',
       },
     ],
-    notes: ['Transmitir una confirmación errónea alertará a la contramedida (Strike).'],
+    notes: [
+      'El botón «REPETIR CICLO» permite al Operador reiniciar la visualización lumínica.',
+      'Sintonizar una frecuencia errónea delatará la posición a la red hostil (Strike).',
+    ],
   },
 
   // 9. TECLADO MAESTRO
   {
     moduleType: 'TECLADO_MAESTRO',
     category: 'COMUNICACIONES',
-    title: 'Teclado Maestro',
-    subtitle: 'Comprobación de Códigos de Autorización',
+    title: 'Teclado de Autenticación Maestro',
+    subtitle: 'Descifrado de Contraseña de Desbloqueo',
     classificationCode: 'DOC-KEY-09',
     division: 'Criptografía y Protocolos',
     visualIdentification:
-      'Teclado numérico 0-9 con visor de display de 4 dígitos, tecla «BORRAR» y tecla «INTRO».',
+      'Teclado numérico 0-9 con visor de display de 4 dígitos, pantalla con el número de serie de la máquina (ej: «SEC-527-X4»), LED de Alimentación Auxiliar (ENCENDIDO / APAGADO), tecla de borrado [C] y tecla «ENTER».',
     identificationChecklist: [
       'Teclado matricial numérico clásico 3x4 (dígitos 0 al 9).',
       'Pantalla LCD digital superior que muestra 4 dígitos de PIN.',
-      'Display que indica el serial de autorización de la máquina.',
-      'Teclas de corrección [C] e introducción [ENT].',
+      'Visor con el número de serie de la máquina (ej: «SEC-527-X4»).',
+      'Indicador LED de Alimentación Auxiliar.',
     ],
     description:
-      'El panel solicita un PIN de acceso de 4 cifras. El código no es fijo: se calcula sumando coeficientes según la hora de inicio de la misión y el sector de la máquina.',
+      'Un teclado numérico protegido requiere un código PIN de 4 cifras. El código se deriva aplicando el protocolo criptográfico sobre las cifras numéricas del número de serie de la máquina y el estado del LED auxiliar.',
     rules: [
       {
-        condition: 'Cálculo del PIN:',
-        action: 'Suma las cifras pares de la serie de la máquina y multiplica por el dígito de sector.',
+        condition: 'LECTURA DEL NÚMERO DE SERIE:',
+        action:
+          'Para este protocolo, ignora las letras y símbolos del número de serie de la máquina. Utiliza únicamente sus cifras numéricas, leídas de izquierda a derecha (Ejemplo de lectura: SEC-527-X4 → 5 · 2 · 7 · 4). La primera cifra numérica es D1, la segunda D2, la tercera D3 y la cuarta D4.',
       },
       {
-        condition: 'Introducción del código:',
-        action: 'El Operador teclea los 4 números y pulsa «INTRO».',
+        condition: '1.ª cifra numérica del PIN (D1):',
+        action:
+          'Toma la 1.ª cifra numérica del serial (D1). Súmale 3 si el LED auxiliar está ENCENDIDO, o súmale 1 si está APAGADO. Si el resultado es mayor que 9, quédate con la última cifra (o mod 10).',
+      },
+      {
+        condition: '2.ª cifra numérica del PIN (D2):',
+        action:
+          'Toma la 2.ª cifra numérica del serial (D2) y súmale 5. Si el resultado es mayor que 9, quédate con la última cifra (o mod 10).',
+      },
+      {
+        condition: '3.ª cifra numérica del PIN (D3):',
+        action:
+          'Toma la 3.ª cifra numérica del serial (D3) y réstale 2. Si el resultado da negativo, toma su valor positivo absoluto (|D3 - 2|).',
+      },
+      {
+        condition: '4.ª cifra numérica del PIN (D4):',
+        action:
+          'Toma la 4.ª cifra numérica del serial (D4) y multiplícala por 2. Si el resultado es mayor que 9, quédate con la última cifra (o mod 10).',
       },
     ],
-    notes: ['Tres intentos erróneos bloquearán permanentemente el panel.'],
+    notes: [
+      'REGLA DE EXTRACCIÓN: Ignora letras y guiones. En un serial como SEC-527-X4, las 4 cifras son D1=5, D2=2, D3=7 y D4=4 (el 4 final cuenta).',
+      'Ejemplo con SEC-527-X4 y LED ENCENDIDO: D1=(5+3=8), D2=(2+5=7), D3=(|7-2|=5), D4=(4×2=8) → PIN = 8758.',
+      'El Operador introduce las 4 cifras del PIN calculado y pulsa «ENTER».',
+      'Introducir un PIN erróneo sumará 1 Strike y reiniciará la entrada.',
+    ],
   },
 
   // 10. PALANCA DE SOBRECARGA
@@ -387,27 +451,36 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     moduleType: 'PALANCA_SOBRECARGA',
     category: 'CONTROL',
     title: 'Palanca de Sobrecarga',
-    subtitle: 'Descarga de Energía Inductiva Acumulada',
+    subtitle: 'Descarga Magnética Sincronizada con el Cronómetro',
     classificationCode: 'DOC-NRG-10',
     division: 'Electricidad y Circuitos',
     visualIdentification:
-      'Palanca industrial pesada con guarda de seguridad a rayas amarillas y negras, barra de carga que se llena progresivamente y luz de advertencia parpadeante.',
+      'Palanca industrial pesada con guarda de seguridad a rayas amarillas y negras, barra luminiscente en su base (AZUL, AMARILLA o ROJA) y cronómetro de la misión visible en el visor superior.',
     identificationChecklist: [
-      'Palanca industrial pesada alojada en ranura vertical.',
-      'Guarda de seguridad con franjas diagonales amarillas y negras.',
-      'Barra luminosa indicadora de carga (Rojo, Ámbar o Azul).',
-      'Requiere soltarse en un segundo específico del temporizador.',
+      'Palanca industrial alojada en ranura vertical.',
+      'Franja luminiscente de carga en la base: AZUL, AMARILLA o ROJA.',
+      'Sincronización requerida con el último dígito del segundero de la misión.',
     ],
     description:
-      'El acumulador acumula carga parásita. Se debe tirar de la palanca y mantenerla accionada hasta el momento preciso especificado por el cronómetro.',
+      'Una palanca industrial acumula energía estática parásita. La descarga solo es segura cuando el último dígito del segundero de la misión coincide con el ciclo armónico de la franja luminosa.',
     rules: [
       {
-        condition: 'Momento de liberación de la palanca:',
-        action:
-          'El Operador debe tirar de la palanca y SOLTARLA cuando el segundero del reloj de la sala termine en una cifra específica (ej. 5 o 0).',
+        condition: 'Si la franja es AZUL:',
+        action: 'Baja la palanca cuando el ÚLTIMO DÍGITO del segundero de la misión sea exactamente 3 o 7 (ej: 03:43, 02:17).',
+      },
+      {
+        condition: 'Si la franja es AMARILLA:',
+        action: 'Baja la palanca cuando el ÚLTIMO DÍGITO del segundero de la misión sea PAR (0, 2, 4, 6 u 8).',
+      },
+      {
+        condition: 'Si la franja es ROJA:',
+        action: 'Baja la palanca cuando el ÚLTIMO DÍGITO del segundero de la misión sea exactamente 5 o 9 (ej: 04:15, 01:09).',
       },
     ],
-    notes: ['Soltar la palanca en el segundo incorrecto provocará una descarga destructiva (Strike).'],
+    notes: [
+      '¡Atención al segundero global de la misión visible en la parte superior del panel!',
+      'Accionar la palanca en cualquier otro segundo producirá una descarga violenta y 1 Strike.',
+    ],
   },
 
   // 11. COMPUERTAS LÓGICAS
@@ -415,30 +488,45 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     moduleType: 'COMPUERTAS_LOGICAS',
     category: 'SISTEMAS',
     title: 'Compuertas Lógicas',
-    subtitle: 'Resolución de Circuitos Booleanos',
+    subtitle: 'Ruteo de Shunts de Silicio',
     classificationCode: 'DOC-LOG-11',
     division: 'Lógica Digital y Cómputo',
     visualIdentification:
-      'Diagrama esquemático con símbolos de compuertas lógicas (AND, OR, XOR, NAND, NOR) con entradas fijas y dos interruptores manuales para resolver la salida Q = 1.',
+      'Un circuito integrado procesa dos entradas lógicas fijas (A y B) con valores 0 o 1. El chip lleva impresa la denominación de la compuerta (AND, OR, XOR o NAND). Debajo se encuentran tres interruptores de patillaje [Pin 1], [Pin 2], [Pin 3] y botón «ENERGIZAR».',
     identificationChecklist: [
-      'Diagrama de circuito integrado con símbolo lógico (AND, OR, XOR).',
-      'Dos pines de entrada conmutables [PIN A] y [PIN B].',
-      'Salida lógica terminal [Q] con indicador LED.',
-      'Denominación de chip integrado (ej. CHIP-AND, CHIP-XOR).',
+      'Chip integrado con tipo de compuerta grabado (AND, OR, XOR o NAND).',
+      'Valores de entrada binarios A (0 o 1) y B (0 o 1).',
+      'Tres interruptores de salida: Pin 1, Pin 2 y Pin 3.',
+      'Pulsador de confirmación «ENERGIZAR».',
     ],
     description:
-      'Un circuito combinacional requiere fijar las entradas para que la salida final Q alcance el nivel lógico alto (1).',
+      'Un circuito combinacional requiere configurar los pines de derivación según el resultado binario de la compuerta para permitir el paso seguro de la corriente.',
     rules: [
       {
-        condition: 'AND: Salida 1 solo si todas las entradas son 1.',
-        action: 'OR: Salida 1 si al menos una entrada es 1. XOR: Salida 1 si las entradas son distintas.',
+        condition: 'Compuerta AND:',
+        action: 'Salida = 1 solo si A=1 y B=1. En cualquier otro caso, Salida = 0.',
       },
       {
-        condition: 'NAND / NOR: Invierten el resultado de AND y OR respectivamente.',
-        action: 'El Guía deduce el estado de los interruptores A y B para que la salida final sea 1.',
+        condition: 'Compuerta OR:',
+        action: 'Salida = 1 si A=1 o B=1 (o ambos). Si A=0 y B=0, Salida = 0.',
+      },
+      {
+        condition: 'Compuerta XOR:',
+        action: 'Salida = 1 si A y B son DISTINTOS (uno es 0 y el otro 1). Si son iguales, Salida = 0.',
+      },
+      {
+        condition: 'Compuerta NAND:',
+        action: 'Salida = 0 solo si A=1 y B=1. En cualquier otro caso, Salida = 1.',
+      },
+      {
+        condition: 'Ruteo final de Pines:',
+        action: '• Si el resultado de la compuerta es 1: ACTIVA los Pines 1 y 3 (deja Pin 2 apagado).\n• Si el resultado es 0: ACTIVA únicamente el Pin 2 (deja Pines 1 y 3 apagados).',
       },
     ],
-    notes: ['Una combinación que arroje Q = 0 activará el disyuntor de seguridad (Strike).'],
+    notes: [
+      'El Operador configura los interruptores de los Pines 1, 2 y 3 y presiona «ENERGIZAR».',
+      'Una combinación incorrecta activará el disyuntor de seguridad (Strike).',
+    ],
   },
 
   // 12. REFRIGERANTE QUÍMICO
@@ -446,131 +534,156 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     moduleType: 'REFRIGERANTE_QUIMICO',
     category: 'ENERGÍA',
     title: 'Refrigerante Químico',
-    subtitle: 'Mezcla y Neutralización de Compuestos Criogénicos',
+    subtitle: 'Neutralización de Reactivos Térmicos',
     classificationCode: 'DOC-CHM-12',
     division: 'Fluidos y Termodinámica',
     visualIdentification:
-      'Tres matraces cilíndricos transparentes con fluidos de colores (Reactivo A Azul, Reactivo B Rojo, Reactivo C Verde), perillas dosificadoras y botón «INYECTAR MEZCLA».',
+      'Tres matraces dosifican agentes de enfriamiento: Criolita (Azul), Xenón (Verde) y Pirógeno (Rojo), regulables de nivel 0 a 5 mediante deslizadores. Una tira reactiva de pH en el centro muestra un color (PÚRPURA, CIAN, NARANJA o LIMA). En la base se ubica el botón «INYECTAR MEZCLA».',
     identificationChecklist: [
-      'Tres cilindros de vidrio verticales con líquido refrigerante.',
-      'Fluidos de colores diferenciados (Azul, Verde, Rojo).',
-      'Marcas de graduación de nivel de llenado en los tubos.',
-      'Pulsadores dosificadores y botón de inyección.',
+      'Tres matraces cilíndricos con fluidos Criolita (Azul), Xenón (Verde) y Pirógeno (Rojo).',
+      'Deslizadores verticales con niveles discretos del 0 al 5.',
+      'Tira reactiva central de color: PÚRPURA, CIAN, NARANJA o LIMA.',
+      'Pulsador de inyección «INYECTAR MEZCLA».',
     ],
     description:
-      'Para neutralizar el sobrecalentamiento del núcleo criogénico, se deben combinar las proporciones exactas de los reactivos según el pH y la temperatura reportada.',
+      'Para neutralizar el sobrecalentamiento criogénico, se deben dosificar las proporciones exactas de los 3 agentes según el color de la tira reactiva.',
+    tableHeaders: ['Tira Reactiva', 'Criolita (Azul)', 'Xenón (Verde)', 'Pirógeno (Rojo)'],
+    tableRows: [
+      ['PÚRPURA', 'Nivel 4', 'Nivel 1', 'Nivel 3'],
+      ['CIAN', 'Nivel 2', 'Nivel 4', 'Nivel 1'],
+      ['NARANJA', 'Nivel 3', 'Nivel 3', 'Nivel 5'],
+      ['LIMA', 'Nivel 1', 'Nivel 5', 'Nivel 2'],
+    ],
     rules: [
       {
-        condition: 'Si la temperatura supera los 350 K:',
-        action: 'Fija Reactivo A al 40%, Reactivo B al 40% y Reactivo C al 20%.',
+        condition: '1. Identificación del color reactivo:',
+        action: 'El Operador comunica el color de la tira reactiva central (Púrpura, Cian, Naranja o Lima).',
       },
       {
-        condition: 'Si la temperatura es 350 K o inferior:',
-        action: 'Fija Reactivo A al 20%, Reactivo B al 50% y Reactivo C al 30%.',
+        condition: '2. Ajuste de deslizadores:',
+        action: 'El Operador ajusta los 3 matraces exactamente a los niveles estequiométricos indicados en la tabla.',
+      },
+      {
+        condition: '3. Inyección del compuesto:',
+        action: 'Presiona «INYECTAR MEZCLA» para estabilizar la temperatura.',
       },
     ],
-    notes: ['Una mezcla descompensada causará cristalización en los conductos (Strike).'],
+    notes: [
+      'Una proporción incorrecta generará una reacción violenta y 1 Strike.',
+    ],
   },
 
   // 13. PUERTOS DE CONEXIÓN
   {
     moduleType: 'PUERTOS_CONEXION',
     category: 'ELECTRICIDAD',
-    title: 'Puertos de Conexión de Puente',
-    subtitle: 'Ruteo de Cables Patch Jack',
+    title: 'Placa de Conexiones Auxiliares',
+    subtitle: 'Puenteado de Jacks de Señal',
     classificationCode: 'DOC-NET-13',
     division: 'Electricidad y Circuitos',
     visualIdentification:
-      'Panel frontal telefónico con 4 conectores jack hembra en la fila superior (A, B, C, D) y 4 en la inferior (1, 2, 3, 4) con dos cables patch para puentear.',
+      'Panel frontal con 6 conectores jack hembra rotulados de J1 a J6, un rótulo de bus de señal (BUS-ALFA, BUS-BETA o BUS-GAMMA) y dos cables de parcheo (un Cable Rojo y un Cable Amarillo). Botón «ENLAZAR SEÑAL».',
     identificationChecklist: [
-      'Placa frontal con dos filas de conectores jack (4 arriba, 4 abajo).',
-      'Fila superior identificada con letras (A, B, C, D).',
-      'Fila inferior identificada con números (1, 2, 3, 4).',
-      'Cables patch de colores puenteando pares de clavijas.',
+      'Seis conectores jack de audio rotulados J1 a J6.',
+      'Placa indicadora de código de bus: BUS-ALFA, BUS-BETA o BUS-GAMMA.',
+      'Dos cables de conexión: Cable Rojo y Cable Amarillo.',
+      'Botón de confirmación «ENLAZAR SEÑAL».',
     ],
     description:
-      'El puente telefónico desvía señales de control. El Operador debe conectar los cables patch entre el par de clavijas correcto según la tabla de asignación.',
+      'El puente telefónico desvía señales de control. El Operador debe comunicar el código del bus y conectar los dos cables patch entre el par de clavijas correcto.',
     rules: [
       {
-        condition: 'Conexión primaria:',
-        action: 'Si el número de serie termina en número par, conecta Puerto A con Clavija 3.',
+        condition: 'Si el rótulo del bus indica BUS-ALFA:',
+        action: 'Conecta Cable Rojo de J1 a J5. Conecta Cable Amarillo de J2 a J6.',
       },
       {
-        condition: 'Conexión secundaria:',
-        action: 'Conecta el segundo cable según la letra de código mostrada en la carcasa.',
+        condition: 'Si el rótulo del bus indica BUS-BETA:',
+        action: 'Conecta Cable Rojo de J2 a J4. Conecta Cable Amarillo de J3 a J5.',
+      },
+      {
+        condition: 'Si el rótulo del bus indica BUS-GAMMA:',
+        action: 'Conecta Cable Rojo de J3 a J6. Conecta Cable Amarillo de J1 a J4.',
       },
     ],
-    notes: ['Un cortocircuito por puente erróneo disparará un Strike inmediato.'],
+    notes: [
+      'El orden de los extremos de un mismo cable no altera el circuito (J1 a J5 es idéntico a J5 a J1).',
+      'Una vez conectados ambos cables, el Operador pulsa «ENLAZAR SEÑAL». Un conexionado erróneo sumará 1 Strike.',
+    ],
   },
 
   // 14. DISIPADOR TÉRMICO
   {
     moduleType: 'DISIPADOR_TERMICO',
     category: 'ENERGÍA',
-    title: 'Disipador Térmico Dirigido',
-    subtitle: 'Alineación de Compuertas de Ventilación',
+    title: 'Disipador Térmico',
+    subtitle: 'Aletas de Expulsión de Radiación',
     classificationCode: 'DOC-THM-14',
     division: 'Fluidos y Termodinámica',
     visualIdentification:
-      'Rejilla de escape con 4 aletas direccionales orientables (Norte, Sur, Este, Oeste) e indicador de vector de flujo de calor convectivo.',
+      'Rejilla con 4 compuertas motorizadas orientadas a los puntos cardinales (NORTE, SUR, ESTE, OESTE), indicador de vector de flujo convectivo de viento e indicador de nivel de alerta (ALERTA-AMARILLA, ALERTA-NARANJA o ALERTA-ROJA). Botón «FIJAR ALETAS».',
     identificationChecklist: [
-      'Rejilla radiadora horizontal con aletas metálicas de ventilación.',
-      'Mando deslizante transversal sobre carril horizontal.',
-      'Barra indicadora de temperatura térmica con zonas de alerta.',
-      'Botón de enclavamiento de deflectores.',
+      'Cuatro aletas conmutables entre ABIERTA y CERRADA (Norte, Sur, Este, Oeste).',
+      'Flecha indicadora de dirección de flujo de calor convectivo.',
+      'Insignia de alerta térmica: ALERTA-AMARILLA, ALERTA-NARANJA o ALERTA-ROJA.',
+      'Pulsador de enclavamiento «FIJAR ALETAS».',
     ],
     description:
-      'El calor del generador debe ser evacuado hacia las toberas abiertas. El Operador orienta las aletas siguiendo el protocolo aerodinámico.',
+      'El calor del reactor debe evacuarse de forma asimétrica para no derretir el blindaje. El Operador orienta las aletas según el flujo del aire caliente y el grado de alerta reportado.',
     rules: [
       {
-        condition: 'Vector de calor hacia el Este:',
-        action: 'Abre aleta Este al 100% y aleta Norte al 50%; mantén Oeste y Sur cerradas.',
+        condition: 'Si la alerta es ALERTA-AMARILLA:',
+        action: '• Si el flujo es NORTE: abre SUR y ESTE.\n• Si es SUR: abre NORTE y OESTE.\n• Si es ESTE: abre NORTE y OESTE.\n• Si es OESTE: abre SUR y ESTE.',
       },
       {
-        condition: 'Vector de calor hacia el Oeste:',
-        action: 'Abre aleta Oeste al 100% y aleta Sur al 50%; mantén Este y Norte cerradas.',
+        condition: 'Si la alerta es ALERTA-NARANJA:',
+        action: '• Si el flujo es NORTE o SUR: abre ESTE y OESTE (cierra Norte y Sur).\n• Si es ESTE u OESTE: abre NORTE y SUR (cierra Este y Oeste).',
+      },
+      {
+        condition: 'Si la alerta es ALERTA-ROJA:',
+        action: 'Abre 3 aletas y cierra ÚNICAMENTE la aleta que apunta en la dirección del flujo de viento.',
       },
     ],
-    notes: ['Cerrar todas las aletas provocará una acumulación súbita de calor (Strike).'],
+    notes: [
+      'El Operador conmuta cada aleta entre ABIERTA y CERRADA y pulsa «FIJAR ALETAS».',
+      'Configurar una combinación incorrecta sobrecalentará el fuselaje (Strike).',
+    ],
   },
 
   // 15. SINCRONIZADOR DE FASES
   {
     moduleType: 'SINCRONIZADOR_FASES',
     category: 'SISTEMAS',
-    title: 'Sincronizador de Fases Concénctricas',
-    subtitle: 'Alineación de Anillos de Inducción Rotativa',
+    title: 'Sincronizador de Fases Cuánticas',
+    subtitle: 'Alineación de Anillos de Aceleración',
     classificationCode: 'DOC-ROT-15',
     division: 'Mecánica y Cinemática',
     visualIdentification:
-      'Dos anillos circulares concéntricos que giran en pantalla con muescas angulares marcadas de 0° a 360°, mandos de giro y gatillo de «ACOPLE DE FASE».',
+      'Dos anillos circulares concéntricos graduados en pasos angulares de 60° (0°, 60°, 120°, 180°, 240°, 300°). El Anillo Interior está bloqueado en una posición fija. El Operador hace girar el Anillo Exterior mediante los mandos de giro. Indicador de modo (MODO-RESONANTE o MODO-INVERSO) y botón «ENCLAVAR FASE».',
     identificationChecklist: [
-      'Dos anillos concéntricos circulares giratorios.',
-      'Muescas y ranuras de alineación angular grabadas.',
-      'Controles de giro paso a paso para regular el ángulo.',
-      'Pulsador de acoplamiento magnético.',
+      'Dos anillos concéntricos con muescas graduadas cada 60 grados.',
+      'Anillo Interior fijo con aguja de referencia.',
+      'Anillo Exterior móvil con botones de giro paso a paso.',
+      'Indicador de modo de fase: MODO-RESONANTE o MODO-INVERSO.',
     ],
     description:
-      'Dos rotores de inducción desfasados generan turbulencia magnética. El Operador debe rotar los anillos hasta hacer coincidir el ángulo de fase seguro antes de trabar el acople.',
+      'Dos rotores desfasados generan turbulencia magnética. El Operador debe alinear el Anillo Exterior al ángulo exacto respecto al Anillo Interior antes de acoplar la fase.',
     rules: [
       {
-        condition: 'Cálculo del ángulo de alineación:',
-        action:
-          'Multiplica el desfase relativo entre anillos por el número de sectores y suma 45° si la serie es par.',
+        condition: 'Si el sistema indica MODO-RESONANTE:',
+        action: 'Gira el anillo exterior hasta que su marcador marque exactamente +120° en sentido horario respecto al anillo interior (Anillo Exterior = Anillo Interior + 120°, si pasa de 360° resta 360).',
       },
       {
-        condition: 'Accionamiento del acople:',
-        action: 'Gira el anillo interior a la posición calculada y pulsa «ACOPLE DE FASE».',
+        condition: 'Si el sistema indica MODO-INVERSO:',
+        action: 'Gira el anillo exterior a la posición diametralmente opuesta (+180°) respecto al anillo interior (Anillo Exterior = Anillo Interior + 180°, si pasa de 360° resta 360).',
       },
     ],
-    notes: ['Acoplar fuera del ángulo de tolerancia destruirá los rodamientos magnéticos (Strike).'],
+    notes: [
+      'Ejemplo en Modo Resonante: Si el Anillo Interior está en 60°, el Exterior debe situarse a 180° (60 + 120 = 180°).',
+      'Una vez alineados, el Operador pulsa «ENCLAVAR FASE». Acoplar a destiempo sumará 1 Strike.',
+    ],
   },
 
-  // =========================================================================
-  // 5 NUEVAS FAMILIAS DE MÓDULOS (20 EN TOTAL)
-  // =========================================================================
-
-  // 16. CALIBRADOR GIROSCÓPICO (NUEVO)
+  // 16. CALIBRADOR GIROSCÓPICO INERCIAL
   {
     moduleType: 'CALIBRADOR_GIROSCOPIO',
     category: 'NAVEGACIÓN',
@@ -616,7 +729,7 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     ],
   },
 
-  // 17. REACTOR DE PLASMA (NUEVO)
+  // 17. REACTOR DE PLASMA
   {
     moduleType: 'REACTOR_PLASMA',
     category: 'ENERGÍA',
@@ -653,7 +766,7 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
       {
         condition: 'ISÓTOPO ÁMBAR SOLAR (Plasma Tritiado)',
         action:
-          '• La suma de Alfa (α) + Beta (β) debe sumar exactamente 6.\n• Si el panel no tiene Strikes acumulados (0 Strikes) → Alfa = 4, Beta = 2, Gamma = 3.\n• Si la máquina ya tiene 1 o más Strikes acumulados → Alfa = 1, Beta = 5, Gamma = 2.',
+          '• Alfa (α) = 4, Beta (β) = 2, Gamma (γ) = 3.',
       },
     ],
     notes: [
@@ -662,7 +775,7 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     ],
   },
 
-  // 18. ATENUADOR ACÚSTICO DE RESONANCIA (NUEVO)
+  // 18. ATENUADOR ACÚSTICO DE RESONANCIA
   {
     moduleType: 'FRECUENCIA_RESONANCIA',
     category: 'SEÑAL',
@@ -713,7 +826,7 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     ],
   },
 
-  // 19. SECUENCIA CINÉTICA DE PISTONES (NUEVO)
+  // 19. SECUENCIA CINÉTICA DE PISTONES
   {
     moduleType: 'SECUENCIA_CINETICA',
     category: 'CONTROL',
@@ -757,7 +870,7 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     ],
   },
 
-  // 20. DIVISOR DE VOLTAJE (NUEVO)
+  // 20. DIVISOR DE VOLTAJE
   {
     moduleType: 'DIVISOR_VOLTAJE',
     category: 'ELECTRICIDAD',

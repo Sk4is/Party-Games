@@ -56,6 +56,7 @@ export const CodigoRojoGame: React.FC<CodigoRojoGameProps> = ({
     leaveRoom,
     kickPlayer,
     updateProfile,
+    selectOperator,
   } = useCodigoRojoSocket({
     player: localPlayer,
     initialRoomCode,
@@ -121,6 +122,7 @@ export const CodigoRojoGame: React.FC<CodigoRojoGameProps> = ({
           onLeaveRoom={() => setShowAbandonModal(true)}
           onKickPlayer={kickPlayer}
           onUpdateProfile={handleUpdateProfile}
+          onSelectOperator={selectOperator}
         />
       )}
 

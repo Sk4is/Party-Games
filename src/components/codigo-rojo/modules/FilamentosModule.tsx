@@ -55,7 +55,7 @@ export const FilamentosModule: React.FC<FilamentosModuleProps> = ({
             ELECTRICIDAD
           </span>
           <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
-            // SECTOR {sector || 'EL-04'}
+            // LÍNEA PRINCIPAL DE POTENCIA
           </span>
         </div>
 
@@ -77,9 +77,9 @@ export const FilamentosModule: React.FC<FilamentosModuleProps> = ({
             <span className="font-bold text-slate-300">{indicatorLed}</span>
           </div>
 
-          {/* Sector Badge */}
-          <div className="px-3 py-1 bg-red-950/70 border border-red-500/50 rounded text-red-400 font-mono text-xs font-black tracking-wider">
-            {sector}
+          {/* Wire count indicator */}
+          <div className="px-3 py-1 bg-slate-950 border border-slate-800 rounded text-slate-400 font-mono text-xs font-bold tracking-wider">
+            {wires.length} FILAMENTOS
           </div>
         </div>
       </div>

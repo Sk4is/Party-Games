@@ -174,6 +174,10 @@ export type CodigoRojoClientMessage =
       targetPlayerId: string;
     }
   | {
+      type: 'SELECT_OPERATOR';
+      operatorPlayerId: string;
+    }
+  | {
       type: 'UPDATE_PROFILE';
       name?: string;
       avatar?: string;

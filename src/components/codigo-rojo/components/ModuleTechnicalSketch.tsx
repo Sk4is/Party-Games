@@ -95,7 +95,7 @@ function renderSketchSvg(type: CodigoRojoModuleType) {
           {/* Controls right rack */}
           <rect x="215" y="20" width="80" height="95" rx="4" fill="#1e293b" stroke="#334155" />
           <rect x="225" y="28" width="60" height="16" rx="2" fill="#0f172a" stroke="#10b981" />
-          <text x="237" y="39" fill="#34d399" stroke="none">CH-1..4</text>
+          <text x="228" y="39" fill="#34d399" stroke="none" fontSize="8">CANAL A..D</text>
           <circle cx="240" cy="65" r="9" stroke="#94a3b8" strokeWidth="1.5" fill="#334155" />
           <text x="236" y="68" fill="#f8fafc" stroke="none">-</text>
           <circle cx="270" cy="65" r="9" stroke="#94a3b8" strokeWidth="1.5" fill="#334155" />
@@ -163,51 +163,89 @@ function renderSketchSvg(type: CodigoRojoModuleType) {
         </svg>
       );
 
-    // 5. VALVULAS_PRESION (3 manómetros circulares con agujas + ruedas giratorias)
+    // 5. VALVULAS_PRESION (1 manómetro central + 3 válvulas A, B, C a 0°, 45°, 90°)
     case 'VALVULAS_PRESION':
       return (
         <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
-          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
-          {/* 3 circular dial gauges */}
-          {[55, 160, 265].map((cx, i) => (
+          <rect x="10" y="8" width="300" height="114" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          
+          {/* Central System Pressure Gauge */}
+          <g transform="translate(160, 36)">
+            {/* Gauge dial */}
+            <circle cx="0" cy="0" r="24" fill="#020617" stroke="#f59e0b" strokeWidth="1.5" />
+            <path d="M -18 0 A 18 18 0 0 1 18 0" stroke="#d97706" strokeWidth="2.5" strokeDasharray="3 2" />
+            {/* Color bands: green, amber, red */}
+            <path d="M -16 6 A 16 16 0 0 1 -6 -14" stroke="#10b981" strokeWidth="2" />
+            <path d="M -6 -14 A 16 16 0 0 1 6 -14" stroke="#f59e0b" strokeWidth="2" />
+            <path d="M 6 -14 A 16 16 0 0 1 16 6" stroke="#ef4444" strokeWidth="2" />
+            {/* Needle pointing to amber */}
+            <line x1="0" y1="0" x2="6" y2="-17" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="0" cy="0" r="2.5" fill="#f8fafc" />
+            <text x="-28" y="-12" fill="#94a3b8" stroke="none" fontSize="7" fontWeight="bold">PRESIÓN DEL SISTEMA</text>
+            <text x="-12" y="16" fill="#f59e0b" stroke="none" fontSize="8" fontWeight="bold">65 PSI</text>
+          </g>
+
+          {/* 3 Valves Below: VÁLVULA A, VÁLVULA B, VÁLVULA C */}
+          {[65, 160, 255].map((cx, i) => (
             <g key={i}>
-              <circle cx={cx} cy="42" r="22" fill="#0f172a" stroke="#f59e0b" strokeWidth="1.5" />
-              <path d={`M ${cx - 15} 42 A 15 15 0 0 1 ${cx + 15} 42`} stroke="#d97706" strokeWidth="2" strokeDasharray="2 3" />
-              {/* Dial needle */}
-              <line cx1={cx} cy1={42} x2={cx + (i === 1 ? -8 : 10)} y2={42 - 12} stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
-              <circle cx={cx} cy="42" r="2.5" fill="#f8fafc" />
-              <text x={cx - 14} y="54" fill="#94a3b8" stroke="none" fontSize="8">{['PSI A', 'PSI B', 'PSI C'][i]}</text>
-              {/* Valve handle below */}
-              <circle cx={cx} cy="88" r="16" fill="#334155" stroke="#94a3b8" strokeWidth="1.5" />
-              <line x1={cx - 16} y1="88" x2={cx + 16} y2="88" stroke="#cbd5e1" strokeWidth="2" />
-              <line x1={cx} y1="72" x2={cx} y2="104" stroke="#cbd5e1" strokeWidth="2" />
-              <circle cx={cx} cy="88" r="4" fill="#f59e0b" />
+              <text x={cx - 24} y="74" fill="#cbd5e1" stroke="none" fontSize="8" fontWeight="bold">
+                {['VÁLVULA A', 'VÁLVULA B', 'VÁLVULA C'][i]}
+              </text>
+              {/* Valve circular rim */}
+              <circle cx={cx} cy="94" r="14" fill="#1e293b" stroke="#94a3b8" strokeWidth="1.2" />
+              {/* Valve handle bar showing 0°, 45°, 90° orientation */}
+              <line
+                x1={cx - (i === 0 ? 0 : i === 1 ? 9 : 12)}
+                y1={94 - (i === 0 ? 12 : i === 1 ? 9 : 0)}
+                x2={cx + (i === 0 ? 0 : i === 1 ? 9 : 12)}
+                y2={94 + (i === 0 ? 12 : i === 1 ? 9 : 0)}
+                stroke="#f59e0b"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <circle cx={cx} cy="94" r="3.5" fill="#0f172a" stroke="#cbd5e1" />
+              <text x={cx - 8} y="116" fill="#64748b" stroke="none" fontSize="7">
+                {['90°', '45°', '0°'][i]}
+              </text>
             </g>
           ))}
-          <text x="25" y="118" fill="#64748b" stroke="none">3 MANÓMETROS ANALÓGICOS + 3 VÁLVULAS GIRATORIAS (A, B, C)</text>
+          <text x="28" y="20" fill="#f59e0b" stroke="none" fontSize="8" fontWeight="bold">UN MANÓMETRO CENTRAL + 3 VÁLVULAS (0° / 45° / 90°)</text>
         </svg>
       );
 
-    // 6. RELES_HEXADECIMALES (4 cajas de relé con interruptores basculantes)
+    // 6. RELES_HEXADECIMALES (1 pantalla HEX central + 4 interruptores R1..R4)
     case 'RELES_HEXADECIMALES':
       return (
         <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
-          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
-          <text x="25" y="24" fill="#c084fc" stroke="none" fontWeight="bold">BANCO DE 4 RELÉS // BUS LÓGICO</text>
-          {/* 4 relays */}
-          {[45, 115, 185, 255].map((cx, i) => (
-            <g key={i}>
-              <rect x={cx - 25} y="32" width="50" height="60" rx="4" fill="#1e293b" stroke="#7e22ce" strokeWidth="1.2" />
-              <text x={cx - 6} y="44" fill="#94a3b8" stroke="none">R{i + 1}</text>
-              {/* Hex display */}
-              <rect x={cx - 18} y="48" width="36" height="14" rx="2" fill="#581c87" stroke="#a855f7" />
-              <text x={cx - 8} y="59" fill="#f3e8ff" stroke="none" fontWeight="bold">{['0x4', '0xA', '0xF', '0x2'][i]}</text>
-              {/* Toggle switch */}
-              <rect x={cx - 12} y="68" width="24" height="18" rx="2" fill="#0f172a" stroke="#64748b" />
-              <rect x={cx - 10} y={i % 2 === 0 ? 69 : 78} width="20" height="8" rx="2" fill={i % 2 === 0 ? '#10b981' : '#ef4444'} />
-            </g>
-          ))}
-          <text x="35" y="112" fill="#64748b" stroke="none">PANTALLAS HEXADECIMALES + INTERRUPTORES UP/DOWN</text>
+          <rect x="10" y="8" width="300" height="114" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          
+          {/* Top Banner & Single Hex Register Display */}
+          <g transform="translate(160, 24)">
+            <text x="-65" y="-3" fill="#c084fc" stroke="none" fontSize="8" fontWeight="bold">REGISTRO HEXADECIMAL ÚNICO</text>
+            <rect x="-40" y="3" width="80" height="20" rx="3" fill="#3b0764" stroke="#a855f7" strokeWidth="1.2" />
+            <text x="-16" y="17" fill="#f3e8ff" stroke="none" fontSize="13" fontWeight="black" letterSpacing="1">0x3A</text>
+          </g>
+
+          {/* 4 Relay Switches: R1, R2, R3, R4 */}
+          {[55, 125, 195, 265].map((cx, i) => {
+            const isUp = i % 2 === 0;
+            return (
+              <g key={i}>
+                {/* Relay container */}
+                <rect x={cx - 24} y="52" width="48" height="58" rx="4" fill="#1e293b" stroke="#7e22ce" strokeWidth="1" />
+                <text x={cx - 7} y="64" fill="#d8b4fe" stroke="none" fontWeight="bold" fontSize="9">R{i + 1}</text>
+                <text x={cx - 16} y="74" fill="#64748b" stroke="none" fontSize="6.5">Bit {3 - i}</text>
+                
+                {/* Lever track & knob */}
+                <rect x={cx - 7} y="78" width="14" height="22" rx="7" fill="#0f172a" stroke="#64748b" />
+                <circle cx={cx} cy={isUp ? 83 : 95} r="4.5" fill={isUp ? '#c084fc' : '#475569'} stroke="#f3e8ff" strokeWidth="0.8" />
+                <text x={cx - 12} y="108" fill={isUp ? '#a855f7' : '#64748b'} stroke="none" fontSize="6">
+                  {isUp ? '1 (ARR)' : '0 (ABJ)'}
+                </text>
+              </g>
+            );
+          })}
+          <text x="35" y="120" fill="#64748b" stroke="none" fontSize="7.5">1 REGISTRO HEX &bull; 4 RELÉS BIESTABLES (R1..R4: 1=ARRIBA, 0=ABAJO)</text>
         </svg>
       );
 
@@ -268,10 +306,16 @@ function renderSketchSvg(type: CodigoRojoModuleType) {
         <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
           <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
           {/* LCD Screen on left */}
-          <rect x="25" y="25" width="120" height="35" rx="4" fill="#022c22" stroke="#10b981" strokeWidth="1.5" />
-          <text x="35" y="46" fill="#34d399" stroke="none" fontSize="14" fontWeight="bold">PIN: [ • • • • ]</text>
-          <text x="25" y="80" fill="#94a3b8" stroke="none">TECLADO MATRICIAL</text>
-          <text x="25" y="95" fill="#64748b" stroke="none">CON PANTALLA DE CÓDIGO</text>
+          <rect x="22" y="20" width="138" height="42" rx="4" fill="#022c22" stroke="#10b981" strokeWidth="1.5" />
+          <text x="28" y="34" fill="#6ee7b7" stroke="none" fontSize="8" fontWeight="bold">Nº SERIE: SEC-527-X4</text>
+          <text x="28" y="52" fill="#34d399" stroke="none" fontSize="13" fontWeight="bold">PIN: [ • • • • ]</text>
+          
+          {/* Aux LED indicator */}
+          <circle cx="28" cy="74" r="3.5" fill="#f59e0b" stroke="#fbbf24" strokeWidth="1" />
+          <text x="37" y="77" fill="#fbbf24" stroke="none" fontSize="8" fontWeight="bold">LED AUX: ENCENDIDO/APAGADO</text>
+
+          <text x="22" y="96" fill="#94a3b8" stroke="none">TECLADO DE AUTENTICACIÓN</text>
+          <text x="22" y="108" fill="#64748b" stroke="none">SERIAL DE LA MÁQUINA</text>
           {/* 3x4 Keypad on right */}
           <g transform="translate(175, 18)">
             {[

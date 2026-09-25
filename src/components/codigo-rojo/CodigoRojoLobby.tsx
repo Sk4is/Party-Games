@@ -34,6 +34,7 @@ interface CodigoRojoLobbyProps {
   onLeaveRoom: () => void;
   onKickPlayer?: (playerId: string) => void;
   onUpdateProfile?: (name: string, avatar: string, color: string) => void;
+  onSelectOperator?: (operatorPlayerId: string) => void;
 }
 
 export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
@@ -45,6 +46,7 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
   onLeaveRoom,
   onKickPlayer,
   onUpdateProfile,
+  onSelectOperator,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
@@ -88,13 +90,21 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
   };
 
   // Calculate approximate automatic time preview
-  const getEstimatedAutoTime = (diff: CodigoRojoDifficulty) => {
-    if (diff === 'NORMAL') return '4:30';
-    if (diff === 'DIFICIL') return '5:45';
-    return '6:30';
+  const getEstimatedAutoTime = (diff: CodigoRojoDifficulty, count?: number) => {
+    if (diff === 'NORMAL') return count === 2 ? '3:30' : '4:30';
+    if (diff === 'DIFICIL') return count === 5 ? '6:45' : '5:45';
+    return count === 6 ? '7:30' : '6:30';
   };
 
-  const canStart = players.length >= 2;
+  const operatorPlayer =
+    players.find((p) => p.role === 'OPERADOR') ||
+    players.find((p) => p.id === roomState.operatorId) ||
+    (players.length > 0 ? players[0] : undefined);
+  const operatorCount = players.filter((p) => p.role === 'OPERADOR').length;
+  const guideCount = players.filter((p) => p.role === 'GUIA').length;
+  const hasExactlyOneOperator = operatorCount === 1;
+  const hasAtLeastOneGuide = guideCount >= 1;
+  const canStart = players.length >= 2 && hasExactlyOneOperator && hasAtLeastOneGuide;
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between p-4 sm:p-8 bg-slate-950 text-slate-100 overflow-x-hidden font-['Plus_Jakarta_Sans',sans-serif]">
@@ -164,24 +174,40 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
       <main className="relative z-10 flex-1 w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 py-6">
         {/* Left 2 Cols: Players List & Roles Overview */}
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-bold text-slate-300 font-mono">
-              <Users className="w-4 h-4 text-red-400" />
-              <span>JUGADORES EN LA SALA ({players.length}/6)</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-slate-900/90 border border-slate-800">
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="text-slate-400 font-bold">OPERADOR SELECCIONADO:</span>
+              {operatorPlayer ? (
+                <span className="px-2.5 py-0.5 rounded-full bg-red-600/20 border border-red-500/50 text-red-400 font-black flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  {operatorPlayer.name}
+                </span>
+              ) : (
+                <span className="text-amber-400 font-bold">Ninguno (selecciona uno)</span>
+              )}
             </div>
-            <span className="text-xs text-slate-500 font-mono">Mínimo 2 jugadores</span>
+            <div className="flex items-center gap-3 text-xs font-mono">
+              <span className="text-slate-400">
+                GUÍAS: <strong className="text-amber-400">{guideCount}</strong>
+              </span>
+              <span className="text-slate-500">({players.length}/6 agentes)</span>
+            </div>
           </div>
 
           {/* Players Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {players.map((p, idx) => {
-              const isOperatorNext = idx === 0; // First in rotation preview
+            {players.map((p) => {
+              const isOp = p.role === 'OPERADOR' || (operatorPlayer && operatorPlayer.id === p.id);
               return (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between p-4 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all shadow-md"
+                  className={`flex items-center justify-between p-4 rounded-2xl bg-slate-900/90 border transition-all shadow-md ${
+                    isOp
+                      ? 'border-red-500/50 shadow-red-950/30 ring-1 ring-red-500/30'
+                      : 'border-slate-800 hover:border-slate-700'
+                  }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     {p.id === currentPlayerId ? (
                       <button
                         type="button"
@@ -189,7 +215,7 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
                           audio.playClick();
                           setShowAvatarPicker(true);
                         }}
-                        className="relative group w-12 h-12 rounded-xl flex items-center justify-center text-2xl border transition-transform hover:scale-105 active:scale-95 cursor-pointer shadow"
+                        className="relative group w-12 h-12 rounded-xl flex items-center justify-center text-2xl border transition-transform hover:scale-105 active:scale-95 cursor-pointer shadow flex-shrink-0"
                         style={{
                           backgroundColor: `${p.color}20`,
                           borderColor: p.color,
@@ -203,7 +229,7 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
                       </button>
                     ) : (
                       <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl border"
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl border flex-shrink-0"
                         style={{
                           backgroundColor: `${p.color}20`,
                           borderColor: p.color,
@@ -212,41 +238,57 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
                         {p.avatar}
                       </div>
                     )}
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-white text-sm sm:text-base">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="font-bold text-white text-sm sm:text-base truncate">
                           {p.name}
                         </span>
                         {p.isHost && (
-                          <Crown className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                          <Crown className="w-3.5 h-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />
                         )}
                         {p.id === currentPlayerId && (
-                          <span className="text-[10px] font-mono font-bold text-slate-400">
+                          <span className="text-[10px] font-mono font-bold text-slate-400 flex-shrink-0">
                             (Tú)
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs font-mono text-slate-400">
-                          {isOperatorNext ? (
-                            <span className="text-red-400 font-bold">1er OPERADOR</span>
-                          ) : (
-                            <span className="text-amber-400">GUÍA</span>
-                          )}
-                        </span>
+                      <div className="flex items-center gap-2 mt-1">
+                        {isOp ? (
+                          <span className="px-2 py-0.5 rounded-full bg-red-600/30 border border-red-500/80 text-red-300 text-[10px] font-black uppercase tracking-wider shadow-[0_0_8px_rgba(239,68,68,0.3)]">
+                            🚨 OPERADOR
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                            📋 GUÍA
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {isHost && p.id !== currentPlayerId && onKickPlayer && (
-                    <button
-                      type="button"
-                      onClick={() => onKickPlayer(p.id)}
-                      className="text-xs text-slate-500 hover:text-red-400 font-mono p-1 transition-colors cursor-pointer"
-                    >
-                      Expulsar
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    {!isOp && onSelectOperator && (
+                      <button
+                        type="button"
+                        onClick={() => onSelectOperator(p.id)}
+                        className="px-2.5 py-1.5 rounded-xl bg-red-950/80 hover:bg-red-800 active:scale-95 border border-red-500/60 hover:border-red-400 text-red-200 text-xs font-mono font-bold transition-all cursor-pointer shadow"
+                        title={p.id === currentPlayerId ? 'Elegir ser el Operador' : 'Asignar como Operador'}
+                      >
+                        {p.id === currentPlayerId ? 'Ser Operador' : 'Asignar'}
+                      </button>
+                    )}
+
+                    {isHost && p.id !== currentPlayerId && onKickPlayer && (
+                      <button
+                        type="button"
+                        onClick={() => onKickPlayer(p.id)}
+                        className="text-xs text-slate-500 hover:text-red-400 font-mono p-1 transition-colors cursor-pointer"
+                        title="Expulsar jugador"
+                      >
+                        &times;
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -254,144 +296,118 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
 
           {/* Role Explainer Card */}
           <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 text-xs text-slate-300 leading-relaxed flex items-start gap-3 mt-2">
-            <Info className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <Shield className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
             <div>
               <span className="font-bold text-white block mb-1">
-                ¿Cómo funciona la rotación de roles?
+                Asignación Manual de Roles (1 Operador + 1 o más Guías)
               </span>
-              En cada misión, exactamente <strong className="text-red-400">1 jugador es el Operador</strong> (quien manipula la máquina y no ve el manual) y todos los demás son <strong className="text-amber-400">Guías</strong> (quienes leen las instrucciones). El rol de Operador rota automáticamente y de forma justa entre todos los jugadores tras cada misión.
+              En cada misión debe haber exactamente <strong className="text-red-400">1 Operador</strong> (quien interactúa con los módulos y no ve el manual) y al menos <strong className="text-amber-400">1 Guía</strong> (quienes consultan el manual técnico). Pulsa <strong className="text-red-300">«Ser Operador»</strong> o <strong className="text-red-300">«Asignar»</strong> en cualquier agente para definir quién controla la máquina.
             </div>
           </div>
         </div>
 
-        {/* Right 1 Col: Mission Configuration */}
+        {/* Right 1 Col: Read-Only Mission Summary & Mission Control */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-300 font-mono">
             <Gauge className="w-4 h-4 text-red-400" />
-            <span>AJUSTES DE LA MISIÓN</span>
+            <span>MISIÓN CONFIGURADA</span>
           </div>
 
-          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col gap-5 shadow-lg">
-            {/* Difficulty Selector */}
-            <div>
-              <label className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                Dificultad
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['NORMAL', 'DIFICIL', 'EXTREMO'] as CodigoRojoDifficulty[]).map((diff) => {
-                  const isSelected = config.difficulty === diff;
-                  return (
-                    <button
-                      key={diff}
-                      type="button"
-                      disabled={!isHost}
-                      onClick={() =>
-                        onUpdateConfig({
-                          difficulty: diff,
-                          modulesCount: diff === 'NORMAL' ? 3 : diff === 'DIFICIL' ? 4 : 5,
-                        })
-                      }
-                      className={`py-2 px-1 rounded-xl text-xs font-mono font-bold transition-all text-center ${
-                        isSelected
-                          ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
-                          : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                      } ${!isHost ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
-                    >
-                      {diff}
-                    </button>
-                  );
-                })}
-              </div>
-              <span className="text-[11px] text-slate-500 font-mono block mt-1.5">
-                {config.difficulty === 'NORMAL'
-                  ? '3 módulos &bull; Reglas moderadas &bull; Tiempo generoso'
-                  : config.difficulty === 'DIFICIL'
-                  ? '4 módulos &bull; Lógica avanzada &bull; Mayor atención'
-                  : '5 módulos &bull; Máxima tensión &bull; Comunicación perfecta'}
-              </span>
-            </div>
-
-            {/* Time Mode */}
-            <div>
-              <label className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                Sistema de Tiempo
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {(['AUTO', 'CUSTOM'] as CodigoRojoTimeMode[]).map((mode) => {
-                  const isSelected = config.timeMode === mode;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      disabled={!isHost}
-                      onClick={() => onUpdateConfig({ timeMode: mode })}
-                      className={`py-2 px-2 rounded-xl text-xs font-mono font-bold transition-all text-center ${
-                        isSelected
-                          ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
-                          : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                      } ${!isHost ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
-                    >
-                      {mode === 'AUTO' ? 'Automático' : 'Personalizado'}
-                    </button>
-                  );
-                })}
+          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col gap-4 shadow-lg">
+            {/* Read-Only Parameters Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Dificultad */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex flex-col justify-between">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider mb-1">
+                  Dificultad
+                </span>
+                <span className="text-sm font-black font-mono text-white flex items-center gap-1.5">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      config.difficulty === 'NORMAL'
+                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]'
+                        : config.difficulty === 'DIFICIL'
+                        ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]'
+                        : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+                    }`}
+                  />
+                  {config.difficulty}
+                </span>
               </div>
 
-              {/* Time Details */}
-              {config.timeMode === 'AUTO' ? (
-                <div className="mt-3 p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between font-mono text-xs">
-                  <span className="text-slate-400">TIEMPO AUTOMÁTICO:</span>
-                  <span className="text-red-400 font-bold text-sm">
-                    ~{getEstimatedAutoTime(config.difficulty)}
-                  </span>
-                </div>
-              ) : (
-                <div className="mt-3 flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs">
-                  <span className="text-slate-400">DURACIÓN (MIN):</span>
-                  <select
-                    disabled={!isHost}
-                    value={config.customTimeMinutes}
-                    onChange={(e) =>
-                      onUpdateConfig({ customTimeMinutes: parseInt(e.target.value, 10) })
-                    }
-                    className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1 font-mono font-bold text-sm"
-                  >
-                    {[3, 4, 5, 6, 7, 8, 10].map((m) => (
-                      <option key={m} value={m}>
-                        {m} minutos
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Módulos */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex flex-col justify-between">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider mb-1">
+                  Módulos
+                </span>
+                <span className="text-sm font-black font-mono text-red-400">
+                  {config.modulesCount || (config.difficulty === 'NORMAL' ? 3 : config.difficulty === 'DIFICIL' ? 4 : 5)} paneles
+                </span>
+              </div>
+
+              {/* Tiempo */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex flex-col justify-between">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider mb-1">
+                  Tiempo
+                </span>
+                <span className="text-xs font-bold font-mono text-slate-200">
+                  {config.timeMode === 'AUTO' ? (
+                    <span>
+                      Auto <strong className="text-red-400">(~{getEstimatedAutoTime(config.difficulty, config.modulesCount)})</strong>
+                    </span>
+                  ) : (
+                    <span className="text-amber-300 font-bold">
+                      {config.customTimeMinutes || 5} min
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Fallos permitidos */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex flex-col justify-between">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider mb-1">
+                  Fallos máx.
+                </span>
+                <span className="text-xs font-bold font-mono text-slate-200">
+                  {config.maxStrikes || 3} strikes
+                </span>
+              </div>
             </div>
 
-            {/* Strikes Limit Info */}
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between font-mono text-xs">
-              <span className="text-slate-400">LÍMITE DE STRIKES:</span>
-              <span className="text-white font-bold">3 FALLOS</span>
+            {/* Config note */}
+            <div className="px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800/50 flex items-center gap-2 text-[11px] font-mono text-slate-400">
+              <Info className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+              <span>Ajustes establecidos por el anfitrión al crear la sala.</span>
             </div>
 
-            {/* Start Button (Host only) */}
+            <div className="h-px w-full bg-slate-800/80 my-1" />
+
+            {/* Start Button (Host only) or Waiting Banner */}
             {isHost ? (
               <button
                 type="button"
+                disabled={!canStart}
                 onClick={onStartMission}
-                className="w-full py-4 px-6 rounded-2xl bg-red-600 hover:bg-red-500 active:scale-95 text-white font-black text-base uppercase tracking-wider transition-all shadow-xl shadow-red-600/30 cursor-pointer flex items-center justify-center gap-2 mt-2"
+                className="w-full py-4 px-6 rounded-2xl bg-red-600 hover:bg-red-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-black text-base uppercase tracking-wider transition-all shadow-xl shadow-red-600/30 cursor-pointer flex items-center justify-center gap-2"
               >
                 <Play className="w-5 h-5 fill-current" />
                 <span>INICIAR MISIÓN</span>
               </button>
             ) : (
-              <div className="w-full py-3.5 px-4 rounded-xl bg-slate-950 border border-slate-800 text-center text-xs font-mono text-slate-400">
-                Esperando a que el anfitrión inicie la misión...
+              <div className="w-full py-3.5 px-4 rounded-xl bg-slate-950 border border-slate-800 text-center text-xs font-mono text-slate-400 flex items-center justify-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span>Esperando a que el anfitrión inicie la misión...</span>
               </div>
             )}
 
             {!canStart && isHost && (
-              <span className="text-[11px] text-amber-400 font-mono text-center">
-                Se recomienda un mínimo de 2 jugadores para jugar.
-              </span>
+              <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-[11px] text-amber-300 font-mono text-center leading-tight">
+                {players.length < 2
+                  ? 'Se requieren al menos 2 jugadores para iniciar la misión.'
+                  : !hasExactlyOneOperator
+                  ? 'Debes asignar exactamente 1 Operador.'
+                  : 'Debe haber al menos 1 Guía en la sala.'}
+              </div>
             )}
           </div>
         </div>

@@ -222,6 +222,19 @@ export class CodigoRojoServer {
         }
         break;
 
+      case 'SELECT_OPERATOR':
+        if (room.phase === 'LOBBY' || room.phase === 'MISSION_SUCCESS' || room.phase === 'MISSION_FAILED') {
+          const targetPlayer = room.players.find((pl) => pl.id === msg.operatorPlayerId && pl.isConnected);
+          if (targetPlayer) {
+            room.operatorId = targetPlayer.id;
+            room.players.forEach((pl) => {
+              pl.role = pl.id === targetPlayer.id ? 'OPERADOR' : 'GUIA';
+            });
+            this.broadcastRoom(room);
+          }
+        }
+        break;
+
       case 'UPDATE_PROFILE':
         if (room.phase === 'LOBBY') {
           const p = room.players.find((pl) => pl.id === conn.playerId);
@@ -387,25 +400,22 @@ export class CodigoRojoServer {
     const connectedPlayers = room.players.filter((p) => p.isConnected);
     if (connectedPlayers.length === 0) return;
 
-    // Pick next operator from history
-    let nextOperatorId = connectedPlayers[0].id;
+    // Check if an operator was manually chosen and is connected
+    let chosenOperator = connectedPlayers.find((p) => p.id === room.operatorId && p.role === 'OPERADOR');
+    if (!chosenOperator) {
+      chosenOperator = connectedPlayers.find((p) => p.role === 'OPERADOR');
+    }
+    if (!chosenOperator) {
+      chosenOperator = connectedPlayers.find((p) => p.id === room.operatorId);
+    }
 
-    // Find the player who has operated the least or oldest
-    const sorted = [...connectedPlayers].sort((a, b) => {
-      if (a.missionsOperatedCount !== b.missionsOperatedCount) {
-        return a.missionsOperatedCount - b.missionsOperatedCount;
-      }
-      const lastA = room.operatorHistory.lastIndexOf(a.id);
-      const lastB = room.operatorHistory.lastIndexOf(b.id);
-      return lastA - lastB;
-    });
+    let finalOperatorId = chosenOperator ? chosenOperator.id : connectedPlayers[0].id;
+    room.operatorId = finalOperatorId;
+    room.operatorHistory.push(finalOperatorId);
 
-    nextOperatorId = sorted[0].id;
-    room.operatorId = nextOperatorId;
-    room.operatorHistory.push(nextOperatorId);
-
+    // EXACTLY 1 OPERADOR + 1 OR MORE GUIAS
     room.players.forEach((p) => {
-      p.role = p.id === nextOperatorId ? 'OPERADOR' : 'GUIA';
+      p.role = p.id === finalOperatorId ? 'OPERADOR' : 'GUIA';
     });
   }
 
@@ -652,6 +662,15 @@ export class CodigoRojoServer {
       const nextHost = room.players.find((p) => p.isConnected) || room.players[0];
       nextHost.isHost = true;
       room.hostId = nextHost.id;
+    }
+
+    // Ensure exactly 1 operator exists if players remain
+    if (!room.players.some((p) => p.role === 'OPERADOR') && room.players.length > 0) {
+      const nextOp = room.players.find((p) => p.isConnected) || room.players[0];
+      room.operatorId = nextOp.id;
+      room.players.forEach((p) => {
+        p.role = p.id === nextOp.id ? 'OPERADOR' : 'GUIA';
+      });
     }
 
     const isGameActive = room.phase !== 'LOBBY' && room.phase !== 'MATCH_ABORTED';

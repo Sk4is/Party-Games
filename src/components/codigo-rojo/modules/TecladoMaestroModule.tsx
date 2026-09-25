@@ -65,7 +65,7 @@ export const TecladoMaestroModule: React.FC<TecladoMaestroModuleProps> = ({
       {/* Screen displays Serial and PIN */}
       <div className="w-full max-w-xs bg-slate-950 p-3 rounded-xl border border-slate-800 my-2 flex justify-between items-center font-mono">
         <div className="text-xs text-slate-400">
-          SERIAL: <span className="text-white font-bold">{serial}</span>
+          Nº SERIE: <span className="text-amber-300 font-bold tracking-wider">{serial}</span>
         </div>
         <div className="text-lg font-black tracking-widest text-emerald-400 bg-slate-900 px-3 py-1 rounded border border-slate-800">
           {pin.padEnd(4, '•')}

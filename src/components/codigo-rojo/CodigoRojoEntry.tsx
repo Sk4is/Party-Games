@@ -51,8 +51,28 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
 
   // Configuration for room creation
   const [difficulty, setDifficulty] = useState<CodigoRojoDifficulty>('NORMAL');
+  const [modulesCount, setModulesCount] = useState<number>(3);
   const [timeMode, setTimeMode] = useState<CodigoRojoTimeMode>('AUTO');
   const [customMinutes, setCustomMinutes] = useState<number>(5);
+
+  const handleDifficultyChange = (d: CodigoRojoDifficulty) => {
+    setDifficulty(d);
+    if (d === 'NORMAL') setModulesCount(3);
+    else if (d === 'DIFICIL') setModulesCount(4);
+    else if (d === 'EXTREMO') setModulesCount(5);
+  };
+
+  const getEstimatedAutoTime = (diff: CodigoRojoDifficulty, count: number) => {
+    if (diff === 'NORMAL') return count === 2 ? '3:30' : '4:30';
+    if (diff === 'DIFICIL') return count === 5 ? '6:45' : '5:45';
+    return count === 6 ? '7:30' : '6:30';
+  };
+
+  const getAvailableModuleCounts = (diff: CodigoRojoDifficulty): number[] => {
+    if (diff === 'NORMAL') return [2, 3];
+    if (diff === 'DIFICIL') return [4, 5];
+    return [5, 6];
+  };
 
   const handleUpdateProfile = (updated: Partial<PlayerProfile>) => {
     setProfile((prev) => {
@@ -71,7 +91,7 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
         difficulty,
         timeMode,
         customTimeMinutes: customMinutes,
-        modulesCount: difficulty === 'NORMAL' ? 3 : difficulty === 'DIFICIL' ? 4 : 5,
+        modulesCount,
         maxStrikes: 3,
       });
     } finally {
@@ -145,7 +165,7 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
                     <button
                       key={d}
                       type="button"
-                      onClick={() => setDifficulty(d)}
+                      onClick={() => handleDifficultyChange(d)}
                       className={`py-2 px-1 rounded-xl text-xs font-mono font-bold transition-all ${
                         difficulty === d
                           ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
@@ -158,11 +178,57 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
                 </div>
                 <span className="text-[11px] text-slate-500 font-mono block mt-1.5">
                   {difficulty === 'NORMAL'
-                    ? '3 módulos &bull; Desafío equilibrado &bull; Recomendado'
+                    ? '2 o 3 módulos &bull; Desafío equilibrado &bull; Recomendado para empezar'
                     : difficulty === 'DIFICIL'
-                    ? '4 módulos &bull; Más condiciones &bull; Menos tiempo'
-                    : '5 módulos &bull; Máxima tensión &bull; Sin margen de error'}
+                    ? '4 o 5 módulos &bull; Lógica avanzada &bull; Mayor presión'
+                    : '5 o 6 módulos &bull; Máxima tensión &bull; Sin margen de error'}
                 </span>
+              </div>
+
+              {/* Module Count Selector */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-mono text-slate-400 font-bold">
+                    NÚMERO DE MÓDULOS:
+                  </label>
+                  <span className="text-xs font-mono font-bold text-red-400">
+                    {modulesCount} {modulesCount === 1 ? 'módulo' : 'módulos'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {getAvailableModuleCounts(difficulty).map((count) => {
+                    const isSelected = modulesCount === count;
+                    const isRec =
+                      (difficulty === 'NORMAL' && count === 3) ||
+                      (difficulty === 'DIFICIL' && count === 4) ||
+                      (difficulty === 'EXTREMO' && count === 5);
+                    return (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => setModulesCount(count)}
+                        className={`py-2 px-3 rounded-xl text-xs font-mono font-bold transition-all flex items-center justify-between ${
+                          isSelected
+                            ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
+                            : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        <span>{count} módulos</span>
+                        {isRec && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-md font-sans uppercase font-black ${
+                              isSelected
+                                ? 'bg-red-800 text-red-100'
+                                : 'bg-slate-800 text-slate-400'
+                            }`}
+                          >
+                            Recomendado
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Time System */}
@@ -180,7 +246,7 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
                     }`}
                   >
-                    Automático (~{difficulty === 'NORMAL' ? '4:30' : difficulty === 'DIFICIL' ? '5:45' : '6:30'})
+                    Automático (~{getEstimatedAutoTime(difficulty, modulesCount)})
                   </button>
                   <button
                     type="button"
@@ -211,6 +277,12 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
                     </select>
                   </div>
                 )}
+              </div>
+
+              {/* Strikes Limit Info */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between font-mono text-xs">
+                <span className="text-slate-400">LÍMITE DE FALLOS:</span>
+                <span className="text-white font-bold">3 STRIKES MÁXIMO</span>
               </div>
             </div>
 

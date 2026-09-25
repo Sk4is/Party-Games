@@ -28,9 +28,28 @@ export function generateMachineSerial(rng: Mulberry32): string {
   return `${prefix}-${num1}${num2}${num3}-${letter}${lastDigit}`;
 }
 
+/**
+ * Extrae todas las cifras numéricas del número de serie de izquierda a derecha,
+ * ignorando letras y símbolos no numéricos.
+ * Asegura al menos 4 dígitos con relleno seguro (ceros) para evitar valores indefinidos o NaN.
+ *
+ * Ejemplo:
+ *   "SEC-214-W8" -> [2, 1, 4, 8]
+ *   "SEC-527-X4" -> [5, 2, 7, 4]
+ *   "CR-4821-X7" -> [4, 8, 2, 1, 7]
+ */
+export function extractSerialDigits(serial: string): number[] {
+  if (!serial || typeof serial !== 'string') return [0, 0, 0, 0];
+  const digits = (serial.match(/\d/g) || []).map((d) => parseInt(d, 10));
+  while (digits.length < 4) {
+    digits.push(0);
+  }
+  return digits;
+}
+
 export function getSerialLastDigit(serial: string): number {
-  const match = serial.match(/\d(?=\D*$)/);
-  return match ? parseInt(match[0], 10) : 4;
+  const digits = extractSerialDigits(serial);
+  return digits.length > 0 ? digits[digits.length - 1] : 4;
 }
 
 export function isSerialLastDigitEven(serial: string): boolean {
@@ -336,7 +355,7 @@ function generateGlifosCriptograficos(rng: Mulberry32): GeneratedModuleInternal 
 // 4. MATRIZ DE CELDAS DE ENERGÍA
 // =========================================================================
 function generateMatrizEnergia(rng: Mulberry32): GeneratedModuleInternal {
-  const coreStates = ['ESTABLE', 'CRÍTICO', 'PURGA_REQUERIDA'] as const;
+  const coreStates = ['ESTABLE', 'CRÍTICO', 'PURGA_REQUERIDA', 'SOBRECALENTAMIENTO'] as const;
   const coreState = rng.pick([...coreStates]);
 
   // 3x3 grid coordinates: A1, A2, A3, B1, B2, B3, C1, C2, C3
@@ -352,38 +371,15 @@ function generateMatrizEnergia(rng: Mulberry32): GeneratedModuleInternal {
   } else if (coreState === 'CRÍTICO') {
     // Target is cross: B1, B2, B3, A2, C2
     targetCells = ['A2', 'B1', 'B2', 'B3', 'C2'];
+  } else if (coreState === 'SOBRECALENTAMIENTO') {
+    // Target is diamond perimeter: A2, B1, B3, C2
+    targetCells = ['A2', 'B1', 'B3', 'C2'];
   } else {
     // PURGA_REQUERIDA: corners A1, A3, C1, C3
     targetCells = ['A1', 'A3', 'C1', 'C3'];
   }
 
-  const manualSection: CodigoRojoManualSection = {
-    moduleType: 'MATRIZ_ENERGIA',
-    title: 'Matriz de Celdas de Energía',
-    subtitle: 'Disipación de Carga Residual en Matriz 3x3',
-    classificationCode: 'DOC-PWR-09',
-    description:
-      'La matriz contiene 9 celdas magnéticas identificadas de A1 a C3. El núcleo presenta un estado de diagnóstico en su pantalla central. Para desenergizar el módulo sin cortocircuitar el sistema, las celdas activas finales deben coincidir exactamente con el patrón de seguridad.',
-    rules: [
-      {
-        condition: 'Si el núcleo indica «ESTABLE»:',
-        action: 'Activa únicamente la diagonal principal: A1, B2 y C3. Apaga todas las demás.',
-      },
-      {
-        condition: 'Si el núcleo indica «CRÍTICO»:',
-        action: 'Forma la cruz de emergencia activando: B2 (centro), A2, C2, B1 y B3.',
-      },
-      {
-        condition: 'Si el núcleo indica «PURGA_REQUERIDA»:',
-        action: 'Activa únicamente las cuatro esquinas: A1, A3, C1 y C3.',
-      },
-    ],
-    notes: [
-      'El Operador puede hacer clic en cualquier celda para encenderla o apagarla.',
-      'Una vez configurado el patrón deseado, debe presionar el botón «DESCARGAR MATRIZ».',
-      'Si el patrón al pulsar «DESCARGAR» no es el exacto, saltará un Strike de sobretensión.',
-    ],
-  };
+  const manualSection = MASTER_MANUAL_SECTIONS.find((s) => s.moduleType === 'MATRIZ_ENERGIA')!;
 
   return {
     moduleState: {
@@ -415,60 +411,99 @@ function generateMatrizEnergia(rng: Mulberry32): GeneratedModuleInternal {
 }
 
 // =========================================================================
-// 5. SELECTOR DE VÁLVULAS NEUMÁTICAS
+// 5. VÁLVULAS DE PRESIÓN NEUMÁTICA
 // =========================================================================
-function generateValvulasPresion(rng: Mulberry32): GeneratedModuleInternal {
-  // 3 Manómetros: PSI de 10 a 90
-  const psiA = rng.range(2, 9) * 10;
-  const psiB = rng.range(2, 9) * 10;
-  const psiC = rng.range(2, 9) * 10;
-  const ledColors = ['VERDE', 'AMBAR', 'AZUL'] as const;
-  const ledColor = rng.pick([...ledColors]);
+function generateValvulasPresion(rng: Mulberry32, serial: string = 'CR-4821-X7'): GeneratedModuleInternal {
+  // One single system pressure between 20 PSI and 95 PSI (step of 5)
+  const systemPressurePSI = rng.range(4, 19) * 5; // 20, 25, 30 ... 95 PSI
+  const isSerialOdd = !isSerialLastDigitEven(serial);
 
-  // Target angles (0°, 45°, 90°)
-  let targetA = 0;
-  let targetB = 0;
-  let targetC = 0;
-
-  if (ledColor === 'VERDE') {
-    targetA = psiA >= 50 ? 90 : 0;
-    targetB = 45;
-    targetC = psiC > psiB ? 90 : 45;
-  } else if (ledColor === 'AMBAR') {
-    targetA = 45;
-    targetB = psiB >= 60 ? 90 : 0;
-    targetC = 0;
+  // Determine zone
+  let indicatorZone: 'ROJA' | 'AMBAR' | 'VERDE' = 'AMBAR';
+  if (systemPressurePSI > 80) {
+    indicatorZone = 'ROJA';
+  } else if (systemPressurePSI >= 40) {
+    indicatorZone = 'AMBAR';
   } else {
-    // AZUL
-    targetA = 90;
-    targetB = psiA > psiC ? 0 : 45;
-    targetC = 90;
+    indicatorZone = 'VERDE';
+  }
+
+  // Canonical valve angles: ONLY 0, 45, or 90 degrees
+  let targetA: 0 | 45 | 90 = 0;
+  let targetB: 0 | 45 | 90 = 0;
+  let targetC: 0 | 45 | 90 = 0;
+
+  if (indicatorZone === 'ROJA') {
+    if (isSerialOdd) {
+      targetA = 90;
+      targetB = 0;
+      targetC = 45;
+    } else {
+      targetA = 90;
+      targetB = 45;
+      targetC = 0;
+    }
+  } else if (indicatorZone === 'AMBAR') {
+    if (isSerialOdd) {
+      targetA = 0;
+      targetB = 45;
+      targetC = 90;
+    } else {
+      targetA = 45;
+      targetB = 90;
+      targetC = 45;
+    }
+  } else {
+    // VERDE
+    if (isSerialOdd) {
+      targetA = 45;
+      targetB = 0;
+      targetC = 45;
+    } else {
+      targetA = 0;
+      targetB = 0;
+      targetC = 90;
+    }
   }
 
   const manualSection: CodigoRojoManualSection = {
     moduleType: 'VALVULAS_PRESION',
-    title: 'Selector de Válvulas Neumáticas',
-    subtitle: 'Compensación de Cámaras de Presión',
-    classificationCode: 'DOC-PNE-12',
+    category: 'ENERGÍA',
+    title: 'Válvulas de Presión Neumática',
+    subtitle: 'Purga y Compensación de Presión de Fluidos',
+    classificationCode: 'DOC-FLU-05',
+    division: 'Fluidos y Termodinámica',
+    visualIdentification:
+      'Un gran manómetro central indica la PRESIÓN DEL SISTEMA en PSI. Debajo se encuentran tres válvulas rotativas rotuladas como VÁLVULA A, VÁLVULA B y VÁLVULA C, ajustables exclusivamente a 0°, 45° o 90°. En la base se ubica el mando de purga «PURGAR PRESIÓN».',
+    identificationChecklist: [
+      'Un único manómetro central indicador de la PRESIÓN DEL SISTEMA en PSI.',
+      'Tres ruedas de válvula giratorias: VÁLVULA A, VÁLVULA B y VÁLVULA C.',
+      'Tres únicas posiciones angulares por válvula: 0° (horizontal), 45° (diagonal) y 90° (vertical).',
+      'Pulsador de descarga «PURGAR PRESIÓN».',
+    ],
     description:
-      'Tres manómetros (A, B, C) miden la presión interna y una luz indicadora marca el modo de purga (VERDE, ÁMBAR o AZUL). Cada válvula dispone de 3 posiciones angulares: 0° (Cerrada / Horizontal), 45° (Media) y 90° (Abierta / Vertical).',
+      'Las líneas hidráulicas del núcleo están bajo presión. El Operador debe comunicar la PRESIÓN DEL SISTEMA en PSI leída en el manómetro central. Los Guías determinan la zona de presión y dictan los ángulos exactos (0°, 45° o 90°) a los que deben orientarse la VÁLVULA A, la VÁLVULA B y la VÁLVULA C antes de accionar la purga.',
     rules: [
       {
-        condition: 'Si la luz indicadora es VERDE:',
-        action: 'Válvula A: 90° si PSI A ≥ 50, sino 0°. Válvula B: fijar en 45°. Válvula C: 90° si PSI C > PSI B, sino 45°.',
+        condition: 'CASO 1: PRESIÓN DEL SISTEMA > 80 PSI (ZONA ROJA)',
+        action:
+          '• Si la última cifra del número de serie de la máquina es PAR:\n  Coloca VÁLVULA A a 90°, VÁLVULA B a 45° y VÁLVULA C a 0°.\n• Si la última cifra es IMPAR:\n  Coloca VÁLVULA A a 90°, VÁLVULA B a 0° y VÁLVULA C a 45°.\nDespués acciona «PURGAR PRESIÓN».',
       },
       {
-        condition: 'Si la luz indicadora es ÁMBAR:',
-        action: 'Válvula A: fijar en 45°. Válvula B: 90° si PSI B ≥ 60, sino 0°. Válvula C: fijar en 0°.',
+        condition: 'CASO 2: PRESIÓN DEL SISTEMA DE 40 A 80 PSI (ZONA ÁMBAR)',
+        action:
+          '• Si la última cifra del número de serie es PAR:\n  Coloca VÁLVULA A a 45°, VÁLVULA B a 90° y VÁLVULA C a 45°.\n• Si la última cifra es IMPAR:\n  Coloca VÁLVULA A a 0°, VÁLVULA B a 45° y VÁLVULA C a 90°.\nDespués acciona «PURGAR PRESIÓN».',
       },
       {
-        condition: 'Si la luz indicadora es AZUL:',
-        action: 'Válvula A: fijar en 90°. Válvula B: 0° si PSI A > PSI C, sino 45°. Válvula C: fijar en 90°.',
+        condition: 'CASO 3: PRESIÓN DEL SISTEMA < 40 PSI (ZONA VERDE)',
+        action:
+          '• Si la última cifra del número de serie es PAR:\n  Coloca VÁLVULA A a 0°, VÁLVULA B a 0° y VÁLVULA C a 90°.\n• Si la última cifra es IMPAR:\n  Coloca VÁLVULA A a 45°, VÁLVULA B a 0° y VÁLVULA C a 45°.\nDespués acciona «PURGAR PRESIÓN».',
       },
     ],
     notes: [
-      'El Operador ajusta las 3 válvulas a sus posiciones exactas y pulsa «PURGAR PRESIÓN».',
-      'Cualquier posición de válvula discordante generará una fuga de alta presión (Strike).',
+      'Las únicas posiciones válidas para cada válvula son 0°, 45° y 90°.',
+      'El Operador puede girar las válvulas libremente sin penalización.',
+      'La evaluación se realiza únicamente al pulsar «PURGAR PRESIÓN». Un intento incorrecto sumará como máximo 1 Strike.',
     ],
   };
 
@@ -476,15 +511,13 @@ function generateValvulasPresion(rng: Mulberry32): GeneratedModuleInternal {
     moduleState: {
       id: `mod-valvulas-${rng.range(1000, 9999)}`,
       moduleType: 'VALVULAS_PRESION',
-      title: 'Selector de Válvulas Neumáticas',
+      title: 'Válvulas de Presión Neumática',
       solved: false,
       strikes: 0,
-      estimatedSolveSeconds: 45,
+      estimatedSolveSeconds: 40,
       operatorState: {
-        psiA,
-        psiB,
-        psiC,
-        ledColor,
+        systemPressurePSI,
+        indicatorZone,
         valves: { a: 0, b: 0, c: 0 },
       },
       manualSection,
@@ -500,62 +533,102 @@ function generateValvulasPresion(rng: Mulberry32): GeneratedModuleInternal {
 }
 
 // =========================================================================
-// 6. SECUENCIA DE RELÉS HEXADECIMALES
+// 6. RELÉS HEXADECIMALES
 // =========================================================================
-function generateRelesHexadecimales(rng: Mulberry32): GeneratedModuleInternal {
-  const hexChars = ['3A', '7F', 'C2', '9E', '5B', 'E4', '2D', '8C', 'F1', '40'];
-  const relays = [
-    rng.pick(hexChars),
-    rng.pick(hexChars),
-    rng.pick(hexChars),
-    rng.pick(hexChars),
-  ];
+function generateRelesHexadecimales(rng: Mulberry32, serial: string = 'CR-4821-X7'): GeneratedModuleInternal {
+  // Generate ONE single 2-digit hexadecimal register (0x10 to 0xFE)
+  const hexVal = rng.range(0x10, 0xFE);
+  const hexRegister = `0x${hexVal.toString(16).toUpperCase().padStart(2, '0')}`;
+  const firstChar = hexRegister.charAt(2);
+  const secondChar = hexRegister.charAt(3);
+  const firstDigit = parseInt(firstChar, 16);
+  const secondDigit = parseInt(secondChar, 16);
 
-  // Evaluate UP or DOWN for each switch (0 = DOWN, 1 = UP)
-  // Rule 1: Switch 1 is UP if the first hex value starts with A-F, else DOWN
-  const sw0 = /^[A-F]/.test(relays[0]) ? 1 : 0;
-  // Rule 2: Switch 2 is UP if the second hex value ends in an even number (0,2,4,6,8,A,C,E)
-  const lastChar = relays[1][1];
-  const sw1 = ['0', '2', '4', '6', '8', 'A', 'C', 'E'].includes(lastChar) ? 1 : 0;
-  // Rule 3: Switch 3 is UP if the sum of numeric digits across all 4 displays is > 10
-  const digits = relays.join('').replace(/[^0-9]/g, '');
-  const sumDigits = digits.split('').reduce((acc, c) => acc + parseInt(c, 10), 0);
-  const sw2 = sumDigits > 10 ? 1 : 0;
-  // Rule 4: Switch 4 is UP if at least two relays contain the same character
-  const allChars = relays.join('');
-  const hasDup = new Set(allChars.split('')).size < allChars.length;
-  const sw3 = hasDup ? 1 : 0;
+  const lastSerialDigit = getSerialLastDigit(serial);
+  const isSerialOdd = !isSerialLastDigitEven(serial);
+  const isFirstCharNumeric = /[0-9]/.test(firstChar);
 
-  const targetSwitches = [sw0, sw1, sw2, sw3];
+  // Authoritative transformation producing a 4-bit integer (0 to 15)
+  let transformedValue = 0;
+
+  if (isFirstCharNumeric) {
+    if (!isSerialOdd) {
+      // Rule 1A: Numeric first char + Even serial -> 0xNN AND 0x0F
+      transformedValue = hexVal & 0x0F;
+    } else {
+      // Rule 1B: Numeric first char + Odd serial -> (Second nibble XOR last serial digit) mod 16
+      transformedValue = (secondDigit ^ (lastSerialDigit % 16)) & 0x0F;
+    }
+  } else {
+    // First char is letter A-F
+    if (!isSerialOdd) {
+      // Rule 2A: Alpha first char + Even serial -> First nibble XOR second nibble
+      transformedValue = (firstDigit ^ secondDigit) & 0x0F;
+    } else {
+      // Rule 2B: Alpha first char + Odd serial -> Invert lower nibble (15 - secondDigit)
+      transformedValue = (15 - secondDigit) & 0x0F;
+    }
+  }
+
+  // Ensure result is strictly 0..15 (4 bits)
+  transformedValue = ((transformedValue % 16) + 16) % 16;
+
+  // Bits: R1 = MSB (bit 3), R2 = bit 2, R3 = bit 1, R4 = LSB (bit 0)
+  // 1 = ARRIBA, 0 = ABAJO
+  const r1 = (transformedValue >> 3) & 1;
+  const r2 = (transformedValue >> 2) & 1;
+  const r3 = (transformedValue >> 1) & 1;
+  const r4 = transformedValue & 1;
+  const targetSwitches = [r1, r2, r3, r4];
 
   const manualSection: CodigoRojoManualSection = {
     moduleType: 'RELES_HEXADECIMALES',
-    title: 'Secuencia de Relés Hexadecimales',
-    subtitle: 'Protocolo de Conmutación Lógica de Buses',
-    classificationCode: 'DOC-HEX-15',
+    category: 'ELECTRICIDAD',
+    title: 'Relés Hexadecimales',
+    subtitle: 'Decodificación Lógica de Registro Base 16',
+    classificationCode: 'DOC-LOG-06',
+    division: 'Lógica Digital y Cómputo',
+    visualIdentification:
+      'El panel contiene UNA única pantalla central con un Registro Hexadecimal (ej. 0x3A, 0x7F, 0xC4) y debajo un banco de CUATRO interruptores de relé biestables etiquetados R1, R2, R3 y R4. Cada relé puede conmutarse a ARRIBA (1) o ABAJO (0). En la parte inferior se encuentra el pulsador «ENCLAVAR RELÉS».',
+    identificationChecklist: [
+      'UNA sola pantalla digital con un registro hexadecimal (0x00 a 0xFF).',
+      'CUATRO interruptores de palanca verticales: R1, R2, R3, R4.',
+      'Dos posiciones por interruptor: ARRIBA (1) y ABAJO (0).',
+      'Pulsador de confirmación «ENCLAVAR RELÉS».',
+    ],
     description:
-      'Cuatro pantallas digitales muestran valores en código hexadecimal (R1, R2, R3, R4) sobre cuatro interruptores de palanca. Cada interruptor puede posicionarse ARRIBA o ABAJO.',
+      'El bus de datos está bloqueado en un registro hexadecimal. Los Guías deben aplicar la regla correspondiente según el primer carácter del registro y la serie de la máquina para obtener un valor final de 4 bits. Dichos 4 bits determinan la posición de los cuatro relés (R1 a R4).',
+    tableHeaders: ['HEX', 'Binario (R1-R2-R3-R4)', 'HEX', 'Binario (R1-R2-R3-R4)'],
+    tableRows: [
+      ['0', '0000 (Abajo-Abajo-Abajo-Abajo)', '8', '1000 (Arriba-Abajo-Abajo-Abajo)'],
+      ['1', '0001 (Abajo-Abajo-Abajo-Arriba)', '9', '1001 (Arriba-Abajo-Abajo-Arriba)'],
+      ['2', '0010 (Abajo-Abajo-Arriba-Abajo)', 'A', '1010 (Arriba-Abajo-Arriba-Abajo)'],
+      ['3', '0011 (Abajo-Abajo-Arriba-Arriba)', 'B', '1011 (Arriba-Abajo-Arriba-Arriba)'],
+      ['4', '0100 (Abajo-Arriba-Abajo-Abajo)', 'C', '1100 (Arriba-Arriba-Abajo-Abajo)'],
+      ['5', '0101 (Abajo-Arriba-Abajo-Arriba)', 'D', '1101 (Arriba-Arriba-Abajo-Arriba)'],
+      ['6', '0110 (Abajo-Arriba-Arriba-Abajo)', 'E', '1110 (Arriba-Arriba-Arriba-Abajo)'],
+      ['7', '0111 (Abajo-Arriba-Arriba-Arriba)', 'F', '1111 (Arriba-Arriba-Arriba-Arriba)'],
+    ],
     rules: [
       {
-        condition: 'Interruptor 1:',
-        action: 'ARRIBA si el código de R1 comienza por letra (A-F). En caso contrario, ABAJO.',
+        condition: 'CASO 1: EL PRIMER CARÁCTER TRAS «0x» ES UN NÚMERO (0 al 9):',
+        action:
+          '• Si la última cifra del número de serie de la máquina es PAR:\n  Aplica operación AND con 0x0F (toma directamente el segundo dígito hexadecimal).\n• Si la última cifra del número de serie es IMPAR:\n  Aplica operación XOR entre el segundo dígito hexadecimal y la última cifra de la serie (módulo 16).',
       },
       {
-        condition: 'Interruptor 2:',
-        action: 'ARRIBA si el último carácter de R2 es par (0, 2, 4, 6, 8, A, C, E). En caso contrario, ABAJO.',
+        condition: 'CASO 2: EL PRIMER CARÁCTER TRAS «0x» ES UNA LETRA (A a la F):',
+        action:
+          '• Si la última cifra del número de serie es PAR:\n  Aplica operación XOR entre el primer dígito hexadecimal y el segundo dígito hexadecimal.\n• Si la última cifra del número de serie es IMPAR:\n  Invierte los 4 bits del segundo dígito hexadecimal (resta el valor del segundo dígito a 15: ej. 15 - F = 0, 15 - A = 5).',
       },
       {
-        condition: 'Interruptor 3:',
-        action: 'ARRIBA si la suma de todas las cifras numéricas visibles (0-9) en los 4 relés supera 10. En caso contrario, ABAJO.',
-      },
-      {
-        condition: 'Interruptor 4:',
-        action: 'ARRIBA si hay algún carácter (letra o número) repetido entre los 4 códigos. En caso contrario, ABAJO.',
+        condition: 'CONFIGURACIÓN DE LOS 4 RELÉS (1 = ARRIBA, 0 = ABAJO):',
+        action:
+          'Localiza el valor hexadecimal obtenido (0 a F) en la tabla de referencia superior:\n• R1 = Primer bit (Bit más significativo)\n• R2 = Segundo bit\n• R3 = Tercer bit\n• R4 = Cuarto bit (Bit menos significativo)\nColoca cada interruptor en su posición y pulsa «ENCLAVAR RELÉS».',
       },
     ],
     notes: [
-      'El Operador ajusta los 4 conmutadores y pulsa «ENCLAVAR RELÉS».',
-      'Si alguno no coincide, se produce un arco voltaico (Strike).',
+      'Ejemplo: Registro 0x3A con número de serie terminado en 4 (PAR). El primer carácter «3» es numérico y la serie es par → resultado = A (segundo dígito). Según la tabla, A = 1010 → R1 = ARRIBA, R2 = ABAJO, R3 = ARRIBA, R4 = ABAJO.',
+      'El Operador puede conmutar los relés libremente sin penalización. La validación ocurre solo al pulsar «ENCLAVAR RELÉS». Un envío erróneo sumará como máximo 1 Strike.',
     ],
   };
 
@@ -563,19 +636,22 @@ function generateRelesHexadecimales(rng: Mulberry32): GeneratedModuleInternal {
     moduleState: {
       id: `mod-reles-${rng.range(1000, 9999)}`,
       moduleType: 'RELES_HEXADECIMALES',
-      title: 'Secuencia de Relés Hexadecimales',
+      title: 'Relés Hexadecimales',
       solved: false,
       strikes: 0,
       estimatedSolveSeconds: 40,
       operatorState: {
-        relays,
+        register: hexRegister,
         switches: [0, 0, 0, 0],
       },
       manualSection,
     },
     internalSolution: { targetSwitches },
     validateAction: (action: { switches: number[] }) => {
-      const match = action.switches.every((s, i) => s === targetSwitches[i]);
+      const match =
+        Array.isArray(action.switches) &&
+        action.switches.length === 4 &&
+        action.switches.every((s, i) => s === targetSwitches[i]);
       if (match) {
         return { valid: true, solved: true };
       }
@@ -600,34 +676,38 @@ function generateRadarVectorial(rng: Mulberry32): GeneratedModuleInternal {
   ];
 
   // True target logic:
-  // If sweep is HORARIO: Target is the blip in the outermost ring (highest ring). If tie, pick SIERRA or TANGO.
-  // If sweep is ANTIHORARIO: Target is the blip in the innermost ring (ring 1). If tie, pick BRAVO or ECHO.
+  // If sweep is HORARIO: Target is the blip in the outermost ring (highest ring).
+  // Tie-breaker order in HORARIO (clockwise starting from North): SIERRA > BRAVO > ECHO > TANGO.
+  // If sweep is ANTIHORARIO: Target is the blip in the innermost ring (ring 1).
+  // Tie-breaker order in ANTIHORARIO (Southern hemisphere priority): BRAVO > ECHO > TANGO > SIERRA.
   let targetBlipName = 'TANGO';
   if (sweepDir === 'HORARIO') {
     const maxRing = Math.max(...blips.map((b) => b.ring));
     const cand = blips.filter((b) => b.ring === maxRing);
-    targetBlipName = cand[0].name;
+    const orderHorario = ['SIERRA', 'BRAVO', 'ECHO', 'TANGO'];
+    targetBlipName = orderHorario.find((name) => cand.some((c) => c.name === name)) || cand[0].name;
   } else {
     const minRing = Math.min(...blips.map((b) => b.ring));
     const cand = blips.filter((b) => b.ring === minRing);
-    targetBlipName = cand[cand.length - 1].name;
+    const orderAntihorario = ['BRAVO', 'ECHO', 'TANGO', 'SIERRA'];
+    targetBlipName = orderAntihorario.find((name) => cand.some((c) => c.name === name)) || cand[0].name;
   }
 
   const manualSection: CodigoRojoManualSection = {
     moduleType: 'RADAR_VECTORIAL',
     title: 'Radar de Coordenadas Tácticas',
     subtitle: 'Identificación de Baliza de Intercepción',
-    classificationCode: 'DOC-NAV-18',
+    classificationCode: 'DOC-NAV-07',
     description:
       'Una pantalla CRT táctica muestra un haz de barrido giratorio y cuatro contactos de radar: TANGO (Noroeste), SIERRA (Noreste), BRAVO (Sureste) y ECHO (Suroeste). Los anillos concéntricos marcan la distancia (1 = interior, 3 = exterior).',
     rules: [
       {
         condition: 'Si el haz gira en sentido HORARIO:',
-        action: 'El objetivo auténtico es el contacto en el anillo MÁS EXTERIOR (mayor número). En caso de empate, prioriza el primer contacto alcanzado tras el Norte (SIERRA sobre TANGO).',
+        action: 'El objetivo auténtico es el contacto en el anillo MÁS EXTERIOR (mayor número). En caso de empate, prioriza el orden horario tras el Norte: SIERRA > BRAVO > ECHO > TANGO.',
       },
       {
         condition: 'Si el haz gira en sentido ANTIHORARIO:',
-        action: 'El objetivo auténtico es el contacto en el anillo MÁS INTERIOR (menor número). En caso de empate, prioriza el contacto del hemisferio Sur (BRAVO sobre ECHO).',
+        action: 'El objetivo auténtico es el contacto en el anillo MÁS INTERIOR (menor número). En caso de empate, prioriza los contactos del hemisferio Sur: BRAVO > ECHO > TANGO > SIERRA.',
       },
     ],
     notes: [
@@ -734,21 +814,27 @@ function generateSeñalOptica(rng: Mulberry32): GeneratedModuleInternal {
 // =========================================================================
 // 9. TECLADO DE AUTENTICACIÓN MAESTRO
 // =========================================================================
-function generateTecladoMaestro(rng: Mulberry32): GeneratedModuleInternal {
-  // Serial prompt e.g. "SYS-4821" or "SYS-9137"
-  const digits = [rng.range(1, 9), rng.range(0, 9), rng.range(0, 9), rng.range(1, 9)];
-  const serial = `SYS-${digits.join('')}`;
+function generateTecladoMaestro(
+  rng: Mulberry32,
+  machineSerial: string = 'SEC-214-W8'
+): GeneratedModuleInternal {
+  // Extraer cifras numéricas de izquierda a derecha ignorando letras y símbolos
+  const digits = extractSerialDigits(machineSerial);
+  const d1 = digits[0];
+  const d2 = digits[1];
+  const d3 = digits[2];
+  const d4 = digits[3];
   const ledAux = rng.next() > 0.5; // true / false
 
-  // Algorithm to compute 4-digit code:
-  // Digit 1: (digits[0] + (ledAux ? 3 : 1)) % 10
-  // Digit 2: (digits[1] + 5) % 10
-  // Digit 3: Math.abs(digits[2] - 2)
-  // Digit 4: (digits[3] * 2) % 10
-  const c1 = (digits[0] + (ledAux ? 3 : 1)) % 10;
-  const c2 = (digits[1] + 5) % 10;
-  const c3 = Math.abs(digits[2] - 2);
-  const c4 = (digits[3] * 2) % 10;
+  // Algoritmo para calcular el PIN de 4 dígitos:
+  // D1: (d1 + (ledAux ? 3 : 1)) % 10
+  // D2: (d2 + 5) % 10
+  // D3: Math.abs(d3 - 2)
+  // D4: (d4 * 2) % 10
+  const c1 = (d1 + (ledAux ? 3 : 1)) % 10;
+  const c2 = (d2 + 5) % 10;
+  const c3 = Math.abs(d3 - 2);
+  const c4 = (d4 * 2) % 10;
   const targetPin = `${c1}${c2}${c3}${c4}`;
 
   const manualSection: CodigoRojoManualSection = {
@@ -757,29 +843,39 @@ function generateTecladoMaestro(rng: Mulberry32): GeneratedModuleInternal {
     subtitle: 'Descifrado de Contraseña de Desbloqueo',
     classificationCode: 'DOC-SEC-25',
     description:
-      'Un teclado numérico protegido requiere un código PIN de 4 dígitos. La pantalla muestra un identificador de sistema («SYS-XXXX») y un LED de Alimentación Auxiliar (ENCENDIDO / APAGADO).',
+      'Un teclado numérico protegido requiere un código PIN de 4 cifras. El código se deriva aplicando el protocolo criptográfico sobre las cifras numéricas del número de serie de la máquina y el estado del LED auxiliar.',
     rules: [
       {
-        condition: '1er Dígito del PIN:',
-        action: 'Toma el 1er dígito del serial y súmale 3 si el LED auxiliar está encendido, o súmale 1 si está apagado (si pasa de 9, quédate con la última cifra).',
+        condition: 'LECTURA DEL NÚMERO DE SERIE:',
+        action:
+          'Para este protocolo, ignora las letras y símbolos del número de serie de la máquina. Utiliza únicamente sus cifras numéricas, leídas de izquierda a derecha (Ejemplo: SEC-527-X4 → 5 · 2 · 7 · 4). La primera cifra es D1, la segunda D2, la tercera D3 y la cuarta D4.',
       },
       {
-        condition: '2º Dígito del PIN:',
-        action: 'Toma el 2º dígito del serial y súmale 5 (si pasa de 9, quédate con la última cifra).',
+        condition: '1.ª cifra numérica del PIN (D1):',
+        action:
+          'Toma la 1.ª cifra numérica del serial (D1). Súmale 3 si el LED auxiliar está ENCENDIDO, o súmale 1 si está APAGADO. Si el resultado es mayor que 9, quédate con la última cifra (o mod 10).',
       },
       {
-        condition: '3er Dígito del PIN:',
-        action: 'Resta 2 al 3er dígito del serial (si da negativo, conviértelo en positivo absoluto).',
+        condition: '2.ª cifra numérica del PIN (D2):',
+        action:
+          'Toma la 2.ª cifra numérica del serial (D2) y súmale 5. Si el resultado es mayor que 9, quédate con la última cifra (o mod 10).',
       },
       {
-        condition: '4º Dígito del PIN:',
-        action: 'Multiplica el 4º dígito del serial por 2 (quédate con la última cifra si pasa de 9).',
+        condition: '3.ª cifra numérica del PIN (D3):',
+        action:
+          'Toma la 3.ª cifra numérica del serial (D3) y réstale 2. Si el resultado da negativo, toma su valor positivo absoluto (|D3 - 2|).',
+      },
+      {
+        condition: '4.ª cifra numérica del PIN (D4):',
+        action:
+          'Toma la 4.ª cifra numérica del serial (D4) y multiplícala por 2. Si el resultado es mayor que 9, quédate con la última cifra (o mod 10).',
       },
     ],
     notes: [
-      'Ejemplo: Serial SYS-4821 con LED encendido: (4+3=7), (8+5=13→3), (|2-2|=0), (1x2=2) → PIN = 7302.',
-      'El Operador introduce los 4 dígitos y pulsa «ENTER».',
-      'Introducir un PIN erróneo bloqueará el módulo temporalmente y sumará un Strike.',
+      'REGLA DE EXTRACCIÓN: Ignora letras y guiones. En un serial como SEC-527-X4, las 4 cifras son D1=5, D2=2, D3=7 y D4=4 (el 4 final cuenta).',
+      'Ejemplo con SEC-527-X4 y LED ENCENDIDO: D1=(5+3=8), D2=(2+5=7), D3=(|7-2|=5), D4=(4×2=8) → PIN = 8758.',
+      'El Operador introduce las 4 cifras del PIN calculado y pulsa «ENTER».',
+      'Introducir un PIN erróneo sumará un Strike y reiniciará la entrada.',
     ],
   };
 
@@ -792,7 +888,7 @@ function generateTecladoMaestro(rng: Mulberry32): GeneratedModuleInternal {
       strikes: 0,
       estimatedSolveSeconds: 45,
       operatorState: {
-        serial,
+        serial: machineSerial,
         ledAux,
         currentInput: '',
       },
@@ -1689,15 +1785,15 @@ export function generateModuleInstance(
     case 'MATRIZ_ENERGIA':
       return generateMatrizEnergia(rng);
     case 'VALVULAS_PRESION':
-      return generateValvulasPresion(rng);
+      return generateValvulasPresion(rng, serial);
     case 'RELES_HEXADECIMALES':
-      return generateRelesHexadecimales(rng);
+      return generateRelesHexadecimales(rng, serial);
     case 'RADAR_VECTORIAL':
       return generateRadarVectorial(rng);
     case 'SEÑAL_OPTICA':
       return generateSeñalOptica(rng);
     case 'TECLADO_MAESTRO':
-      return generateTecladoMaestro(rng);
+      return generateTecladoMaestro(rng, serial);
     case 'PALANCA_SOBRECARGA':
       return generatePalancaSobrecarga(rng);
     case 'COMPUERTAS_LOGICAS':

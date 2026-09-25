@@ -539,6 +539,14 @@ export function useCodigoRojoSocket({
     [sendMessage]
   );
 
+  const selectOperator = useCallback(
+    (operatorPlayerId: string) => {
+      audio.playMechanicalSwitch();
+      sendMessage({ type: 'SELECT_OPERATOR', operatorPlayerId });
+    },
+    [sendMessage]
+  );
+
   return {
     connectionStatus,
     roomState,
@@ -554,5 +562,6 @@ export function useCodigoRojoSocket({
     leaveRoom,
     kickPlayer,
     updateProfile,
+    selectOperator,
   };
 }
