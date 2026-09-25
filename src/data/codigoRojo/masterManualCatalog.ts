@@ -743,7 +743,7 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
       {
         condition: 'PASO 4: CALIBRACIÓN Y BLOQUEO',
         action:
-          'El Rumbo Objetivo se normaliza en el rango 0° a 359° (módulo 360). El Operador ajusta los mandos al grado exacto (±2°) y pulsa «FIJAR RUMBO».',
+          'Obtén el RUMBO OBJETIVO calculado en los pasos anteriores.\n\n• Si el resultado supera 359°, resta 360° hasta que quede entre 0° y 359°.\n• Si el resultado es negativo, suma 360° hasta que quede entre 0° y 359°.\n\nComunica el resultado al Operador. El Operador deberá ajustar el rumbo a ese valor (se admite un margen de ±2°) y pulsar «FIJAR RUMBO».\n\nEJEMPLO:\n• 382° → 22°  (porque 382° - 360° = 22°)\n• -15° → 345°  (porque -15° + 360° = 345°)',
       },
     ],
     notes: [

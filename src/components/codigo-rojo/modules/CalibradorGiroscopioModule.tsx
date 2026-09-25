@@ -20,7 +20,8 @@ export const CalibradorGiroscopioModule: React.FC<CalibradorGiroscopioModuleProp
   onAction,
 }) => {
   const { axis, pitch, led, currentBearing } = operatorState;
-  const [heading, setHeading] = useState(currentBearing);
+  const [heading, setHeading] = useState(operatorState.selectedHeading ?? currentBearing);
+  const [visualRotation, setVisualRotation] = useState(operatorState.selectedHeading ?? currentBearing);
 
   const adjustHeading = (delta: number) => {
     if (solved) return;
@@ -30,6 +31,7 @@ export const CalibradorGiroscopioModule: React.FC<CalibradorGiroscopioModuleProp
       if (next < 0) next += 360;
       return next;
     });
+    setVisualRotation((prev) => prev + delta);
   };
 
   const handleLock = () => {
@@ -77,38 +79,74 @@ export const CalibradorGiroscopioModule: React.FC<CalibradorGiroscopioModuleProp
 
       {/* Main Horizon Instrument Display */}
       <div className="w-full flex flex-col sm:flex-row items-center justify-around gap-6 my-4">
-        {/* Artificial Horizon Sphere */}
+        {/* Artificial Horizon Sphere / Kaleidoscope */}
         <div className="relative w-44 h-44 sm:w-52 sm:h-52 rounded-full border-4 border-slate-700 bg-slate-950 overflow-hidden shadow-2xl flex items-center justify-center">
-          {/* Horizon Background Sky / Ground */}
+          {/* Rotating Kaleidoscope / Gyro disc */}
           <div
-            className="absolute inset-0 transition-transform duration-500 ease-out"
+            className="absolute inset-0 transition-transform duration-300 ease-out"
             style={{
-              transform: `translateY(${pitchAngle}px) rotate(${-pitchAngle / 2}deg)`,
+              transform: `rotate(${-visualRotation}deg)`,
             }}
           >
-            {/* Sky (Blue/Cyan top) */}
-            <div className="w-full h-1/2 bg-gradient-to-b from-sky-900 to-sky-700 border-b-2 border-white/80" />
-            {/* Ground (Brown/Dark bottom) */}
-            <div className="w-full h-1/2 bg-gradient-to-t from-stone-900 to-amber-950/80" />
+            {/* Horizon Background Sky / Ground */}
+            <div
+              className="absolute inset-0 transition-transform duration-500 ease-out"
+              style={{
+                transform: `translateY(${pitchAngle}px) rotate(${-pitchAngle / 2}deg)`,
+              }}
+            >
+              {/* Sky (Blue/Cyan top) */}
+              <div className="w-full h-1/2 bg-gradient-to-b from-sky-900 to-sky-700 border-b-2 border-white/80" />
+              {/* Ground (Brown/Dark bottom) */}
+              <div className="w-full h-1/2 bg-gradient-to-t from-stone-900 to-amber-950/80" />
+            </div>
+
+            {/* Pitch Ladder Lines */}
+            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center gap-2 opacity-70">
+              <div className="w-12 h-0.5 bg-white/70" />
+              <div className="w-16 h-0.5 bg-white/90" />
+              <div className="w-24 h-1 bg-amber-400" />
+              <div className="w-16 h-0.5 bg-white/90" />
+              <div className="w-12 h-0.5 bg-white/70" />
+            </div>
+
+            {/* Azimuth / Compass Rose radial markings (kaleidoscope perimeter dial) */}
+            <div className="absolute inset-0 pointer-events-none">
+              {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => (
+                <div
+                  key={deg}
+                  className="absolute inset-0 flex justify-center items-start"
+                  style={{ transform: `rotate(${deg}deg)` }}
+                >
+                  <div
+                    className={`w-0.5 ${
+                      deg % 90 === 0 ? 'h-3.5 bg-amber-400' : 'h-2 bg-white/60'
+                    }`}
+                  />
+                  {deg % 90 === 0 && (
+                    <span
+                      className="absolute top-4 text-[9px] font-mono font-black text-amber-300 select-none"
+                      style={{ transform: `rotate(-${deg}deg)` }}
+                    >
+                      {deg === 0 ? 'N' : deg === 90 ? 'E' : deg === 180 ? 'S' : 'O'}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Pitch Ladder Lines */}
-          <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center gap-2 opacity-70">
-            <div className="w-12 h-0.5 bg-white/70" />
-            <div className="w-16 h-0.5 bg-white/90" />
-            <div className="w-24 h-1 bg-amber-400" />
-            <div className="w-16 h-0.5 bg-white/90" />
-            <div className="w-12 h-0.5 bg-white/70" />
-          </div>
-
-          {/* Center Airplane Reticle */}
-          <div className="relative z-10 w-10 h-10 border-2 border-amber-400 rounded-full flex items-center justify-center">
+          {/* Center Airplane Reticle (Fixed) */}
+          <div className="relative z-10 w-10 h-10 border-2 border-amber-400 rounded-full flex items-center justify-center pointer-events-none">
             <div className="w-3 h-3 bg-amber-400 rounded-full" />
             <div className="absolute w-16 h-0.5 bg-amber-400" />
           </div>
 
+          {/* Top Lubber line / Index marker at 12 o'clock */}
+          <div className="absolute top-1 z-20 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-amber-400 drop-shadow pointer-events-none" />
+
           {/* Bezel angle ring */}
-          <div className="absolute inset-0 rounded-full border border-slate-600/50 pointer-events-none" />
+          <div className="absolute inset-0 rounded-full border border-slate-600/50 pointer-events-none shadow-[inset_0_0_12px_rgba(0,0,0,0.6)]" />
         </div>
 
         {/* Gyro Data & Heading Dial */}
