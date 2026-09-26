@@ -98,7 +98,7 @@ export const MissionResultModal: React.FC<MissionResultModalProps> = ({
           {isSuccess ? '¡MISIÓN CUMPLIDA!' : '¡MISIÓN FALLIDA!'}
         </h2>
         <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-slate-400 mb-5">
-          MISIÓN {missionNumber} &bull; {isSuccess ? 'MÁQUINA COMPLETAMENTE DESACTIVADA' : 'COLAPSO DEL SISTEMA'}
+          MISIÓN {missionNumber} • {isSuccess ? 'MÁQUINA COMPLETAMENTE DESACTIVADA' : 'COLAPSO DEL SISTEMA'}
         </p>
 
         {endMessage && !isSuccess && (

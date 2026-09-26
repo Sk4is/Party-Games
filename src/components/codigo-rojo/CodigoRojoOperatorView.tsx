@@ -24,6 +24,16 @@ import { ReactorPlasmaModule } from './modules/ReactorPlasmaModule';
 import { FrecuenciaResonanciaModule } from './modules/FrecuenciaResonanciaModule';
 import { SecuenciaCineticaModule } from './modules/SecuenciaCineticaModule';
 import { DivisorVoltajeModule } from './modules/DivisorVoltajeModule';
+import { CamaraContrapesosModule } from './modules/CamaraContrapesosModule';
+import { PrismaRefraccionModule } from './modules/PrismaRefraccionModule';
+import { CircuitoRefrigeranteModule } from './modules/CircuitoRefrigeranteModule';
+import { AnillosCifradoModule } from './modules/AnillosCifradoModule';
+import { MasasMagneticasModule } from './modules/MasasMagneticasModule';
+import { PresionPistonModule } from './modules/PresionPistonModule';
+import { GiroscopioEstabilizacionModule } from './modules/GiroscopioEstabilizacionModule';
+import { CamaraCartuchosModule } from './modules/CamaraCartuchosModule';
+import { FlujoGravitacionalModule } from './modules/FlujoGravitacionalModule';
+import { PlacasSuperpuestasModule } from './modules/PlacasSuperpuestasModule';
 import { CodigoRojoLampEntrance } from './components/CodigoRojoLampEntrance';
 import {
   AlertTriangle,
@@ -247,7 +257,7 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-red-400">
-                CÓDIGO ROJO &bull; MISIÓN {missionNumber}
+                CÓDIGO ROJO • MISIÓN {missionNumber}
               </span>
               <span className="px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-[10px] font-black uppercase text-red-300">
                 OPERADOR
@@ -577,6 +587,76 @@ export const CodigoRojoOperatorView: React.FC<CodigoRojoOperatorViewProps> = ({
               )}
               {activeModule.moduleType === 'DIVISOR_VOLTAJE' && (
                 <DivisorVoltajeModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'CAMARA_CONTRAPESOS' && (
+                <CamaraContrapesosModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'PRISMA_REFRACCION' && (
+                <PrismaRefraccionModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'CIRCUITO_REFRIGERANTE' && (
+                <CircuitoRefrigeranteModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'ANILLOS_CIFRADO' && (
+                <AnillosCifradoModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'MASAS_MAGNETICAS' && (
+                <MasasMagneticasModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'PRESION_PISTON' && (
+                <PresionPistonModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'GIROSCOPIO_ESTABILIZACION' && (
+                <GiroscopioEstabilizacionModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'CAMARA_CARTUCHOS' && (
+                <CamaraCartuchosModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'FLUJO_GRAVITACIONAL' && (
+                <FlujoGravitacionalModule
+                  operatorState={activeModule.operatorState}
+                  solved={activeModule.solved}
+                  onAction={(act) => onSubmitAction(activeModule.id, act)}
+                />
+              )}
+              {activeModule.moduleType === 'PLACAS_SUPERPUESTAS' && (
+                <PlacasSuperpuestasModule
                   operatorState={activeModule.operatorState}
                   solved={activeModule.solved}
                   onAction={(act) => onSubmitAction(activeModule.id, act)}

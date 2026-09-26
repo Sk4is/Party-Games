@@ -281,8 +281,8 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
       'Pulsador de confirmación «ENCLAVAR RELÉS».',
     ],
     description:
-      'El bus de datos está bloqueado en un registro hexadecimal. Los Guías deben aplicar la regla correspondiente según el primer carácter del registro y la serie de la máquina para obtener un valor final de 4 bits. Dichos 4 bits determinan la posición de los cuatro relés (R1 a R4).',
-    tableHeaders: ['HEX', 'Binario (R1-R2-R3-R4)', 'HEX', 'Binario (R1-R2-R3-R4)'],
+      'El bus de datos está bloqueado en un registro hexadecimal. El Operador lee el registro de dos caracteres tras «0x» (ej. en «0x3A»: el primer carácter es 3 y el segundo es A). Los Guías determinan qué CARÁCTER OBJETIVO debe seleccionarse y consultan la tabla para obtener la posición de los 4 relés (R1 a R4).',
+    tableHeaders: ['HEX', 'Relés (R1-R2-R3-R4)', 'HEX', 'Relés (R1-R2-R3-R4)'],
     tableRows: [
       ['0', '0000 (Abajo-Abajo-Abajo-Abajo)', '8', '1000 (Arriba-Abajo-Abajo-Abajo)'],
       ['1', '0001 (Abajo-Abajo-Abajo-Arriba)', '9', '1001 (Arriba-Abajo-Abajo-Arriba)'],
@@ -295,23 +295,23 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     ],
     rules: [
       {
-        condition: 'CASO 1: EL PRIMER CARÁCTER TRAS «0x» ES UN NÚMERO (0 al 9):',
+        condition: 'PASO 1: LECTURA DEL REGISTRO',
         action:
-          '• Si la última cifra del número de serie de la máquina es PAR:\n  Aplica operación AND con 0x0F (toma directamente el segundo dígito hexadecimal).\n• Si la última cifra del número de serie es IMPAR:\n  Aplica operación XOR entre el segundo dígito hexadecimal y la última cifra de la serie (módulo 16).',
+          'El Operador comunica los dos caracteres visibles tras «0x» en pantalla:\n• Primer Carácter (C1)\n• Segundo Carácter (C2)\nEjemplo: en «0x3A», el primer carácter es «3» y el segundo es «A».',
       },
       {
-        condition: 'CASO 2: EL PRIMER CARÁCTER TRAS «0x» ES UNA LETRA (A a la F):',
+        condition: 'PASO 2: SELECCIÓN DEL CARÁCTER OBJETIVO',
         action:
-          '• Si la última cifra del número de serie es PAR:\n  Aplica operación XOR entre el primer dígito hexadecimal y el segundo dígito hexadecimal.\n• Si la última cifra del número de serie es IMPAR:\n  Invierte los 4 bits del segundo dígito hexadecimal (resta el valor del segundo dígito a 15: ej. 15 - F = 0, 15 - A = 5).',
+          'Aplica el caso que corresponda al tipo de caracteres del registro:\n\n• CASO A — AMBOS SON NÚMEROS (ej. 0x48):\n  - Si la última cifra del número de serie es PAR → Selecciona el SEGUNDO número (8).\n  - Si la última cifra del número de serie es IMPAR → Selecciona el PRIMER número (4).\n\n• CASO B — AMBOS SON LETRAS (ej. 0xCF):\n  - Si el número de serie contiene alguna VOCAL (A, E, I, O, U) → Selecciona la letra de MAYOR orden alfabético (F).\n  - Si NO contiene vocales → Selecciona la letra de MENOR orden alfabético (C).\n\n• CASO C — UN NÚMERO Y UNA LETRA (ej. 0x3A o 0xB4):\n  - Si la última cifra del número de serie es PAR → Selecciona la LETRA.\n  - Si la última cifra del número de serie es IMPAR → Selecciona el NÚMERO.',
       },
       {
-        condition: 'CONFIGURACIÓN DE LOS 4 RELÉS (1 = ARRIBA, 0 = ABAJO):',
+        condition: 'PASO 3: CONFIGURACIÓN DE LOS 4 RELÉS (1 = ARRIBA, 0 = ABAJO)',
         action:
-          'Localiza el valor hexadecimal obtenido (0 a F) en la tabla de referencia superior:\n• R1 = Primer bit (Bit más significativo)\n• R2 = Segundo bit\n• R3 = Tercer bit\n• R4 = Cuarto bit (Bit menos significativo)\nColoca cada interruptor en su posición y pulsa «ENCLAVAR RELÉS».',
+          'Localiza el carácter seleccionado en la tabla de referencia superior:\n• R1 = Primer interruptor\n• R2 = Segundo interruptor\n• R3 = Tercer interruptor\n• R4 = Cuarto interruptor\n\nEl Operador coloca cada interruptor en su posición y presiona «ENCLAVAR RELÉS».',
       },
     ],
     notes: [
-      'Ejemplo: Registro 0x3A con número de serie terminado en 4 (PAR). El primer carácter «3» es numérico y la serie es par → resultado = A (segundo dígito). Según la tabla, A = 1010 → R1 = ARRIBA, R2 = ABAJO, R3 = ARRIBA, R4 = ABAJO.',
+      'Ejemplo práctico: Registro 0x3A con número de serie terminado en 4 (PAR). Al ser un número y una letra (Caso C) y la serie terminar en par, el carácter objetivo es la LETRA → «A». En la tabla, A = 1010 → R1 = ARRIBA, R2 = ABAJO, R3 = ARRIBA, R4 = ABAJO.',
       'El Operador puede conmutar los relés libremente sin penalización. La validación ocurre solo al pulsar «ENCLAVAR RELÉS». Un envío erróneo sumará como máximo 1 Strike.',
     ],
   },
@@ -726,6 +726,11 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
       'La plataforma inercial ha sufrido deriva por turbulencia. El Operador debe comunicar el eje seleccionado, el estado del cabeceo y el rumbo inicial. El Guía calcula el ángulo de compensación exacto y el Operador calibra la esfera antes de bloquear el rumbo.',
     rules: [
       {
+        condition: 'IMPORTANTE — EL RUMBO ES CIRCULAR',
+        action:
+          'Trata el rumbo exactamente como una brújula:\n\nDespués de 359° se vuelve a 0°.\nAntes de 0° se vuelve a 359°.\n\nEjemplos:\n• 359° + 15° = 14°\n• 5° - 15° = 350°',
+      },
+      {
         condition: 'PASO 1: SELECCIÓN DEL EJE Y DERIVA BASE',
         action:
           '• Si el panel marca EJE X:\n  - Si la última cifra del número de serie es IMPAR → Deriva base = Azimut actual + 45°.\n  - Si es PAR → Deriva base = Azimut actual + 90°.\n• Si el panel marca EJE Y:\n  - Si la serie es IMPAR → Deriva base = Azimut actual + 180°.\n  - Si es PAR → Deriva base = Azimut actual + 30°.\n• Si el panel marca EJE Z:\n  - Si la serie es IMPAR → Deriva base = Azimut actual + 60°.\n  - Si es PAR → Deriva base = Azimut actual + 120°.',
@@ -741,13 +746,13 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
           '• Si el LED auxiliar parpadea en color ÁMBAR, invierte la compensación del Paso 2 (si sumaba, resta; si restaba, suma).\n• Si el LED está en VERDE o apagado, conserva la corrección del Paso 2.',
       },
       {
-        condition: 'PASO 4: CALIBRACIÓN Y BLOQUEO',
+        condition: 'PASO 4: FIJAR EL RUMBO',
         action:
-          'Obtén el RUMBO OBJETIVO calculado en los pasos anteriores.\n\n• Si el resultado supera 359°, resta 360° hasta que quede entre 0° y 359°.\n• Si el resultado es negativo, suma 360° hasta que quede entre 0° y 359°.\n\nComunica el resultado al Operador. El Operador deberá ajustar el rumbo a ese valor (se admite un margen de ±2°) y pulsar «FIJAR RUMBO».\n\nEJEMPLO:\n• 382° → 22°  (porque 382° - 360° = 22°)\n• -15° → 345°  (porque -15° + 360° = 345°)',
+          '👉 El resultado final de los pasos anteriores es el RUMBO OBJETIVO.\n\nComunícaselo al Operador.\n\nEl Operador debe ajustar el panel a ese rumbo y pulsar:\n\n«FIJAR RUMBO»\n\nSe admite un margen de ±2°.',
       },
     ],
     notes: [
-      'Si el resultado excede 360°, resta 360. Si es negativo, suma 360.',
+      'Se admite un margen de tolerancia de ±2° respecto al rumbo objetivo.',
       'Fijar el rumbo con una desviación mayor a 2 grados provocará una desorientación inercial y un Strike.',
     ],
   },
@@ -936,6 +941,451 @@ export const MASTER_MANUAL_SECTIONS: CodigoRojoManualSection[] = [
     notes: [
       'Al accionar la palanca con el dial en la posición correcta, la aguja caerá suavemente a 0 mV exactos y el módulo quedará resuelto.',
       'Un balance incorrecto producirá una sobretensión galvánica y un Strike.',
+    ],
+  },
+
+  // 21. CÁMARA DE CONTRAPESOS
+  {
+    moduleType: 'CAMARA_CONTRAPESOS',
+    category: 'MECÁNICA',
+    title: 'Cámara de Contrapesos',
+    subtitle: 'Equilibrado de Momentos de Inercia',
+    classificationCode: 'DOC-MEC-21',
+    division: 'Mecánica y Cinemática',
+    visualIdentification:
+      'Brazo balancín horizontal pivotado en fulcro central (muescas -3, -2, -1 a la izquierda y +1, +2, +3 a la derecha), banco inferior con 3 pesas suspendidas (Pesa A, B y C con masa en kg grabada), indicador de inclinación del brazo y pulsador «BLOQUEAR EQUILIBRIO».',
+    identificationChecklist: [
+      'Brazo balancín horizontal que se inclina físicamente según la masa colocada.',
+      'Muescas ranuradas a distancias 1, 2 y 3 respecto al centro.',
+      'Tres pesas metálicas (Pesa A: 2 kg, Pesa B: 4 kg, Pesa C: 6 kg o 7 kg).',
+      'Pulsador de fijación «BLOQUEAR EQUILIBRIO».',
+    ],
+    description:
+      'Un balancín descompensado bloquea el eje cinético primario. La física del sistema responde a la regla de palanca: Torque = Masa × Distancia al fulcro. Para que el brazo esté en reposo horizontal absoluto, el par total izquierdo debe igualar al par total derecho.',
+    rules: [
+      {
+        condition: '1. Ley de Equilibrio de Momentos:',
+        action:
+          'Torque Total Izquierdo (suma de Masa × Distancia en ranuras izquierdas) debe ser igual al Torque Total Derecho (Masa × Distancia en ranuras derechas).',
+      },
+      {
+        condition: '2. Asignación de lados según Número de Serie:',
+        action:
+          '• Si el número de serie CONTIENE alguna vocal (A, E, I, O, U) → La Pesa C (la más pesada) DEBE colocarse en el lado IZQUIERDO; la Pesa B (intermedia) en el lado DERECHO.\n• Si el número de serie NO contiene vocales → La Pesa C DEBE colocarse en el lado DERECHO; la Pesa B en el lado IZQUIERDO.\n• La Pesa A (ligera) se coloca en el lado y ranura necesarios para nivelar la balanza.',
+      },
+      {
+        condition: '3. Asignación de Ranuras:',
+        action:
+          '• Si el último dígito del número de serie es PAR: Coloca la Pesa C en la distancia 1. Coloca la Pesa B en la distancia 2. La Pesa A se sitúa en la distancia calculada para igualar los torques.\n• Si el último dígito es IMPAR: Coloca la Pesa C en la distancia 2. Coloca la Pesa B en la distancia 1 (o ranura de equilibrio calculada).',
+      },
+      {
+        condition: '4. Bloqueo:',
+        action:
+          'Una vez colocadas las 3 pesas y con el balancín estabilizado horizontalmente a 0°, el Operador pulsa «BLOQUEAR EQUILIBRIO».',
+      },
+    ],
+    notes: [
+      'Mover las pesas libremente no causa fallos; solo pulsar «BLOQUEAR EQUILIBRIO» con desequilibrio o en ranuras erróneas produce un Strike.',
+    ],
+  },
+
+  // 22. PRISMA DE REFRACCIÓN
+  {
+    moduleType: 'PRISMA_REFRACCION',
+    category: 'ÓPTICA',
+    title: 'Prisma de Refracción',
+    subtitle: 'Desviación Angular de Haz Colimado',
+    classificationCode: 'DOC-OPT-22',
+    division: 'Óptica y Fotónica',
+    visualIdentification:
+      'Emisor de haz láser continuo a la izquierda, plataforma giratoria con prisma triangular de cristal en el centro con selector angular, y un arco receptor a la derecha con 5 sensores numerados (S-1 a S-5). Botón «FIJAR PRISMA».',
+    identificationChecklist: [
+      'Emisor láser a la izquierda proyectando un haz luminoso coloreado.',
+      'Prisma triangular de vidrio montado sobre torreta giratoria de 360°.',
+      'Arco receptor de 5 sensores ópticos fotodiodos rotulados S-1, S-2, S-3, S-4, S-5.',
+      'Botón de enclavamiento óptico «FIJAR PRISMA».',
+    ],
+    description:
+      'Un haz láser colimado debe atravesar un prisma de alta dispersión para activar el fotodiodo sensor correcto. El Operador identifica el color del haz y el tipo de prisma; el Guía calcula el sensor objetivo y el Operador orienta el prisma.',
+    tableHeaders: ['Color del Haz', 'Prisma Flint (F)', 'Prisma Corona (K)', 'Prisma Fluorita (Ca)'],
+    tableRows: [
+      ['Rojo', 'Sensor S-2 (60°)', 'Sensor S-4 (120°)', 'Sensor S-1 (30°)'],
+      ['Verde', 'Sensor S-3 (90°)', 'Sensor S-1 (30°)', 'Sensor S-5 (150°)'],
+      ['Azul', 'Sensor S-5 (150°)', 'Sensor S-3 (90°)', 'Sensor S-2 (60°)'],
+      ['Ámbar', 'Sensor S-4 (120°)', 'Sensor S-2 (60°)', 'Sensor S-3 (90°)'],
+    ],
+    rules: [
+      {
+        condition: '1. Determinación de Sensor Base:',
+        action:
+          'Cruza el COLOR DEL HAZ (Rojo, Verde, Azul, Ámbar) con el TIPO DE PRISMA grabado en la montura (Flint-F, Corona-K, Fluorita-Ca) en la tabla superior.',
+      },
+      {
+        condition: '2. Desvío por Paridad de Serie:',
+        action:
+          '• Si el último dígito del número de serie es IMPAR: Desplaza el sensor objetivo un puesto adelante (+1). Ejemplo: S-2 pasa a S-3; si es S-5, rota a S-1.\n• Si el último dígito es PAR: Mantén el sensor obtenido en la tabla sin modificar.',
+      },
+      {
+        condition: '3. Calibración y Fijación:',
+        action:
+          'El Operador rota la montura del prisma hasta que el haz incida directamente en el sensor objetivo y pulsa «FIJAR PRISMA».',
+      },
+    ],
+    notes: [
+      'Al alcanzar el sensor objetivo, el haz se estabiliza. Pulsar «FIJAR PRISMA» apuntando al sensor equivocado causará un Strike.',
+    ],
+  },
+
+  // 23. CIRCUITO DE REFRIGERANTE
+  {
+    moduleType: 'CIRCUITO_REFRIGERANTE',
+    category: 'TÉRMICO',
+    title: 'Circuito de Refrigerante',
+    subtitle: 'Inyección Criogénica Proporcional',
+    classificationCode: 'DOC-TER-23',
+    division: 'Termodinámica y Fluidos',
+    visualIdentification:
+      'Tres depósitos presurizados etiquetados «FRÍO» (Cian), «TEMPLADO» (Ámbar) y «CALIENTE» (Rojo), conectados a una cámara de mezcla central graduada de 0 a 6 unidades, visor de Temperatura del Núcleo y pulsador «INICIAR REFRIGERACIÓN».',
+    identificationChecklist: [
+      'Tres depósitos de fluido marcados con etiquetas físicas FRÍO, TEMPLADO y CALIENTE.',
+      'Cámara central transparente de mezcla con indicadores de nivel de volumen.',
+      'Visor numérico con la temperatura actual del reactor en °C.',
+      'Controles de inyección [+] [-] y pulsador «INICIAR REFRIGERACIÓN».',
+    ],
+    description:
+      'El reactor experimenta una fluctuación térmica severa. Para estabilizar el núcleo sin provocar un choque térmico destructivo, debe prepararse en la cámara de mezcla una proporción exacta de fluidos antes de su inyección.',
+    tableHeaders: ['Rango de Temperatura', 'Inyección FRÍO', 'Inyección TEMPLADO', 'Inyección CALIENTE'],
+    tableRows: [
+      ['Crítica (> 300 °C)', '3 unidades', '1 unidad', '0 unidades'],
+      ['Alta (220 °C - 300 °C)', '2 unidades', '2 unidades', '0 unidades'],
+      ['Moderada (150 °C - 219 °C)', '1 unidad', '2 unidades', '1 unidad'],
+      ['Baja (< 150 °C)', '0 unidades', '3 unidades', '1 unidad'],
+    ],
+    rules: [
+      {
+        condition: '1. Rango Térmico del Reactor:',
+        action:
+          'El Operador reporta la temperatura en °C visible en el termómetro digital. El Guía localiza la fila correspondiente en la tabla.',
+      },
+      {
+        condition: '2. Ajuste por Prefijo de Máquina:',
+        action:
+          '• Si el número de serie comienza por «CR» o «TX»: Añade +1 unidad de FRÍO y resta -1 unidad de TEMPLADO respecto a la tabla base (si TEMPLADO llega a 0, no se resta).\n• En cualquier otro caso: Utiliza las cantidades exactas de la tabla.',
+      },
+      {
+        condition: '3. Dosificación y Purga:',
+        action:
+          'El Operador ajusta los niveles en la cámara central con los mandos de cada depósito y pulsa «INICIAR REFRIGERACIÓN».',
+      },
+    ],
+    notes: [
+      'La cámara de mezcla permite un máximo de 5 unidades totales. Una mezcla incorrecta sobrecalentará el sistema y registrará un Strike.',
+    ],
+  },
+
+  // 24. ANILLOS DE CIFRADO MECÁNICO
+  {
+    moduleType: 'ANILLOS_CIFRADO',
+    category: 'CRIPTOGRAFÍA',
+    title: 'Anillos de Cifrado Mecánico',
+    subtitle: 'Alineación de Rotores Concéntricos',
+    classificationCode: 'DOC-CIP-24',
+    division: 'Sistemas Criptomecánicos',
+    visualIdentification:
+      'Tres anillos concéntricos giratorios de latón y acero (Exterior con símbolos, Medio con letras A-F, Interior con cifras 1-6), línea vertical de mira superior y pulsador de bloqueo «BLOQUEAR ANILLOS».',
+    identificationChecklist: [
+      'Tres rotores concéntricos con muescas mecánicas de retén táctil.',
+      'Anillo Exterior: glifos ⍾, ⌬, ⌖, ⎊, ⏣, ⍲.',
+      'Anillo Medio: letras A, B, C, D, E, F.',
+      'Anillo Interior: números 1, 2, 3, 4, 5, 6.',
+      'Línea de mira superior central y botón «BLOQUEAR ANILLOS».',
+    ],
+    description:
+      'Un mecanismo de rotor criptomecánico requiere alinear simultáneamente un símbolo, una letra y una cifra bajo el cursor central para descifrar el cerrojo lógico.',
+    rules: [
+      {
+        condition: '1. Anillo Exterior (Símbolos):',
+        action:
+          '• Prefijo de serie «CR» o «TX» → Alinear el símbolo ⌬ (Benceno).\n• Prefijo «NX» o «ALFA» → Alinear el símbolo ⌖ (Mira Vectorial).\n• Prefijo «BETA» o «SEC» → Alinear el símbolo ⎊ (Triángulo Ocular).\n• Cualquier otro prefijo → Alinear el símbolo ⍾ (Bobina Cuántica).',
+      },
+      {
+        condition: '2. Anillo Medio (Letras A..F):',
+        action:
+          'Toma el PRIMER DÍGITO numérico del número de serie:\n• 1 o 2 → Letra A\n• 3 o 4 → Letra B\n• 5 o 6 → Letra C\n• 7 u 8 → Letra D\n• 9 o 0 → Letra E\n* EXCEPCIÓN: Si el número de serie contiene alguna vocal, avanza una letra alfabética (+1, ejemplo: C pasa a D; F pasa a A).',
+      },
+      {
+        condition: '3. Anillo Interior (Cifras 1..6):',
+        action:
+          'Toma el ÚLTIMO DÍGITO numérico de la serie:\nCifra Objetivo = (Último dígito mod 6) + 1. (Ejemplo: dígito 4 → 4 mod 6 + 1 = 5; dígito 8 → 8 mod 6 + 1 = 3).',
+      },
+      {
+        condition: '4. Bloqueo del Tambor:',
+        action:
+          'El Operador hace rotar cada anillo hasta enfrentar los tres caracteres con el cursor superior y pulsa «BLOQUEAR ANILLOS».',
+      },
+    ],
+    notes: [
+      'Cada anillo rota independientemente con sonido de carraca mecánica. Un bloqueo desalineado provoca un Strike.',
+    ],
+  },
+
+  // 25. MATRIZ DE MASAS MAGNÉTICAS
+  {
+    moduleType: 'MASAS_MAGNETICAS',
+    category: 'CAMPO',
+    title: 'Matriz de Masas Magnéticas',
+    subtitle: 'Confinamiento Dipolar en Red',
+    classificationCode: 'DOC-MAG-25',
+    division: 'Campos y Magnetismo',
+    visualIdentification:
+      'Placa metálica de retícula 3x3 con el núcleo central activo en (1,1) y bandeja con 4 fichas magnéticas: 2 de Polo Norte [N] (Rojo) y 2 de Polo Sur [S] (Azul). Tecla «ESTABILIZAR CAMPO».',
+    identificationChecklist: [
+      'Retícula metálica cuadrada de 3x3 con coordenadas visibles.',
+      'Núcleo emisor fijo en la celda central (1,1).',
+      '4 fichas magnéticas en la bahía de carga: 2 Norte [N] y 2 Sur [S].',
+      'Pulsador «ESTABILIZAR CAMPO».',
+    ],
+    description:
+      'Un campo magnético parásito debe confinarse disponiendo cuatro dipolos sobre la placa según las leyes de polaridad del blindaje.',
+    rules: [
+      {
+        condition: '1. Ley de Repulsión Dipolar:',
+        action:
+          'Dos fichas de la misma polaridad (N-N o S-S) NUNCA pueden compartir un lado ortogonal (arriba, abajo, izquierda, derecha). Sí pueden tocarse en diagonal.',
+      },
+      {
+        condition: '2. Configuración según Última Cifra de Serie:',
+        action:
+          '• Si el último dígito de serie es PAR (Configuración en Cruz):\n  - Coloca los dos polos NORTE [N] en las posiciones laterales opuestas: Izquierda (1,0) y Derecha (1,2).\n  - Coloca los dos polos SUR [S] en las posiciones superior e inferior: Arriba (0,1) y Abajo (2,1).\n• Si el último dígito de serie es IMPAR (Configuración en Vértices):\n  - Coloca los dos polos NORTE [N] en las esquinas superiores: (0,0) y (0,2).\n  - Coloca los dos polos SUR [S] en las esquinas inferiores: (2,0) y (2,2).',
+      },
+      {
+        condition: '3. Enclavamiento del Campo:',
+        action:
+          'El Operador arrastra las cuatro fichas a las celdas indicadas y pulsa «ESTABILIZAR CAMPO».',
+      },
+    ],
+    notes: [
+      'El acople de las fichas a la rejilla es libre. Solo al pulsar «ESTABILIZAR CAMPO» se verifica la distribución.',
+    ],
+  },
+
+  // 26. CÁMARA DE PRESIÓN POR PISTÓN
+  {
+    moduleType: 'PRESION_PISTON',
+    category: 'NEUMÁTICA',
+    title: 'Cámara de Presión por Pistón',
+    subtitle: 'Compresión y Enclavamiento de Émbolo',
+    classificationCode: 'DOC-NEU-26',
+    division: 'Neumática y Presión',
+    visualIdentification:
+      'Cilindro vertical transparente con émbolo metálico desplazable con pomo en T, 3 muescas de bloqueo con pasador (Muesca 1: Alta/20 PSI, Muesca 2: Media/50 PSI, Muesca 3: Baja/85 PSI), manómetro lateral y botón «BLOQUEAR PISTÓN».',
+    identificationChecklist: [
+      'Cilindro neumático vertical transparente de compresión.',
+      'Émbolo accionado manualmente con tres muescas de retén (Muescas 1, 2 y 3).',
+      'Manómetro analógico de aguja conectado que reacciona a la compresión.',
+      'Placa indicadora con la designación del cilindro (ALFA, BETA o GAMMA).',
+    ],
+    description:
+      'Un cilindro hidráulico de alta presión requiere situar el pistón en una muesca de compresión precisa para descargar la sobrepresión acumulada.',
+    tableHeaders: ['Tipo de Cilindro', 'Temp. < 50 °C (Cámara Fría)', 'Temp. ≥ 50 °C (Cámara Caliente)'],
+    tableRows: [
+      ['CILINDRO ALFA', 'Muesca 2 (Media - 50 PSI)', 'Muesca 3 (Baja - 85 PSI)'],
+      ['CILINDRO BETA', 'Muesca 1 (Alta - 20 PSI)', 'Muesca 2 (Media - 50 PSI)'],
+      ['CILINDRO GAMMA', 'Muesca 3 (Baja - 85 PSI)', 'Muesca 1 (Alta - 20 PSI)'],
+    ],
+    rules: [
+      {
+        condition: '1. Parámetros de Trabajo:',
+        action:
+          'El Operador comunica el TIPO DE CILINDRO (ALFA, BETA o GAMMA) y la TEMPERATURA leída en el sensor ambiental.',
+      },
+      {
+        condition: '2. Selección de Muesca:',
+        action:
+          'Ubica en la tabla la fila del cilindro y la columna según la temperatura (< 50 °C o ≥ 50 °C) para determinar la Muesca Objetivo (1, 2 o 3).',
+      },
+      {
+        condition: '3. Enclavamiento del Pasador:',
+        action:
+          'El Operador arrastra el émbolo a la muesca calculada y acciona «BLOQUEAR PISTÓN». El perno neumático fijará el cilindro.',
+      },
+    ],
+    notes: [
+      'Muesca 1 corresponde a la posición superior (expansión), Muesca 2 a la intermedia y Muesca 3 a la inferior (compresión máxima).',
+    ],
+  },
+
+  // 27. GIROSCOPIO DE ESTABILIZACIÓN
+  {
+    moduleType: 'GIROSCOPIO_ESTABILIZACION',
+    category: 'NAVEGACIÓN',
+    title: 'Giroscopio de Estabilización',
+    subtitle: 'Alineación Triaxial Inercial',
+    classificationCode: 'DOC-NAV-27',
+    division: 'Sistemas Inerciales',
+    visualIdentification:
+      'Tres anillos cardánicos concéntricos articulados en 3 ejes ortogonales: EJE X (Roll/Rojo), EJE Y (Pitch/Verde) y EJE Z (Yaw/Azul), con selector de orientación en 4 cuadrantes (0°, 90°, 180°, 270°), rotor inercial central giratorio y tecla «ESTABILIZAR».',
+    identificationChecklist: [
+      'Gimbal esférico de tres anillos concéntricos suspendidos.',
+      'Anillo exterior Eje X (Rojo), intermedio Eje Y (Verde), interior Eje Z (Azul).',
+      'Marcas angulares de 0°, 90°, 180° y 270° en cada aro.',
+      'Piloto LED de deriva inercial y pulsador «ESTABILIZAR».',
+    ],
+    description:
+      'La plataforma inercial triaxial ha perdido la referencia espacial. El Guía calcula los tres ángulos de ajuste y el Operador orienta los anillos X, Y y Z independientemente.',
+    tableHeaders: ['Dígito Inicial Serie', 'Orientación Eje X', 'Orientación Eje Y', 'Orientación Eje Z'],
+    tableRows: [
+      ['1 o 2', '0°', '90°', '180°'],
+      ['3 o 4', '90°', '180°', '270°'],
+      ['5 o 6', '180°', '270°', '0°'],
+      ['7 o 8', '270°', '0°', '90°'],
+      ['9 o 0', '90°', '0°', '270°'],
+    ],
+    rules: [
+      {
+        condition: '1. Orientaciones Base:',
+        action:
+          'Toma el PRIMER DÍGITO numérico del número de serie y extrae las orientaciones base para X, Y y Z en la tabla inercial.',
+      },
+      {
+        condition: '2. Compensación por LED de Deriva:',
+        action:
+          '• Si el LED de deriva inercial está ENCENDIDO (ámbar) → Suma +90° a la orientación del Eje Z (módulo 360°, por ejemplo: 270° pasa a 0°).\n• Si el LED de deriva está APAGADO → Mantén los valores de la tabla.',
+      },
+      {
+        condition: '3. Enclavamiento Triaxial:',
+        action:
+          'El Operador ajusta los tres ángulos en los selectores correspondientes y pulsa «ESTABILIZAR».',
+      },
+    ],
+    notes: [
+      'Al estabilizar correctamente, los tres cardanes se alinean y el volante inercial central zumba con giro constante.',
+    ],
+  },
+
+  // 28. CÁMARA DE CARTUCHOS
+  {
+    moduleType: 'CAMARA_CARTUCHOS',
+    category: 'MECÁNICA',
+    title: 'Cámara de Cartuchos',
+    subtitle: 'Inserción Secuencial de Módulos de Combustible',
+    classificationCode: 'DOC-MEC-28',
+    division: 'Mecánica y Cinemática',
+    visualIdentification:
+      'Tambor o bahía horizontal con 4 ranuras numeradas (Ranura 1 a 4) y 4 cartuchos cilíndricos extraíbles, diferenciados por material exterior (ACERO, COBRE, CERÁMICA, TITANIO) y símbolo geométrico estampado (TRIÁNGULO, CÍRCULO, ROMBO, CUADRADO). Palanca «SELLAR CÁMARA».',
+    identificationChecklist: [
+      'Cuatro ranuras mecánicas de inserción numeradas de 1 a 4.',
+      'Cuatro cartuchos cilíndricos con aleaciones distintivas: Acero (gris), Cobre (naranja), Cerámica (blanco) y Titanio (dorado).',
+      'Troqueles geométricos estampados en cada cabeza: Triángulo, Círculo, Rombo, Cuadrado.',
+      'Cerrojo basculante «SELLAR CÁMARA».',
+    ],
+    description:
+      'Un banco de cartuchos térmicos alimenta el generador. Disponerlos en un orden incorrecto generará un arco voltaico instantáneo.',
+    rules: [
+      {
+        condition: '1. Secuencia de Ranuras (de izquierda a derecha: 1 a 4):',
+        action:
+          '• Si el número de serie comienza por «CR» o «TX»:\n  1. Ranura 1 → Cartucho de COBRE\n  2. Ranura 2 → Cartucho de CERÁMICA\n  3. Ranura 3 → Cartucho de ACERO\n  4. Ranura 4 → Cartucho de TITANIO\n• En cualquier otro caso:\n  1. Ranura 1 → Cartucho con símbolo CÍRCULO\n  2. Ranura 2 → Cartucho de TITANIO\n  3. Ranura 3 → Cartucho con símbolo TRIÁNGULO\n  4. Ranura 4 → Cartucho restante (que no haya sido colocado).',
+      },
+      {
+        condition: '2. Enclavamiento del Tambor:',
+        action:
+          'El Operador arrastra o intercambia los cartuchos hasta que coincidan con la secuencia requerida y presiona «SELLAR CÁMARA».',
+      },
+    ],
+    notes: [
+      'Los cartuchos se deslizan sobre guías de precisión. El sellado es una operación única que valida la distribución completa.',
+    ],
+  },
+
+  // 29. REGULADOR DE FLUJO GRAVITACIONAL
+  {
+    moduleType: 'FLUJO_GRAVITACIONAL',
+    category: 'FLUIDOS',
+    title: 'Regulador de Flujo Gravitacional',
+    subtitle: 'Conducción de Esferas en Laberinto Hidráulico',
+    classificationCode: 'DOC-FLU-29',
+    division: 'Hidráulica y Flujos',
+    visualIdentification:
+      'Laberinto vertical transparente con tolva superior con 2 esferas de fluidos marcadas (Esfera Roja y Esfera Azul), 3 válvulas giratorias intermedias (V-1 superior, V-2 izquierda, V-3 derecha) con canal de desvío conmutable, y 3 depósitos colectores en la base (DEPÓSITO A, B, C). Botón «LIBERAR».',
+    identificationChecklist: [
+      'Laberinto vertical transparente con caída por gravedad.',
+      'Dos esferas fluidas coloreadas (Roja y Azul) en la esclusa superior.',
+      'Tres compuertas/válvulas conmutables: V-1 (nivel superior), V-2 (izquierda), V-3 (derecha).',
+      'Tres depósitos colectores de salida: Depósito A (izq), Depósito B (centro) y Depósito C (der).',
+    ],
+    description:
+      'Un circuito de distribución por decantación gravitatoria exige configurar las compuertas intermedias para que cada esfera desemboque en su depósito asignado.',
+    rules: [
+      {
+        condition: '1. Manifiesto de Destino de Esferas:',
+        action:
+          '• Si el último dígito del número de serie es PAR:\n  - La Esfera ROJA debe terminar en el DEPÓSITO A (izquierda).\n  - La Esfera AZUL debe terminar en el DEPÓSITO B (centro).\n• Si el último dígito es IMPAR:\n  - La Esfera ROJA debe terminar en el DEPÓSITO B (centro).\n  - La Esfera AZUL debe terminar en el DEPÓSITO C (derecha).',
+      },
+      {
+        condition: '2. Enrutamiento de Válvulas:',
+        action:
+          'Cada válvula V-1, V-2 y V-3 puede rotar en 3 vías: Izquierda (L), Recto (S) o Derecha (R). El Operador pulsa las válvulas para conmutar su ángulo según la trayectoria necesaria para ambas esferas.',
+      },
+      {
+        condition: '3. Liberación de Esferas:',
+        action:
+          'Una vez orientadas las compuertas, el Operador pulsa «LIBERAR». Las esferas descenderán por los canales hasta los depósitos finales.',
+      },
+    ],
+    notes: [
+      'Si alguna esfera entra en un depósito equivocado, el sistema registrará un Strike y reseteará las esferas a la tolva superior.',
+    ],
+  },
+
+  // 30. CERRADURA DE PLACAS SUPERPUESTAS
+  {
+    moduleType: 'PLACAS_SUPERPUESTAS',
+    category: 'SEGURIDAD',
+    title: 'Cerradura de Placas Superpuestas',
+    subtitle: 'Alineación de Silueta y Enclavamiento Perimétrico',
+    classificationCode: 'DOC-SEG-30',
+    division: 'Mecanismos de Bloqueo',
+    visualIdentification:
+      'Conjunto de 3 placas metálicas superpuestas (Placa 1, 2 y 3) con perforaciones rectangulares y lumbreras retroiluminadas, cada una con un cursor deslizante en 3 posiciones (1: Izq, 2: Centro, 3: Der), visor de silueta central y botón «ENCLAVAR PLACAS».',
+    identificationChecklist: [
+      'Tres placas de acero perforadas montadas en capas deslizantes paralelas.',
+      'Mandos deslizantes individuales con tres muescas fijas: 1 (Izquierda), 2 (Centro), 3 (Derecha).',
+      'Apertura central retroiluminada que proyecta la silueta resultante combinada.',
+      'Cerrojos perimetrales de alta resistencia con tecla «ENCLAVAR PLACAS».',
+    ],
+    description:
+      'Una cerradura física de seguridad de triple capa oculta el perno principal. Deslizar las tres placas a las posiciones correctas alinea las lumbreras permitiendo el disparo del cerrojo maestro.',
+    tableHeaders: ['Nivel de Seguridad Registrado', 'Placa 1 (Frontal)', 'Placa 2 (Media)', 'Placa 3 (Trasera)'],
+    tableRows: [
+      ['NIVEL I (Verde)', 'Posición 2 (Centro)', 'Posición 1 (Izquierda)', 'Posición 3 (Derecha)'],
+      ['NIVEL II (Ámbar)', 'Posición 1 (Izquierda)', 'Posición 3 (Derecha)', 'Posición 2 (Centro)'],
+      ['NIVEL III (Rojo)', 'Posición 3 (Derecha)', 'Posición 2 (Centro)', 'Posición 1 (Izquierda)'],
+    ],
+    rules: [
+      {
+        condition: '1. Nivel de Seguridad:',
+        action:
+          'El Operador identifica el NIVEL DE SEGURIDAD (NIVEL I, NIVEL II o NIVEL III) indicado en la placa frontal del chasis.',
+      },
+      {
+        condition: '2. Determinación de Posiciones Base:',
+        action:
+          'Localiza la fila del nivel correspondiente en la tabla de enclavamiento para conocer las posiciones requeridas (1, 2 o 3) de Placa 1, Placa 2 y Placa 3.',
+      },
+      {
+        condition: '3. Inversión por Número de Serie:',
+        action:
+          '• Si el número de serie contiene la letra «Z» o «W»: Intercambia las posiciones finales de la Placa 1 y la Placa 3.\n• En cualquier otro caso: Mantén las posiciones exactas de la tabla.',
+      },
+      {
+        condition: '4. Enclavamiento Maestro:',
+        action:
+          'El Operador desplaza los cursores de cada placa a sus muescas y pulsa «ENCLAVAR PLACAS». Los cerrojos perimetrales se bloquearán.',
+      },
+    ],
+    notes: [
+      'Deslizar las placas permite ver cómo cambia la silueta en tiempo real. Pulsar «ENCLAVAR PLACAS» en una posición errónea disparará un Strike.',
     ],
   },
 ];

@@ -4,6 +4,7 @@ import {
   CoartadaConfig,
   CoartadaServerMessage,
   CoartadaClientMessage,
+  CoartadaRoleChoice,
   DetectiveVerdictSubmission,
   EvidenceCard,
 } from '../types/coartada';
@@ -45,6 +46,7 @@ export function useCoartadaSocket({
   const [notebookText, setNotebookText] = useState<string>('');
   const [newEvidenceAlert, setNewEvidenceAlert] = useState<EvidenceCard | null>(null);
   const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number>(0);
+  const [prepSecondsRemaining, setPrepSecondsRemaining] = useState<number>(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const messageQueueRef = useRef<CoartadaClientMessage[]>([]);
@@ -118,7 +120,6 @@ export function useCoartadaSocket({
         (wsRef.current.readyState === WebSocket.OPEN ||
           wsRef.current.readyState === WebSocket.CONNECTING)
       ) {
-        // Send join if socket open
         sendClientMessage({
           type: 'JOIN_ROOM',
           code: cleanCode,
@@ -144,7 +145,6 @@ export function useCoartadaSocket({
           setConnectionStatus('connected');
           setErrorMessage(null);
 
-          // Join message
           const joinMsg: CoartadaClientMessage = {
             type: 'JOIN_ROOM',
             code: cleanCode,
@@ -157,7 +157,6 @@ export function useCoartadaSocket({
           };
           ws.send(JSON.stringify(joinMsg));
 
-          // Save active session
           sessionRecovery.saveActiveSession({
             gameType: 'coartada',
             roomCode: cleanCode,
@@ -166,7 +165,6 @@ export function useCoartadaSocket({
 
           flushMessageQueue();
 
-          // Ping interval
           if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
           pingIntervalRef.current = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
@@ -185,11 +183,16 @@ export function useCoartadaSocket({
               if (data.room.timeRemainingSeconds !== undefined) {
                 setTimeRemainingSeconds(data.room.timeRemainingSeconds);
               }
+              if (data.room.prepSecondsRemaining !== undefined) {
+                setPrepSecondsRemaining(data.room.prepSecondsRemaining);
+              }
               if (data.savedNotebookText !== undefined) {
                 setNotebookText(data.savedNotebookText);
               }
             } else if (data.type === 'TICK') {
               setTimeRemainingSeconds(data.timeRemainingSeconds);
+            } else if (data.type === 'PREP_TICK') {
+              setPrepSecondsRemaining(data.prepSecondsRemaining);
             } else if (data.type === 'NEW_EVIDENCE') {
               audio.playEvidenceReveal();
               setNewEvidenceAlert(data.evidence);
@@ -227,7 +230,7 @@ export function useCoartadaSocket({
         };
 
         ws.onerror = () => {
-          // let onclose handle reconnection
+          // handled by onclose
         };
       } catch (err) {
         console.error('[useCoartadaSocket] WebSocket connection exception:', err);
@@ -238,7 +241,10 @@ export function useCoartadaSocket({
   );
 
   const createRoom = useCallback(
-    async (durationMinutes: CoartadaConfig['durationMinutes'] = 10) => {
+    async (
+      durationMinutes: CoartadaConfig['durationMinutes'] = 10,
+      prepSeconds: CoartadaConfig['prepSeconds'] = 90
+    ) => {
       if (isCreatingOrJoiningRef.current) return;
       isCreatingOrJoiningRef.current = true;
       setErrorMessage(null);
@@ -247,7 +253,7 @@ export function useCoartadaSocket({
         const roomMeta = await createOnlineRoom(
           'coartada' as any,
           playerRef.current,
-          { durationMinutes }
+          { durationMinutes, prepSeconds }
         );
         connectToRoom(roomMeta.code);
       } catch (err: any) {
@@ -283,6 +289,14 @@ export function useCoartadaSocket({
       }
     },
     [connectToRoom]
+  );
+
+  const claimRole = useCallback(
+    (role: CoartadaRoleChoice) => {
+      audio.playClick();
+      sendClientMessage({ type: 'CLAIM_ROLE', role });
+    },
+    [sendClientMessage]
   );
 
   const updateConfig = useCallback(
@@ -366,8 +380,10 @@ export function useCoartadaSocket({
     notebookText,
     newEvidenceAlert,
     timeRemainingSeconds,
+    prepSecondsRemaining,
     createRoom,
     joinRoom,
+    claimRole,
     updateConfig,
     startCase,
     requestVerdictPhase,

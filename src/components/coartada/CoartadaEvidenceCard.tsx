@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
-import { Search, Camera, FileText, Receipt, Key, Fingerprint, Phone, MapPin, X, Pin } from 'lucide-react';
-import { EvidenceCard } from '../../types/coartada';
+import {
+  Search,
+  Camera,
+  FileText,
+  Receipt,
+  Key,
+  Fingerprint,
+  Phone,
+  MapPin,
+  X,
+  Pin,
+  Ticket,
+  UserCheck,
+  FileCheck2,
+} from 'lucide-react';
+import { EvidenceCard, EvidenceVisualCategory } from '../../types/coartada';
 import { audio } from '../../utils/audio';
 
 interface CoartadaEvidenceCardProps {
@@ -21,78 +35,136 @@ export const CoartadaEvidenceCard: React.FC<CoartadaEvidenceCardProps> = ({ card
     setIsModalOpen(false);
   };
 
-  const getIcon = () => {
-    switch (card.type) {
-      case 'CAMERA':
-        return <Camera className="w-4 h-4 text-slate-300" />;
+  const category = card.visualCategory || 'OFFICIAL_REPORT';
+
+  // Card visual container styling depending on evidence type
+  const getContainerStyle = () => {
+    switch (category) {
+      case 'PHOTO':
+        return 'bg-[#121212] border-2 border-stone-600 text-stone-200 shadow-2xl';
+      case 'ID_CARD':
+        return 'bg-[#201d19] border-2 border-amber-800/70 text-amber-100 shadow-xl';
+      case 'HANDWRITTEN':
+        return 'bg-[#231e18] border border-amber-700/50 text-stone-200 shadow-md';
+      case 'TICKET':
+        return 'bg-[#2a221b] border-2 border-dashed border-amber-600/60 text-amber-200 font-mono shadow-md';
       case 'RECEIPT':
-        return <Receipt className="w-4 h-4 text-amber-300" />;
-      case 'ACCESS_LOG':
-        return <Key className="w-4 h-4 text-cyan-300" />;
-      case 'FINGERPRINT':
-        return <Fingerprint className="w-4 h-4 text-rose-300" />;
-      case 'PHONE':
-        return <Phone className="w-4 h-4 text-amber-300" />;
+        return 'bg-[#1c1a17] border border-stone-700 text-stone-300 font-mono shadow-md';
       case 'MAP':
-        return <MapPin className="w-4 h-4 text-amber-400" />;
+        return 'bg-[#161a1d] border border-cyan-800/60 text-cyan-100 shadow-lg';
+      case 'LOG':
+        return 'bg-[#18191a] border border-stone-700 text-stone-200 font-mono shadow-md';
       default:
-        return <FileText className="w-4 h-4 text-slate-300" />;
+        return 'bg-[#1a1714] border border-stone-800 text-stone-200 shadow-lg';
     }
   };
 
-  const getTypeLabel = () => {
-    switch (card.type) {
-      case 'CAMERA':
-        return 'GRABACIÓN CCTV';
+  const getBadge = () => {
+    switch (category) {
+      case 'PHOTO':
+        return (
+          <span className="flex items-center gap-1 text-[10px] font-mono font-black uppercase text-stone-300 bg-stone-800 px-2 py-0.5 rounded">
+            <Camera className="w-3 h-3 text-stone-300" /> FOTOGRAFÍA POLICIAL
+          </span>
+        );
+      case 'ID_CARD':
+        return (
+          <span className="flex items-center gap-1 text-[10px] font-mono font-black uppercase text-amber-300 bg-amber-950 border border-amber-700/60 px-2 py-0.5 rounded">
+            <UserCheck className="w-3 h-3 text-amber-400" /> DOCUMENTO DE IDENTIDAD
+          </span>
+        );
+      case 'HANDWRITTEN':
+        return (
+          <span className="flex items-center gap-1 text-[10px] font-mono font-black uppercase text-amber-400 bg-stone-900 px-2 py-0.5 rounded">
+            <FileText className="w-3 h-3" /> MANUSCRITO CONFIDENCIAL
+          </span>
+        );
+      case 'TICKET':
+        return (
+          <span className="flex items-center gap-1 text-[10px] font-mono font-black uppercase text-amber-300 bg-amber-900/40 px-2 py-0.5 rounded border border-dashed border-amber-500/50">
+            <Ticket className="w-3 h-3" /> BILLETE OFICIAL
+          </span>
+        );
       case 'RECEIPT':
-        return 'TIQUE / REGISTRO';
-      case 'ACCESS_LOG':
-        return 'CONTROL DE ACCESO';
-      case 'FINGERPRINT':
-        return 'ANÁLISIS DACTILAR';
-      case 'PHONE':
-        return 'REGISTRO TELEFÓNICO';
+        return (
+          <span className="flex items-center gap-1 text-[10px] font-mono font-black uppercase text-stone-300 bg-stone-900 px-2 py-0.5 rounded">
+            <Receipt className="w-3 h-3 text-amber-400" /> COMPROBANTE TIMBRADO
+          </span>
+        );
       case 'MAP':
-        return 'CROQUIS DE PLANTA';
-      case 'NOTE':
-        return 'MANUSCRITO';
+        return (
+          <span className="flex items-center gap-1 text-[10px] font-mono font-black uppercase text-cyan-300 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">
+            <MapPin className="w-3 h-3" /> PLANO TÉCNICO
+          </span>
+        );
+      case 'LOG':
+        return (
+          <span className="flex items-center gap-1 text-[10px] font-mono font-black uppercase text-stone-300 bg-stone-900 px-2 py-0.5 rounded">
+            <Key className="w-3 h-3 text-amber-400" /> REGISTRO DE CONTROL
+          </span>
+        );
       default:
-        return 'DECLARACIÓN JURADA';
+        return (
+          <span className="flex items-center gap-1 text-[10px] font-mono font-black uppercase text-stone-300 bg-stone-900 px-2 py-0.5 rounded">
+            <FileCheck2 className="w-3 h-3 text-amber-400" /> INFORME TESTIFICAL
+          </span>
+        );
     }
   };
 
   return (
     <>
-      {/* Physical Card on Desk */}
+      {/* Physical Evidence Card on Desk */}
       <div
         onClick={handleOpen}
-        className={`group relative flex flex-col justify-between p-4 rounded-xl border transition-all duration-300 cursor-pointer shadow-lg hover:shadow-2xl hover:-translate-y-1 select-none overflow-hidden ${
-          card.type === 'CAMERA'
-            ? 'bg-neutral-900 border-neutral-700 text-neutral-200'
-            : card.type === 'RECEIPT'
-            ? 'bg-stone-900 border-stone-700 text-stone-200 font-mono'
-            : card.type === 'FINGERPRINT'
-            ? 'bg-[#181412] border-amber-900/60 text-stone-200'
-            : 'bg-[#1a1714] border-stone-800 text-stone-200'
-        } ${isNew ? 'ring-2 ring-red-600 animate-pulse' : ''}`}
+        className={`group relative flex flex-col justify-between p-4 rounded-xl transition-all duration-300 cursor-pointer hover:shadow-2xl hover:-translate-y-1 select-none overflow-hidden ${getContainerStyle()} ${
+          isNew ? 'ring-2 ring-red-600 animate-pulse' : ''
+        }`}
       >
-        {/* Subtle Pushpin at top */}
-        <div className="absolute top-2 right-2 flex items-center gap-1">
-          <Pin className="w-3.5 h-3.5 text-red-700 drop-shadow transform rotate-12" />
+        {/* Pushpin at top */}
+        <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-none">
+          <Pin className="w-3.5 h-3.5 text-red-600 drop-shadow transform rotate-12" />
         </div>
 
         {/* Top Header */}
         <div>
-          <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400/90 mb-1.5">
-            {getIcon()}
-            <span>{getTypeLabel()}</span>
-            <span className="text-stone-500">·</span>
-            <span className="text-stone-300">{card.timestamp}</span>
+          <div className="flex items-center justify-between mb-2">
+            {getBadge()}
+            <span className="text-[10px] font-mono text-stone-400 font-bold mr-4">
+              {card.timestamp}
+            </span>
           </div>
 
-          <h4 className="text-sm font-bold text-stone-100 font-serif leading-snug line-clamp-2 mb-2 group-hover:text-amber-200 transition-colors">
+          <h4 className="text-sm font-bold font-serif leading-snug line-clamp-2 mb-2 group-hover:text-amber-300 transition-colors">
             {card.title}
           </h4>
+
+          {/* Visual Miniature Representation depending on type */}
+          {category === 'PHOTO' && (
+            <div className="my-2 p-3 bg-black border border-stone-700 rounded-lg flex items-center justify-center gap-2 text-stone-400 text-xs font-mono">
+              <Camera className="w-4 h-4 text-stone-500" />
+              <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold">
+                [ FOTOGRAFÍA MONOCROMA 1984 ]
+              </span>
+            </div>
+          )}
+
+          {category === 'ID_CARD' && (
+            <div className="my-2 p-2.5 bg-stone-950 border border-amber-900/60 rounded-lg flex items-center justify-between text-amber-200/90 text-[10px] font-mono">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🪪</span>
+                <span>REGISTRO OFICIAL DNI</span>
+              </div>
+              <span className="text-stone-500">REF: POL-84</span>
+            </div>
+          )}
+
+          {category === 'TICKET' && (
+            <div className="my-2 p-2 bg-stone-950 border border-dashed border-amber-600/50 rounded flex items-center justify-between text-[10px] font-mono text-amber-300">
+              <span>🎟️ SERIE VALIDADORA</span>
+              <span>PASE SELLADO</span>
+            </div>
+          )}
 
           <p className="text-xs text-stone-400 line-clamp-2 leading-relaxed">
             {card.summary}
@@ -132,50 +204,82 @@ export const CoartadaEvidenceCard: React.FC<CoartadaEvidenceCardProps> = ({ card
 
             {/* Document Header */}
             <div className="flex items-center gap-2 mb-3 pb-3 border-b border-stone-800 text-xs font-mono text-amber-400 font-bold uppercase tracking-wider">
-              {getIcon()}
-              <span>{getTypeLabel()}</span>
+              {getBadge()}
               <span className="text-stone-600">·</span>
               <span className="text-stone-300">Hora: {card.timestamp}</span>
+              <span className="text-stone-600">·</span>
+              <span className="text-stone-400">{card.dateStr}</span>
             </div>
 
-            {/* Title */}
-            <h3 className="text-xl sm:text-2xl font-black font-serif text-amber-100 mb-4 leading-snug">
+            {/* Document Title */}
+            <h3 className="text-xl sm:text-2xl font-black font-serif text-stone-100 mb-2 leading-tight">
               {card.title}
             </h3>
 
-            {/* Location & Source Metadata */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-stone-950/80 rounded-xl border border-stone-800/80 text-xs font-mono mb-4 text-stone-300">
+            {/* Metadata tags */}
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono text-stone-400 mb-5 p-3 rounded-xl bg-stone-950/80 border border-stone-850">
               <div>
-                <span className="text-stone-500 block">UBICACIÓN:</span>
-                <span className="font-bold text-stone-200">{card.location}</span>
+                <span className="text-stone-600 block text-[10px]">ORIGEN:</span>
+                <span className="text-stone-300 font-bold truncate block">{card.source}</span>
               </div>
               <div>
-                <span className="text-stone-500 block">ORIGEN / FUENTE:</span>
-                <span className="font-bold text-stone-200">{card.source}</span>
+                <span className="text-stone-600 block text-[10px]">LOCALIZACIÓN:</span>
+                <span className="text-stone-300 font-bold truncate block">{card.location}</span>
               </div>
             </div>
 
-            {/* Document Body */}
-            <div className="bg-[#1f1b17] border border-stone-800 p-4 sm:p-5 rounded-xl text-stone-200 text-sm leading-relaxed whitespace-pre-line font-mono shadow-inner mb-6">
+            {/* Case specific visual design in modal */}
+            {category === 'PHOTO' && (
+              <div className="mb-4 p-6 bg-stone-950 border-2 border-stone-700 rounded-xl text-center space-y-2">
+                <div className="w-20 h-20 mx-auto rounded-full bg-stone-900 border border-stone-700 flex items-center justify-center text-3xl">
+                  📷
+                </div>
+                <div className="text-[11px] font-mono text-stone-400 uppercase tracking-widest font-bold">
+                  EXPEDIENTE FOTOGRÁFICO DE PRUEBA MATERIAL
+                </div>
+                <div className="text-[10px] font-mono text-stone-500">
+                  COPIA POLICIAL EN PAPEL FOTOGRÁFICO DE HALUROS DE PLATA
+                </div>
+              </div>
+            )}
+
+            {category === 'ID_CARD' && (
+              <div className="mb-4 p-5 bg-[#1e1b17] border-2 border-amber-800/80 rounded-xl space-y-2 font-mono text-xs text-amber-100">
+                <div className="flex items-center justify-between border-b border-amber-900/60 pb-2">
+                  <span className="font-black tracking-widest text-amber-400">DOCUMENTO NACIONAL DE IDENTIDAD</span>
+                  <span className="text-[10px] text-stone-400">ESPAÑA · 1984</span>
+                </div>
+                <div className="text-[11px] text-stone-300 pt-1">
+                  Documento cotejado por la brigada de investigación e incorporado a la causa.
+                </div>
+              </div>
+            )}
+
+            {category === 'TICKET' && (
+              <div className="mb-4 p-4 bg-[#231b14] border-2 border-dashed border-amber-600/70 rounded-xl font-mono text-xs text-amber-300 space-y-1">
+                <div className="text-center font-bold tracking-widest border-b border-amber-800 pb-1">
+                  *** COMPROBANTE OFICIAL TIMBRADO ***
+                </div>
+                <div className="flex justify-between text-[11px] pt-1">
+                  <span>FECHA: {card.dateStr}</span>
+                  <span>HORA: {card.timestamp}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Detailed text */}
+            <div className="p-4 sm:p-5 rounded-xl bg-stone-950 border border-stone-850 text-stone-200 text-xs sm:text-sm font-mono leading-relaxed whitespace-pre-line">
               {card.details}
             </div>
 
-            {/* Summary highlight */}
-            <div className="p-3 bg-amber-950/30 border-l-4 border-amber-500 rounded-r-xl text-xs text-amber-200/90 leading-relaxed">
-              <span className="font-bold block font-mono uppercase mb-0.5 text-amber-300">
-                DICTAMEN DE LA PRUEBA:
-              </span>
-              {card.summary}
-            </div>
-
-            {/* Bottom Close Button */}
+            {/* Modal Footer */}
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold text-xs font-mono uppercase tracking-wider cursor-pointer transition-colors"
+                className="px-5 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-mono font-bold border border-stone-700 cursor-pointer transition-colors"
               >
-                Volver al expediente
+                Volver a la mesa
               </button>
             </div>
           </div>

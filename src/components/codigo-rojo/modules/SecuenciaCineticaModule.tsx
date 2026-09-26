@@ -224,7 +224,7 @@ export const SecuenciaCineticaModule: React.FC<SecuenciaCineticaModuleProps> = (
                       : 'bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 border-slate-600 hover:border-amber-400/80 hover:-translate-y-1 active:translate-y-3 shadow-lg shadow-slate-950/80'
                   }`}
                   style={{ touchAction: 'none' }}
-                  title={`Pistón P-${piston.id} &bull; Collar ${piston.collar}, Recorrido ${piston.stroke}`}
+                  title={`Pistón P-${piston.id} • Collar ${piston.collar}, Recorrido ${piston.stroke}`}
                 >
                   {/* Metallic Top Plunger Head */}
                   <div className="w-full flex flex-col items-center">

@@ -160,6 +160,7 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
             setMode(m);
           }}
           accentColor="#ef4444"
+          gameType="codigo-rojo"
         />
 
         {/* Create Room View */}
@@ -192,13 +193,33 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
                     </button>
                   ))}
                 </div>
-                <span className="text-[11px] text-slate-500 font-mono block mt-1.5">
-                  {difficulty === 'NORMAL'
-                    ? '2 o 3 módulos &bull; Desafío equilibrado &bull; Recomendado para empezar'
-                    : difficulty === 'DIFICIL'
-                    ? '4 o 5 módulos &bull; Lógica avanzada &bull; Mayor presión'
-                    : '5 o 6 módulos &bull; Máxima tensión &bull; Sin margen de error'}
-                </span>
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-400 font-mono mt-2 leading-relaxed">
+                  {difficulty === 'NORMAL' ? (
+                    <>
+                      <span>2 o 3 módulos</span>
+                      <span aria-hidden="true" className="text-slate-600 font-bold">•</span>
+                      <span>Desafío equilibrado</span>
+                      <span aria-hidden="true" className="text-slate-600 font-bold">•</span>
+                      <span>Recomendado para empezar</span>
+                    </>
+                  ) : difficulty === 'DIFICIL' ? (
+                    <>
+                      <span>4 o 5 módulos</span>
+                      <span aria-hidden="true" className="text-slate-600 font-bold">•</span>
+                      <span>Lógica avanzada</span>
+                      <span aria-hidden="true" className="text-slate-600 font-bold">•</span>
+                      <span>Mayor presión</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>5 o 6 módulos</span>
+                      <span aria-hidden="true" className="text-slate-600 font-bold">•</span>
+                      <span>Máxima tensión</span>
+                      <span aria-hidden="true" className="text-slate-600 font-bold">•</span>
+                      <span>Sin margen de error</span>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Module Count Selector */}
@@ -348,6 +369,7 @@ export const CodigoRojoEntry: React.FC<CodigoRojoEntryProps> = ({
             onJoin={handleJoinRoom}
             isSubmitting={isSubmitting}
             accentColor="#ef4444"
+            gameType="codigo-rojo"
           />
         )}
       </div>

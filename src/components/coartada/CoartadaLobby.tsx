@@ -1,6 +1,24 @@
 import React, { useState } from 'react';
-import { Clock, Users, ArrowLeft, Copy, Check, Play, ShieldAlert, FileSearch } from 'lucide-react';
-import { CoartadaPlayer, CoartadaConfig, CoartadaDurationMinutes } from '../../types/coartada';
+import {
+  Clock,
+  BookOpen,
+  Users,
+  ArrowLeft,
+  Copy,
+  Check,
+  Play,
+  FileSearch,
+  Shield,
+  Briefcase,
+  HelpCircle,
+} from 'lucide-react';
+import {
+  CoartadaPlayer,
+  CoartadaConfig,
+  CoartadaDurationMinutes,
+  CoartadaPrepSeconds,
+  CoartadaRoleChoice,
+} from '../../types/coartada';
 import { audio } from '../../utils/audio';
 
 interface CoartadaLobbyProps {
@@ -8,19 +26,31 @@ interface CoartadaLobbyProps {
   players: CoartadaPlayer[];
   config: CoartadaConfig;
   isHost: boolean;
+  currentPlayerId: string;
   onUpdateConfig: (config: Partial<CoartadaConfig>) => void;
+  onClaimRole: (role: CoartadaRoleChoice) => void;
   onStartCase: () => void;
   onLeaveRoom: () => void;
 }
 
 const DURATION_OPTIONS: CoartadaDurationMinutes[] = [5, 7, 10, 12, 15];
+const PREP_OPTIONS: { seconds: CoartadaPrepSeconds; label: string }[] = [
+  { seconds: 30, label: '30 s' },
+  { seconds: 60, label: '1 min' },
+  { seconds: 90, label: '1 min 30 s' },
+  { seconds: 120, label: '2 min' },
+  { seconds: 150, label: '2 min 30 s' },
+  { seconds: 180, label: '3 min' },
+];
 
 export const CoartadaLobby: React.FC<CoartadaLobbyProps> = ({
   roomCode,
   players,
   config,
   isHost,
+  currentPlayerId,
   onUpdateConfig,
+  onClaimRole,
   onStartCase,
   onLeaveRoom,
 }) => {
@@ -41,7 +71,15 @@ export const CoartadaLobby: React.FC<CoartadaLobbyProps> = ({
     onUpdateConfig({ durationMinutes: duration });
   };
 
+  const handleSelectPrep = (seconds: CoartadaPrepSeconds) => {
+    if (!isHost) return;
+    audio.playClick();
+    onUpdateConfig({ prepSeconds: seconds });
+  };
+
   const isReadyToStart = players.length === 2;
+  const me = players.find((p) => p.id === currentPlayerId);
+  const myRolePreference = me?.selectedRolePreference || 'ALEATORIO';
 
   return (
     <div className="relative z-10 w-full max-w-xl mx-auto p-4 sm:p-6 flex flex-col gap-6 animate-in fade-in duration-300">
@@ -52,7 +90,7 @@ export const CoartadaLobby: React.FC<CoartadaLobbyProps> = ({
           onClick={onLeaveRoom}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900/80 hover:bg-stone-800 text-stone-300 text-xs font-mono font-bold border border-stone-800 transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> Salir al menú
+          <ArrowLeft className="w-3.5 h-3.5" /> Salir de la sala
         </button>
 
         <div className="flex items-center gap-2 text-xs font-mono text-stone-400">
@@ -71,7 +109,7 @@ export const CoartadaLobby: React.FC<CoartadaLobbyProps> = ({
         {/* Title */}
         <div className="mb-6">
           <span className="text-[11px] font-mono uppercase tracking-widest text-amber-500 font-bold block mb-1">
-            DESPACHO DE INTERROGATORIOS
+            DESPACHO DE INVESTIGACIÓN
           </span>
           <h2 className="text-3xl sm:text-4xl font-black font-serif text-stone-100 tracking-tight">
             SALA DE INVESTIGACIÓN
@@ -108,7 +146,7 @@ export const CoartadaLobby: React.FC<CoartadaLobbyProps> = ({
           </button>
         </div>
 
-        {/* Players List (Exact 2 players) */}
+        {/* Players List with Assigned / Preferred Roles */}
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs font-mono text-stone-400 mb-2">
             <span className="font-bold flex items-center gap-1">
@@ -120,23 +158,30 @@ export const CoartadaLobby: React.FC<CoartadaLobbyProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {players.map((p, idx) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-stone-950/60 border border-stone-800 text-stone-200 text-xs font-mono"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{p.avatar || '🕵️'}</span>
-                  <div>
-                    <span className="font-bold block truncate max-w-[120px]">{p.name}</span>
-                    <span className="text-[10px] text-stone-500">
-                      {p.isHost ? 'Anfitrión' : 'Compañero'}
-                    </span>
+            {players.map((p) => {
+              const pref = p.selectedRolePreference || 'ALEATORIO';
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-stone-950/60 border border-stone-800 text-stone-200 text-xs font-mono"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{p.avatar || '🕵️'}</span>
+                    <div>
+                      <span className="font-bold block truncate max-w-[120px]">{p.name}</span>
+                      <span className="text-[10px] text-amber-400 font-semibold block">
+                        {pref === 'DETECTIVE'
+                          ? '🕵️ Detective'
+                          : pref === 'SOSPECHOSO'
+                          ? '💼 Sospechoso'
+                          : '🎲 Aleatorio'}
+                      </span>
+                    </div>
                   </div>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]" />
                 </div>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]" />
-              </div>
-            ))}
+              );
+            })}
 
             {players.length === 1 && (
               <div className="flex items-center justify-center p-3 rounded-xl border border-dashed border-stone-800 text-stone-500 text-xs font-mono animate-pulse">
@@ -146,11 +191,64 @@ export const CoartadaLobby: React.FC<CoartadaLobbyProps> = ({
           </div>
         </div>
 
-        {/* ONLY GAMEPLAY SETTING: DURACIÓN DE LA PARTIDA */}
+        {/* ROLE SELECTION (Requirement 25, 26, 27) */}
         <div className="mb-6 pt-4 border-t border-stone-800/80">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-mono font-bold text-stone-300 flex items-center gap-1.5 uppercase">
-              <Clock className="w-3.5 h-3.5 text-amber-500" /> Duración de la partida:
+              <Shield className="w-3.5 h-3.5 text-amber-500" /> Selección de Rol:
+            </span>
+            <span className="text-[10px] font-mono text-stone-500">
+              (Tu preferencia para el caso)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => onClaimRole('DETECTIVE')}
+              className={`p-2.5 rounded-xl font-mono text-xs font-bold transition-all flex flex-col items-center gap-1 border cursor-pointer ${
+                myRolePreference === 'DETECTIVE'
+                  ? 'bg-amber-600 text-stone-950 border-amber-400 shadow-md shadow-amber-600/30'
+                  : 'bg-stone-900 hover:bg-stone-850 text-stone-300 border-stone-800'
+              }`}
+            >
+              <span className="text-base">🕵️</span>
+              <span>DETECTIVE</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onClaimRole('SOSPECHOSO')}
+              className={`p-2.5 rounded-xl font-mono text-xs font-bold transition-all flex flex-col items-center gap-1 border cursor-pointer ${
+                myRolePreference === 'SOSPECHOSO'
+                  ? 'bg-amber-600 text-stone-950 border-amber-400 shadow-md shadow-amber-600/30'
+                  : 'bg-stone-900 hover:bg-stone-850 text-stone-300 border-stone-800'
+              }`}
+            >
+              <span className="text-base">💼</span>
+              <span>SOSPECHOSO</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onClaimRole('ALEATORIO')}
+              className={`p-2.5 rounded-xl font-mono text-xs font-bold transition-all flex flex-col items-center gap-1 border cursor-pointer ${
+                myRolePreference === 'ALEATORIO'
+                  ? 'bg-amber-600 text-stone-950 border-amber-400 shadow-md shadow-amber-600/30'
+                  : 'bg-stone-900 hover:bg-stone-850 text-stone-300 border-stone-800'
+              }`}
+            >
+              <span className="text-base">🎲</span>
+              <span>ALEATORIO</span>
+            </button>
+          </div>
+        </div>
+
+        {/* SETTING 1: DURACIÓN DEL INTERROGATORIO */}
+        <div className="mb-5 pt-4 border-t border-stone-800/80">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-mono font-bold text-stone-300 flex items-center gap-1.5 uppercase">
+              <Clock className="w-3.5 h-3.5 text-amber-500" /> Duración del interrogatorio:
             </span>
             {!isHost && (
               <span className="text-[10px] font-mono text-stone-500">
@@ -179,10 +277,43 @@ export const CoartadaLobby: React.FC<CoartadaLobbyProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* SETTING 2: TIEMPO DE LECTURA (Max 3 min, default 1:30) */}
+        <div className="mb-6 pt-4 border-t border-stone-800/80">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-mono font-bold text-stone-300 flex items-center gap-1.5 uppercase">
+              <BookOpen className="w-3.5 h-3.5 text-amber-500" /> Tiempo de lectura del expediente:
+            </span>
+            {!isHost && (
+              <span className="text-[10px] font-mono text-stone-500">
+                (Configurado por el anfitrión)
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+            {PREP_OPTIONS.map((opt) => {
+              const isSelected = config.prepSeconds === opt.seconds;
+              return (
+                <button
+                  key={opt.seconds}
+                  type="button"
+                  disabled={!isHost}
+                  onClick={() => handleSelectPrep(opt.seconds)}
+                  className={`py-2 px-1 rounded-lg font-mono text-xs font-bold transition-all text-center ${
+                    isSelected
+                      ? 'bg-amber-600 text-stone-950 shadow-md shadow-amber-600/30 border border-amber-400'
+                      : 'bg-stone-900 hover:bg-stone-850 text-stone-400 border border-stone-800 cursor-pointer'
+                  } ${!isHost ? 'cursor-default opacity-85' : ''}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
           <span className="text-[11px] font-mono text-stone-500 block mt-2 text-center">
-            {config.durationMinutes === 10
-              ? '10 minutos: Tiempo recomendado para un interrogatorio equilibrado.'
-              : `${config.durationMinutes} minutos: Las pruebas llegarán distribuidas proporcionalmente.`}
+            Fase de preparación previa: el detective y el sospechoso estudian sus expedientes antes de interrogar.
           </span>
         </div>
 
@@ -200,7 +331,7 @@ export const CoartadaLobby: React.FC<CoartadaLobbyProps> = ({
               }`}
             >
               <Play className="w-4 h-4 fill-current" />
-              <span>{isReadyToStart ? 'COMENZAR INTERROGATORIO' : 'SE NECESITAN 2 JUGADORES'}</span>
+              <span>{isReadyToStart ? 'INICIAR CASO' : 'SE NECESITAN 2 JUGADORES'}</span>
             </button>
           ) : (
             <div className="p-3 bg-stone-950/70 border border-stone-800 rounded-xl text-center text-xs font-mono text-stone-400">

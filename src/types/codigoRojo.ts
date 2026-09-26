@@ -33,7 +33,17 @@ export type CodigoRojoModuleType =
   | 'REACTOR_PLASMA'
   | 'FRECUENCIA_RESONANCIA'
   | 'SECUENCIA_CINETICA'
-  | 'DIVISOR_VOLTAJE';
+  | 'DIVISOR_VOLTAJE'
+  | 'CAMARA_CONTRAPESOS'
+  | 'PRISMA_REFRACCION'
+  | 'CIRCUITO_REFRIGERANTE'
+  | 'ANILLOS_CIFRADO'
+  | 'MASAS_MAGNETICAS'
+  | 'PRESION_PISTON'
+  | 'GIROSCOPIO_ESTABILIZACION'
+  | 'CAMARA_CARTUCHOS'
+  | 'FLUJO_GRAVITACIONAL'
+  | 'PLACAS_SUPERPUESTAS';
 
 export interface CodigoRojoPlayer {
   id: string;
@@ -50,8 +60,8 @@ export interface CodigoRojoPlayer {
 export interface CodigoRojoConfig {
   difficulty: CodigoRojoDifficulty;
   timeMode: CodigoRojoTimeMode;
+  durationSeconds?: number; // Authoritative duration in seconds (e.g. 270 for 4:30)
   customTimeMinutes: number; // e.g. 5
-  durationSeconds?: number; // Exact authoritative duration in seconds (e.g. 270 for 4:30)
   maxStrikes: number; // default 3
   modulesCount: number; // calculated or customized (2-6)
 }
@@ -63,7 +73,15 @@ export type CodigoRojoCategory =
   | 'NAVEGACIÓN'
   | 'ENERGÍA'
   | 'SISTEMAS'
-  | 'COMUNICACIONES';
+  | 'COMUNICACIONES'
+  | 'MECÁNICA'
+  | 'ÓPTICA'
+  | 'TÉRMICO'
+  | 'NEUMÁTICA'
+  | 'FLUIDOS'
+  | 'SEGURIDAD'
+  | 'CRIPTOGRAFÍA'
+  | 'CAMPO';
 
 export interface CodigoRojoManualRule {
   condition: string;

@@ -6,17 +6,22 @@ import { GameSlug } from '../../styles/gameThemes';
 interface JoinRoomPanelProps {
   onJoin: (code: string) => void;
   isLoading?: boolean;
+  isSubmitting?: boolean;
   initialCode?: string;
   accentClass?: string;
-  gameType?: GameSlug;
+  accentColor?: string;
+  gameType?: GameSlug | 'codigo-rojo' | 'coartada';
 }
 
 export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
   onJoin,
   isLoading = false,
+  isSubmitting = false,
   initialCode = '',
+  accentColor,
   gameType = 'la-bomba',
 }) => {
+  const loading = isLoading || isSubmitting;
   const [code, setCode] = useState(initialCode.toUpperCase().trim());
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,7 +33,7 @@ export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = code.trim();
-    if (trimmed.length >= 2 && !isLoading) {
+    if (trimmed.length >= 2 && !loading) {
       audio.playGameStart();
       onJoin(trimmed);
     }
@@ -36,23 +41,27 @@ export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
 
   const isValid = code.trim().length >= 3;
 
-  const inputThemeClass =
-    gameType === 'la-peor-respuesta'
-      ? 'focus:border-[#FF3B4F] text-[#FF3B4F]'
-      : gameType === 'pinturillo'
-      ? 'focus:border-[#00BCEB] text-[#00BCEB]'
-      : gameType === 'palabra-secreta'
-      ? 'focus:border-[#10B981] text-[#10B981]'
-      : 'focus:border-[#FFB000] text-[#FFB000]';
+  const isCodigoRojo = gameType === 'codigo-rojo' || accentColor === '#ef4444';
 
-  const btnThemeClass =
-    gameType === 'la-peor-respuesta'
-      ? 'bg-[#FF3B4F] hover:bg-[#E6293D] text-white shadow-[#FF3B4F]/25'
-      : gameType === 'pinturillo'
-      ? 'bg-[#00BCEB] hover:bg-[#009ED0] text-slate-950 shadow-[#00BCEB]/25'
-      : gameType === 'palabra-secreta'
-      ? 'bg-[#10B981] hover:bg-[#059669] text-slate-950 shadow-[#10B981]/25'
-      : 'bg-[#FFB000] hover:bg-[#FF8A00] text-stone-950 shadow-[#FFB000]/25';
+  const inputThemeClass = isCodigoRojo
+    ? 'focus:border-red-500 text-red-400'
+    : gameType === 'la-peor-respuesta'
+    ? 'focus:border-[#FF3B4F] text-[#FF3B4F]'
+    : gameType === 'pinturillo'
+    ? 'focus:border-[#00BCEB] text-[#00BCEB]'
+    : gameType === 'palabra-secreta'
+    ? 'focus:border-[#10B981] text-[#10B981]'
+    : 'focus:border-[#FFB000] text-[#FFB000]';
+
+  const btnThemeClass = isCodigoRojo
+    ? 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/30'
+    : gameType === 'la-peor-respuesta'
+    ? 'bg-[#FF3B4F] hover:bg-[#E6293D] text-white shadow-[#FF3B4F]/25'
+    : gameType === 'pinturillo'
+    ? 'bg-[#00BCEB] hover:bg-[#009ED0] text-slate-950 shadow-[#00BCEB]/25'
+    : gameType === 'palabra-secreta'
+    ? 'bg-[#10B981] hover:bg-[#059669] text-slate-950 shadow-[#10B981]/25'
+    : 'bg-[#FFB000] hover:bg-[#FF8A00] text-stone-950 shadow-[#FFB000]/25';
 
   return (
     <form onSubmit={handleSubmit} className="bg-stone-900/70 border border-stone-800/90 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5">
@@ -87,10 +96,10 @@ export const JoinRoomPanel: React.FC<JoinRoomPanelProps> = ({
 
       <button
         type="submit"
-        disabled={!isValid || isLoading}
+        disabled={!isValid || loading}
         className={`w-full py-4 px-6 rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed font-black text-sm sm:text-base uppercase tracking-wider transition-all shadow-xl active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer ${btnThemeClass}`}
       >
-        {isLoading ? (
+        {loading ? (
           <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ) : (
           <>

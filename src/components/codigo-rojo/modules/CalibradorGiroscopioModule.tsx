@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Compass, RotateCw } from 'lucide-react';
 import { audio } from '../../../utils/audio';
 
@@ -23,6 +23,10 @@ export const CalibradorGiroscopioModule: React.FC<CalibradorGiroscopioModuleProp
   const [heading, setHeading] = useState(operatorState.selectedHeading ?? currentBearing);
   const [visualRotation, setVisualRotation] = useState(operatorState.selectedHeading ?? currentBearing);
 
+  const dialRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const lastAngleRef = useRef<number | null>(null);
+
   const adjustHeading = (delta: number) => {
     if (solved) return;
     audio.playClick();
@@ -32,6 +36,57 @@ export const CalibradorGiroscopioModule: React.FC<CalibradorGiroscopioModuleProp
       return next;
     });
     setVisualRotation((prev) => prev + delta);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (solved) return;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        adjustHeading(e.shiftKey ? 10 : 1);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        adjustHeading(e.shiftKey ? -10 : -1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [solved]);
+
+  const getPointerAngle = (clientX: number, clientY: number) => {
+    if (!dialRef.current) return 0;
+    const rect = dialRef.current.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const angleRad = Math.atan2(clientY - cy, clientX - cx);
+    let angleDeg = (angleRad * 180) / Math.PI;
+    if (angleDeg < 0) angleDeg += 360;
+    return angleDeg;
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (solved) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    isDraggingRef.current = true;
+    lastAngleRef.current = getPointerAngle(e.clientX, e.clientY);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDraggingRef.current || lastAngleRef.current === null || solved) return;
+    const currentAngle = getPointerAngle(e.clientX, e.clientY);
+    let delta = currentAngle - lastAngleRef.current;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    if (Math.abs(delta) >= 1) {
+      const step = Math.round(delta);
+      adjustHeading(step);
+      lastAngleRef.current = currentAngle;
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    isDraggingRef.current = false;
+    lastAngleRef.current = null;
   };
 
   const handleLock = () => {
@@ -80,7 +135,17 @@ export const CalibradorGiroscopioModule: React.FC<CalibradorGiroscopioModuleProp
       {/* Main Horizon Instrument Display */}
       <div className="w-full flex flex-col sm:flex-row items-center justify-around gap-6 my-4">
         {/* Artificial Horizon Sphere / Kaleidoscope */}
-        <div className="relative w-44 h-44 sm:w-52 sm:h-52 rounded-full border-4 border-slate-700 bg-slate-950 overflow-hidden shadow-2xl flex items-center justify-center">
+        <div
+          ref={dialRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className={`relative w-44 h-44 sm:w-52 sm:h-52 rounded-full border-4 border-slate-700 bg-slate-950 overflow-hidden shadow-2xl flex items-center justify-center touch-none ${
+            solved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+          }`}
+          title="Arrastra circularmente o usa los botones para ajustar el rumbo"
+        >
           {/* Rotating Kaleidoscope / Gyro disc */}
           <div
             className="absolute inset-0 transition-transform duration-300 ease-out"
@@ -213,6 +278,12 @@ export const CalibradorGiroscopioModule: React.FC<CalibradorGiroscopioModuleProp
             >
               +10°
             </button>
+          </div>
+
+          {/* Circular wrap reminder */}
+          <div className="flex items-center gap-1.5 text-[10px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2.5 py-0.5 rounded-full">
+            <RotateCw className="w-3 h-3 text-cyan-400" />
+            <span>RUMBO CIRCULAR • 359° ↔ 000°</span>
           </div>
         </div>
       </div>

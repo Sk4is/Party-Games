@@ -5,6 +5,14 @@ export const ALL_CATEGORIES: CodigoRojoCategory[] = [
   'CONTROL',
   'SEÑAL',
   'NAVEGACIÓN',
+  'MECÁNICA',
+  'ÓPTICA',
+  'TÉRMICO',
+  'NEUMÁTICA',
+  'FLUIDOS',
+  'SEGURIDAD',
+  'CRIPTOGRAFÍA',
+  'CAMPO',
   'ENERGÍA',
   'SISTEMAS',
   'COMUNICACIONES',
@@ -26,9 +34,10 @@ export const MODULE_CATEGORY_MAP: Record<CodigoRojoModuleType, CodigoRojoCategor
   MODULADOR_FRECUENCIA: 'SEÑAL',
   FRECUENCIA_RESONANCIA: 'SEÑAL',
 
-  // NAVEGACIÓN (2 familias)
+  // NAVEGACIÓN (3 familias)
   RADAR_VECTORIAL: 'NAVEGACIÓN',
   CALIBRADOR_GIROSCOPIO: 'NAVEGACIÓN',
+  GIROSCOPIO_ESTABILIZACION: 'NAVEGACIÓN',
 
   // ENERGÍA (4 familias)
   VALVULAS_PRESION: 'ENERGÍA',
@@ -44,6 +53,17 @@ export const MODULE_CATEGORY_MAP: Record<CodigoRojoModuleType, CodigoRojoCategor
   // COMUNICACIONES (2 familias)
   TECLADO_MAESTRO: 'COMUNICACIONES',
   SEÑAL_OPTICA: 'COMUNICACIONES',
+
+  // 10 NUEVAS FAMILIAS
+  CAMARA_CONTRAPESOS: 'MECÁNICA',
+  PRISMA_REFRACCION: 'ÓPTICA',
+  CIRCUITO_REFRIGERANTE: 'TÉRMICO',
+  ANILLOS_CIFRADO: 'CRIPTOGRAFÍA',
+  MASAS_MAGNETICAS: 'CAMPO',
+  PRESION_PISTON: 'NEUMÁTICA',
+  CAMARA_CARTUCHOS: 'MECÁNICA',
+  FLUJO_GRAVITACIONAL: 'FLUIDOS',
+  PLACAS_SUPERPUESTAS: 'SEGURIDAD',
 };
 
 export const CATEGORY_META: Record<
@@ -83,7 +103,7 @@ export const CATEGORY_META: Record<
   },
   NAVEGACIÓN: {
     title: 'Navegación',
-    description: 'Radares de barrido circular polar y plataformas giroscópicas de horizonte artificial.',
+    description: 'Radares de barrido circular polar, plataformas de horizonte y giroscopios de 3 ejes.',
     accentColor: '#06b6d4',
     badgeBg: 'bg-cyan-950/70',
     badgeBorder: 'border-cyan-500/50',
@@ -112,6 +132,70 @@ export const CATEGORY_META: Record<
     badgeBg: 'bg-pink-950/70',
     badgeBorder: 'border-pink-500/50',
     badgeText: 'text-pink-300',
+  },
+  MECÁNICA: {
+    title: 'Mecánica',
+    description: 'Balanza de contrapesos de par físico y tambor cilíndrico de cartuchos de aleación.',
+    accentColor: '#eab308',
+    badgeBg: 'bg-yellow-950/70',
+    badgeBorder: 'border-yellow-500/50',
+    badgeText: 'text-yellow-300',
+  },
+  ÓPTICA: {
+    title: 'Óptica',
+    description: 'Prisma de difracción angular rotativo y direccionamiento de haz láser sobre sensores.',
+    accentColor: '#14b8a6',
+    badgeBg: 'bg-teal-950/70',
+    badgeBorder: 'border-teal-500/50',
+    badgeText: 'text-teal-300',
+  },
+  TÉRMICO: {
+    title: 'Térmico',
+    description: 'Circuito cerrado de fluidos caloportadores, cámaras de mezcla e intercambio térmico.',
+    accentColor: '#f97316',
+    badgeBg: 'bg-orange-950/70',
+    badgeBorder: 'border-orange-500/50',
+    badgeText: 'text-orange-300',
+  },
+  NEUMÁTICA: {
+    title: 'Neumática',
+    description: 'Cámara de compresión con pistón de tracción manual y enclavamiento mecánico de muescas.',
+    accentColor: '#0ea5e9',
+    badgeBg: 'bg-sky-950/70',
+    badgeBorder: 'border-sky-500/50',
+    badgeText: 'text-sky-300',
+  },
+  FLUIDOS: {
+    title: 'Fluidos',
+    description: 'Laberinto gravitacional con válvulas orientables de derivación y depósitos de decantación.',
+    accentColor: '#6366f1',
+    badgeBg: 'bg-indigo-950/70',
+    badgeBorder: 'border-indigo-500/50',
+    badgeText: 'text-indigo-300',
+  },
+  SEGURIDAD: {
+    title: 'Seguridad',
+    description: 'Cerradura de placas de acero troqueladas superpuestas y cerrojos perimetrales de bloqueo.',
+    accentColor: '#84cc16',
+    badgeBg: 'bg-lime-950/70',
+    badgeBorder: 'border-lime-500/50',
+    badgeText: 'text-lime-300',
+  },
+  CRIPTOGRAFÍA: {
+    title: 'Criptografía',
+    description: 'Rotores mecánicos concéntricos de cifrado con retenes táctiles y cursor de alineación.',
+    accentColor: '#d946ef',
+    badgeBg: 'bg-fuchsia-950/70',
+    badgeBorder: 'border-fuchsia-500/50',
+    badgeText: 'text-fuchsia-300',
+  },
+  CAMPO: {
+    title: 'Campo',
+    description: 'Matriz ferromagnética de polaridad dipolar con restricción de flujo y núcleo central.',
+    accentColor: '#8b5cf6',
+    badgeBg: 'bg-violet-950/70',
+    badgeBorder: 'border-violet-500/50',
+    badgeText: 'text-violet-300',
   },
 };
 

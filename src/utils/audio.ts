@@ -27,6 +27,7 @@ class AudioManager {
     if (this.isMuted) {
       this.stopFuseLoop();
     }
+    this.updateRainGain();
     return !this.isMuted;
   }
 
@@ -35,6 +36,7 @@ class AudioManager {
     if (this.isMuted) {
       this.stopFuseLoop();
     }
+    this.updateRainGain();
   }
 
   public getIsMuted(): boolean {
@@ -1442,27 +1444,99 @@ class AudioManager {
     }
   }
 
+  private rainVolume: number = (() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('fiesta_coartada_rain_vol');
+        if (saved !== null) {
+          const parsed = parseFloat(saved);
+          if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) return parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return 0.5;
+  })();
+
+  public getRainVolume(): number {
+    return this.rainVolume;
+  }
+
+  public setRainVolume(volume: number) {
+    const clamped = Math.max(0, Math.min(1, volume));
+    this.rainVolume = clamped;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('fiesta_coartada_rain_vol', clamped.toString());
+      } catch {
+        // ignore
+      }
+    }
+    this.updateRainGain();
+  }
+
+  public updateRainGain() {
+    if (!this.rainGain || !this.ctx) return;
+    try {
+      const targetGain = this.isMuted ? 0 : this.rainVolume * 0.04;
+      this.rainGain.gain.linearRampToValueAtTime(targetGain, this.ctx.currentTime + 0.1);
+    } catch {
+      // ignore
+    }
+  }
+
   public startRainAmbience() {
-    if (this.isMuted || this.rainNode) return;
     this.initContext();
     if (!this.ctx) return;
+
+    if (this.rainNode) {
+      // Already running, just ensure gain is correct
+      this.updateRainGain();
+      return;
+    }
+
     try {
-      const bufferLength = Math.floor(this.ctx.sampleRate * 2.0);
-      const buffer = this.ctx.createBuffer(1, bufferLength, this.ctx.sampleRate);
+      // Generate 5-second seamless pink-noise rain loop with smooth crossfade
+      const sampleRate = this.ctx.sampleRate;
+      const bufferLength = Math.floor(sampleRate * 5.0);
+      const buffer = this.ctx.createBuffer(1, bufferLength, sampleRate);
       const data = buffer.getChannelData(0);
+
+      // Pink noise filter state
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
       for (let i = 0; i < bufferLength; i++) {
-        data[i] = (Math.random() * 2 - 1) * 0.3;
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        const pink = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+        b6 = white * 0.115926;
+        data[i] = pink * 0.11;
       }
+
+      // Smooth loop crossfade over 0.2s at boundaries to eliminate clicks
+      const crossfadeLen = Math.floor(sampleRate * 0.2);
+      for (let i = 0; i < crossfadeLen; i++) {
+        const t = i / crossfadeLen;
+        data[i] = data[i] * t + data[bufferLength - crossfadeLen + i] * (1 - t);
+      }
+
       this.rainNode = this.ctx.createBufferSource();
       this.rainNode.buffer = buffer;
       this.rainNode.loop = true;
 
       const filter = this.ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(450, this.ctx.currentTime);
+      filter.frequency.setValueAtTime(550, this.ctx.currentTime);
+      filter.Q.setValueAtTime(0.5, this.ctx.currentTime);
 
       this.rainGain = this.ctx.createGain();
-      this.rainGain.gain.setValueAtTime(0.015, this.ctx.currentTime); // Very quiet atmospheric hum
+      const initialGain = this.isMuted ? 0 : this.rainVolume * 0.04;
+      this.rainGain.gain.setValueAtTime(initialGain, this.ctx.currentTime);
 
       this.rainNode.connect(filter);
       filter.connect(this.rainGain);
@@ -1476,13 +1550,115 @@ class AudioManager {
   public stopRainAmbience() {
     if (this.rainNode) {
       try {
-        this.rainNode.stop();
-        this.rainNode.disconnect();
+        if (this.rainGain && this.ctx) {
+          this.rainGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
+        }
+        setTimeout(() => {
+          if (this.rainNode) {
+            try {
+              this.rainNode.stop();
+              this.rainNode.disconnect();
+            } catch {
+              // ignore
+            }
+            this.rainNode = null;
+          }
+        }, 220);
       } catch {
-        // ignore
+        this.rainNode = null;
       }
-      this.rainNode = null;
     }
+  }
+
+  // --- CÓDIGO ROJO NEW MODULE SOUNDS ---
+  public playMetalLever() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(70, now + 0.08);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.09);
+  }
+
+  public playMechanicalDetent() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(200, now + 0.03);
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.03);
+  }
+
+  public playMagneticSnap() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(450, now);
+    osc.frequency.exponentialRampToValueAtTime(110, now + 0.05);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.05);
+  }
+
+  public playPistonCompression() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(90, now);
+    osc.frequency.linearRampToValueAtTime(220, now + 0.07);
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }
+
+  public playCartridgeInsert() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(180, now + 0.06);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.06);
   }
 }
 

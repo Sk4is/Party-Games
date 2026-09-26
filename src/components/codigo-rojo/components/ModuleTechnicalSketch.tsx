@@ -245,7 +245,7 @@ function renderSketchSvg(type: CodigoRojoModuleType) {
               </g>
             );
           })}
-          <text x="35" y="120" fill="#64748b" stroke="none" fontSize="7.5">1 REGISTRO HEX &bull; 4 RELÉS BIESTABLES (R1..R4: 1=ARRIBA, 0=ABAJO)</text>
+          <text x="35" y="120" fill="#64748b" stroke="none" fontSize="7.5">1 REGISTRO HEX • 4 RELÉS BIESTABLES (R1..R4: 1=ARRIBA, 0=ABAJO)</text>
         </svg>
       );
 
@@ -655,6 +655,376 @@ function renderSketchSvg(type: CodigoRojoModuleType) {
             <rect x="0" y="42" width="105" height="24" rx="4" fill="#047857" stroke="#10b981" />
             <text x="12" y="58" fill="#ffffff" stroke="none" fontWeight="bold">EQUILIBRAR (0 mV)</text>
           </g>
+        </svg>
+      );
+
+    // 21. CAMARA_CONTRAPESOS (Balanza horizontal con brazo basculante y 3 pesas)
+    case 'CAMARA_CONTRAPESOS':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#eab308" stroke="none" fontWeight="bold">BALANCÍN DE CONTRAPESOS (TORQUE = MASA × POSICIÓN)</text>
+          {/* Fulcrum central triangle */}
+          <polygon points="160,78 152,94 168,94" fill="#64748b" stroke="#94a3b8" strokeWidth="1.2" />
+          {/* Pivoted Balance Beam */}
+          <line x1="45" y1="78" x2="275" y2="78" stroke="#cbd5e1" strokeWidth="3.5" strokeLinecap="round" />
+          {/* Discrete Slot Notches (-3, -2, -1, 0, +1, +2, +3) */}
+          {[-3, -2, -1, 0, 1, 2, 3].map((pos) => {
+            const x = 160 + pos * 36;
+            return (
+              <g key={pos}>
+                <line x1={x} y1="74" x2={x} y2="82" stroke="#eab308" strokeWidth="1.5" />
+                <text x={x - 4} y="70" fill="#94a3b8" stroke="none" fontSize="7">{pos !== 0 ? Math.abs(pos) : '0'}</text>
+              </g>
+            );
+          })}
+          {/* Hanging weights example */}
+          <rect x="80" y="84" width="16" height="18" rx="2" fill="#d97706" stroke="#fde047" strokeWidth="1" />
+          <text x="82" y="96" fill="#ffffff" stroke="none" fontSize="7" fontWeight="bold">4kg</text>
+          <line x1="88" y1="78" x2="88" y2="84" stroke="#eab308" strokeWidth="1" />
+          <rect x="224" y="84" width="16" height="22" rx="2" fill="#b45309" stroke="#fde047" strokeWidth="1" />
+          <text x="226" y="98" fill="#ffffff" stroke="none" fontSize="7" fontWeight="bold">6kg</text>
+          <line x1="232" y1="78" x2="232" y2="84" stroke="#eab308" strokeWidth="1" />
+          {/* Lock Action Button */}
+          <rect x="195" y="102" width="105" height="15" rx="3" fill="#854d0e" stroke="#eab308" strokeWidth="1" />
+          <text x="202" y="113" fill="#fef08a" stroke="none" fontSize="7.5" fontWeight="bold">BLOQUEAR EQUILIBRIO</text>
+        </svg>
+      );
+
+    // 22. PRISMA_REFRACCION (Láser incidente + prisma giratorio + 5 sensores)
+    case 'PRISMA_REFRACCION':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#14b8a6" stroke="none" fontWeight="bold">DISPERSIÓN ÓPTICA // HAZ INCIDENTE Y MATRIZ S-1..S-5</text>
+          {/* Left Laser Emitter */}
+          <rect x="25" y="55" width="28" height="20" rx="3" fill="#1e293b" stroke="#0d9488" strokeWidth="1.5" />
+          <circle cx="53" cy="65" r="3" fill="#14b8a6" />
+          {/* Incoming Ray */}
+          <line x1="53" y1="65" x2="135" y2="65" stroke="#2dd4bf" strokeWidth="2.5" />
+          {/* Rotating Prism Base */}
+          <circle cx="145" cy="65" r="26" fill="#0f172a" stroke="#475569" strokeWidth="1" strokeDasharray="3 2" />
+          {/* Triangular Glass Prism */}
+          <polygon points="145,43 130,76 160,76" fill="#042f2e" stroke="#5eead4" strokeWidth="2" opacity="0.85" />
+          {/* Refracted Exit Ray */}
+          <line x1="145" y1="65" x2="242" y2="48" stroke="#2dd4bf" strokeWidth="2" strokeDasharray="4 2" />
+          {/* Sensor Arc S1..S5 */}
+          {[
+            { id: 'S1', x: 245, y: 32 },
+            { id: 'S2', x: 248, y: 48 },
+            { id: 'S3', x: 245, y: 65 },
+            { id: 'S4', x: 248, y: 82 },
+            { id: 'S5', x: 245, y: 98 },
+          ].map((s, i) => (
+            <g key={s.id}>
+              <rect x={s.x} y={s.y - 6} width="22" height="12" rx="2" fill={i === 1 ? '#042f2e' : '#1e293b'} stroke={i === 1 ? '#2dd4bf' : '#64748b'} />
+              <text x={s.x + 3} y={s.y + 3} fill={i === 1 ? '#5eead4' : '#94a3b8'} stroke="none" fontSize="7" fontWeight="bold">{s.id}</text>
+            </g>
+          ))}
+          {/* Fix Prism Button */}
+          <rect x="25" y="98" width="90" height="16" rx="3" fill="#115e59" stroke="#14b8a6" strokeWidth="1" />
+          <text x="36" y="110" fill="#f0fdfa" stroke="none" fontSize="8" fontWeight="bold">FIJAR PRISMA</text>
+        </svg>
+      );
+
+    // 23. CIRCUITO_REFRIGERANTE (3 depósitos térmicos + cámara de mezcla graduada)
+    case 'CIRCUITO_REFRIGERANTE':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#f97316" stroke="none" fontWeight="bold">MEZCLA CRIOGÉNICA // FRÍO (AZUL), TEMPLADO, CALIENTE</text>
+          {/* 3 Top Reservoirs */}
+          {[
+            { label: 'FRÍO', color: '#06b6d4', x: 35 },
+            { label: 'TEMPL.', color: '#f59e0b', x: 80 },
+            { label: 'CAL.', color: '#ef4444', x: 125 },
+          ].map((res) => (
+            <g key={res.label}>
+              <rect x={res.x} y={32} width="35" height="38" rx="4" fill="#1e293b" stroke={res.color} strokeWidth="1.2" />
+              <rect x={res.x + 3} y={50} width="29" height="17" fill={res.color} opacity="0.6" />
+              <text x={res.x + 4} y={43} fill={res.color} stroke="none" fontSize="7" fontWeight="bold">{res.label}</text>
+            </g>
+          ))}
+          {/* Central Mixing Chamber */}
+          <g transform="translate(180, 32)">
+            <rect x="0" y="0" width="48" height="68" rx="5" fill="#020617" stroke="#94a3b8" strokeWidth="1.5" />
+            <rect x="4" y="32" width="40" height="32" rx="2" fill="#0ea5e9" opacity="0.5" />
+            {/* Level graduation marks */}
+            {[10, 22, 34, 46, 58].map((ly, i) => (
+              <line key={i} x1="38" y1={ly} x2="44" y2={ly} stroke="#94a3b8" strokeWidth="1" />
+            ))}
+            <text x="12" y="80" fill="#94a3b8" stroke="none" fontSize="7">MEZCLA</text>
+          </g>
+          {/* Temp Readout & Action */}
+          <g transform="translate(236, 32)">
+            <rect x="0" y="0" width="68" height="26" rx="4" fill="#431407" stroke="#f97316" />
+            <text x="6" y="11" fill="#fed7aa" stroke="none" fontSize="6.5">TEMP NÚCLEO</text>
+            <text x="6" y="22" fill="#fb923c" stroke="none" fontSize="10" fontWeight="bold">285 °C</text>
+            <rect x="0" y="38" width="68" height="26" rx="4" fill="#c2410c" stroke="#f97316" strokeWidth="1" />
+            <text x="4" y="54" fill="#ffffff" stroke="none" fontSize="6.5" fontWeight="bold">REFRIGERAR</text>
+          </g>
+        </svg>
+      );
+
+    // 24. ANILLOS_CIFRADO (3 rotores concéntricos con cursor superior)
+    case 'ANILLOS_CIFRADO':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#d946ef" stroke="none" fontWeight="bold">ROTORES CONCÉNTRICOS // SÍMBOLOS, LETRAS (A-F) Y CIFRAS (1-6)</text>
+          {/* Concentric Rings */}
+          <g transform="translate(100, 68)">
+            <circle cx="0" cy="0" r="44" stroke="#c026d3" strokeWidth="2.5" fill="#1e1b4b" />
+            <circle cx="0" cy="0" r="30" stroke="#a855f7" strokeWidth="2" fill="#2e1065" />
+            <circle cx="0" cy="0" r="16" stroke="#e879f9" strokeWidth="1.5" fill="#0f172a" />
+            {/* Top Alignment Cursor Hairline */}
+            <line x1="0" y1="-50" x2="0" y2="-44" stroke="#f43f5e" strokeWidth="2.5" />
+            <polygon points="0,-44 -4,-49 4,-49" fill="#f43f5e" />
+            {/* Sample characters at top */}
+            <text x="-4" y="-33" fill="#f5d0fe" stroke="none" fontSize="8" fontWeight="bold">⌬</text>
+            <text x="-3" y="-19" fill="#f5d0fe" stroke="none" fontSize="8" fontWeight="bold">B</text>
+            <text x="-2" y="-6" fill="#f5d0fe" stroke="none" fontSize="8" fontWeight="bold">3</text>
+          </g>
+          {/* Rotor Description and Action */}
+          <g transform="translate(170, 35)">
+            <text x="0" y="12" fill="#e879f9" stroke="none" fontWeight="bold">ALINEACIÓN DE MIRA</text>
+            <text x="0" y="26" fill="#94a3b8" stroke="none" fontSize="7.5">EXTERIOR: GLIFO // MEDIO: LETRA</text>
+            <text x="0" y="38" fill="#94a3b8" stroke="none" fontSize="7.5">INTERIOR: DÍGITO (1-6)</text>
+            <rect x="0" y="48" width="120" height="20" rx="4" fill="#a21caf" stroke="#e879f9" strokeWidth="1" />
+            <text x="14" y="61" fill="#ffffff" stroke="none" fontSize="8" fontWeight="bold">BLOQUEAR ANILLOS</text>
+          </g>
+        </svg>
+      );
+
+    // 25. MASAS_MAGNETICAS (Placa metálica 3x3 con núcleo y polos N / S)
+    case 'MASAS_MAGNETICAS':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#8b5cf6" stroke="none" fontWeight="bold">MATRIZ FERROMAGNÉTICA 3x3 // POLOS [N] (ROJO) Y [S] (AZUL)</text>
+          {/* 3x3 Metallic Grid */}
+          <g transform="translate(45, 34)">
+            {[0, 1, 2].map((r) =>
+              [0, 1, 2].map((c) => {
+                const isCenter = r === 1 && c === 1;
+                return (
+                  <rect
+                    key={`${r}-${c}`}
+                    x={c * 26}
+                    y={r * 26}
+                    width="23"
+                    height="23"
+                    rx="3"
+                    fill={isCenter ? '#312e81' : '#1e293b'}
+                    stroke={isCenter ? '#818cf8' : '#475569'}
+                    strokeWidth="1.2"
+                  />
+                );
+              })
+            )}
+            {/* Center Core Coil Icon */}
+            <circle cx="37" cy="37" r="6" fill="#6366f1" />
+            <text x="34" y="40" fill="#ffffff" stroke="none" fontSize="7" fontWeight="bold">⚡</text>
+            {/* Sample placed N and S tokens */}
+            <circle cx="11" cy="11" r="7" fill="#dc2626" stroke="#f87171" />
+            <text x="8" y="14" fill="#ffffff" stroke="none" fontSize="7" fontWeight="bold">N</text>
+            <circle cx="63" cy="11" r="7" fill="#dc2626" stroke="#f87171" />
+            <text x="60" y="14" fill="#ffffff" stroke="none" fontSize="7" fontWeight="bold">N</text>
+            <circle cx="11" cy="63" r="7" fill="#2563eb" stroke="#60a5fa" />
+            <text x="9" y="66" fill="#ffffff" stroke="none" fontSize="7" fontWeight="bold">S</text>
+            <circle cx="63" cy="63" r="7" fill="#2563eb" stroke="#60a5fa" />
+            <text x="61" y="66" fill="#ffffff" stroke="none" fontSize="7" fontWeight="bold">S</text>
+          </g>
+          {/* Side Token Rack & Action */}
+          <g transform="translate(150, 35)">
+            <text x="0" y="12" fill="#c4b5fd" stroke="none" fontWeight="bold">CONFINAMIENTO DIPOLAR</text>
+            <text x="0" y="26" fill="#94a3b8" stroke="none" fontSize="7.5">SIN ADYACENCIA N-N NI S-S</text>
+            <text x="0" y="38" fill="#94a3b8" stroke="none" fontSize="7.5">PAR: EN CRUZ // IMPAR: VÉRTICES</text>
+            <rect x="0" y="48" width="135" height="20" rx="4" fill="#5b21b6" stroke="#8b5cf6" strokeWidth="1" />
+            <text x="14" y="61" fill="#ffffff" stroke="none" fontSize="8" fontWeight="bold">ESTABILIZAR CAMPO</text>
+          </g>
+        </svg>
+      );
+
+    // 26. PRESION_PISTON (Cilindro neumático con 3 muescas y manómetro)
+    case 'PRESION_PISTON':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#0ea5e9" stroke="none" fontWeight="bold">CÁMARA NEUMÁTICA // ÉMBOLO Y 3 MUESCAS DE ENCLAVAMIENTO</text>
+          {/* Horizontal/Vertical cylinder */}
+          <g transform="translate(50, 32)">
+            <rect x="0" y="0" width="34" height="74" rx="4" fill="#020617" stroke="#38bdf8" strokeWidth="1.5" />
+            {/* Piston head & T-handle */}
+            <rect x="5" y="30" width="24" height="8" rx="2" fill="#0284c7" stroke="#bae6fd" />
+            <line x1="17" y1="0" x2="17" y2="30" stroke="#94a3b8" strokeWidth="3" />
+            <line x1="7" y1="0" x2="27" y2="0" stroke="#cbd5e1" strokeWidth="4" strokeLinecap="round" />
+            {/* 3 Notches markings */}
+            {[
+              { id: '1', y: 15, label: 'ALTA (20 PSI)' },
+              { id: '2', y: 35, label: 'MEDIA (50 PSI)' },
+              { id: '3', y: 55, label: 'BAJA (85 PSI)' },
+            ].map((n) => (
+              <g key={n.id}>
+                <line x1="34" y1={n.y} x2="40" y2={n.y} stroke="#f59e0b" strokeWidth="2" />
+                <circle cx="43" cy={n.y} r="2" fill="#f59e0b" />
+              </g>
+            ))}
+          </g>
+          {/* Pressure Gauge */}
+          <g transform="translate(130, 45)">
+            <circle cx="20" cy="20" r="18" fill="#0f172a" stroke="#0ea5e9" strokeWidth="1.2" />
+            <line x1="20" y1="20" x2="28" y2="12" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="20" cy="20" r="2.5" fill="#ffffff" />
+            <text x="7" y="46" fill="#94a3b8" stroke="none" fontSize="7">MANÓMETRO</text>
+          </g>
+          {/* Cylinder Type & Action */}
+          <g transform="translate(195, 34)">
+            <rect x="0" y="0" width="100" height="24" rx="4" fill="#082f49" stroke="#0284c7" />
+            <text x="8" y="10" fill="#7dd3fc" stroke="none" fontSize="6.5">TIPO DE CILINDRO</text>
+            <text x="8" y="20" fill="#ffffff" stroke="none" fontSize="8" fontWeight="bold">ALFA / BETA / GAMMA</text>
+            <rect x="0" y="44" width="100" height="24" rx="4" fill="#0369a1" stroke="#38bdf8" strokeWidth="1" />
+            <text x="8" y="59" fill="#ffffff" stroke="none" fontSize="7.5" fontWeight="bold">BLOQUEAR PISTÓN</text>
+          </g>
+        </svg>
+      );
+
+    // 27. GIROSCOPIO_ESTABILIZACION (3 anillos concéntricos ortogonales X, Y, Z)
+    case 'GIROSCOPIO_ESTABILIZACION':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#06b6d4" stroke="none" fontWeight="bold">PLATAFORMA GIROSCÓPICA // 3 EJES (X: ROLL, Y: PITCH, Z: YAW)</text>
+          {/* Nested 3 Gimbal Rings */}
+          <g transform="translate(90, 68)">
+            {/* Ring X (Outer - Red) */}
+            <circle cx="0" cy="0" r="44" stroke="#ef4444" strokeWidth="2" strokeDasharray="10 3" />
+            {/* Ring Y (Middle - Green) */}
+            <circle cx="0" cy="0" r="31" stroke="#22c55e" strokeWidth="2" strokeDasharray="8 3" />
+            {/* Ring Z (Inner - Blue) */}
+            <circle cx="0" cy="0" r="18" stroke="#3b82f6" strokeWidth="2" strokeDasharray="6 2" />
+            {/* Central spinning brass rotor */}
+            <circle cx="0" cy="0" r="8" fill="#eab308" stroke="#ca8a04" />
+            <line x1="-8" y1="0" x2="8" y2="0" stroke="#ffffff" strokeWidth="1.5" />
+          </g>
+          {/* Axis controls description & Action */}
+          <g transform="translate(160, 32)">
+            <text x="0" y="12" fill="#67e8f9" stroke="none" fontWeight="bold">ALINEACIÓN TRIAXIAL</text>
+            <text x="0" y="26" fill="#f87171" stroke="none" fontSize="7.5">EJE X: 0° / 90° / 180° / 270°</text>
+            <text x="0" y="38" fill="#4ade80" stroke="none" fontSize="7.5">EJE Y: 0° / 90° / 180° / 270°</text>
+            <text x="0" y="50" fill="#60a5fa" stroke="none" fontSize="7.5">EJE Z: 0° / 90° / 180° / 270°</text>
+            <rect x="0" y="58" width="130" height="20" rx="4" fill="#0e7490" stroke="#22d3ee" strokeWidth="1" />
+            <text x="32" y="71" fill="#ffffff" stroke="none" fontSize="8" fontWeight="bold">ESTABILIZAR</text>
+          </g>
+        </svg>
+      );
+
+    // 28. CAMARA_CARTUCHOS (4 ranuras de cartuchos con materiales y troqueles)
+    case 'CAMARA_CARTUCHOS':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#eab308" stroke="none" fontWeight="bold">BAHÍA DE 4 CARTUCHOS // MATERIALES (COBRE, ACERO...) Y FORMAS</text>
+          {/* 4 Cartridge Slots (1..4) */}
+          {[
+            { num: 1, mat: 'COBRE', sym: '▲', color: '#ea580c' },
+            { num: 2, mat: 'CERÁM.', sym: '●', color: '#e2e8f0' },
+            { num: 3, mat: 'ACERO', sym: '◆', color: '#94a3b8' },
+            { num: 4, mat: 'TITANIO', sym: '■', color: '#facc15' },
+          ].map((c, i) => {
+            const x = 30 + i * 50;
+            return (
+              <g key={c.num}>
+                {/* Slot rail */}
+                <rect x={x} y="32" width="40" height="58" rx="4" fill="#1e293b" stroke="#475569" strokeWidth="1" />
+                {/* Cartridge body */}
+                <rect x={x + 4} y="38" width="32" height="38" rx="3" fill="#0f172a" stroke={c.color} strokeWidth="1.5" />
+                <text x={x + 15} y="55" fill={c.color} stroke="none" fontSize="11">{c.sym}</text>
+                <text x={x + 7} y="68" fill="#94a3b8" stroke="none" fontSize="6">{c.mat}</text>
+                <text x={x + 16} y="82" fill="#64748b" stroke="none" fontSize="7">#{c.num}</text>
+              </g>
+            );
+          })}
+          {/* Seal Chamber Action */}
+          <rect x="235" y="44" width="70" height="42" rx="4" fill="#854d0e" stroke="#facc15" strokeWidth="1.2" />
+          <text x="242" y="62" fill="#fef08a" stroke="none" fontSize="7" fontWeight="bold">SELLAR</text>
+          <text x="242" y="74" fill="#fef08a" stroke="none" fontSize="7" fontWeight="bold">CÁMARA</text>
+        </svg>
+      );
+
+    // 29. FLUJO_GRAVITACIONAL (Laberinto gravitacional con 3 válvulas y 3 depósitos)
+    case 'FLUJO_GRAVITACIONAL':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#6366f1" stroke="none" fontWeight="bold">LABERINTO GRAVITACIONAL // ESFERAS (ROJA, AZUL) Y VÁLVULAS</text>
+          {/* Top entry chute with 2 spheres */}
+          <g transform="translate(100, 30)">
+            <rect x="-20" y="0" width="40" height="12" rx="2" fill="#1e293b" stroke="#6366f1" />
+            <circle cx="-6" cy="6" r="4" fill="#ef4444" />
+            <circle cx="6" cy="6" r="4" fill="#3b82f6" />
+          </g>
+          {/* 3 Junction Diverter Valves */}
+          <g transform="translate(100, 52)">
+            {/* Valve 1 (Top) */}
+            <circle cx="0" cy="0" r="9" fill="#1e293b" stroke="#818cf8" strokeWidth="1.5" />
+            <line x1="-6" y1="0" x2="6" y2="0" stroke="#f8fafc" strokeWidth="2" />
+            {/* Valve 2 (Left) */}
+            <circle cx="-35" cy="22" r="9" fill="#1e293b" stroke="#818cf8" strokeWidth="1.5" />
+            <line x1="-41" y1="22" x2="-29" y2="22" stroke="#f8fafc" strokeWidth="2" />
+            {/* Valve 3 (Right) */}
+            <circle cx="35" cy="22" r="9" fill="#1e293b" stroke="#818cf8" strokeWidth="1.5" />
+            <line x1="29" y1="22" x2="41" y2="22" stroke="#f8fafc" strokeWidth="2" />
+          </g>
+          {/* Bottom Reservoirs A, B, C */}
+          {[
+            { id: 'A', x: 50 },
+            { id: 'B', x: 100 },
+            { id: 'C', x: 150 },
+          ].map((dep) => (
+            <g key={dep.id}>
+              <rect x={dep.x - 12} y="92" width="24" height="18" rx="2" fill="#0f172a" stroke="#818cf8" strokeWidth="1.2" />
+              <text x={dep.x - 3} y="104" fill="#c7d2fe" stroke="none" fontSize="8" fontWeight="bold">{dep.id}</text>
+            </g>
+          ))}
+          {/* Release Trigger */}
+          <g transform="translate(205, 45)">
+            <rect x="0" y="0" width="95" height="42" rx="4" fill="#3730a3" stroke="#818cf8" strokeWidth="1.5" />
+            <text x="24" y="24" fill="#ffffff" stroke="none" fontSize="10" fontWeight="bold">LIBERAR</text>
+            <text x="14" y="35" fill="#c7d2fe" stroke="none" fontSize="7">CAÍDA GRAVITATORIA</text>
+          </g>
+        </svg>
+      );
+
+    // 30. PLACAS_SUPERPUESTAS (3 placas con lumbreras retroiluminadas y cerrojo)
+    case 'PLACAS_SUPERPUESTAS':
+      return (
+        <svg viewBox="0 0 320 130" className="w-full max-w-xs h-32 stroke-slate-300 fill-none font-mono text-[9px]">
+          <rect x="10" y="10" width="300" height="110" rx="6" stroke="#475569" strokeWidth="1.5" fill="#0f172a" />
+          <text x="22" y="23" fill="#84cc16" stroke="none" fontWeight="bold">CERRADURA DE PLACAS // 3 CAPAS DESLIZANTES Y SILUETA ÓPTICA</text>
+          {/* Central Backlit Aperture Viewer */}
+          <g transform="translate(65, 40)">
+            <rect x="0" y="0" width="70" height="60" rx="4" fill="#1e293b" stroke="#84cc16" strokeWidth="1.5" />
+            <rect x="8" y="8" width="54" height="44" fill="#020617" />
+            {/* Resulting Silhouette Pattern */}
+            <path d="M 20 16 L 38 16 L 38 46 L 20 46 Z" fill="#65a30d" opacity="0.8" />
+            <circle cx="48" cy="30" r="6" fill="#a3e635" />
+            <text x="12" y="66" fill="#94a3b8" stroke="none" fontSize="6.5">SILUETA COMBINADA</text>
+          </g>
+          {/* 3 Slider Tracks (Placa 1, 2, 3) */}
+          <g transform="translate(155, 34)">
+            {['P-1 (FRONT)', 'P-2 (MED)', 'P-3 (TRAS)'].map((p, i) => (
+              <g key={p}>
+                <text x="0" y={i * 22 + 9} fill="#bef264" stroke="none" fontSize="7" fontWeight="bold">{p}</text>
+                <rect x="52" y={i * 22 + 2} width="45" height="10" rx="3" fill="#020617" stroke="#475569" />
+                <rect x={52 + (i === 0 ? 5 : i === 1 ? 18 : 32)} y={i * 22} width="9" height="14" rx="2" fill="#84cc16" stroke="#ecfccb" />
+              </g>
+            ))}
+          </g>
+          {/* Enclavar Action */}
+          <rect x="255" y="44" width="50" height="48" rx="4" fill="#3f6212" stroke="#84cc16" strokeWidth="1.2" />
+          <text x="260" y="64" fill="#ffffff" stroke="none" fontSize="7" fontWeight="bold">ENCLAVAR</text>
+          <text x="263" y="76" fill="#ecfccb" stroke="none" fontSize="6.5">PLACAS</text>
         </svg>
       );
 

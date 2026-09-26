@@ -9,16 +9,19 @@ interface RoomModeSelectorProps {
   mode: RoomMode;
   onChange: (mode: RoomMode) => void;
   accentColor?: string;
-  gameType?: GameSlug;
+  gameType?: GameSlug | 'codigo-rojo' | 'coartada';
 }
 
 export const RoomModeSelector: React.FC<RoomModeSelectorProps> = ({
   mode,
   onChange,
+  accentColor,
   gameType = 'la-bomba',
 }) => {
   const activeClass =
-    gameType === 'la-peor-respuesta'
+    gameType === 'codigo-rojo' || accentColor === '#ef4444'
+      ? 'bg-red-600 text-white shadow-md shadow-red-600/30 scale-[1.01]'
+      : gameType === 'la-peor-respuesta'
       ? 'bg-[#FF3B4F] text-white shadow-md shadow-[#FF3B4F]/25 scale-[1.01]'
       : gameType === 'pinturillo'
       ? 'bg-[#00BCEB] text-slate-950 shadow-md shadow-[#00BCEB]/25 scale-[1.01]'

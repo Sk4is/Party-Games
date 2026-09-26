@@ -536,101 +536,66 @@ function generateValvulasPresion(rng: Mulberry32, serial: string = 'CR-4821-X7')
 // 6. RELÉS HEXADECIMALES
 // =========================================================================
 function generateRelesHexadecimales(rng: Mulberry32, serial: string = 'CR-4821-X7'): GeneratedModuleInternal {
-  // Generate ONE single 2-digit hexadecimal register (0x10 to 0xFE)
-  const hexVal = rng.range(0x10, 0xFE);
-  const hexRegister = `0x${hexVal.toString(16).toUpperCase().padStart(2, '0')}`;
-  const firstChar = hexRegister.charAt(2);
-  const secondChar = hexRegister.charAt(3);
-  const firstDigit = parseInt(firstChar, 16);
-  const secondDigit = parseInt(secondChar, 16);
+  // Generate a 2-character hex register (e.g. 0x3A, 0x48, 0xCF, etc.)
+  const mode = rng.range(0, 2); // 0: both numbers, 1: both letters, 2: mixed (one num, one letter)
+  let char1 = '0';
+  let char2 = '0';
+  const numChars = '0123456789';
+  const letterChars = 'ABCDEF';
 
-  const lastSerialDigit = getSerialLastDigit(serial);
-  const isSerialOdd = !isSerialLastDigitEven(serial);
-  const isFirstCharNumeric = /[0-9]/.test(firstChar);
-
-  // Authoritative transformation producing a 4-bit integer (0 to 15)
-  let transformedValue = 0;
-
-  if (isFirstCharNumeric) {
-    if (!isSerialOdd) {
-      // Rule 1A: Numeric first char + Even serial -> 0xNN AND 0x0F
-      transformedValue = hexVal & 0x0F;
-    } else {
-      // Rule 1B: Numeric first char + Odd serial -> (Second nibble XOR last serial digit) mod 16
-      transformedValue = (secondDigit ^ (lastSerialDigit % 16)) & 0x0F;
-    }
+  if (mode === 0) {
+    char1 = rng.pick(numChars.slice(1).split('')); // avoid 0x00
+    char2 = rng.pick(numChars.split(''));
+  } else if (mode === 1) {
+    char1 = rng.pick(letterChars.split(''));
+    char2 = rng.pick(letterChars.split(''));
   } else {
-    // First char is letter A-F
-    if (!isSerialOdd) {
-      // Rule 2A: Alpha first char + Even serial -> First nibble XOR second nibble
-      transformedValue = (firstDigit ^ secondDigit) & 0x0F;
+    if (rng.range(0, 1) === 0) {
+      char1 = rng.pick(numChars.slice(1).split(''));
+      char2 = rng.pick(letterChars.split(''));
     } else {
-      // Rule 2B: Alpha first char + Odd serial -> Invert lower nibble (15 - secondDigit)
-      transformedValue = (15 - secondDigit) & 0x0F;
+      char1 = rng.pick(letterChars.split(''));
+      char2 = rng.pick(numChars.split(''));
     }
   }
 
-  // Ensure result is strictly 0..15 (4 bits)
-  transformedValue = ((transformedValue % 16) + 16) % 16;
+  const hexRegister = `0x${char1}${char2}`;
+  const isSerialEven = isSerialLastDigitEven(serial);
+  const serialHasVowel = doesSerialContainVowel(serial);
 
+  let targetChar = '0';
+  const isChar1Num = /[0-9]/.test(char1);
+  const isChar2Num = /[0-9]/.test(char2);
+
+  if (isChar1Num && isChar2Num) {
+    // Caso A: Ambos son números
+    targetChar = isSerialEven ? char2 : char1;
+  } else if (!isChar1Num && !isChar2Num) {
+    // Caso B: Ambos son letras
+    if (serialHasVowel) {
+      targetChar = char1 > char2 ? char1 : char2; // Mayor orden alfabético
+    } else {
+      targetChar = char1 < char2 ? char1 : char2; // Menor orden alfabético
+    }
+  } else {
+    // Caso C: Un número y una letra
+    if (isSerialEven) {
+      targetChar = !isChar1Num ? char1 : char2; // La letra
+    } else {
+      targetChar = isChar1Num ? char1 : char2; // El número
+    }
+  }
+
+  const hexVal = parseInt(targetChar, 16);
   // Bits: R1 = MSB (bit 3), R2 = bit 2, R3 = bit 1, R4 = LSB (bit 0)
   // 1 = ARRIBA, 0 = ABAJO
-  const r1 = (transformedValue >> 3) & 1;
-  const r2 = (transformedValue >> 2) & 1;
-  const r3 = (transformedValue >> 1) & 1;
-  const r4 = transformedValue & 1;
+  const r1 = (hexVal >> 3) & 1;
+  const r2 = (hexVal >> 2) & 1;
+  const r3 = (hexVal >> 1) & 1;
+  const r4 = hexVal & 1;
   const targetSwitches = [r1, r2, r3, r4];
 
-  const manualSection: CodigoRojoManualSection = {
-    moduleType: 'RELES_HEXADECIMALES',
-    category: 'ELECTRICIDAD',
-    title: 'Relés Hexadecimales',
-    subtitle: 'Decodificación Lógica de Registro Base 16',
-    classificationCode: 'DOC-LOG-06',
-    division: 'Lógica Digital y Cómputo',
-    visualIdentification:
-      'El panel contiene UNA única pantalla central con un Registro Hexadecimal (ej. 0x3A, 0x7F, 0xC4) y debajo un banco de CUATRO interruptores de relé biestables etiquetados R1, R2, R3 y R4. Cada relé puede conmutarse a ARRIBA (1) o ABAJO (0). En la parte inferior se encuentra el pulsador «ENCLAVAR RELÉS».',
-    identificationChecklist: [
-      'UNA sola pantalla digital con un registro hexadecimal (0x00 a 0xFF).',
-      'CUATRO interruptores de palanca verticales: R1, R2, R3, R4.',
-      'Dos posiciones por interruptor: ARRIBA (1) y ABAJO (0).',
-      'Pulsador de confirmación «ENCLAVAR RELÉS».',
-    ],
-    description:
-      'El bus de datos está bloqueado en un registro hexadecimal. Los Guías deben aplicar la regla correspondiente según el primer carácter del registro y la serie de la máquina para obtener un valor final de 4 bits. Dichos 4 bits determinan la posición de los cuatro relés (R1 a R4).',
-    tableHeaders: ['HEX', 'Binario (R1-R2-R3-R4)', 'HEX', 'Binario (R1-R2-R3-R4)'],
-    tableRows: [
-      ['0', '0000 (Abajo-Abajo-Abajo-Abajo)', '8', '1000 (Arriba-Abajo-Abajo-Abajo)'],
-      ['1', '0001 (Abajo-Abajo-Abajo-Arriba)', '9', '1001 (Arriba-Abajo-Abajo-Arriba)'],
-      ['2', '0010 (Abajo-Abajo-Arriba-Abajo)', 'A', '1010 (Arriba-Abajo-Arriba-Abajo)'],
-      ['3', '0011 (Abajo-Abajo-Arriba-Arriba)', 'B', '1011 (Arriba-Abajo-Arriba-Arriba)'],
-      ['4', '0100 (Abajo-Arriba-Abajo-Abajo)', 'C', '1100 (Arriba-Arriba-Abajo-Abajo)'],
-      ['5', '0101 (Abajo-Arriba-Abajo-Arriba)', 'D', '1101 (Arriba-Arriba-Abajo-Arriba)'],
-      ['6', '0110 (Abajo-Arriba-Arriba-Abajo)', 'E', '1110 (Arriba-Arriba-Arriba-Abajo)'],
-      ['7', '0111 (Abajo-Arriba-Arriba-Arriba)', 'F', '1111 (Arriba-Arriba-Arriba-Arriba)'],
-    ],
-    rules: [
-      {
-        condition: 'CASO 1: EL PRIMER CARÁCTER TRAS «0x» ES UN NÚMERO (0 al 9):',
-        action:
-          '• Si la última cifra del número de serie de la máquina es PAR:\n  Aplica operación AND con 0x0F (toma directamente el segundo dígito hexadecimal).\n• Si la última cifra del número de serie es IMPAR:\n  Aplica operación XOR entre el segundo dígito hexadecimal y la última cifra de la serie (módulo 16).',
-      },
-      {
-        condition: 'CASO 2: EL PRIMER CARÁCTER TRAS «0x» ES UNA LETRA (A a la F):',
-        action:
-          '• Si la última cifra del número de serie es PAR:\n  Aplica operación XOR entre el primer dígito hexadecimal y el segundo dígito hexadecimal.\n• Si la última cifra del número de serie es IMPAR:\n  Invierte los 4 bits del segundo dígito hexadecimal (resta el valor del segundo dígito a 15: ej. 15 - F = 0, 15 - A = 5).',
-      },
-      {
-        condition: 'CONFIGURACIÓN DE LOS 4 RELÉS (1 = ARRIBA, 0 = ABAJO):',
-        action:
-          'Localiza el valor hexadecimal obtenido (0 a F) en la tabla de referencia superior:\n• R1 = Primer bit (Bit más significativo)\n• R2 = Segundo bit\n• R3 = Tercer bit\n• R4 = Cuarto bit (Bit menos significativo)\nColoca cada interruptor en su posición y pulsa «ENCLAVAR RELÉS».',
-      },
-    ],
-    notes: [
-      'Ejemplo: Registro 0x3A con número de serie terminado en 4 (PAR). El primer carácter «3» es numérico y la serie es par → resultado = A (segundo dígito). Según la tabla, A = 1010 → R1 = ARRIBA, R2 = ABAJO, R3 = ARRIBA, R4 = ABAJO.',
-      'El Operador puede conmutar los relés libremente sin penalización. La validación ocurre solo al pulsar «ENCLAVAR RELÉS». Un envío erróneo sumará como máximo 1 Strike.',
-    ],
-  };
+  const manualSection = MASTER_MANUAL_SECTIONS.find((s) => s.moduleType === 'RELES_HEXADECIMALES')!;
 
   return {
     moduleState: {
@@ -1517,7 +1482,8 @@ function generateCalibradorGiroscopio(rng: Mulberry32, serial: string): Generate
     },
     internalSolution: { targetHeading },
     validateAction: (action: { lockedHeading: number }) => {
-      const diff = Math.abs(((action.lockedHeading - targetHeading + 180) % 360) - 180);
+      let diff = Math.abs(action.lockedHeading - targetHeading) % 360;
+      if (diff > 180) diff = 360 - diff;
       if (diff <= 2) {
         return { valid: true, solved: true };
       }
@@ -1824,7 +1790,699 @@ function generateDivisorVoltaje(rng: Mulberry32, serial: string): GeneratedModul
 }
 
 // =========================================================================
-// AUTHORITATIVE GENERATOR & VALIDATOR REGISTRY (20 MODULE FAMILIES)
+// 21. CÁMARA DE CONTRAPESOS
+// =========================================================================
+function generateCamaraContrapesos(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  const hasVowel = doesSerialContainVowel(serial);
+  const isEven = isSerialLastDigitEven(serial);
+
+  // Masses: A (2 kg), B (4 kg), C (6 kg)
+  // Left torque must equal Right torque: Sum(mass * pos)
+  // hasVowel -> C on Left, B on Right
+  // !hasVowel -> C on Right, B on Left
+  let expectedSlots: { A: number; B: number; C: number };
+  if (hasVowel) {
+    if (isEven) {
+      // C (-1): torque 6 * 1 = 6
+      // B (+1): torque 4 * 1 = 4
+      // A (+1): torque 2 * 1 = 2 -> 4 + 2 = 6!
+      expectedSlots = { C: -1, B: 1, A: 1 };
+    } else {
+      // C (-2): torque 6 * 2 = 12
+      // B (+2): torque 4 * 2 = 8
+      // A (+2): torque 2 * 2 = 4 -> 8 + 4 = 12!
+      expectedSlots = { C: -2, B: 2, A: 2 };
+    }
+  } else {
+    if (isEven) {
+      // C (+1): torque 6
+      // B (-1): torque 4
+      // A (-1): torque 2 -> 4 + 2 = 6!
+      expectedSlots = { C: 1, B: -1, A: -1 };
+    } else {
+      // C (+2): torque 12
+      // B (-2): torque 8
+      // A (-2): torque 4 -> 8 + 4 = 12!
+      expectedSlots = { C: 2, B: -2, A: -2 };
+    }
+  }
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'CAMARA_CONTRAPESOS'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-peso-${rng.range(1000, 9999)}`,
+      moduleType: 'CAMARA_CONTRAPESOS',
+      title: 'Cámara de Contrapesos',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 50,
+      operatorState: {
+        weights: [
+          { id: 'A', name: 'Pesa A', mass: 2, slot: null },
+          { id: 'B', name: 'Pesa B', mass: 4, slot: null },
+          { id: 'C', name: 'Pesa C', mass: 6, slot: null },
+        ],
+        slots: { A: null, B: null, C: null },
+      },
+      manualSection,
+    },
+    internalSolution: { expectedSlots },
+    validateAction: (action: { slots: { A: number; B: number; C: number } }) => {
+      const { slots } = action;
+      if (!slots || slots.A === undefined || slots.B === undefined || slots.C === undefined) {
+        return { valid: false, solved: false };
+      }
+
+      // Check torque balance: Torque = mass * pos
+      const torque = 2 * slots.A + 4 * slots.B + 6 * slots.C;
+      const matchesRule =
+        slots.A === expectedSlots.A &&
+        slots.B === expectedSlots.B &&
+        slots.C === expectedSlots.C;
+
+      if (torque === 0 && matchesRule) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 22. PRISMA DE REFRACCIÓN
+// =========================================================================
+function generatePrismaRefraccion(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  const beamColors = ['Rojo', 'Verde', 'Azul', 'Ámbar'] as const;
+  const prismTypes = ['Prisma Flint (F)', 'Prisma Corona (K)', 'Prisma Fluorita (Ca)'] as const;
+  const beamColor = rng.pick([...beamColors]);
+  const prismType = rng.pick([...prismTypes]);
+  const isOdd = !isSerialLastDigitEven(serial);
+
+  // Table base mapping (1..5):
+  // Rojo: F->2, K->4, Ca->1
+  // Verde: F->3, K->1, Ca->5
+  // Azul: F->5, K->3, Ca->2
+  // Ámbar: F->4, K->2, Ca->3
+  let baseSensor = 1;
+  if (beamColor === 'Rojo') {
+    baseSensor = prismType === 'Prisma Flint (F)' ? 2 : prismType === 'Prisma Corona (K)' ? 4 : 1;
+  } else if (beamColor === 'Verde') {
+    baseSensor = prismType === 'Prisma Flint (F)' ? 3 : prismType === 'Prisma Corona (K)' ? 1 : 5;
+  } else if (beamColor === 'Azul') {
+    baseSensor = prismType === 'Prisma Flint (F)' ? 5 : prismType === 'Prisma Corona (K)' ? 3 : 2;
+  } else {
+    baseSensor = prismType === 'Prisma Flint (F)' ? 4 : prismType === 'Prisma Corona (K)' ? 2 : 3;
+  }
+
+  // If odd, +1 (modulo 1..5)
+  let targetSensorNum = baseSensor;
+  if (isOdd) {
+    targetSensorNum = targetSensorNum === 5 ? 1 : targetSensorNum + 1;
+  }
+  const targetSensor = `S-${targetSensorNum}`;
+  const sensorAngles: Record<string, number> = {
+    'S-1': 30,
+    'S-2': 60,
+    'S-3': 90,
+    'S-4': 120,
+    'S-5': 150,
+  };
+  const targetAngle = sensorAngles[targetSensor] || 90;
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'PRISMA_REFRACCION'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-prism-${rng.range(1000, 9999)}`,
+      moduleType: 'PRISMA_REFRACCION',
+      title: 'Prisma de Refracción',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 45,
+      operatorState: {
+        beamColor,
+        prismType,
+        angle: 30,
+        selectedSensor: 'S-1',
+      },
+      manualSection,
+    },
+    internalSolution: { targetSensor, targetAngle },
+    validateAction: (action: { sensor: string; angle: number }) => {
+      if (action.sensor === targetSensor || Math.abs(action.angle - targetAngle) <= 8) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 23. CIRCUITO DE REFRIGERANTE
+// =========================================================================
+function generateCircuitoRefrigerante(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  const temps = [335, 270, 195, 130];
+  const coreTemp = rng.pick(temps);
+  const startsWithCRorTX = /^(CR|TX)/i.test(serial);
+
+  let frio = 0;
+  let templado = 0;
+  let caliente = 0;
+
+  if (coreTemp > 300) {
+    frio = 3;
+    templado = 1;
+    caliente = 0;
+  } else if (coreTemp >= 220) {
+    frio = 2;
+    templado = 2;
+    caliente = 0;
+  } else if (coreTemp >= 150) {
+    frio = 1;
+    templado = 2;
+    caliente = 1;
+  } else {
+    frio = 0;
+    templado = 3;
+    caliente = 1;
+  }
+
+  if (startsWithCRorTX) {
+    frio += 1;
+    templado = Math.max(0, templado - 1);
+  }
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'CIRCUITO_REFRIGERANTE'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-cool-${rng.range(1000, 9999)}`,
+      moduleType: 'CIRCUITO_REFRIGERANTE',
+      title: 'Circuito de Refrigerante',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 45,
+      operatorState: {
+        coreTemp,
+        maxUnits: 5,
+        levels: { frio: 0, templado: 0, caliente: 0 },
+      },
+      manualSection,
+    },
+    internalSolution: { frio, templado, caliente },
+    validateAction: (action: { frio: number; templado: number; caliente: number }) => {
+      if (
+        action.frio === frio &&
+        action.templado === templado &&
+        action.caliente === caliente
+      ) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 24. ANILLOS DE CIFRADO MECÁNICO
+// =========================================================================
+function generateAnillosCifrado(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  // Exterior ring: symbols
+  let targetSymbol = '⍾';
+  if (/^(CR|TX)/i.test(serial)) {
+    targetSymbol = '⌬';
+  } else if (/^(NX|ALFA)/i.test(serial)) {
+    targetSymbol = '⌖';
+  } else if (/^(BETA|SEC)/i.test(serial)) {
+    targetSymbol = '⎊';
+  }
+
+  // Middle ring: letters
+  const firstDigit = extractSerialDigits(serial)[0] ?? 4;
+  const letterMap = ['E', 'A', 'A', 'B', 'B', 'C', 'C', 'D', 'D', 'E'];
+  let targetLetter = letterMap[firstDigit % 10] || 'B';
+  if (doesSerialContainVowel(serial)) {
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const idx = letters.indexOf(targetLetter);
+    targetLetter = letters[(idx + 1) % letters.length];
+  }
+
+  // Inner ring: numbers (1..6)
+  const lastDigit = getSerialLastDigit(serial);
+  const targetNumber = (lastDigit % 6) + 1;
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'ANILLOS_CIFRADO'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-cif-${rng.range(1000, 9999)}`,
+      moduleType: 'ANILLOS_CIFRADO',
+      title: 'Anillos de Cifrado',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 50,
+      operatorState: {
+        currentSymbol: '⍾',
+        currentLetter: 'A',
+        currentNumber: 1,
+        symbolsList: ['⍾', '⌬', '⌖', '⎊', '⏣', '⍲'],
+        lettersList: ['A', 'B', 'C', 'D', 'E', 'F'],
+        numbersList: [1, 2, 3, 4, 5, 6],
+      },
+      manualSection,
+    },
+    internalSolution: { targetSymbol, targetLetter, targetNumber },
+    validateAction: (action: { symbol: string; letter: string; number: number }) => {
+      if (
+        action.symbol === targetSymbol &&
+        action.letter === targetLetter &&
+        Number(action.number) === targetNumber
+      ) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 25. MATRIZ DE MASAS MAGNÉTICAS
+// =========================================================================
+function generateMasasMagneticas(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  const isEven = isSerialLastDigitEven(serial);
+
+  // Par -> Cruz: N at (1,0) and (1,2), S at (0,1) and (2,1)
+  // Impar -> Vértices: N at (0,0) and (0,2), S at (2,0) and (2,2)
+  const expectedPositions = isEven
+    ? {
+        '1-0': 'N',
+        '1-2': 'N',
+        '0-1': 'S',
+        '2-1': 'S',
+      }
+    : {
+        '0-0': 'N',
+        '0-2': 'N',
+        '2-0': 'S',
+        '2-2': 'S',
+      };
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'MASAS_MAGNETICAS'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-mag-${rng.range(1000, 9999)}`,
+      moduleType: 'MASAS_MAGNETICAS',
+      title: 'Masas Magnéticas',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 45,
+      operatorState: {
+        grid: {
+          '0-0': null, '0-1': null, '0-2': null,
+          '1-0': null, '1-1': 'CORE', '1-2': null,
+          '2-0': null, '2-1': null, '2-2': null,
+        },
+        availableTokens: ['N', 'N', 'S', 'S'],
+      },
+      manualSection,
+    },
+    internalSolution: { expectedPositions },
+    validateAction: (action: { grid: Record<string, 'N' | 'S' | null> }) => {
+      const { grid } = action;
+      if (!grid) return { valid: false, solved: false };
+
+      const allMatch = Object.entries(expectedPositions).every(
+        ([key, pole]) => grid[key] === pole
+      );
+
+      // Verify no other tokens are placed incorrectly
+      const otherKeys = ['0-0', '0-1', '0-2', '1-0', '1-2', '2-0', '2-1', '2-2'].filter(
+        (k) => !(k in expectedPositions)
+      );
+      const noneExtra = otherKeys.every((k) => !grid[k]);
+
+      if (allMatch && noneExtra) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 26. CÁMARA DE PRESIÓN POR PISTÓN
+// =========================================================================
+function generatePresionPiston(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  const cylinderTypes = ['CILINDRO ALFA', 'CILINDRO BETA', 'CILINDRO GAMMA'] as const;
+  const cylinderType = rng.pick([...cylinderTypes]);
+  const isHot = rng.next() > 0.5;
+  const temperature = isHot ? rng.range(54, 78) : rng.range(22, 44);
+
+  // Table base:
+  // ALFA: cold -> 2, hot -> 3
+  // BETA: cold -> 1, hot -> 2
+  // GAMMA: cold -> 3, hot -> 1
+  let targetNotch = 2;
+  if (cylinderType === 'CILINDRO ALFA') {
+    targetNotch = isHot ? 3 : 2;
+  } else if (cylinderType === 'CILINDRO BETA') {
+    targetNotch = isHot ? 2 : 1;
+  } else {
+    targetNotch = isHot ? 1 : 3;
+  }
+
+  // Modifier: 3 or more even digits in serial -> +1 notch (max 3)
+  const evenDigitsCount = extractSerialDigits(serial).filter((d) => d % 2 === 0).length;
+  if (evenDigitsCount >= 3) {
+    targetNotch = Math.min(3, targetNotch + 1);
+  }
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'PRESION_PISTON'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-piston-${rng.range(1000, 9999)}`,
+      moduleType: 'PRESION_PISTON',
+      title: 'Cámara de Pistón',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 40,
+      operatorState: {
+        cylinderType,
+        temperature,
+        currentNotch: 1,
+      },
+      manualSection,
+    },
+    internalSolution: { targetNotch },
+    validateAction: (action: { notch: number }) => {
+      if (Number(action.notch) === targetNotch) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 27. GIROSCOPIO DE ESTABILIZACIÓN
+// =========================================================================
+function generateGiroscopioEstabilizacion(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  const firstDigit = extractSerialDigits(serial)[0] ?? 4;
+  const driftLed = rng.next() > 0.5;
+
+  let targetX = 0;
+  let targetY = 90;
+  let targetZ = 180;
+
+  if (firstDigit === 1 || firstDigit === 2) {
+    targetX = 0;
+    targetY = 90;
+    targetZ = 180;
+  } else if (firstDigit === 3 || firstDigit === 4) {
+    targetX = 90;
+    targetY = 180;
+    targetZ = 270;
+  } else if (firstDigit === 5 || firstDigit === 6) {
+    targetX = 180;
+    targetY = 270;
+    targetZ = 0;
+  } else if (firstDigit === 7 || firstDigit === 8) {
+    targetX = 270;
+    targetY = 0;
+    targetZ = 90;
+  } else {
+    targetX = 90;
+    targetY = 0;
+    targetZ = 270;
+  }
+
+  if (driftLed) {
+    targetZ = (targetZ + 90) % 360;
+  }
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'GIROSCOPIO_ESTABILIZACION'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-gyro-${rng.range(1000, 9999)}`,
+      moduleType: 'GIROSCOPIO_ESTABILIZACION',
+      title: 'Giroscopio Triaxial',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 50,
+      operatorState: {
+        driftLed,
+        angles: { x: 0, y: 0, z: 0 },
+      },
+      manualSection,
+    },
+    internalSolution: { targetX, targetY, targetZ },
+    validateAction: (action: { x: number; y: number; z: number }) => {
+      if (
+        Number(action.x) === targetX &&
+        Number(action.y) === targetY &&
+        Number(action.z) === targetZ
+      ) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 28. CÁMARA DE CARTUCHOS
+// =========================================================================
+function generateCamaraCartuchos(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  const startsWithCRorTX = /^(CR|TX)/i.test(serial);
+
+  let targetOrder: string[];
+  if (startsWithCRorTX) {
+    // 1: COBRE, 2: CERÁMICA, 3: ACERO, 4: TITANIO
+    targetOrder = ['COBRE', 'CERÁMICA', 'ACERO', 'TITANIO'];
+  } else {
+    // 1: CÍRCULO (Cerámica), 2: TITANIO, 3: TRIÁNGULO (Cobre), 4: Restante (Acero)
+    targetOrder = ['CERÁMICA', 'TITANIO', 'COBRE', 'ACERO'];
+  }
+
+  const defaultCartridges = [
+    { id: 'cart-1', material: 'ACERO', symbol: 'ROMBO', color: '#94a3b8' },
+    { id: 'cart-2', material: 'COBRE', symbol: 'TRIÁNGULO', color: '#ea580c' },
+    { id: 'cart-3', material: 'CERÁMICA', symbol: 'CÍRCULO', color: '#e2e8f0' },
+    { id: 'cart-4', material: 'TITANIO', symbol: 'CUADRADO', color: '#facc15' },
+  ];
+
+  // Scramble initial slots so it's not solved immediately
+  const initialSlots = rng.shuffle(defaultCartridges);
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'CAMARA_CARTUCHOS'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-cart-${rng.range(1000, 9999)}`,
+      moduleType: 'CAMARA_CARTUCHOS',
+      title: 'Cámara de Cartuchos',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 45,
+      operatorState: {
+        cartridges: initialSlots,
+      },
+      manualSection,
+    },
+    internalSolution: { targetOrder },
+    validateAction: (action: { materialsOrder: string[] }) => {
+      const { materialsOrder } = action;
+      if (!materialsOrder || materialsOrder.length !== 4) {
+        return { valid: false, solved: false };
+      }
+      const matches = materialsOrder.every((mat, idx) => mat === targetOrder[idx]);
+      if (matches) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 29. REGULADOR DE FLUJO GRAVITACIONAL
+// =========================================================================
+function generateFlujoGravitacional(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  const isEven = isSerialLastDigitEven(serial);
+
+  // Par -> Roja a Depósito A (izq), Azul a Depósito B (centro)
+  // Impar -> Roja a Depósito B (centro), Azul a Depósito C (der)
+  const targetRed = isEven ? 'A' : 'B';
+  const targetBlue = isEven ? 'B' : 'C';
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'FLUJO_GRAVITACIONAL'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-flujo-${rng.range(1000, 9999)}`,
+      moduleType: 'FLUJO_GRAVITACIONAL',
+      title: 'Flujo Gravitacional',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 50,
+      operatorState: {
+        targetDestinations: { red: targetRed, blue: targetBlue },
+        valves: { v1: 'IZQ', v2: 'REC', v3: 'REC' },
+      },
+      manualSection,
+    },
+    internalSolution: { targetRed, targetBlue },
+    validateAction: (action: { valves: { v1: string; v2: string; v3: string } }) => {
+      const { valves } = action;
+      if (!valves) return { valid: false, solved: false };
+
+      // Compute resulting destinations based on valve positions
+      // Red enters V1:
+      let finalRed = 'B';
+      if (valves.v1 === 'IZQ') {
+        finalRed = valves.v2 === 'IZQ' ? 'A' : 'B';
+      } else if (valves.v1 === 'REC') {
+        finalRed = 'B';
+      } else {
+        finalRed = valves.v3 === 'DER' ? 'C' : 'B';
+      }
+
+      // Blue enters secondary right chute:
+      let finalBlue = 'B';
+      if (valves.v3 === 'DER') {
+        finalBlue = 'C';
+      } else if (valves.v3 === 'IZQ') {
+        finalBlue = 'B';
+      } else {
+        finalBlue = valves.v2 === 'IZQ' ? 'A' : 'B';
+      }
+
+      if (finalRed === targetRed && finalBlue === targetBlue) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// 30. CERRADURA DE PLACAS SUPERPUESTAS
+// =========================================================================
+function generatePlacasSuperpuestas(
+  rng: Mulberry32,
+  serial: string
+): GeneratedModuleInternal {
+  const levels = ['NIVEL I (Verde)', 'NIVEL II (Ámbar)', 'NIVEL III (Rojo)'] as const;
+  const securityLevel = rng.pick([...levels]);
+  const hasZW = /[ZWzw]/.test(serial);
+
+  let p1 = 2;
+  let p2 = 1;
+  let p3 = 3;
+
+  if (securityLevel === 'NIVEL I (Verde)') {
+    p1 = 2;
+    p2 = 1;
+    p3 = 3;
+  } else if (securityLevel === 'NIVEL II (Ámbar)') {
+    p1 = 1;
+    p2 = 3;
+    p3 = 2;
+  } else {
+    p1 = 3;
+    p2 = 2;
+    p3 = 1;
+  }
+
+  if (hasZW) {
+    const temp = p1;
+    p1 = p3;
+    p3 = temp;
+  }
+
+  const manualSection = MASTER_MANUAL_SECTIONS.find(
+    (s) => s.moduleType === 'PLACAS_SUPERPUESTAS'
+  )!;
+
+  return {
+    moduleState: {
+      id: `mod-placas-${rng.range(1000, 9999)}`,
+      moduleType: 'PLACAS_SUPERPUESTAS',
+      title: 'Placas Superpuestas',
+      solved: false,
+      strikes: 0,
+      estimatedSolveSeconds: 45,
+      operatorState: {
+        securityLevel,
+        positions: { p1: 1, p2: 1, p3: 1 },
+      },
+      manualSection,
+    },
+    internalSolution: { p1, p2, p3 },
+    validateAction: (action: { p1: number; p2: number; p3: number }) => {
+      if (
+        Number(action.p1) === p1 &&
+        Number(action.p2) === p2 &&
+        Number(action.p3) === p3
+      ) {
+        return { valid: true, solved: true };
+      }
+      return { valid: false, solved: false };
+    },
+  };
+}
+
+// =========================================================================
+// AUTHORITATIVE GENERATOR & VALIDATOR REGISTRY (30 MODULE FAMILIES)
 // =========================================================================
 export const ALL_MODULE_TYPES: CodigoRojoModuleType[] = [
   'FILAMENTOS',
@@ -1847,6 +2505,16 @@ export const ALL_MODULE_TYPES: CodigoRojoModuleType[] = [
   'FRECUENCIA_RESONANCIA',
   'SECUENCIA_CINETICA',
   'DIVISOR_VOLTAJE',
+  'CAMARA_CONTRAPESOS',
+  'PRISMA_REFRACCION',
+  'CIRCUITO_REFRIGERANTE',
+  'ANILLOS_CIFRADO',
+  'MASAS_MAGNETICAS',
+  'PRESION_PISTON',
+  'GIROSCOPIO_ESTABILIZACION',
+  'CAMARA_CARTUCHOS',
+  'FLUJO_GRAVITACIONAL',
+  'PLACAS_SUPERPUESTAS',
 ];
 
 export function generateModuleInstance(
@@ -1898,6 +2566,26 @@ export function generateModuleInstance(
       return generateSecuenciaCinetica(rng, serial);
     case 'DIVISOR_VOLTAJE':
       return generateDivisorVoltaje(rng, serial);
+    case 'CAMARA_CONTRAPESOS':
+      return generateCamaraContrapesos(rng, serial);
+    case 'PRISMA_REFRACCION':
+      return generatePrismaRefraccion(rng, serial);
+    case 'CIRCUITO_REFRIGERANTE':
+      return generateCircuitoRefrigerante(rng, serial);
+    case 'ANILLOS_CIFRADO':
+      return generateAnillosCifrado(rng, serial);
+    case 'MASAS_MAGNETICAS':
+      return generateMasasMagneticas(rng, serial);
+    case 'PRESION_PISTON':
+      return generatePresionPiston(rng, serial);
+    case 'GIROSCOPIO_ESTABILIZACION':
+      return generateGiroscopioEstabilizacion(rng, serial);
+    case 'CAMARA_CARTUCHOS':
+      return generateCamaraCartuchos(rng, serial);
+    case 'FLUJO_GRAVITACIONAL':
+      return generateFlujoGravitacional(rng, serial);
+    case 'PLACAS_SUPERPUESTAS':
+      return generatePlacasSuperpuestas(rng, serial);
     default:
       return generateFilamentos(rng, difficulty, serial);
   }

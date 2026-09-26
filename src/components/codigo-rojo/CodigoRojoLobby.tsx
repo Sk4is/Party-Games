@@ -412,7 +412,7 @@ export const CodigoRojoLobby: React.FC<CodigoRojoLobbyProps> = ({
 
       {/* Footer */}
       <footer className="relative z-10 w-full max-w-5xl mx-auto text-center text-xs text-slate-500 py-3 border-t border-slate-800/80">
-        CÓDIGO ROJO &bull; Comunica lo que ves &bull; No compartas pantalla &bull; 100% en castellano
+        CÓDIGO ROJO • Comunica lo que ves • No compartas pantalla • 100% en castellano
       </footer>
 
       {/* Avatar Picker Modal */}

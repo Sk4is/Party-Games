@@ -144,7 +144,7 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
             </div>
             <div className="text-center font-mono">
               <span className="text-xs uppercase font-bold text-amber-400 tracking-widest block">
-                CÓDIGO ROJO &bull; MISIÓN {missionNumber}
+                CÓDIGO ROJO • MISIÓN {missionNumber}
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
                 MANUAL TÉCNICO DESCLASIFICADO
@@ -164,14 +164,14 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">
-                MANUAL TÉCNICO &bull; MISIÓN {missionNumber}
+                MANUAL TÉCNICO • MISIÓN {missionNumber}
               </span>
               <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-[10px] font-black uppercase text-amber-300">
                 ROL: GUÍA
               </span>
             </div>
             <h1 className="text-base sm:text-lg font-black text-white">
-              MANUAL DE DESACTIVACIÓN (20 PROTOCOLOS)
+              MANUAL DE DESACTIVACIÓN (30 PROTOCOLOS)
             </h1>
           </div>
         </div>
@@ -222,10 +222,10 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
         </div>
       </header>
 
-      {/* Main Content: 20-Module Manual Index + Classified Technical Document */}
+      {/* Main Content: 30-Module Manual Index + Classified Technical Document */}
       <main className="flex-1 w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-col md:flex-row gap-4 mb-4">
-        {/* Left Sidebar: 20-Module Index & Search */}
-        <aside className="w-full md:w-80 flex flex-col gap-3">
+        {/* Left Sidebar: 30-Module Index & Search */}
+        <aside className="w-full md:w-80 lg:w-96 flex flex-col gap-3">
           {/* Quick Search */}
           <div className="relative w-full">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -242,7 +242,7 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
           </div>
 
           {/* Broad Category Filter Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[10px] font-mono">
+          <div className="flex md:flex-wrap items-center gap-1.5 overflow-x-auto md:overflow-x-visible pb-1 scrollbar-none text-[10px] font-mono">
             {['TODOS', ...ALL_CATEGORIES].map((cat) => (
               <button
                 key={cat}
@@ -259,7 +259,7 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
             ))}
           </div>
 
-          {/* 20-Module Manual Entries List */}
+          {/* 30-Module Manual Entries List */}
           <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-y-auto max-h-[580px] p-1 scrollbar-none">
             {filteredSections.map((sec, idx) => {
               const isSelected = selectedSectionIndex === idx;
@@ -321,7 +321,7 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
                     </span>
                   </div>
                   <div className="text-[11px] font-mono text-slate-500 mt-1">
-                    CÓDIGO: {currentSection.classificationCode} &bull; SECCIÓN #{selectedSectionIndex + 1} DE {filteredSections.length}
+                    CÓDIGO: {currentSection.classificationCode} • SECCIÓN #{selectedSectionIndex + 1} DE {filteredSections.length}
                   </div>
                 </div>
 
@@ -496,19 +496,29 @@ export const CodigoRojoGuideView: React.FC<CodigoRojoGuideViewProps> = ({
                 <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-700">
                   INSTRUCCIONES Y ÁRBOL DE DECISIÓN:
                 </h3>
-                {currentSection.rules.map((rule, rIdx) => (
-                  <div
-                    key={rIdx}
-                    className="p-3.5 rounded-xl bg-amber-50/90 border-l-4 border-amber-600 text-xs sm:text-sm leading-relaxed shadow-sm"
-                  >
-                    <span className="font-bold text-slate-950 block mb-1">
-                      {rule.condition}
-                    </span>
-                    <span className="text-slate-850 font-medium whitespace-pre-line">
-                      👉 {rule.action}
-                    </span>
-                  </div>
-                ))}
+                {currentSection.rules.map((rule, rIdx) => {
+                  const isCircularNotice = rule.condition.includes('EL RUMBO ES CIRCULAR');
+                  return (
+                    <div
+                      key={rIdx}
+                      className={`p-3.5 rounded-xl text-xs sm:text-sm leading-relaxed shadow-sm ${
+                        isCircularNotice
+                          ? 'bg-cyan-50/95 border-2 border-cyan-500 text-cyan-950 font-mono shadow-md'
+                          : 'bg-amber-50/90 border-l-4 border-amber-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold block mb-1">
+                        {isCircularNotice && <span className="text-cyan-700 text-base">🧭</span>}
+                        <span className={isCircularNotice ? 'text-cyan-950 font-black tracking-wide' : 'text-slate-950'}>
+                          {rule.condition}
+                        </span>
+                      </div>
+                      <span className={`font-medium whitespace-pre-line block ${isCircularNotice ? 'text-cyan-900' : 'text-slate-800'}`}>
+                        {rule.action.startsWith('👉') ? rule.action : `👉 ${rule.action}`}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Notes & Warnings */}

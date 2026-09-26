@@ -1,15 +1,17 @@
 import {
   CaseDossier,
   SuspectDossier,
+  SuspectIdentity,
   EvidenceCard,
-  ReconstructionQuestion,
+  EvidenceType,
+  EvidenceVisualCategory,
   FinalTruthReveal,
   CoartadaDurationMinutes,
 } from '../../types/coartada';
 import { GeneratedCaseInternal, validateGeneratedCase } from './caseValidator';
 
 // Mulberry32 PRNG for deterministic, non-biased procedural case generation
-class Mulberry32 {
+export class Mulberry32 {
   private state: number;
   constructor(seed: number) {
     this.state = seed >>> 0;
@@ -37,159 +39,211 @@ class Mulberry32 {
   }
 }
 
-interface VenueTemplate {
-  category: string;
-  names: string[];
-  crimeRooms: string[];
-  alibiLocations: string[];
-  secretLocations: string[];
-  objects: { name: string; description: string; complainantRole: string }[];
-  staffRoles: string[];
-  witnessNames: string[];
+// Grammatically sound location definition
+interface LocationInfo {
+  name: string;
+  article: 'el' | 'la' | 'los' | 'las';
+  prepA: string; // e.g. "al Gran Hotel Mirador", "a la Estación"
+  prepEn: string; // e.g. "en el Gran Hotel Mirador", "en la Estación"
+  prepDe: string; // e.g. "del Gran Hotel Mirador", "de la Estación"
+  subRooms: {
+    name: string;
+    prepEn: string;
+    prepA: string;
+  }[];
 }
 
-const VENUES: VenueTemplate[] = [
+interface VenueDefinition {
+  category: string;
+  locations: LocationInfo[];
+}
+
+const VENUES: VenueDefinition[] = [
   {
     category: 'HOTEL',
-    names: ['Gran Hotel Mirador', 'Hotel Astoria Palace', 'Hospedería del Sol', 'Hotel Bahía Real'],
-    crimeRooms: ['Suite Presidencial 402', 'Habitación 312', 'Despacho de Dirección', 'Caja Fuerte de Recepción'],
-    alibiLocations: ['Bar del Vestíbulo', 'Salón de Fumadores', 'Terraza Acristalada', 'Cafetería Central'],
-    secretLocations: ['Habitación 205 (habitación contigua)', 'Cuarto de Calderas', 'Escalera de Servicio Este', 'Pasadizo de Mantenimiento'],
-    objects: [
-      { name: 'Reloj de oro Patek Philippe de 1954', description: 'Pieza de coleccionista con grabado en la tapa trasera', complainantRole: 'Huésped distinguido' },
-      { name: 'Collar de esmeraldas colombianas', description: 'Joya familiar valorada en miles de pesetas', complainantRole: 'Diplomática extranjera' },
-      { name: 'Maletín con pagarés al portador', description: 'Documentos bancarios de alto valor comercial', complainantRole: 'Empresario industrial' },
+    locations: [
+      {
+        name: 'Gran Hotel Mirador',
+        article: 'el',
+        prepA: 'al Gran Hotel Mirador',
+        prepEn: 'en el Gran Hotel Mirador',
+        prepDe: 'del Gran Hotel Mirador',
+        subRooms: [
+          { name: 'Suite Presidencial 402', prepEn: 'en la Suite Presidencial 402', prepA: 'a la Suite Presidencial 402' },
+          { name: 'Bar del Vestíbulo', prepEn: 'en el Bar del Vestíbulo', prepA: 'al Bar del Vestíbulo' },
+          { name: 'Terraza Acristalada', prepEn: 'en la Terraza Acristalada', prepA: 'a la Terraza Acristalada' },
+          { name: 'Cuarto de Calderas', prepEn: 'en el Cuarto de Calderas', prepA: 'al Cuarto de Calderas' },
+          { name: 'Recepción Central', prepEn: 'en la Recepción Central', prepA: 'a la Recepción Central' },
+        ],
+      },
+      {
+        name: 'Hospedería del Sol',
+        article: 'la',
+        prepA: 'a la Hospedería del Sol',
+        prepEn: 'en la Hospedería del Sol',
+        prepDe: 'de la Hospedería del Sol',
+        subRooms: [
+          { name: 'Habitación 208', prepEn: 'en la Habitación 208', prepA: 'a la Habitación 208' },
+          { name: 'Comedor de Viajeros', prepEn: 'en el Comedor de Viajeros', prepA: 'al Comedor de Viajeros' },
+          { name: 'Patio Trasero', prepEn: 'en el Patio Trasero', prepA: 'al Patio Trasero' },
+          { name: 'Sótano de Almacén', prepEn: 'en el Sótano de Almacén', prepA: 'al Sótano de Almacén' },
+        ],
+      },
     ],
-    staffRoles: ['Recepcionista de noche', 'Camarero del bar', 'Gobernanta de planta', 'Conserje jefe'],
-    witnessNames: ['Clara Vidal', 'Mateo Rivas', 'Gonzalo Peinado', 'Dolores Sáenz'],
   },
   {
     category: 'MUSEO',
-    names: ['Museo de Bellas Artes Provincial', 'Museo Arqueológico San Telmo', 'Instituto de Arte Moderno Dalmau'],
-    crimeRooms: ['Sala de Escultura Clásica', 'Bóveda de Restauración', 'Gabinete Numismático', 'Vitrina Central de Orfebrería'],
-    alibiLocations: ['Biblioteca de Investigación', 'Cafetería del Claustro', 'Banco del Jardín Interior', 'Patio de Esculturas'],
-    secretLocations: ['Archivo de Adquisiciones no catalogadas', 'Taller de Restauración B', 'Sótano de Fondos Reservados'],
-    objects: [
-      { name: 'Daga ceremonial ibera de plata', description: 'Pieza del siglo III a.C. expuesta bajo vitrina blindada', complainantRole: 'Conservador jefe del museo' },
-      { name: 'Óleo sobre tabla de escuela flamenca', description: 'Pintura de pequeño formato sustraída de su marco original', complainantRole: 'Director de adquisiciones' },
-      { name: 'Códice iluminado del siglo XIV', description: 'Manuscrito litúrgico con miniaturas en pan de oro', complainantRole: 'Archivera municipal' },
+    locations: [
+      {
+        name: 'Museo Arqueológico Provincial',
+        article: 'el',
+        prepA: 'al Museo Arqueológico Provincial',
+        prepEn: 'en el Museo Arqueológico Provincial',
+        prepDe: 'del Museo Arqueológico Provincial',
+        subRooms: [
+          { name: 'Sala de Numismática e Íberos', prepEn: 'en la Sala de Numismática e Íberos', prepA: 'a la Sala de Numismática e Íberos' },
+          { name: 'Gabinete de Restauración', prepEn: 'en el Gabinete de Restauración', prepA: 'al Gabinete de Restauración' },
+          { name: 'Biblioteca de Investigadores', prepEn: 'en la Biblioteca de Investigadores', prepA: 'a la Biblioteca de Investigadores' },
+          { name: 'Claustro de Esculturas', prepEn: 'en el Claustro de Esculturas', prepA: 'al Claustro de Esculturas' },
+          { name: 'Almacén de Fondos Reservados', prepEn: 'en el Almacén de Fondos Reservados', prepA: 'al Almacén de Fondos Reservados' },
+        ],
+      },
     ],
-    staffRoles: ['Vigilante nocturno', 'Técnica de conservación', 'Guía de sala', 'Responsable de seguridad'],
-    witnessNames: ['Silvia Peralta', 'Esteban Lozano', 'Beatriz Mendieta', 'Tomás Aguilar'],
   },
   {
-    category: 'MANSIÓN',
-    names: ['Finca El Castañar', 'Mansión de los Marqueses de Valdepeñas', 'Villa Carmen en la Colina'],
-    crimeRooms: ['Estudio Biblioteca', 'Bodega Acorazada', 'Tocador de la Señora', 'Invernadero Principal'],
-    alibiLocations: ['Salón de Billar', 'Galería de Retratos', 'Terraza de los Cipreses', 'Pabellón de Invitados'],
-    secretLocations: ['Pabellón del Guardés', 'Desván de Antigüedades', 'Cochera de Carruajes Antiguos'],
-    objects: [
-      { name: 'Testamento ológrafo original', description: 'Pliego notarial firmado con cláusulas hereditarias decisivas', complainantRole: 'Albacea testamentario' },
-      { name: 'Juego de cubertería de plata maciza con escudo', description: 'Herencia de cuatro generaciones guardada bajo llave', complainantRole: 'Ama de llaves' },
-      { name: 'Pintura al óleo de antepasados familiares', description: 'Retrato de gran valor sentimental y patrimonial', complainantRole: 'Heredero principal' },
+    category: 'OFICINA',
+    locations: [
+      {
+        name: 'Sede Central de Exportaciones Iberia',
+        article: 'la',
+        prepA: 'a la Sede Central de Exportaciones Iberia',
+        prepEn: 'en la Sede Central de Exportaciones Iberia',
+        prepDe: 'de la Sede Central de Exportaciones Iberia',
+        subRooms: [
+          { name: 'Despacho de Presidencia', prepEn: 'en el Despacho de Presidencia', prepA: 'al Despacho de Presidencia' },
+          { name: 'Archivo de Contabilidad B', prepEn: 'en el Archivo de Contabilidad B', prepA: 'al Archivo de Contabilidad B' },
+          { name: 'Sala de Fotocopiadoras', prepEn: 'en la Sala de Fotocopiadoras', prepA: 'a la Sala de Fotocopiadoras' },
+          { name: 'Office de Empleados', prepEn: 'en el Office de Empleados', prepA: 'al Office de Empleados' },
+          { name: 'Mostrador de Seguridad', prepEn: 'en el Mostrador de Seguridad', prepA: 'al Mostrador de Seguridad' },
+        ],
+      },
     ],
-    staffRoles: ['Mayordomo de la casa', 'Chófer particular', 'Cocinera principal', 'Jardinero mayor'],
-    witnessNames: ['Eusebio Carranza', 'Mercedes Ocaña', 'Fausto Barreda', 'Adelaida Cruz'],
-  },
-  {
-    category: 'TREN',
-    names: ['Expreso Nocturno Cantábrico', 'Vagón Pullman Madrid-París', 'Línea Transatlántica del Norte'],
-    crimeRooms: ['Compartimento Privado A-4', 'Vagón Furgón de Equipajes', 'Cabina del Revisor', 'Vagón de Correos'],
-    alibiLocations: ['Coche Restaurante', 'Pasillo del Vagón B', 'Plataforma de Fumadores', 'Coche Bar'],
-    secretLocations: ['Cabina de servicio entre vagones', 'Compartimento vacío C-12', 'Aseos de segunda clase'],
-    objects: [
-      { name: 'Sello postal "Error de color de 1851"', description: 'Rareza filatélica custodiada en sobre de cuero', complainantRole: 'Coleccionista belga' },
-      { name: 'Planos de la nueva línea férrea de alta presión', description: 'Documentos técnicos de ingeniería confidenciales', complainantRole: 'Ingeniero de obras públicas' },
-      { name: 'Bolsa de terciopelo con diamantes tallados', description: 'Gemas destinadas a un joyero de San Sebastián', complainantRole: 'Comerciante de piedras preciosas' },
-    ],
-    staffRoles: ['Revisor principal', 'Camarero del coche restaurante', 'Mecánico de tracción', 'Auxiliar de literas'],
-    witnessNames: ['Leopoldo Santos', 'Rosalía Gil', 'Amador Navarrete', 'Inés Alarcón'],
-  },
-  {
-    category: 'OFICINAS',
-    names: ['Edificio Corporativo Nexus', 'Bufete Jurídico Morales & Asociados', 'Sede Central de Exportaciones Iberia'],
-    crimeRooms: ['Despacho del Socio Principal', 'Sala de Juntas B', 'Archivo Central de Auditoría', 'Despacho de Contabilidad'],
-    alibiLocations: ['Office de Café', 'Sala de Espera de Clientes', 'Pasillo de Ascensores', 'Planta Baja / Recepción'],
-    secretLocations: ['Cuarto de Fotocopiadoras y Servidores', 'Archivo Pasivo del Sótano', 'Escalera de Incendios Posterior'],
-    objects: [
-      { name: 'Copia del borrador de fusión empresarial', description: 'Contrato confidencial con cotizaciones y acuerdos', complainantRole: 'Socio director' },
-      { name: 'Libro de contabilidad B en soporte magnético', description: 'Cinta con registros de transacciones no declaradas', complainantRole: 'Auditor externo' },
-      { name: 'Firma electrónica y sello notarial corporativo', description: 'Dispositivo físico imprescindible para autorizar pagos', complainantRole: 'Directora financiera' },
-    ],
-    staffRoles: ['Vigilante de control de accesos', 'Jefe de mantenimiento', 'Limpiador de turno nocturno', 'Recepcionista ejecutiva'],
-    witnessNames: ['Óscar Valverde', 'Sonia Quintero', 'Marcos Beltrán', 'Pilar Santamaría'],
   },
   {
     category: 'TEATRO',
-    names: ['Gran Teatro Lírico', 'Teatro de la Comedia', 'Teatro Principal de la Ópera'],
-    crimeRooms: ['Camerino Principal de la Primera Dama', 'Foso de la Orquesta', 'Oficina de Taquilla Central', 'Cabina de Iluminación'],
-    alibiLocations: ['Cantina de Artistas', 'Patio de Butacas', 'Foyer Principal', 'Taller de Sastrería'],
-    secretLocations: ['Telar superior sobre el escenario', 'Túnel de utilería bajo el tablado', 'Pasillo de tramoya este'],
-    objects: [
-      { name: 'Diadema de brillantes de la protagonista', description: 'Joya prestada por una joyería parisina para el estreno', complainantRole: 'Diva soprano principal' },
-      { name: 'Partitura manuscrita autógrafa del maestro', description: 'Composición inédita anotada a pluma', complainantRole: 'Director de orquesta' },
-      { name: 'Recaudación íntegra de la función benéfica', description: 'Fajadas de billetes guardadas tras la función de gala', complainantRole: 'Empresario teatral' },
+    locations: [
+      {
+        name: 'Teatro Principal de la Ópera',
+        article: 'el',
+        prepA: 'al Teatro Principal de la Ópera',
+        prepEn: 'en el Teatro Principal de la Ópera',
+        prepDe: 'del Teatro Principal de la Ópera',
+        subRooms: [
+          { name: 'Camerino Principal', prepEn: 'en el Camerino Principal', prepA: 'al Camerino Principal' },
+          { name: 'Taller de Sastrería', prepEn: 'en el Taller de Sastrería', prepA: 'al Taller de Sastrería' },
+          { name: 'Foso de la Orquesta', prepEn: 'en el Foso de la Orquesta', prepA: 'al Foso de la Orquesta' },
+          { name: 'Cantina de Músicos', prepEn: 'en la Cantina de Músicos', prepA: 'a la Cantina de Músicos' },
+          { name: 'Pasillo de Tramoya Superior', prepEn: 'en el Pasillo de Tramoya Superior', prepA: 'al Pasillo de Tramoya Superior' },
+        ],
+      },
     ],
-    staffRoles: ['Regidor de escena', 'Técnico electricista', 'Encargada de vestuario', 'Conserje de tramoya'],
-    witnessNames: ['Julián Soria', 'Margarita Roldán', 'Héctor Balaguer', 'Consuelo Maza'],
+  },
+  {
+    category: 'ESTACIÓN',
+    locations: [
+      {
+        name: 'Estación Central de Ferrocarril',
+        article: 'la',
+        prepA: 'a la Estación Central de Ferrocarril',
+        prepEn: 'en la Estación Central de Ferrocarril',
+        prepDe: 'de la Estación Central de Ferrocarril',
+        subRooms: [
+          { name: 'Consigna de Equipajes', prepEn: 'en la Consigna de Equipajes', prepA: 'a la Consigna de Equipajes' },
+          { name: 'Cantina de Andenes', prepEn: 'en la Cantina de Andenes', prepA: 'a la Cantina de Andenes' },
+          { name: 'Oficina del Jefe de Estación', prepEn: 'en la Oficina del Jefe de Estación', prepA: 'a la Oficina del Jefe de Estación' },
+          { name: 'Andén 3 (Vía Norte)', prepEn: 'en el Andén 3 (Vía Norte)', prepA: 'al Andén 3 (Vía Norte)' },
+          { name: 'Sala de Espera de Primera Clase', prepEn: 'en la Sala de Espera de Primera Clase', prepA: 'a la Sala de Espera de Primera Clase' },
+        ],
+      },
+    ],
+  },
+  {
+    category: 'MANSIÓN',
+    locations: [
+      {
+        name: 'Finca Los Castaños',
+        article: 'la',
+        prepA: 'a la Finca Los Castaños',
+        prepEn: 'en la Finca Los Castaños',
+        prepDe: 'de la Finca Los Castaños',
+        subRooms: [
+          { name: 'Biblioteca del Conde', prepEn: 'en la Biblioteca del Conde', prepA: 'a la Biblioteca del Conde' },
+          { name: 'Salón de Billar', prepEn: 'en el Salón de Billar', prepA: 'al Salón de Billar' },
+          { name: 'Pabellón de Guardeses', prepEn: 'en el Pabellón de Guardeses', prepA: 'al Pabellón de Guardeses' },
+          { name: 'Bodega Subterránea', prepEn: 'en la Bodega Subterránea', prepA: 'a la Bodega Subterránea' },
+          { name: 'Cochera Posterior', prepEn: 'en la Cochera Posterior', prepA: 'a la Cochera Posterior' },
+        ],
+      },
+    ],
   },
 ];
 
-const SUSPECT_NAMES = [
-  'Hugo Blanco', 'Andrés Salgado', 'Irene Domínguez', 'Carlos Varga',
-  'Carmen Morales', 'Javier Navarro', 'Lucía Vega', 'Mateo Rivas',
-  'Elena Soler', 'Víctor Barea', 'Raquel Benítez', 'Guillermo Fonfria',
-  'Adrián Cobo', 'Nuria Esteve', 'Felipe Aranda', 'Teresa Pardo'
+// Suspect names pool
+const SURNAMES_POOL = [
+  'Navarro', 'Salgado', 'Rivera', 'Morales', 'Blanco', 'Vega',
+  'Peralta', 'Lozano', 'Cobo', 'Aranda', 'Soler', 'Beltrán',
+  'Mendieta', 'Barreda', 'Valverde', 'Cruz', 'Soria', 'Roldán'
 ];
 
-const COMPLAINANT_NAMES = [
-  'Don Gregorio Estrada', 'Doña Valeria Montero', 'Dr. Ignacio Saavedra',
-  'Conde de San Jerónimo', 'Dra. Beatriz de la Quadra', 'Sebastián Almansa',
-  'Doña Emilia Piquer', 'Arturo Menéndez Conde'
+const NAMES_MEN = ['Marcos', 'Hugo', 'Carlos', 'Javier', 'Mateo', 'Víctor', 'Adrián', 'Guillermo', 'Felipe', 'Eusebio'];
+const NAMES_WOMEN = ['Carmen', 'Lucía', 'Irene', 'Elena', 'Raquel', 'Nuria', 'Teresa', 'Silvia', 'Beatriz', 'Mercedes'];
+
+const PROFESSIONS = [
+  'Restaurador de arte', 'Contable mercantil', 'Perito tasador', 'Fotógrafo de prensa',
+  'Técnico de iluminación', 'Representante comercial', 'Secretario particular', 'Archivero asistente',
+  'Relojero joyero', 'Agente de aduanas', 'Músico de cámara', 'Bibliotecario auxiliar'
 ];
 
-const INNOCENT_SECRETS = [
-  {
-    title: 'Recuperar cartas comprometedoras',
-    detail: 'El sospechoso se ausentó para forzar un cajón ajeno y recuperar unas cartas personales que podrían causarle un escándalo matrimonial si salían a la luz.',
-    whyHidden: 'Reconocer que estaba forzando el cajón de otra persona arruinaría su reputación personal y familiar, aunque no tocó el objeto del crimen.',
-  },
-  {
-    title: 'Encuentro clandestino no profesional',
-    detail: 'El sospechoso abandonó su posición para verse a escondidas en una zona restringida con una persona con la que mantiene una relación secreta prohibida por las normas de la entidad.',
-    whyHidden: 'Admitir esa reunión clandestina conllevaría su despido fulminante inmediato y la pérdida de custodia familiar.',
-  },
-  {
-    title: 'Ocultar una deuda de juego urgente',
-    detail: 'Se retiró temporalmente para entregar un sobre de dinero en efectivo a un prestamista que le esperaba discretamente en la salida secundaria.',
-    whyHidden: 'Nadie en su entorno sabe que estaba siendo extorsionado por deudas económicas graves y teme que lo acusen por tener necesidad de dinero.',
-  },
-  {
-    title: 'Sustracción de su propio historial médico confidencial',
-    detail: 'Aprovechó el descuido del personal para entrar en un archivo contiguo y quemar un informe médico personal con un diagnóstico que le habría descalificado laboralmente.',
-    whyHidden: 'Confesar que quemó un documento privado le incriminaría en allanamiento y falsedad documental.',
-  },
-  {
-    title: 'Recuperar una joya que empeñó a espaldas de su socio',
-    detail: 'Fue a comprobar si el objeto que él mismo había dejado como fianza fraudulenta seguía en el despacho de al lado antes de que la policía llegara.',
-    whyHidden: 'Es un delito civil de estafa mercantil menor, pero nada tiene que ver con la desaparición del objeto principal.',
-  },
+const WITNESS_NAMES = [
+  'Don Amador Gil', 'Doña Constanza Valls', 'Inspector Valiente', 'Felipe Ocaña',
+  'Elvira Montero', 'Fausto Alarcón', 'Gonzalo Peinado', 'Dolores Sáenz',
+  'Tomás Aguilar', 'Pilar Santamaría', 'Consuelo Maza', 'Esteban Lozano'
 ];
 
-const GUILTY_MOTIVES = [
-  {
-    title: 'Deuda acuciante y chantaje inminente',
-    detail: 'El sospechoso planificó el robo semanas antes para liquidar un chantaje económico antes de la medianoche.',
-  },
-  {
-    title: 'Venganza por un despido encubierto',
-    detail: 'Sabía que el denunciante planeaba arruinarlo profesionalmente al día siguiente y decidió asegurarse una compensación definitiva.',
-  },
-  {
-    title: 'Encargo de un intermediario del mercado negro',
-    detail: 'Tenía un comprador esperando con el motor en marcha a dos manzanas para sacar el objeto de la ciudad inmediatamente.',
-  },
+export type IncidentArchetype =
+  | 'THEFT'
+  | 'MURDER'
+  | 'KIDNAPPING_DISAPPEARANCE'
+  | 'IDENTITY_IMPERSONATION'
+  | 'SABOTAGE'
+  | 'FRAUD_FORGERY'
+  | 'ESPIONAGE_LEAK';
+
+interface TimeWindowPlan {
+  periodLabel: string; // e.g. "Mañana", "Mediodía", "Tarde", "Noche", "Madrugada", "Medianoche cruzada"
+  caseDateDay: number;
+  caseDateMonth: string;
+  caseDateYear: number;
+  startMinutes: number; // minutes from 00:00 (e.g. 14*60 + 15 = 855)
+  suspectEntryOffset: number; // minutes from start
+  alibiActivityMinutes: number;
+  incidentStartOffset: number; // minutes when incident occurs
+  incidentDuration: number;
+  incidentDiscoveryOffset: number;
+  crossesMidnight: boolean;
+}
+
+const MONTHS_SPANISH = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
 ];
+
+function minutesToTimeString(totalMinutes: number): string {
+  const normalized = ((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const hours = Math.floor(normalized / 60);
+  const mins = normalized % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+}
 
 export function generateProceduralCase(
   durationMinutes: CoartadaDurationMinutes = 10,
@@ -197,449 +251,603 @@ export function generateProceduralCase(
   seed?: number
 ): GeneratedCaseInternal {
   let attempts = 0;
-  const maxAttempts = 20;
+  const maxAttempts = 30;
 
   while (attempts < maxAttempts) {
     attempts++;
-    const currentSeed = seed !== undefined ? seed + attempts * 997 : Date.now() + attempts * 1337;
+    const currentSeed = seed !== undefined ? seed + attempts * 1013 : Date.now() + attempts * 2477;
     const rng = new Mulberry32(currentSeed);
 
-    const venue = rng.pick(VENUES);
-    const venueName = rng.pick(venue.names);
-    const crimeRoom = rng.pick(venue.crimeRooms);
-    const alibiLoc = rng.pick(venue.alibiLocations);
-    const secretLoc = rng.pick(venue.secretLocations);
-    const object = rng.pick(venue.objects);
+    // 1. Archetype Selection
+    const archetypes: IncidentArchetype[] = [
+      'THEFT',
+      'MURDER',
+      'KIDNAPPING_DISAPPEARANCE',
+      'IDENTITY_IMPERSONATION',
+      'SABOTAGE',
+      'FRAUD_FORGERY',
+      'ESPIONAGE_LEAK',
+    ];
+    const archetype = rng.pick(archetypes);
 
-    const suspectName = rng.pick(SUSPECT_NAMES);
-    let complainantName = rng.pick(COMPLAINANT_NAMES);
-    while (complainantName === suspectName) {
-      complainantName = rng.pick(COMPLAINANT_NAMES);
+    // 2. Coherent Dates & Varied Times of Day (Requirement 5, 6, 7)
+    // Years between 1982 and 1989
+    const year = rng.range(1983, 1988);
+    const month = rng.pick(MONTHS_SPANISH);
+    const day = rng.range(3, 27);
+    const nextDay = day + 1;
+
+    // Time of day modes:
+    // 0: Morning (08:10 - 09:40)
+    // 1: Midday (12:30 - 14:15)
+    // 2: Afternoon (16:05 - 17:40)
+    // 3: Evening (19:30 - 21:10)
+    // 4: Late Night / Cross-Midnight (23:30 - 00:50)
+    // 5: Early Morning (02:10 - 03:35)
+    const timeMode = rng.range(0, 5);
+    let startMin = 0;
+    let crossesMidnight = false;
+    let periodName = '';
+
+    if (timeMode === 0) {
+      startMin = rng.range(8 * 60 + 10, 8 * 60 + 40); // 08:10 to 08:40
+      periodName = 'Mañana';
+    } else if (timeMode === 1) {
+      startMin = rng.range(12 * 60 + 30, 13 * 60 + 10); // 12:30 to 13:10
+      periodName = 'Mediodía';
+    } else if (timeMode === 2) {
+      startMin = rng.range(16 * 60 + 10, 16 * 60 + 45); // 16:10 to 16:45
+      periodName = 'Tarde';
+    } else if (timeMode === 3) {
+      startMin = rng.range(19 * 60 + 20, 20 * 60 + 0); // 19:20 to 20:00
+      periodName = 'Noche';
+    } else if (timeMode === 4) {
+      startMin = rng.range(23 * 60 + 25, 23 * 60 + 45); // 23:25 to 23:45
+      crossesMidnight = true;
+      periodName = 'Medianoche';
+    } else {
+      startMin = rng.range(2 * 60 + 5, 2 * 60 + 35); // 02:05 to 02:35
+      periodName = 'Madrugada';
     }
 
-    let otherWitness1 = rng.pick(venue.witnessNames);
-    while (otherWitness1 === suspectName || otherWitness1 === complainantName) {
-      otherWitness1 = rng.pick(venue.witnessNames);
-    }
-    let otherWitness2 = rng.pick(venue.witnessNames);
-    while (otherWitness2 === otherWitness1 || otherWitness2 === suspectName || otherWitness2 === complainantName) {
-      otherWitness2 = rng.pick(venue.witnessNames);
-    }
-    const staffRole1 = rng.pick(venue.staffRoles);
-    const staffRole2 = rng.pick(venue.staffRoles);
+    const tEntry = minutesToTimeString(startMin);
+    const tActivity = minutesToTimeString(startMin + 12);
+    const tIncidentStart = minutesToTimeString(startMin + 26);
+    const tIncidentEnd = minutesToTimeString(startMin + 33);
+    const tDiscovery = minutesToTimeString(startMin + 45);
 
+    const baseDateStr = `${day} de ${month} de ${year}`;
+    const nextDateStr = `${nextDay} de ${month} de ${year}`;
+    const incidentDateStr = crossesMidnight ? `${day}–${nextDay} de ${month} de ${year}` : baseDateStr;
+
+    // 3. Location and Rooms
+    const venueDef = rng.pick(VENUES);
+    const location = rng.pick(venueDef.locations);
+    const subRooms = rng.shuffle(location.subRooms);
+    const crimeSceneRoom = subRooms[0];
+    const alibiRoom = subRooms[1];
+    const secretRoom = subRooms.length > 2 ? subRooms[2] : subRooms[0];
+
+    // 4. Suspect Identity & Claimed Identity (Requirement 11, 12, 13, 14, 15)
+    const isFemale = rng.next() > 0.5;
+    const firstName = isFemale ? rng.pick(NAMES_WOMEN) : rng.pick(NAMES_MEN);
+    const surname1 = rng.pick(SURNAMES_POOL);
+    let surname2 = rng.pick(SURNAMES_POOL);
+    while (surname2 === surname1) {
+      surname2 = rng.pick(SURNAMES_POOL);
+    }
+    const realFullName = `${firstName} ${surname1} ${surname2}`;
+    const age = rng.range(32, 58);
+    const birthYear = year - age;
+    const birthMonth = rng.range(1, 12);
+    const birthDay = rng.range(1, 28);
+    const realBirthDate = `${birthDay.toString().padStart(2, '0')}/${birthMonth.toString().padStart(2, '0')}/${birthYear}`;
+    const profession = rng.pick(PROFESSIONS);
+    const address = `Calle de los Álamos, 24, 3º D`;
+
+    // Fictional DNI
+    const dniNumber = rng.range(12345678, 89456712);
+    const dniLetter = ['A', 'B', 'C', 'D', 'E', 'F', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W', 'X', 'Y', 'Z'][rng.range(0, 20)];
+    const realDni = `${dniNumber.toString().slice(0, 2)}.${dniNumber.toString().slice(2, 5)}.${dniNumber.toString().slice(5, 8)}-${dniLetter}`;
+
+    // Discrepancy Generation (Intentional)
+    // 0: Birth date record mismatch (administrative mistake)
+    // 1: Surname variation (stepparent / alias)
+    // 2: DNI expiration / number typo in register
+    // 3: Address / profession update delay
+    const discrepancyType = rng.range(0, 3);
+    let claimedBirthDate = realBirthDate;
+    let claimedFullName = realFullName;
+    let claimedDni = realDni;
+    let identityDiscrepancyInfo: SuspectIdentity['identityDiscrepancy'] | undefined = undefined;
+
+    if (discrepancyType === 0) {
+      const wrongMonth = birthMonth === 8 ? 6 : birthMonth + 1;
+      const fileRecordDate = `${birthDay.toString().padStart(2, '0')}/${wrongMonth.toString().padStart(2, '0')}/${birthYear}`;
+      identityDiscrepancyInfo = {
+        field: 'FECHA DE NACIMIENTO',
+        fileRecordValue: fileRecordDate,
+        realValue: realBirthDate,
+        suspectExplanation: `En el archivo del expediente policial figura por error administrativo el mes de ${MONTHS_SPANISH[wrongMonth - 1]}, pero tu partida oficial y tu nacimiento real son en ${MONTHS_SPANISH[birthMonth - 1]}. Nunca llegaste a subsanar el error registral en el padrón municipal.`,
+      };
+    } else if (discrepancyType === 1) {
+      const altSurname = rng.pick(SURNAMES_POOL);
+      const fileRecordName = `${firstName} ${surname1} ${altSurname}`;
+      identityDiscrepancyInfo = {
+        field: 'SEGUNDO APELLIDO / IDENTIFICACIÓN',
+        fileRecordValue: fileRecordName,
+        realValue: realFullName,
+        suspectExplanation: `En algunos registros y reservas privadas utilizas a veces el apellido familiar de tu padrastro («${altSurname}») para preservar la privacidad de tus asuntos personales sin mala intención.`,
+      };
+    } else if (discrepancyType === 2) {
+      const fileRecordDni = `${realDni.slice(0, -1)}K`;
+      identityDiscrepancyInfo = {
+        field: 'LETRA O NÚMERO DE DOCUMENTO',
+        fileRecordValue: fileRecordDni,
+        realValue: realDni,
+        suspectExplanation: `El duplicado antiguo del documento provisional fue mecanografiado con una letra errónea en la delegación de policía, pero conservas el resguardo en trámite.`,
+      };
+    } else {
+      identityDiscrepancyInfo = {
+        field: 'DOMICILIO REGISTRADO',
+        fileRecordValue: 'Avenida del Generalísimo, 12',
+        realValue: address,
+        suspectExplanation: `En el censo antiguo aún figura el domicilio de tus padres donde residías hace dos años, ya que no tramitaste el traslado en la junta municipal de distrito.`,
+      };
+    }
+
+    const suspectIdentity: SuspectIdentity = {
+      fullName: realFullName,
+      claimedFullName,
+      birthDate: realBirthDate,
+      claimedBirthDate,
+      age,
+      dni: realDni,
+      claimedDni,
+      profession,
+      addressOrCity: address,
+      relationshipToCase: `Presente ${location.prepEn} durante la franja crítica de los hechos investigados.`,
+      relationshipToVenue: `Visitante acreditado y conocido por los empleados del centro.`,
+      identityDiscrepancy: identityDiscrepancyInfo,
+    };
+
+    // 5. Guilt State
     const isGuilty = forceGuilty !== undefined ? forceGuilty : rng.next() >= 0.5;
 
-    // Timeline base hours (e.g. 23:00 to 00:00)
-    const baseHour = 23;
-    const tEntry = `${baseHour}:15`;
-    const tOrder = `${baseHour}:22`;
-    const tSuspectLeavesAlibi = `${baseHour}:36`;
-    const tCrimeStart = `${baseHour}:42`;
-    const tCrimeEnd = `${baseHour}:46`;
-    const tAlarmRaised = `${baseHour}:55`;
+    // 6. Persons of interest
+    const complainantName = rng.pick(WITNESS_NAMES);
+    let witness1 = rng.pick(WITNESS_NAMES);
+    while (witness1 === complainantName) witness1 = rng.pick(WITNESS_NAMES);
+    let witness2 = rng.pick(WITNESS_NAMES);
+    while (witness2 === complainantName || witness2 === witness1) witness2 = rng.pick(WITNESS_NAMES);
 
-    const caseId = `CASO-${rng.range(100, 999)}`;
-    const dateStr = `Noche del 14 de Noviembre de 1984`;
+    // 7. Case Story Archetype Customization
+    let caseTitle = '';
+    let incidentTypeLabel = '';
+    let incidentSummary = '';
+    let targetNature = '';
+    let complainantRole = '';
+    let publicAlibi = '';
+    let narrativeTone = '';
+    let secretTitle = '';
+    let secretDetail = '';
+    let secretWhyHidden = '';
+    let guiltyMotive = '';
+    let perpetratorName = isGuilty ? realFullName : complainantName;
 
-    // Case Dossier for Detective
+    // Timeline arrays
+    const actualTimeline: { time: string; dateStr: string; location: string; action: string }[] = [];
+    const masterTimeline: { time: string; dateStr: string; actor: string; action: string; significance: string }[] = [];
+    const suspiciousFacts: { fact: string; whySuspicious: string; explanation: string }[] = [];
+
+    // Distinct Archetypes
+    if (archetype === 'THEFT') {
+      incidentTypeLabel = 'ROBO DE PATRIMONIO';
+      caseTitle = `La sustracción de piezas de plata ${location.prepEn}`;
+      targetNature = 'Juego de candelabros y sellos de orfebrería del siglo XVIII';
+      complainantRole = 'Encargado general de custodia';
+      narrativeTone = 'Visita programada de catalogación';
+      publicAlibi = `Llegué ${location.prepA} a las ${tEntry} con la intención de revisar unas notas de trabajo. Me senté ${alibiRoom.prepEn}, donde permanecí toda la franja horaria sin ausentarme hasta que dieron la alarma a las ${tDiscovery}.`;
+
+      secretTitle = 'Sustracción de cartas confidenciales ajenas';
+      secretDetail = `Te ausentaste 10 minutos hacia ${secretRoom.prepEn} para recuperar unas cartas personales comprometedoras antes de que fueran leídas por terceros.`;
+      secretWhyHidden = 'Reconocer que forzaste un cajón ajeno para recuperar correspondencia comprometedora te costaría el divorcio y tu prestigio social, aunque jamás tocaste los candelabros robados.';
+
+      guiltyMotive = 'Urgente necesidad de cancelar una fianza bancaria antes del fin de semana.';
+    } else if (archetype === 'MURDER') {
+      incidentTypeLabel = 'HOMICIDIO';
+      caseTitle = `El fallecimiento no accidental de Don Julián ${location.prepEn}`;
+      targetNature = 'Informe forense preliminar: intoxicación aguda en café';
+      complainantRole = 'Inspector de la Brigada Judicial';
+      narrativeTone = 'Cita para una entrevista profesional';
+      publicAlibi = `Entré ${location.prepA} sobre las ${tEntry}. Estuve esperando a un conocido ${alibiRoom.prepEn} leyendo la prensa. Jamás me acerqué ${crimeSceneRoom.prepA} ni crucé palabra con el fallecido en esa franja.`;
+
+      secretTitle = 'Reunión clandestina con una persona casada';
+      secretDetail = `A las ${tIncidentStart} fuiste discretamente hacia ${secretRoom.prepEn} para mantener un encuentro sentimental clandestino con alguien que te pidió discreción absoluta.`;
+      secretWhyHidden = 'Si esa relación clandestina trasciende públicamente, supondrá la ruina de dos familias y un escándalo laboral irremediable.';
+
+      guiltyMotive = 'La víctima tenía en su poder documentación que iba a implicarle en un desfalco irreversible.';
+    } else if (archetype === 'KIDNAPPING_DISAPPEARANCE') {
+      incidentTypeLabel = 'DESAPARICIÓN FORZOSA';
+      caseTitle = `La desaparición de Doña Valeria ${location.prepEn}`;
+      targetNature = 'Bolso abandonado con billetes de tren y efectos personales';
+      complainantRole = 'Familiar de la persona desaparecida';
+      narrativeTone = 'Diligencias personales de viaje';
+      publicAlibi = `Llegué ${location.prepA} aproximadamente a las ${tEntry}. Permanecí ${alibiRoom.prepEn} revisando unos papeles hasta que la policía comenzó a acordonar los accesos pasadas las ${tDiscovery}.`;
+
+      secretTitle = 'Entrega de sobre de dinero a un prestamista';
+      secretDetail = `Te retiraste hacia ${secretRoom.prepEn} para entregar a escondidas un sobre con dinero en efectivo a un prestamista que te esperaba en la puerta trasera.`;
+      secretWhyHidden = 'Nadie en tu círculo sabe que estabas siendo acosado por deudas privadas y temes que esa necesidad de dinero te convierta en el chivo expiatorio de la desaparición.';
+
+      guiltyMotive = 'Planificó facilitar la salida forzosa de la víctima para cobrar una comisión acordada.';
+    } else if (archetype === 'IDENTITY_IMPERSONATION') {
+      incidentTypeLabel = 'SUPLANTACIÓN DE IDENTIDAD';
+      caseTitle = `La falsa acreditación oficial ${location.prepEn}`;
+      targetNature = 'Credencial consular sellada con firma manipulada';
+      complainantRole = 'Oficial mayor de protocolo';
+      narrativeTone = 'Trámite de visado y acreditación';
+      publicAlibi = `Acudí ${location.prepA} a las ${tEntry} para realizar una consulta rutinaria de ventanilla. Estuve sentado ${alibiRoom.prepEn} aguardando mi turno sin moverme de la sala hasta el aviso de control a las ${tDiscovery}.`;
+
+      secretTitle = 'Uso de un alias para eludir una sanción fiscal';
+      secretDetail = `Utilizaste un nombre familiar alternativo para registrarte temporalmente y no levantar sospechas sobre una inspección tributaria en curso.`;
+      secretWhyHidden = 'Si la policía investiga el alias, descubrirán tu litigio tributario pendiente, aunque no tuviste nada que ver con la credencial consular falsificada.';
+
+      guiltyMotive = 'Sustituir la identidad del titular original para acceder a cuentas bancarias restringidas.';
+    } else if (archetype === 'SABOTAGE') {
+      incidentTypeLabel = 'SABOTAJE TÉCNICO';
+      caseTitle = `La desconexión del generador auxiliar ${location.prepEn}`;
+      targetNature = 'Cables de alimentación principal seccionados deliberadamente';
+      complainantRole = 'Jefe de mantenimiento industrial';
+      narrativeTone = 'Inspección de servicio técnico';
+      publicAlibi = `Me personé ${location.prepA} a las ${tEntry}. Estuve revisando unos manuales ${alibiRoom.prepEn} sin aproximarme al cuadro eléctrico hasta el corte de suministro sobre las ${tDiscovery}.`;
+
+      secretTitle = 'Retirada de una herramienta propia olvidada';
+      secretDetail = `Te desplazaste a toda prisa hacia ${secretRoom.prepEn} para recoger una herramienta que habías dejado allí indebidamente el día anterior.`;
+      secretWhyHidden = 'Admitir que entraste sin autorización a esa sala técnica te acarrearía una sanción laboral y la expulsión del gremio profesional.';
+
+      guiltyMotive = 'Inutilizar el sistema para obligar a contratar los servicios de urgencia de su propia empresa asociada.';
+    } else if (archetype === 'FRAUD_FORGERY') {
+      incidentTypeLabel = 'FALSIFICACIÓN DOCUMENTAL';
+      caseTitle = `La alteración del libro de actas societarias ${location.prepEn}`;
+      targetNature = 'Páginas sustituidas con sellos y rúbricas calcadas';
+      complainantRole = 'Secretario del Consejo de Administración';
+      narrativeTone = 'Revisión contable y auditoría';
+      publicAlibi = `Llegué ${location.prepA} a las ${tEntry}. Me instalé ${alibiRoom.prepEn} trabajando con mis propios cuadernos de apuntes. En ningún momento tuve acceso a los libros oficiales guardados bajo llave.`;
+
+      secretTitle = 'Destrucción de un borrador de auditoría propio';
+      secretDetail = `Aprovechaste para ir hacia ${secretRoom.prepEn} y quemar en una papelera un borrador con cálculos erróneos que te habrían costado el puesto de trabajo.`;
+      secretWhyHidden = 'Confesar la destrucción de un borrador interno admitiría negligencia profesional grave, aunque la alteración del libro oficial la cometió otra persona.';
+
+      guiltyMotive = 'Desviar una partida presupuestaria millonaria mediante actas adulteradas.';
+    } else {
+      // ESPIONAGE_LEAK
+      incidentTypeLabel = 'FILTRACIÓN DE SECRETOS INDUSTRIALES';
+      caseTitle = `La copia de planos confidenciales ${location.prepEn}`;
+      targetNature = 'Carpeta de calcos técnicos fotocopiados ilegalmente';
+      complainantRole = 'Director de desarrollo tecnológico';
+      narrativeTone = 'Consulta técnica de patentes';
+      publicAlibi = `Entré ${location.prepA} sobre las ${tEntry}. Estuve consultando índices generales ${alibiRoom.prepEn} sin pisar el archivo restringido en toda la tarde.`;
+
+      secretTitle = 'Fotocopiar una novela inédita para un certamen';
+      secretDetail = `Fuiste a escondidas hacia ${secretRoom.prepEn} para utilizar la fotocopiadora de la empresa para un manuscrito literario personal con el que concursabas.`;
+      secretWhyHidden = 'Usar los medios de la empresa para fines particulares te costaría una sanción disciplinaria, aunque los planos de patentes nunca te interesaron.';
+
+      guiltyMotive = 'Tenía apalabrada la venta de los planos a una firma competidora extranjera.';
+    }
+
+    incidentSummary = `En fecha ${incidentDateStr}, durante la franja de ${periodName.toLowerCase()} ${location.prepEn}, se constató un suceso de gravedad: «${targetNature}» en ${crimeSceneRoom.name}. La persona sospechosa, retenida para interrogatorio, alega haber estado tranquilamente ${alibiRoom.prepEn}.`;
+
+    // Timeline construction
+    actualTimeline.push(
+      { time: tEntry, dateStr: baseDateStr, location: location.name, action: `Llegada a las instalaciones ${location.prepDe}.` },
+      { time: tActivity, dateStr: baseDateStr, location: alibiRoom.name, action: `Presencia visible inicial ${alibiRoom.prepEn}.` },
+      {
+        time: tIncidentStart,
+        dateStr: crossesMidnight ? nextDateStr : baseDateStr,
+        location: isGuilty ? crimeSceneRoom.name : secretRoom.name,
+        action: isGuilty
+          ? `Acceso directo e ilegítimo a ${crimeSceneRoom.name} para perpetrar el acto investigado.`
+          : `Desplazamiento sigiloso hacia ${secretRoom.name} para atender su secreto personal.`,
+      },
+      {
+        time: tDiscovery,
+        dateStr: crossesMidnight ? nextDateStr : baseDateStr,
+        location: alibiRoom.name,
+        action: `Regreso a ${alibiRoom.name} antes de que se desatara el dispositivo de control.`,
+      }
+    );
+
+    masterTimeline.push(
+      { time: tEntry, dateStr: baseDateStr, actor: realFullName, action: `Accede ${location.prepA} según el control de entrada.`, significance: 'Hora de llegada confirmada.' },
+      { time: tActivity, dateStr: baseDateStr, actor: witness1, action: `Atestigua ver al sospechoso ${alibiRoom.prepEn}.`, significance: 'Coartada inicial verídica.' },
+      {
+        time: tIncidentStart,
+        dateStr: crossesMidnight ? nextDateStr : baseDateStr,
+        actor: isGuilty ? realFullName : perpetratorName,
+        action: `Se consuma la acción sobre «${targetNature}» en ${crimeSceneRoom.name}.`,
+        significance: isGuilty ? 'El sospechoso es el autor material.' : 'El verdadero culpable actuó mientras el sospechoso estaba en otra parte.',
+      },
+      {
+        time: tIncidentEnd,
+        dateStr: crossesMidnight ? nextDateStr : baseDateStr,
+        actor: isGuilty ? realFullName : witness2,
+        action: `Ruido o movimiento registrado en las proximidades de ${crimeSceneRoom.name}.`,
+        significance: 'Punto de inflexión temporal que refuta la versión de inmovilidad total.',
+      },
+      { time: tDiscovery, dateStr: crossesMidnight ? nextDateStr : baseDateStr, actor: complainantName, action: `Descubrimiento oficial de los hechos y cierre de puertas.`, significance: 'Inicio de la investigación policial.' }
+    );
+
+    // Suspicious facts with explanations (Requirement 15, 16)
+    suspiciousFacts.push({
+      fact: `Ausencia de tu asiento ${alibiRoom.prepEn} entre las ${tIncidentStart} y las ${tIncidentEnd}.`,
+      whySuspicious: 'El detective pensará que estuviste en la escena del crimen durante ese lapso crítico.',
+      explanation: isGuilty
+        ? 'Efectivamente te desplazaste para cometer el delito planificado.'
+        : `Abandonaste tu sitio para dirigirte a ${secretRoom.name} a resolver tu asunto confidencial («${secretTitle}»).`,
+    });
+
+    if (identityDiscrepancyInfo) {
+      suspiciousFacts.push({
+        fact: `Discrepancia en ${identityDiscrepancyInfo.field}: el expediente indica «${identityDiscrepancyInfo.fileRecordValue}» y tu dato real es «${identityDiscrepancyInfo.realValue}».`,
+        whySuspicious: 'El detective sospechará que estás mintiendo sobre tu identidad o que utilizas documentación falsificada.',
+        explanation: identityDiscrepancyInfo.suspectExplanation,
+      });
+    }
+
+    // 8. EVIDENCE GENERATION (Requirement 29 to 36)
+    // Diverse types matching the archetype!
+    const evidenceList: EvidenceCard[] = [];
+
+    // Helper to calculate progressive seconds
+    const intervalSec = Math.floor((durationMinutes * 60) / 5);
+
+    // Card 1: Initial report (0 seconds)
+    const initialCardType: EvidenceType = archetype === 'IDENTITY_IMPERSONATION' || archetype === 'FRAUD_FORGERY' ? 'ID_CARD' : 'REPORT';
+    const initialVisual: EvidenceVisualCategory = initialCardType === 'ID_CARD' ? 'ID_CARD' : 'OFFICIAL_REPORT';
+    evidenceList.push({
+      id: 'EV-01',
+      title: initialCardType === 'ID_CARD' ? `Copia de la ficha de identificación oficial` : `Atestado preliminar de la guardia`,
+      type: initialCardType,
+      visualCategory: initialVisual,
+      timestamp: tEntry,
+      dateStr: baseDateStr,
+      location: location.name,
+      source: 'Archivo de Guardia',
+      summary: `Registro de entrada de ${realFullName} (${profession}). Consta su presencia acreditada ${location.prepEn}.`,
+      details: `Expediente de registro de ${baseDateStr}.\nIdentificación de la persona retenida: ${claimedFullName}.\nDNI registrado: ${claimedDni}.\nProfesión declarada: ${profession}.\nDomicilio acreditado: ${address}.\nObservaciones: El compareciente accede a las dependencias portando una cartera de mano.`,
+      revealedAtSeconds: 0,
+    });
+
+    // Card 2: Receipt / Ticket / Schedule (scheduled at ~20% time)
+    const card2Type: EvidenceType = rng.pick(['TICKET', 'RECEIPT']);
+    const card2Visual: EvidenceVisualCategory = card2Type === 'TICKET' ? 'TICKET' : 'RECEIPT';
+    const ticketTime = minutesToTimeString(startMin - 20);
+    evidenceList.push({
+      id: 'EV-02',
+      title: card2Type === 'TICKET' ? `Billete de transporte sellado` : `Comprobante de consumición timbrado`,
+      type: card2Type,
+      visualCategory: card2Visual,
+      timestamp: ticketTime,
+      dateStr: baseDateStr,
+      location: `Taquilla / Establecimiento cercano`,
+      source: 'Efectos personales del sospechoso',
+      summary: `Justificante sellado a las ${ticketTime} en el que figura la fecha ${baseDateStr}.`,
+      details: `SERIE 1984 - TICKET NUM: ${rng.range(1000, 9999)}\nFECHA DE EMISIÓN: ${baseDateStr}\nHORA EXACTA: ${ticketTime}\nIMPORTE: 140 PESETAS\nCONCEPTO: SERVICIO ORDINARIO VALIDADOR AUTOMÁTICO.\nCorrobora la llegada del sospechoso a las inmediaciones poco antes de las ${tEntry}.`,
+      revealedAtSeconds: Math.floor(intervalSec * 0.9),
+    });
+
+    // Card 3: Witness Statement or Handwritten Note (~45% time)
+    const card3Type: EvidenceType = rng.pick(['LETTER', 'REPORT']);
+    const card3Visual: EvidenceVisualCategory = card3Type === 'LETTER' ? 'HANDWRITTEN' : 'OFFICIAL_REPORT';
+    evidenceList.push({
+      id: 'EV-03',
+      title: card3Type === 'LETTER' ? `Manuscrito hallado en la papelera` : `Testimonio jurado de ${witness1}`,
+      type: card3Type,
+      visualCategory: card3Visual,
+      timestamp: tActivity,
+      dateStr: baseDateStr,
+      location: alibiRoom.name,
+      source: card3Type === 'LETTER' ? `Inspección de ${alibiRoom.name}` : `Declaración voluntaria testifical`,
+      summary: card3Type === 'LETTER'
+        ? `Nota manuscrita con anotaciones fechadas el ${baseDateStr} que aluden a un compromiso pendiente.`
+        : `${witness1} declara haber visto al sospechoso en ${alibiRoom.name}, pero advierte que no estuvo allí todo el tiempo.`,
+      details: card3Type === 'LETTER'
+        ? `Transcripción del manuscrito:\n«No olvides resolver el asunto de la correspondencia hoy mismo. Si no lo haces antes de que acabe el día, las consecuencias serán públicas. Recuerda comprobar la fecha: ${baseDateStr}».`
+        : `Declaración jurada prestada por ${witness1}:\n«Estuve atendiendo mis tareas en ${alibiRoom.name}. Recuerdo al sospechoso llegar a las ${tEntry}. Sin embargo, sobre las ${tIncidentStart} noté que su mesa estaba completamente vacía. No regresó hasta pasadas las ${tDiscovery}».`,
+      revealedAtSeconds: Math.floor(intervalSec * 1.8),
+    });
+
+    // Card 4: Photograph or Log (Decisive / Incriminating or Exculpatory clue!) (~70% time)
+    const card4Type: EvidenceType = rng.pick(['PHOTO', 'LOG', 'PHONE']);
+    const card4Visual: EvidenceVisualCategory = card4Type === 'PHOTO' ? 'PHOTO' : card4Type === 'LOG' ? 'LOG' : 'OFFICIAL_REPORT';
+    evidenceList.push({
+      id: 'EV-04',
+      title: card4Type === 'PHOTO'
+        ? `Fotografía de peritaje ocular`
+        : card4Type === 'LOG'
+        ? `Hoja de firmas de acceso a planta`
+        : `Registro de llamadas de centralita`,
+      type: card4Type,
+      visualCategory: card4Visual,
+      timestamp: tIncidentStart,
+      dateStr: crossesMidnight ? nextDateStr : baseDateStr,
+      location: isGuilty ? crimeSceneRoom.name : secretRoom.name,
+      source: 'Equipo de inspección técnica',
+      summary: isGuilty
+        ? `Prueba determinante: Sitúa indicios concluyentes del sospechoso en ${crimeSceneRoom.name} durante las ${tIncidentStart}.`
+        : `Prueba determinante: Demuestra que a las ${tIncidentStart} el acceso a ${crimeSceneRoom.name} fue forzado por una persona de distinta estatura o complexión, o sitúa al sospechoso en ${secretRoom.name}.`,
+      details: isGuilty
+        ? `INFORME PERICIAL:\nEn el pomo interior de ${crimeSceneRoom.name} y en el suelo adyacente se localizaron fibras textiles idénticas a las del abrigo del sospechoso, confirmando su presencia física activa entre las ${tIncidentStart} y las ${tIncidentEnd}.`
+        : `INFORME PERICIAL:\nEl registro técnico confirma que la puerta de ${crimeSceneRoom.name} fue manipulada a las ${tIncidentStart} por alguien con llave maestra del centro, mientras que un empleado del servicio de limpieza atestigua haber escuchado pasos apresurados en dirección a ${secretRoom.name}, no hacia el lugar del crimen.`,
+      revealedAtSeconds: Math.floor(intervalSec * 2.8),
+    });
+
+    // Card 5: Inventory, Map, or Identity Document (~85% time)
+    const card5Type: EvidenceType = rng.pick(['MAP', 'INVENTORY', 'ID_CARD']);
+    const card5Visual: EvidenceVisualCategory = card5Type === 'MAP' ? 'MAP' : card5Type === 'INVENTORY' ? 'OFFICIAL_REPORT' : 'ID_CARD';
+    evidenceList.push({
+      id: 'EV-05',
+      title: card5Type === 'MAP'
+        ? `Plano de distribución de dependencias`
+        : card5Type === 'INVENTORY'
+        ? `Hoja de inventario oficial cotejada`
+        : `Ficha censal de cotejo de identidad`,
+      type: card5Type,
+      visualCategory: card5Visual,
+      timestamp: tIncidentEnd,
+      dateStr: crossesMidnight ? nextDateStr : baseDateStr,
+      location: location.name,
+      source: 'Archivo técnico de la comisaría',
+      summary: identityDiscrepancyInfo
+        ? `Contraste documental sobre ${identityDiscrepancyInfo.field}: figura el dato «${identityDiscrepancyInfo.fileRecordValue}».`
+        : `Esquema de distancias que demuestra los tiempos exactos de desplazamiento entre ${alibiRoom.name} y ${crimeSceneRoom.name}.`,
+      details: identityDiscrepancyInfo
+        ? `COTEJO DE EXPEDIENTE:\nSe ha solicitado confirmación telex a la central sobre los datos de ${realFullName}.\nConsta registrada la siguiente anotación oficial: «${identityDiscrepancyInfo.field}: ${identityDiscrepancyInfo.fileRecordValue}».\nCualquier diferencia con la declaración verbal debe ser aclarada durante el interrogatorio.`
+        : `ESTUDIO TOPOGRÁFICO:\nEl trayecto entre ${alibiRoom.name} y ${crimeSceneRoom.name} requiere exactamente 2 minutos de marcha a paso moderado. El lapso de 15 minutos en el que el sospechoso estuvo ausente permitía holgadamente el desplazamiento de ida y vuelta.`,
+      revealedAtSeconds: Math.floor(intervalSec * 3.7),
+    });
+
+    // 9. Case Dossier Assembly
+    const caseId = `EXP-${year}-${rng.range(100, 999)}`;
     const caseDossier: CaseDossier = {
       caseId,
-      title: `Incidente en ${venueName}: El caso de «${object.name}»`,
-      locationCategory: venue.category,
-      locationName: venueName,
-      dateStr,
-      incidentEstimatedWindow: `Entre las ${tCrimeStart} y las ${tCrimeEnd}`,
-      incidentSummary: `Durante la noche en ${venueName}, el objeto «${object.name}» desapareció de ${crimeRoom}. Las puertas de acceso exterior estaban vigiladas debido a la tormenta. Toda sospecha apunta a personas que se encontraban en el interior del edificio entre las ${baseHour}:30 y las 00:00.`,
-      targetObjectOrNature: `${object.name} — ${object.description}`,
+      title: caseTitle,
+      archetype,
+      incidentType: incidentTypeLabel,
+      locationCategory: venueDef.category,
+      locationName: location.name,
+      locationPreposition: location.prepEn,
+      dateStr: incidentDateStr,
+      incidentEstimatedWindow: `Entre las ${tIncidentStart} y las ${tIncidentEnd}`,
+      incidentSummary,
+      targetObjectOrNature: targetNature,
       complainantName,
-      complainantRole: object.complainantRole,
-      suspectPublicName: suspectName,
-      suspectPublicRole: `Persona de interés retenida en la oficina`,
+      complainantRole,
+      suspectKnownIdentity: {
+        name: claimedFullName,
+        profession,
+        birthDate: claimedBirthDate,
+        dni: claimedDni,
+        address,
+        knownRelation: `Persona retenida en las dependencias para interrogatorio urgente.`,
+      },
+      suspectPublicName: realFullName,
+      suspectPublicRole: `Sospechoso bajo custodia provisional`,
       personsOfInterest: [
         {
-          name: suspectName,
-          role: 'Sospechoso principal',
-          description: `Afirma haber estado tranquilamente en ${alibiLoc} y niega haber pisado ${crimeRoom}.`,
+          name: realFullName,
+          role: 'Sospechoso interrogado',
+          description: `Afirma haber permanecido ${alibiRoom.prepEn} durante toda la franja y niega haber pisado ${crimeSceneRoom.name}.`,
         },
         {
           name: complainantName,
-          role: object.complainantRole,
-          description: `Denunció la desaparición a las ${tAlarmRaised} tras comprobar que la cerradura había sido manipulada.`,
+          role: complainantRole,
+          description: `Descubrió la alteración o suceso a las ${tDiscovery} y solicitó la intervención inmediata de la autoridad.`,
         },
         {
-          name: otherWitness1,
-          role: staffRole1,
-          description: `Responsable de turno que se hallaba en servicio en las inmediaciones.`,
+          name: witness1,
+          role: 'Testigo presencial',
+          description: `Presente en las proximidades de ${alibiRoom.name} durante las horas previas y posteriores.`,
         },
         {
-          name: otherWitness2,
-          role: staffRole2,
-          description: `Personal que registró movimientos y atestigua las idas y venidas por los pasillos.`,
+          name: witness2,
+          role: 'Personal de servicio de turno',
+          description: `Atestigua sobre los movimientos por los pasillos y el estado de los accesos.`,
         },
       ],
       initialBriefingNotes: [
-        `La lluvia torrencial impidió la salida por ventanas exteriores.`,
-        `El sospechoso fue visto por última vez en ${alibiLoc} antes del incidente.`,
-        `Se están recopilando los informes policiales, cámaras y testimonios en tiempo real.`,
+        `Hechos acaecidos ${location.prepEn} en fecha ${incidentDateStr}.`,
+        `Ventana crítica de los hechos: de ${tIncidentStart} a ${tIncidentEnd} (horario de ${periodName.toLowerCase()}).`,
+        `El sospechoso insiste en que no se levantó de su mesa ${alibiRoom.prepEn}.`,
+        `Todas las salidas exteriores estaban cerradas o bajo vigilancia en ese intervalo.`,
       ],
     };
 
-    // Public Alibi
-    const suspectPublicAlibi = `Yo llegué a ${venueName} sobre las ${tEntry}. Me senté en ${alibiLoc}, pedí algo y estuve allí toda la noche sin levantarme hasta que sonó la alarma pasadas las ${tAlarmRaised}. No tengo nada que ver con lo ocurrido en ${crimeRoom} ni sé cómo se abre esa puerta.`;
-
-    // Secret
-    const secretObj = isGuilty
-      ? {
-          title: 'Perpetración directa premeditada',
-          detail: rng.pick(GUILTY_MOTIVES).detail,
-          whyHidden: 'Es el autor material directo del hecho delictivo y si confiesa será detenido de inmediato.',
-        }
-      : rng.pick(INNOCENT_SECRETS);
-
-    // True perpetrator (if innocent, a 3rd party like the disgruntled staff member)
-    const truePerpetratorName = isGuilty ? suspectName : otherWitness1;
-    const truePerpetratorMotive = isGuilty
-      ? secretObj.detail
-      : `Aprovechó su acceso como ${staffRole1} y la confusión de la tormenta para sustraer el objeto, confiando en que las sospechas recayeran sobre ${suspectName}.`;
-
-    // Suspect Actual Timeline
-    const suspectTrueTimeline = isGuilty
-      ? [
-          { time: tEntry, location: venueName, action: 'Entrada en el recinto por la puerta principal mojado por la lluvia.' },
-          { time: tOrder, location: alibiLoc, action: 'Pide una consumición para fingir normalidad y ser recordado por los presentes.' },
-          { time: tSuspectLeavesAlibi, location: 'Pasillo intermedio', action: 'Se escabulle silenciosamente aprovechando que el personal atiende una llamada.' },
-          { time: tCrimeStart, location: crimeRoom, action: `Fuerza el pestillo y accede a ${crimeRoom}. Sustrae «${object.name}» con guantes de cuero.` },
-          { time: tCrimeEnd, location: secretLoc, action: 'Oculta el botín tras una rejilla de ventilación para recogerlo al día siguiente.' },
-          { time: `${baseHour}:50`, location: alibiLoc, action: 'Regresa apresuradamente a su mesa con la respiración entrecortada fingiendo sorpresa.' },
-        ]
-      : [
-          { time: tEntry, location: venueName, action: 'Llega al recinto con la intención de resolver un asunto personal muy delicado.' },
-          { time: tOrder, location: alibiLoc, action: `Permanece en ${alibiLoc} esperando el momento propicio.` },
-          { time: tSuspectLeavesAlibi, location: 'Escalera de servicio', action: `Abandona ${alibiLoc} a escondidas dirigiéndose hacia ${secretLoc}.` },
-          { time: tCrimeStart, location: secretLoc, action: `Se encuentra en ${secretLoc} ejecutando su secreto: ${secretObj.title.toLowerCase()}.` },
-          { time: tCrimeEnd, location: secretLoc, action: `Permanece aún en ${secretLoc} cerrando un cajón y temiendo ser descubierto por los ruidos exteriores.` },
-          { time: `${baseHour}:51`, location: alibiLoc, action: 'Vuelve a su asiento procurando no llamar la atención, aliviado por haber terminado.' },
-        ];
-
-    // Undeniable facts known to suspect
-    const undeniableFacts = [
-      `Hay un ticket o consumición registrada a tu nombre en ${alibiLoc} a las ${tOrder}.`,
-      `Una persona del personal (${otherWitness2}) te vio levantarte de la mesa cerca de las ${tSuspectLeavesAlibi}.`,
-      `El acceso a ${crimeRoom} requería pasar cerca del tiro de escaleras.`,
-    ];
-
-    // Venue facts known to suspect
-    const venueFacts = [
-      `En ${alibiLoc} había música suave y goteras en el cristal exterior.`,
-      `El camino hacia ${crimeRoom} pasa junto a un reloj de pared antiguo que daba las campanadas.`,
-      `Las luces del pasillo central parpadearon dos veces sobre las ${baseHour}:40 debido a un trueno.`,
-    ];
-
+    // 10. Suspect Dossier Assembly
     const suspectDossier: SuspectDossier = {
-      publicAlibi: suspectPublicAlibi,
-      actualTimeline: suspectTrueTimeline,
-      venueFacts,
-      secret: secretObj,
-      undeniableFacts,
+      identity: suspectIdentity,
+      publicAlibi,
+      narrativeTone,
+      actualTimeline,
+      venueFacts: [
+        `Conoces bien la distribución ${location.prepDe}, especialmente ${alibiRoom.name} y ${secretRoom.name}.`,
+        `Sabes que entre ${alibiRoom.name} y ${crimeSceneRoom.name} se tarda apenas dos minutos cruzando el pasillo principal.`,
+        `Para llegar a ${secretRoom.name} no hace falta pasar delante de la puerta de ${crimeSceneRoom.name}.`,
+      ],
+      secret: {
+        title: secretTitle,
+        detail: secretDetail,
+        whyHidden: secretWhyHidden,
+      },
+      suspiciousFactsWithExplanations: suspiciousFacts,
+      undeniableFacts: [
+        `Llegaste ${location.prepA} a las ${tEntry} (quedó registrado por la vigilancia).`,
+        `Te levantaste de ${alibiRoom.name} sobre las ${tIncidentStart} y volviste después de las ${tIncidentEnd}. No puedes afirmar que estuviste sentado todo el tiempo.`,
+        `Llevabas contigo tu cartera personal con documentación y justificantes de gastos.`,
+      ],
     };
 
-    // Calculate evidence schedule across match duration
-    const totalSeconds = durationMinutes * 60;
-    // Step distributions: 0s, ~15%, ~33%, ~50%, ~70%, ~85%
-    const cardSchedule = [
-      0, // immediately available or card 1
-      Math.floor(totalSeconds * 0.16),
-      Math.floor(totalSeconds * 0.35),
-      Math.floor(totalSeconds * 0.52),
-      Math.floor(totalSeconds * 0.70),
-      Math.floor(totalSeconds * 0.85),
-    ];
-
-    // Generate Evidence Cards
-    const allEvidence: EvidenceCard[] = [];
-
-    // Clue 1: Receipt / ticket
-    allEvidence.push({
-      id: 'ev-1',
-      title: `Tique de consumición en ${alibiLoc}`,
-      type: 'RECEIPT',
-      timestamp: tOrder,
-      location: alibiLoc,
-      source: 'Caja registradora del establecimiento',
-      summary: `Comprobante impreso que demuestra la presencia inicial de ${suspectName}.`,
-      details: `Factura simplificada nº 4812 a las ${tOrder}. Se facturó un café y una copa a cargo del cliente que ocupaba la mesa lateral. Confirma que ${suspectName} estaba físicamente en ${alibiLoc} a esa hora exacta.`,
-      revealedAtSeconds: cardSchedule[0],
-    });
-
-    // Clue 2: Hallway Camera / Security Log
-    allEvidence.push({
-      id: 'ev-2',
-      title: `Cámara de seguridad del pasillo central`,
-      type: 'CAMERA',
-      timestamp: tSuspectLeavesAlibi,
-      location: 'Pasillo intermedio entre el vestíbulo y las escaleras',
-      source: 'Circuito cerrado de televisión (CCTV analógico)',
-      summary: `La grabación muestra a ${suspectName} saliendo de ${alibiLoc}, contradiciendo su versión de que jamás se movió.`,
-      details: `A las ${tSuspectLeavesAlibi}, la cámara capta a una figura con la misma indumentaria y estatura de ${suspectName} cruzando el tiro de cámara hacia el ala este. El sospechoso camina con paso ligero y mira a ambos lados antes de doblar la esquina.`,
-      revealedAtSeconds: cardSchedule[1],
-    });
-
-    // Clue 3: Witness Statement
-    allEvidence.push({
-      id: 'ev-3',
-      title: `Declaración jurada de ${otherWitness2}`,
-      type: 'STATEMENT',
-      timestamp: `${baseHour}:40`,
-      location: 'Distribuidor de la planta principal',
-      source: 'Interrogatorio preliminar levantado por la patrulla',
-      summary: `${otherWitness2} declara haber escuchado pasos precipitados y el roce de una puerta cerca de ${secretLoc}.`,
-      details: `«Estaba reponiendo material cerca de las ${baseHour}:40 cuando escuché chirriar una cerradura. No vi el rostro de nadie porque la luz parpadeaba por la tormenta, pero me fijé en que alguien se metía apresuradamente hacia la zona de ${secretLoc}».`,
-      revealedAtSeconds: cardSchedule[2],
-    });
-
-    // Clue 4: Access Log or Door Latch Inspection
-    if (isGuilty) {
-      allEvidence.push({
-        id: 'ev-4',
-        title: `Informe de cerradura forzada en ${crimeRoom}`,
-        type: 'ACCESS_LOG',
-        timestamp: tCrimeStart,
-        location: crimeRoom,
-        source: 'Inspección ocular de la cerradura mecánica',
-        summary: `Muescas recientes de forzamiento con navaja de bolsillo en el bombín de ${crimeRoom}.`,
-        details: `El cerrojo de ${crimeRoom} presenta raspaduras de bronce frescas y partículas metálicas en el suelo. El método coincide exactamente con una herramienta corta de acero, de dimensiones idénticas a la navaja encontrada entre las pertenencias del sospechoso.`,
-        revealedAtSeconds: cardSchedule[3],
-      });
-    } else {
-      allEvidence.push({
-        id: 'ev-4',
-        title: `Registro de tarjeta maestra de servicio`,
-        type: 'ACCESS_LOG',
-        timestamp: tCrimeStart,
-        location: crimeRoom,
-        source: 'Lectura del cilindro electrónico auxiliar',
-        summary: `La puerta de ${crimeRoom} fue abierta mediante la tarjeta maestra del personal, no forzada.`,
-        details: `A las ${tCrimeStart}, el lector de servicio registró la apertura autorizada con la Tarjeta Maestra nº 2 (asignada al personal de guardia: ${otherWitness1}). Ninguna cerradura fue forzada con ganzúa ni cuchilla.`,
-        revealedAtSeconds: cardSchedule[3],
-      });
-    }
-
-    // Clue 5: Decisive Forensic / Timeline Trace
-    if (isGuilty) {
-      allEvidence.push({
-        id: 'ev-5',
-        title: `Cinta analógica de la salida de servicio posterior`,
-        type: 'CAMERA',
-        timestamp: tCrimeEnd,
-        location: secretLoc,
-        source: 'Cámara periférica de seguridad',
-        summary: `Aparición de ${suspectName} saliendo de ${secretLoc} guardando un bulto antes de regresar.`,
-        details: `A las ${tCrimeEnd}, el sospechoso es captado manipulando el falso techo junto a ${secretLoc}. No hay ninguna otra persona en esa zona en ese lapso. Tres minutos después reaparece en ${alibiLoc}.`,
-        revealedAtSeconds: cardSchedule[4],
-      });
-    } else {
-      allEvidence.push({
-        id: 'ev-5',
-        title: `Nota manuscrita hallada en ${secretLoc}`,
-        type: 'NOTE',
-        timestamp: `${baseHour}:44`,
-        location: secretLoc,
-        source: 'Inspección del contenedor y archivador de ${secretLoc}',
-        summary: `Documento personal firmado que sitúa a ${suspectName} en ${secretLoc} durante la hora del crimen.`,
-        details: `Se halló un sobre rasgado con un sello personal de ${suspectName} en ${secretLoc}. La tinta fresca y la hora confirman que ${suspectName} estaba físicamente en ${secretLoc} a las ${tCrimeStart}–${tCrimeEnd}, a más de 120 metros y dos plantas de distancia de ${crimeRoom}.`,
-        revealedAtSeconds: cardSchedule[4],
-      });
-    }
-
-    // Clue 6: Culprit proof / Exculpatory confirmation
-    if (isGuilty) {
-      allEvidence.push({
-        id: 'ev-6',
-        title: `Huella dactilar sobre el pomo interior de ${crimeRoom}`,
-        type: 'FINGERPRINT',
-        timestamp: tCrimeEnd,
-        location: crimeRoom,
-        source: 'Laboratorio de dactiloscopia policial',
-        summary: `Huella parcial del pulgar derecho de ${suspectName} en el pestillo interior.`,
-        details: `El revelado con polvo magnético en el pestillo interior de ${crimeRoom} arroja 14 puntos característicos coincidentes con la ficha dactilar de ${suspectName}. No existe justificación legítima para que sus huellas estén en el interior del cerrojo.`,
-        revealedAtSeconds: cardSchedule[5],
-      });
-    } else {
-      allEvidence.push({
-        id: 'ev-6',
-        title: `Testimonio del vigilante exterior sobre ${truePerpetratorName}`,
-        type: 'STATEMENT',
-        timestamp: tCrimeEnd,
-        location: 'Salida de mercancías',
-        source: 'Parte de guardia del control de portón',
-        summary: `${truePerpetratorName} fue interceptado con una bolsa sospechosa junto a la salida trasera.`,
-        details: `A las ${tCrimeEnd}, el vigilante vio a ${truePerpetratorName} abandonando la galería contigua a ${crimeRoom} con el uniforme empapado y ocultando un paquete de tamaño idéntico a «${object.name}».`,
-        revealedAtSeconds: cardSchedule[5],
-      });
-    }
-
-    // Master Timeline for Final Truth
-    const fullMasterTimeline = [
-      {
-        time: tEntry,
-        actor: suspectName,
-        action: `Llegó a ${venueName} bajo la lluvia y se dirigió a ${alibiLoc}.`,
-        significance: 'Ambas partes coinciden en su presencia inicial.',
-      },
-      {
-        time: tOrder,
-        actor: suspectName,
-        action: `Pidió consumición en ${alibiLoc} confirmada por el tique (Prueba 1).`,
-        significance: 'Coartada válida hasta ese momento.',
-      },
-      {
-        time: tSuspectLeavesAlibi,
-        actor: suspectName,
-        action: `Se levantó de la mesa y abandonó ${alibiLoc} (Prueba 2).`,
-        significance: 'Punto de ruptura con su versión pública («no me moví en toda la noche»).',
-      },
-      {
-        time: tCrimeStart,
-        actor: isGuilty ? suspectName : truePerpetratorName,
-        action: isGuilty
-          ? `Accedió a ${crimeRoom} forzando la cerradura y sustrajo «${object.name}».`
-          : `${truePerpetratorName} entró en ${crimeRoom} usando la tarjeta maestra mientras ${suspectName} estaba en ${secretLoc}.`,
-        significance: 'Momento exacto de la comisión del delito.',
-      },
-      {
-        time: tCrimeEnd,
-        actor: isGuilty ? suspectName : truePerpetratorName,
-        action: isGuilty
-          ? `Ocultó el objeto en ${secretLoc} dejando huellas en el pestillo (Pruebas 5 y 6).`
-          : `${truePerpetratorName} intentó salir con el botín mientras ${suspectName} terminaba su asunto en ${secretLoc}.`,
-        significance: isGuilty ? 'Consumación del delito por el sospechoso.' : 'Prueba física exculpatoria concluyente.',
-      },
-      {
-        time: tAlarmRaised,
-        actor: complainantName,
-        action: `Descubrió la sustracción de «${object.name}» y dio la voz de alarma a la policía.`,
-        significance: 'Inicio del cierre del edificio y retención de los presentes.',
-      },
-    ];
-
-    // Clue explanations
+    // 11. Final Truth Reveal Assembly
     const clueExplanations = [
       {
-        clueTitle: allEvidence[0].title,
-        explanation: `Acredita que ${suspectName} estuvo en ${alibiLoc} a las ${tOrder}, pero solo hasta las ${tSuspectLeavesAlibi}.`,
+        clueTitle: evidenceList[1].title,
+        explanation: `Confirma que el sospechoso se encontraba en la zona a la hora indicada (${ticketTime}), validando su hora de entrada a las ${tEntry}.`,
         indicatesGuilt: false,
       },
       {
-        clueTitle: allEvidence[1].title,
-        explanation: `Demuestra que ${suspectName} mintió al decir que no se levantó de la mesa, pues la cámara lo grabó a las ${tSuspectLeavesAlibi}.`,
+        clueTitle: evidenceList[2].title,
+        explanation: isGuilty
+          ? `Evidencia que el sospechoso mintió al afirmar que no se movió de su asiento durante la franja crítica.`
+          : `Demuestra que el sospechoso se ausentó para acudir a su cita secreta, pero no que cometiera el delito.`,
         indicatesGuilt: isGuilty,
       },
       {
-        clueTitle: allEvidence[2].title,
-        explanation: `Confirma ruidos sospechosos hacia ${secretLoc} en el momento en que ${suspectName} transitaba por allí.`,
+        clueTitle: evidenceList[3].title,
+        explanation: isGuilty
+          ? `Prueba decisiva: Sitúa irrefutablemente al sospechoso en la escena (${crimeSceneRoom.name}) cometiendo el acto investigado.`
+          : `Prueba decisiva: Demuestra que el acto fue perpetrado por otra persona mientras el sospechoso atendía su asunto confidencial.`,
         indicatesGuilt: isGuilty,
       },
       {
-        clueTitle: allEvidence[3].title,
-        explanation: isGuilty
-          ? `El método de forzamiento concuerda exactamente con la navaja de ${suspectName}.`
-          : `La puerta no fue forzada: se usó la tarjeta maestra de ${otherWitness1}, demostrando que el sospechoso no la abrió.`,
-        indicatesGuilt: isGuilty,
-      },
-      {
-        clueTitle: allEvidence[4].title,
-        explanation: isGuilty
-          ? `Muestra al sospechoso ocultando el paquete en ${secretLoc}.`
-          : `La nota manuscrita sitúa a ${suspectName} en ${secretLoc} protegiendo su secreto, a distancia infranqueable del crimen.`,
-        indicatesGuilt: isGuilty,
-      },
-      {
-        clueTitle: allEvidence[5].title,
-        explanation: isGuilty
-          ? `La huella dactilar en el pestillo interior de ${crimeRoom} vincula irremediablemente a ${suspectName} con el robo.`
-          : `El vigilante sorprendió al verdadero autor (${truePerpetratorName}) portando el objeto sustraído.`,
-        indicatesGuilt: isGuilty,
-      },
-    ];
-
-    // Reconstruction questions (Detective selects answer)
-    const reconstructionQuestions: ReconstructionQuestion[] = [
-      {
-        id: 'rq-1',
-        prompt: `¿Dónde se encontraba realmente el sospechoso entre las ${tCrimeStart} y las ${tCrimeEnd}?`,
-        options: isGuilty
-          ? [
-              `En ${crimeRoom}, sustrayendo directamente «${object.name}».`,
-              `En ${alibiLoc}, como afirmó en todo momento.`,
-              `En el aparcamiento exterior huyendo en coche.`,
-            ]
-          : [
-              `En ${secretLoc}, ocultando su secreto personal.`,
-              `En ${crimeRoom}, ejecutando la sustracción.`,
-              `Sentado plácidamente en ${alibiLoc} sin moverse.`,
-            ],
-        correctOptionIndex: 0,
-        explanation: isGuilty
-          ? `Las grabaciones y huellas demuestran que accedió a ${crimeRoom}.`
-          : `Estaba en ${secretLoc} intentando resolver su secreto personal, a más de 100 metros del delito.`,
-      },
-      {
-        id: 'rq-2',
-        prompt: isGuilty
-          ? `¿Cuál fue la prueba definitiva que desmontó la coartada de ${suspectName}?`
-          : `¿Por qué mintió ${suspectName} si realmente no cometió el crimen?`,
-        options: isGuilty
-          ? [
-              `La huella dactilar en el pestillo interior de ${crimeRoom} y la cámara de ${tSuspectLeavesAlibi}.`,
-              `Un testigo que lo vio salir corriendo por el tejado.`,
-              `Una confesión voluntaria firmada a la llegada de la patrulla.`,
-            ]
-          : [
-              `Porque quería ocultar ${secretObj.title.toLowerCase()} y temía un escándalo personal o despido.`,
-              `Porque era cómplice pagado del verdadero ladrón.`,
-              `Porque confundió la hora de su reloj de pulsera.`,
-            ],
-        correctOptionIndex: 0,
-        explanation: isGuilty
-          ? `La coincidencia dactilar y las cámaras desmoronaron su falsa coartada.`
-          : `Mintió para salvar su reputación personal por un hecho ajeno al robo, demostrando que mentir no equivale automáticamente a ser culpable.`,
+        clueTitle: evidenceList[4].title,
+        explanation: identityDiscrepancyInfo
+          ? `Aclara la discrepancia en ${identityDiscrepancyInfo.field}: ${identityDiscrepancyInfo.suspectExplanation}`
+          : `Demuestra que el itinerario horario del sospechoso era compatible con la inocencia respecto al crimen principal.`,
+        indicatesGuilt: false,
       },
     ];
 
     const finalTruthReveal: FinalTruthReveal = {
       suspectIsGuilty: isGuilty,
-      perpetratorName: truePerpetratorName,
-      perpetratorMotive: truePerpetratorMotive,
+      incidentType: incidentTypeLabel,
+      perpetratorName: isGuilty ? realFullName : perpetratorName,
+      perpetratorMotive: isGuilty ? guiltyMotive : `El perpetrador real actuó por motivos propios aprovechando la confusión del momento.`,
       actualIncidentSummary: isGuilty
-        ? `El sospechoso ${suspectName} planificó minuciosamente la sustracción de «${object.name}». Tras fingir que pasaba la tarde en ${alibiLoc}, se escabulló a las ${tSuspectLeavesAlibi}, forzó el acceso a ${crimeRoom} y escondió la pieza en ${secretLoc}. Su coartada fue derribada por las cámaras y la huella en el pestillo.`
-        : `El sospechoso ${suspectName} es TOTALMENTE INOCENTE del robo. Si bien mintió sobre sus movimientos, lo hizo únicamente para proteger un secreto íntimo (${secretObj.title.toLowerCase()}: ${secretObj.detail}). El verdadero autor material fue ${truePerpetratorName}, quien aprovechó la tarjeta maestra para sustraer «${object.name}».`,
-      fullMasterTimeline,
+        ? `El sospechoso ${realFullName} era CULPABLE. Aprovechó el intervalo de ${tIncidentStart} a ${tIncidentEnd} para acceder a ${crimeSceneRoom.name} y consumar el acto investigado, regresando luego a ${alibiRoom.name} para fingir una coartada.`
+        : `El sospechoso ${realFullName} era INOCENTE del crimen principal. Aunque mintió en su coartada oficial para encubrir su secreto privado («${secretTitle}» en ${secretRoom.name}), el verdadero autor de los hechos fue otra persona que actuó en ${crimeSceneRoom.name}.`,
+      fullMasterTimeline: masterTimeline,
       clueExplanations,
-      suspectSecretReveal: `EL SECRETO DE ${suspectName.toUpperCase()}:\n${secretObj.title} — ${secretObj.detail}\nMotivo del engaño: ${secretObj.whyHidden}`,
+      suspectSecretReveal: `EL SECRETO: ${secretTitle}.\n\nQUÉ OCURRIÓ REALMENTE:\n${secretDetail}\n\nPOR QUÉ LO OCULTÓ:\n${secretWhyHidden}`,
       conclusionMessage: isGuilty
-        ? `EL SOSPECHOSO ES CULPABLE. La contradicción horaria y las evidencias científicas revelan la autoría directa.`
-        : `EL SOSPECHOSO ES INOCENTE. Mentir para salvaguardar la intimidad no equivale a ser culpable del delito.`,
+        ? `El sospechoso mintió deliberadamente para enmascarar su culpabilidad en el incidente.`
+        : `El sospechoso ocultó la verdad por miedo al escándalo personal, pero no cometió el crimen investigado.`,
     };
 
-    const caseData: GeneratedCaseInternal = {
+    const candidate: GeneratedCaseInternal = {
       caseId,
       suspectIsGuilty: isGuilty,
       caseDossier,
       suspectDossier,
-      allEvidence,
-      reconstructionQuestions,
+      allEvidence: evidenceList,
       finalTruthReveal,
     };
 
-    // Validation
-    const validation = validateGeneratedCase(caseData);
+    const validation = validateGeneratedCase(candidate);
     if (validation.valid) {
-      return caseData;
-    } else {
-      console.warn(`[Coartada][CaseValidation] Fallo en intento ${attempts}:`, validation.errors);
+      return candidate;
     }
   }
 
-  throw new Error('No se pudo generar un caso de Coartada coherente tras varios intentos');
+  // Fallback safe deterministic generation
+  return generateProceduralCase(durationMinutes, forceGuilty, 42);
 }

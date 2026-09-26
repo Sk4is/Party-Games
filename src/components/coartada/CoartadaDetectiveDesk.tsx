@@ -7,9 +7,12 @@ import {
   Pin,
   FileCheck,
   Search,
-  Bell,
   ChevronDown,
   ChevronUp,
+  User,
+  LogOut,
+  Calendar,
+  MapPin,
 } from 'lucide-react';
 import { CaseDossier, EvidenceCard } from '../../types/coartada';
 import { CoartadaEvidenceCard } from './CoartadaEvidenceCard';
@@ -23,6 +26,7 @@ interface CoartadaDetectiveDeskProps {
   onRequestVerdict: () => void;
   timeRemainingSeconds: number;
   newEvidenceAlert: EvidenceCard | null;
+  onLeaveRoom: () => void;
 }
 
 export const CoartadaDetectiveDesk: React.FC<CoartadaDetectiveDeskProps> = ({
@@ -33,6 +37,7 @@ export const CoartadaDetectiveDesk: React.FC<CoartadaDetectiveDeskProps> = ({
   onRequestVerdict,
   timeRemainingSeconds,
   newEvidenceAlert,
+  onLeaveRoom,
 }) => {
   const [isDossierOpen, setIsDossierOpen] = useState(false);
   const [isNotebookOpen, setIsNotebookOpen] = useState(false);
@@ -61,54 +66,49 @@ export const CoartadaDetectiveDesk: React.FC<CoartadaDetectiveDeskProps> = ({
   const isLowTime = timeRemainingSeconds <= 60 && timeRemainingSeconds > 0;
 
   return (
-    <div className="relative z-10 w-full max-w-6xl mx-auto flex flex-col gap-4 p-3 sm:p-6 select-none animate-in fade-in duration-300">
+    <div className="relative z-10 w-full max-w-6xl mx-auto flex flex-col gap-4 p-2 sm:p-6 select-none animate-in fade-in duration-300">
       {/* Top HUD: Case Title, Timer, Drawer Triggers & Verdict Button */}
-      <header className="w-full p-4 rounded-2xl bg-[#141210]/95 border border-stone-800 shadow-xl flex flex-wrap items-center justify-between gap-3 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="px-2.5 py-1 rounded bg-red-950/70 border border-red-700/60 text-red-300 text-xs font-mono font-black tracking-wider uppercase">
+      <header className="w-full p-3 sm:p-4 rounded-2xl bg-[#141210]/95 border border-stone-800 shadow-xl flex flex-wrap items-center justify-between gap-2.5 backdrop-blur-md">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 max-w-full">
+          <div className="px-2 py-0.5 rounded bg-red-950/70 border border-red-700/60 text-red-300 text-[10px] sm:text-xs font-mono font-black tracking-wider uppercase flex-shrink-0">
             DETECTIVE
           </div>
-          <div>
-            <h1 className="text-sm sm:text-base font-bold font-serif text-stone-100 truncate max-w-[200px] sm:max-w-md">
+          <div className="min-w-0">
+            <h1 className="text-xs sm:text-base font-bold font-serif text-stone-100 truncate max-w-[180px] sm:max-w-md">
               {caseDossier.title}
             </h1>
-            <span className="text-[11px] font-mono text-stone-400 block">
+            <span className="text-[10px] sm:text-[11px] font-mono text-stone-400 block truncate">
               {caseDossier.locationName} · {caseDossier.incidentEstimatedWindow}
             </span>
           </div>
         </div>
 
         {/* Central HUD Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
           {/* Synchronized Timer */}
           <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm font-mono font-black ${
+            className={`flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl border text-xs sm:text-sm font-mono font-black ${
               isLowTime
                 ? 'bg-red-950/80 border-red-600 text-red-300 animate-pulse'
                 : 'bg-stone-950 border-stone-800 text-amber-300'
             }`}
           >
-            <Clock className="w-4 h-4 text-amber-400" />
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
             <span>{formatTimer(timeRemainingSeconds)}</span>
-            {isLowTime && (
-              <span className="text-[10px] text-red-400 font-bold hidden sm:inline ml-1">
-                QUEDA 1 MINUTO
-              </span>
-            )}
           </div>
 
           {/* Dossier Toggle Button */}
           <button
             type="button"
             onClick={handleToggleDossier}
-            className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl font-mono text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
               isDossierOpen
                 ? 'bg-amber-600 text-stone-950 border-amber-500 shadow-md'
                 : 'bg-stone-900 hover:bg-stone-850 text-stone-300 border-stone-700'
             }`}
           >
             <Folder className="w-3.5 h-3.5" />
-            <span>EXPEDIENTE</span>
+            <span className="hidden xs:inline">EXPEDIENTE</span>
             {isDossierOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
 
@@ -116,14 +116,14 @@ export const CoartadaDetectiveDesk: React.FC<CoartadaDetectiveDeskProps> = ({
           <button
             type="button"
             onClick={handleToggleNotebook}
-            className={`relative px-3 py-1.5 rounded-xl font-mono text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`relative px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl font-mono text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
               isNotebookOpen
                 ? 'bg-amber-600 text-stone-950 border-amber-500 shadow-md'
                 : 'bg-stone-900 hover:bg-stone-850 text-stone-300 border-stone-700'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>NOTAS</span>
+            <span className="hidden xs:inline">NOTAS</span>
             {notebookText.trim().length > 0 && !isNotebookOpen && (
               <span className="w-2 h-2 rounded-full bg-amber-400" />
             )}
@@ -133,11 +133,20 @@ export const CoartadaDetectiveDesk: React.FC<CoartadaDetectiveDeskProps> = ({
           <button
             type="button"
             onClick={onRequestVerdict}
-            className="px-3.5 py-1.5 rounded-xl bg-red-700 hover:bg-red-600 active:scale-95 text-stone-100 font-mono text-xs font-black uppercase tracking-wider border border-red-500 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
+            className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-xl bg-red-700 hover:bg-red-600 active:scale-95 text-stone-100 font-mono text-xs font-black uppercase tracking-wider border border-red-500 cursor-pointer shadow-md transition-all flex items-center gap-1"
           >
             <FileCheck className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">DICTAR VEREDICTO</span>
-            <span className="sm:hidden">VEREDICTO</span>
+            <span>DICTAR VEREDICTO</span>
+          </button>
+
+          {/* Leave Button */}
+          <button
+            type="button"
+            onClick={onLeaveRoom}
+            title="Abandonar partida"
+            className="p-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-red-400 border border-stone-800 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
@@ -145,14 +154,14 @@ export const CoartadaDetectiveDesk: React.FC<CoartadaDetectiveDeskProps> = ({
       {/* Non-Disruptive New Evidence Arrival Notification */}
       {newEvidenceAlert && (
         <div className="w-full p-3 bg-red-950/90 border-2 border-red-600 rounded-xl shadow-2xl flex items-center justify-between text-stone-100 text-xs font-mono animate-in slide-in-from-top-4 duration-300">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-red-600 text-stone-950 font-black text-[10px] uppercase">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="px-2 py-0.5 rounded bg-red-600 text-stone-950 font-black text-[10px] uppercase flex-shrink-0">
               NUEVA PRUEBA
             </span>
-            <span className="font-bold">{newEvidenceAlert.title}</span>
+            <span className="font-bold truncate">{newEvidenceAlert.title}</span>
             <span className="text-stone-400 hidden sm:inline">({newEvidenceAlert.timestamp})</span>
           </div>
-          <span className="text-[11px] text-amber-300 flex items-center gap-1">
+          <span className="text-[11px] text-amber-300 flex items-center gap-1 flex-shrink-0">
             <Search className="w-3 h-3" /> Añadida al tablero
           </span>
         </div>
@@ -162,7 +171,7 @@ export const CoartadaDetectiveDesk: React.FC<CoartadaDetectiveDeskProps> = ({
       <div className="relative w-full flex flex-col lg:flex-row gap-4">
         {/* COLLAPSIBLE CASE DOSSIER DRAWER */}
         {isDossierOpen && (
-          <div className="w-full lg:w-96 flex-shrink-0 bg-[#161311] border border-stone-800 rounded-2xl p-5 shadow-2xl animate-in slide-in-from-left duration-200 overflow-y-auto max-h-[75vh]">
+          <div className="w-full lg:w-96 flex-shrink-0 bg-[#161311] border border-stone-800 rounded-2xl p-4 sm:p-5 shadow-2xl animate-in slide-in-from-left duration-200 overflow-y-auto max-h-[75vh]">
             <div className="flex items-center justify-between pb-3 border-b border-stone-800 mb-4">
               <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
                 <Folder className="w-4 h-4" /> EXPEDIENTE DEL CASO
@@ -184,12 +193,29 @@ export const CoartadaDetectiveDesk: React.FC<CoartadaDetectiveDeskProps> = ({
 
               <div className="grid grid-cols-2 gap-2 p-2.5 bg-stone-950/80 rounded-xl border border-stone-850">
                 <div>
-                  <span className="text-[10px] text-stone-500 uppercase block">HORA ESTIMADA:</span>
-                  <span className="font-bold text-amber-300">{caseDossier.incidentEstimatedWindow}</span>
+                  <span className="text-[10px] text-stone-500 uppercase block">FECHA:</span>
+                  <span className="font-bold text-amber-400 flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {caseDossier.dateStr}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-stone-500 uppercase block">DENUNCIANTE:</span>
-                  <span className="font-bold text-stone-300">{caseDossier.complainantName}</span>
+                  <span className="text-[10px] text-stone-500 uppercase block">FRANJA CRÍTICA:</span>
+                  <span className="font-bold text-amber-300">{caseDossier.incidentEstimatedWindow}</span>
+                </div>
+              </div>
+
+              {/* Suspect known identity in dossier */}
+              <div className="p-3 bg-stone-950/90 rounded-xl border border-amber-900/40 space-y-1.5">
+                <span className="text-[10px] text-amber-400 uppercase font-bold block flex items-center gap-1">
+                  <User className="w-3 h-3" /> IDENTIDAD DEL SOSPECHOSO:
+                </span>
+                <div className="text-[11px] text-stone-300">
+                  <div><strong>Nombre:</strong> {caseDossier.suspectKnownIdentity.name}</div>
+                  <div><strong>Profesión:</strong> {caseDossier.suspectKnownIdentity.profession}</div>
+                  <div><strong>Fecha de nac.:</strong> {caseDossier.suspectKnownIdentity.birthDate}</div>
+                  <div><strong>DNI:</strong> {caseDossier.suspectKnownIdentity.dni}</div>
+                  <div><strong>Domicilio:</strong> {caseDossier.suspectKnownIdentity.address}</div>
                 </div>
               </div>
 
@@ -228,13 +254,13 @@ export const CoartadaDetectiveDesk: React.FC<CoartadaDetectiveDeskProps> = ({
         )}
 
         {/* INVESTIGATION BOARD (EVIDENCE CARDS ON PHYSICAL DESK) */}
-        <div className="flex-1 flex flex-col gap-4">
-          <div className="flex items-center justify-between px-1 text-xs font-mono text-stone-400">
+        <div className="flex-1 flex flex-col gap-4 min-w-0">
+          <div className="flex items-center justify-between px-1 text-xs font-mono text-stone-400 flex-wrap gap-1">
             <span className="font-bold flex items-center gap-1.5 text-stone-300 uppercase tracking-wider">
               <Pin className="w-3.5 h-3.5 text-red-500" /> TABLERO DE PRUEBAS ({revealedEvidence.length})
             </span>
-            <span className="text-stone-500">
-              Las pruebas adicionales llegarán periódicamente durante el interrogatorio
+            <span className="text-stone-500 text-[11px]">
+              Llegan periódicamente durante el interrogatorio
             </span>
           </div>
 

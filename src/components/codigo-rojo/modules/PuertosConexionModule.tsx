@@ -300,7 +300,7 @@ export const PuertosConexionModule: React.FC<PuertosConexionModuleProps> = ({
           </div>
           <div>
             <span className="text-[10px] uppercase font-bold tracking-widest text-blue-400 block">
-              ELECTRICIDAD &bull; PARCHEO AUXILIAR
+              ELECTRICIDAD • PARCHEO AUXILIAR
             </span>
             <h3 className="text-sm font-black text-white">PLACA DE CONEXIONES</h3>
           </div>

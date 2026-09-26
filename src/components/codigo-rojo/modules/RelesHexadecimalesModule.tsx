@@ -45,10 +45,10 @@ export const RelesHexadecimalesModule: React.FC<RelesHexadecimalesModuleProps> =
   };
 
   const RELAY_LABELS = [
-    { id: 'R1', bit: 'Bit 3 (MSB)', pos: 0 },
-    { id: 'R2', bit: 'Bit 2', pos: 1 },
-    { id: 'R3', bit: 'Bit 1', pos: 2 },
-    { id: 'R4', bit: 'Bit 0 (LSB)', pos: 3 },
+    { id: 'R1', bit: 'Relé 1', pos: 0 },
+    { id: 'R2', bit: 'Relé 2', pos: 1 },
+    { id: 'R3', bit: 'Relé 3', pos: 2 },
+    { id: 'R4', bit: 'Relé 4', pos: 3 },
   ];
 
   return (
@@ -61,7 +61,7 @@ export const RelesHexadecimalesModule: React.FC<RelesHexadecimalesModuleProps> =
             ELECTRICIDAD
           </span>
           <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
-            // SUB-BUS 04 &bull; LÓGICA HEXADECIMAL
+            // SUB-BUS 04 • LÓGICA HEXADECIMAL
           </span>
         </div>
         <span className="px-2.5 py-0.5 rounded-full bg-purple-950 border border-purple-500/40 text-xs font-mono text-purple-300 font-bold">
