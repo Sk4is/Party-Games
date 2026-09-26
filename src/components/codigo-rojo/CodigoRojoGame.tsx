@@ -150,6 +150,7 @@ export const CodigoRojoGame: React.FC<CodigoRojoGameProps> = ({
               onNextMission={nextMission}
               onRestartMatch={restartMatch}
               onBackToMenu={leaveRoom}
+              onSelectOperator={selectOperator}
             />
           )}
         </>

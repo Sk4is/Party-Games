@@ -745,18 +745,18 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
         {/* Center of this container corresponds to exactly 50vw of viewport   */}
         {/* The bomb and player ring visually sit in horizontal centre of screen*/}
         {/* ================================================================== */}
-        <main className="relative flex-1 flex flex-col items-center justify-between w-full max-w-4xl lg:max-w-5xl mx-auto px-4 my-auto z-20">
+        <main className="desktop-game-stage relative flex-1 flex flex-col items-center justify-center gap-5 lg:gap-7 xl:gap-8 w-full max-w-[1280px] 2xl:max-w-[1400px] mx-auto px-4 pt-4 lg:pt-6 xl:pt-7 pb-6 lg:pb-10 xl:pb-12 z-20">
           {/* Desktop Required Letters Section - Centred on Screen */}
           <section
             aria-label="Letras obligatorias"
-            className="relative z-30 flex flex-col items-center justify-center mt-3 mb-2 select-none"
+            className="relative z-30 flex flex-col items-center justify-center shrink-0 select-none"
           >
-            <div className="px-12 py-4 md:px-18 md:py-5 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-[0_0_35px_rgba(245,158,11,0.25)] flex flex-col items-center backdrop-blur-md">
-              <span className="text-xs md:text-sm font-black tracking-[0.25em] text-amber-300 uppercase mb-0.5">
+            <div className="px-10 py-3.5 lg:px-14 lg:py-4 xl:px-16 xl:py-5 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-[0_0_35px_rgba(245,158,11,0.25)] flex flex-col items-center backdrop-blur-md">
+              <span className="text-xs lg:text-sm xl:text-[15px] font-black tracking-[0.28em] text-amber-300 uppercase mb-1">
                 PALABRAS CON
               </span>
 
-              <div className="relative overflow-hidden flex items-center justify-center min-h-[85px] md:min-h-[100px] min-w-[240px] md:min-w-[300px]">
+              <div className="relative overflow-hidden flex items-center justify-center min-h-[76px] lg:min-h-[86px] xl:min-h-[96px] min-w-[220px] lg:min-w-[260px] xl:min-w-[300px]">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.div
                     key={currentSequence.sequence}
@@ -764,7 +764,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
                     animate={{ y: 0, opacity: 1, scale: 1 }}
                     exit={{ y: -35, opacity: 0, scale: 0.85 }}
                     transition={{ duration: 0.26, ease: 'easeOut' }}
-                    className="text-7xl md:text-8xl font-black font-display tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-500 drop-shadow-[0_0_24px_rgba(245,158,11,0.65)]"
+                    className="text-6xl lg:text-7xl xl:text-8xl font-black font-display tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-500 drop-shadow-[0_0_24px_rgba(245,158,11,0.65)]"
                   >
                     {currentSequence.sequence}
                   </motion.div>
@@ -774,14 +774,21 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
           </section>
 
           {/* Central Arena: Radial Players + Central Bomb (Centered at 50vw) */}
-          <div className="relative w-full flex items-center justify-center my-1">
+          <div
+            className={`relative w-full flex items-center justify-center shrink-0 ${
+              players.length <= 2
+                ? 'md:h-[265px] lg:h-[300px] xl:h-[330px] 2xl:h-[360px]'
+                : 'md:h-[400px] lg:h-[450px] xl:h-[500px] 2xl:h-[540px]'
+            }`}
+          >
             <PlayerRing
               players={players}
               activePlayerIndex={activePlayerIndex}
               currentTypingWord={currentTypingWord}
+              isSidebarExpanded={isDesktopAlphabetOpen}
             />
 
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+            <div className="relative z-20 flex items-center justify-center pointer-events-none">
               <BombVisual
                 progress={progress}
                 dangerLevel={dangerLevel}
@@ -791,7 +798,7 @@ export const LaBombaGame: React.FC<LaBombaGameProps> = ({
           </div>
 
           {/* Desktop Word Input - Centred on Screen */}
-          <div className="w-full max-w-2xl mt-3 mb-2">
+          <div className="w-full shrink-0">
             <WordInput
               onWordSubmit={handleWordSubmit}
               disabled={phase !== 'PLAYING'}

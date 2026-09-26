@@ -63,12 +63,12 @@ export const WordInput: React.FC<WordInputProps> = ({
   };
 
   return (
-    <div className="relative z-30 w-full max-w-2xl mx-auto flex flex-col items-center px-4">
+    <div className="relative z-30 w-full max-w-2xl lg:max-w-[700px] xl:max-w-[760px] mx-auto flex flex-col items-center px-4">
       {/* 
         DEDICATED FIXED VALIDATION MESSAGE AREA IMMEDIATELY ABOVE THE INPUT
         Maintains fixed height so messages NEVER push the input or surrounding UI around.
       */}
-      <div className="w-full h-10 min-h-[40px] mb-2 flex items-center justify-center pointer-events-none">
+      <div className="w-full h-10 min-h-[40px] md:h-11 md:min-h-[44px] mb-2 md:mb-2.5 flex items-center justify-center pointer-events-none">
         <AnimatePresence mode="wait">
           {isValidating ? (
             <motion.div
@@ -114,7 +114,7 @@ export const WordInput: React.FC<WordInputProps> = ({
       {/* Main Input Form with generous size and clear ENVIAR button */}
       <form
         onSubmit={handleSubmit}
-        className="w-full flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-center"
+        className="w-full flex flex-col sm:flex-row gap-2.5 sm:gap-3 md:gap-3.5 xl:gap-4 items-center justify-center"
       >
         <input
           id="word-input-field"
@@ -139,34 +139,34 @@ export const WordInput: React.FC<WordInputProps> = ({
           autoComplete="off"
           autoCorrect="off"
           spellCheck="false"
-          className="w-full sm:flex-1 h-13 sm:h-14 px-6 rounded-2xl bg-slate-900/95 border-2 border-slate-700 focus:border-amber-400 focus:ring-4 focus:ring-amber-500/20 text-slate-100 font-bold text-base sm:text-lg placeholder:text-slate-500 shadow-2xl focus:outline-none transition-all disabled:opacity-50 disabled:bg-slate-950 text-center sm:text-left"
+          className="w-full sm:flex-1 h-13 sm:h-14 md:h-[58px] lg:h-[62px] xl:h-16 px-6 md:px-7 xl:px-8 rounded-2xl bg-slate-900/95 border-2 border-slate-700 focus:border-amber-400 focus:ring-4 focus:ring-amber-500/20 text-slate-100 font-bold text-base sm:text-lg md:text-lg lg:text-xl placeholder:text-slate-500 shadow-2xl focus:outline-none transition-all disabled:opacity-50 disabled:bg-slate-950 text-center sm:text-left"
         />
 
         <button
           id="submit-word-button"
           type="submit"
           disabled={disabled || isValidating || isSubmitting || !currentTypingWord.trim()}
-          className="w-full sm:w-auto h-13 sm:h-14 px-8 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-black text-base tracking-wider shadow-xl shadow-amber-500/25 active:scale-95 transition-all inline-flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          className="w-full sm:w-auto h-13 sm:h-14 md:h-[58px] lg:h-[62px] xl:h-16 px-8 md:px-9 xl:px-10 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-black text-base md:text-base lg:text-lg tracking-wider shadow-xl shadow-amber-500/25 active:scale-95 transition-all inline-flex items-center justify-center gap-2 cursor-pointer shrink-0"
         >
           <span>ENVIAR</span>
-          <Send className="w-4 h-4" />
+          <Send className="w-4 h-4 md:w-5 md:h-5" />
         </button>
       </form>
 
       {/* Collapsible Secondary History Panel */}
-      <div className="mt-4 flex flex-col items-center w-full">
+      <div className="mt-4 md:mt-5 xl:mt-6 flex flex-col items-center w-full">
         <button
           id="toggle-word-history-button"
           type="button"
           onClick={() => setShowHistory(!showHistory)}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-400 hover:text-slate-200 text-xs font-bold transition-all cursor-pointer shadow-md"
+          className="inline-flex items-center gap-2 px-4 py-1.5 md:px-5 md:py-2 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-400 hover:text-slate-200 text-xs lg:text-[13px] font-bold transition-all cursor-pointer shadow-md"
         >
-          <History className="w-3.5 h-3.5 text-amber-400" />
+          <History className="w-3.5 h-3.5 md:w-4 md:h-4 text-amber-400" />
           <span>Palabras usadas ({usedWords.length})</span>
           {showHistory ? (
-            <ChevronUp className="w-3.5 h-3.5" />
+            <ChevronUp className="w-3.5 h-3.5 md:w-4 md:h-4" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5" />
+            <ChevronDown className="w-3.5 h-3.5 md:w-4 md:h-4" />
           )}
         </button>
 

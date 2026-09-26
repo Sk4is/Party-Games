@@ -9,6 +9,7 @@ interface MissionResultModalProps {
   onNextMission: () => void;
   onRestartMatch: () => void;
   onBackToMenu: () => void;
+  onSelectOperator?: (playerId: string) => void;
 }
 
 export const MissionResultModal: React.FC<MissionResultModalProps> = ({
@@ -17,6 +18,7 @@ export const MissionResultModal: React.FC<MissionResultModalProps> = ({
   onNextMission,
   onRestartMatch,
   onBackToMenu,
+  onSelectOperator,
 }) => {
   const { phase, missionNumber, stats, strikes, maxStrikes, players, endMessage } = roomState;
   const isSuccess = phase === 'MISSION_SUCCESS';
@@ -42,9 +44,12 @@ export const MissionResultModal: React.FC<MissionResultModalProps> = ({
   const solvedModulesCount = roomState.modules.filter((m) => m.solved).length;
   const totalModulesCount = roomState.modules.length;
 
-  // Identify who the next operator will be based on operator rotation
+  // Identify current assigned operator (manual selection)
   const connected = players.filter((p) => p.isConnected);
-  const nextOp = connected.find((p) => p.id !== roomState.operatorId) || connected[0];
+  const currentOp =
+    connected.find((p) => p.role === 'OPERADOR') ||
+    connected.find((p) => p.id === roomState.operatorId) ||
+    connected[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in font-['Plus_Jakarta_Sans',sans-serif]">
@@ -139,20 +144,48 @@ export const MissionResultModal: React.FC<MissionResultModalProps> = ({
           </div>
         </div>
 
-        {/* Next Operator Preview */}
-        {nextOp && (
-          <div className="w-full p-4 bg-slate-950/90 rounded-2xl border border-slate-800 flex items-center justify-between mb-6">
-            <div className="text-left">
-              <span className="text-[10px] font-mono uppercase text-slate-500 block">
-                PRÓXIMO OPERADOR (ROTACIÓN):
+        {/* Role Assignment / Operator Selection for Next Mission */}
+        {connected.length > 0 && (
+          <div className="w-full p-4 bg-slate-950/90 rounded-2xl border border-slate-800 flex flex-col gap-2.5 mb-6 text-left">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold tracking-wider">
+                ROLES PRÓXIMA MISIÓN (1 OPERADOR + {Math.max(0, connected.length - 1)} {connected.length - 1 === 1 ? 'GUÍA' : 'GUÍAS'}):
               </span>
-              <span className="text-sm font-bold text-slate-200">
-                {nextOp.avatar} {nextOp.name}
+              <span className="text-[10px] font-mono text-amber-400">
+                Pulsa para asignar Operador
               </span>
             </div>
-            <span className="px-2.5 py-1 bg-red-500/20 border border-red-500/40 text-red-300 text-[10px] font-black uppercase rounded-full">
-              EN TURNO
-            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {connected.map((p) => {
+                const isOp = currentOp?.id === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => onSelectOperator && onSelectOperator(p.id)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl border text-left transition-all cursor-pointer ${
+                      isOp
+                        ? 'bg-red-950/50 border-red-500/70 text-white shadow-sm'
+                        : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base shrink-0">{p.avatar}</span>
+                      <span className="text-xs font-bold truncate">{p.name}</span>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-[9px] font-mono font-black uppercase shrink-0 ${
+                        isOp
+                          ? 'bg-red-500/25 text-red-300 border border-red-500/40'
+                          : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                      }`}
+                    >
+                      {isOp ? '🎛️ OPERADOR' : '📖 GUÍA'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 

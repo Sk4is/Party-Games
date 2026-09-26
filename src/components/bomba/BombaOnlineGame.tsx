@@ -415,9 +415,9 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
         )}
       </AnimatePresence>
 
-      {/* BODY CONTAINER: FIXED LEFT ALPHABET SIDEBAR + MAIN GAME AREA */}
+      {/* BODY CONTAINER: INDEPENDENT LEFT ALPHABET HUD SIDEBAR + TRUE 50VW-CENTERED MAIN GAME STAGE */}
       <div className="relative flex-1 flex w-full h-[calc(100vh-50px)] min-h-0 overflow-hidden">
-        {/* 1. FIXED LEFT ALPHABET SIDEBAR (Desktop) & DRAWER (Mobile) */}
+        {/* 1. INDEPENDENT LEFT ALPHABET SIDEBAR (Desktop fixed HUD) & DRAWER (Mobile) */}
         <AlphabetSidebar
           players={castPlayers}
           currentUserId={currentUserId}
@@ -427,20 +427,26 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
           onCloseMobileDrawer={() => setIsMobileAlphabetOpen(false)}
         />
 
-        {/* 2. MAIN GAME AREA */}
+        {/* 2. MAIN GAME AREA (True 50vw viewport center on desktop; mobile flow unchanged) */}
         <main
           id="main-game-area"
-          className="relative flex-1 flex flex-col items-center justify-between h-full min-w-0 px-2 sm:px-4 lg:px-6 py-1 sm:py-2 overflow-y-auto overflow-x-hidden"
+          className="desktop-game-stage relative flex-1 flex flex-col items-center justify-between md:justify-center md:gap-5 lg:gap-7 xl:gap-8 w-full h-full min-w-0 px-2 sm:px-4 lg:px-6 py-1 sm:py-2 md:pt-4 lg:pt-6 xl:pt-7 md:pb-6 lg:pb-10 xl:pb-12 overflow-y-auto overflow-x-hidden"
         >
           {/* TOP: REQUIRED LETTERS BANNER */}
           <div className="w-full shrink-0 z-20">
             <RequiredLettersBanner sequence={roomState.currentSequence?.sequence || ''} />
           </div>
 
-          {/* DESKTOP/TABLET: CENTRAL RADIAL ARENA (BOMB + ORBITING PLAYERS) */}
-          <div className="hidden md:flex relative flex-1 w-full max-w-5xl items-center justify-center my-1 sm:my-2 min-h-0">
-            {/* Central Bomb (Absolute visual centre of main game area) */}
-            <div className="relative z-10 flex items-center justify-center pointer-events-none scale-95 sm:scale-100 md:scale-105 transition-transform duration-300">
+          {/* DESKTOP/TABLET: CENTRAL RADIAL ARENA (BOMB + ORBITING PLAYERS, CENTERED AT 50VW) */}
+          <div
+            className={`hidden md:flex relative w-full max-w-[1280px] 2xl:max-w-[1400px] mx-auto items-center justify-center shrink-0 ${
+              castPlayers.length <= 2
+                ? 'md:h-[265px] lg:h-[300px] xl:h-[330px] 2xl:h-[360px]'
+                : 'md:h-[400px] lg:h-[450px] xl:h-[500px] 2xl:h-[540px]'
+            }`}
+          >
+            {/* Central Bomb (Exact 50vw visual anchor) */}
+            <div className="relative z-10 flex items-center justify-center pointer-events-none transition-transform duration-300">
               <BombVisual
                 progress={progress}
                 dangerLevel={roomState.dangerLevel}
@@ -470,11 +476,12 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
                 }
                 maxLives={roomState.config.startingLives}
                 allowedMistakesPerRound={roomState.config.allowedMistakesPerRound}
+                isSidebarExpanded={isDesktopAlphabetOpen}
               />
             </div>
           </div>
 
-          {/* MOBILE: DEDICATED STRUCTURED COMPOSITION (< md) */}
+          {/* MOBILE: DEDICATED STRUCTURED COMPOSITION (< md) — UNCHANGED */}
           <div className="md:hidden w-full max-w-md my-0.5 shrink-0">
             <MobilePlayerGrid
               players={castPlayers}
@@ -504,7 +511,7 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
           </div>
 
           {/* BOTTOM: ACTION BAR / WORD INPUT */}
-          <footer className="relative z-30 w-full pb-2 sm:pb-3 pt-1 shrink-0">
+          <footer className="relative z-30 w-full pb-2 sm:pb-3 md:pb-0 pt-1 shrink-0">
             {isMeActive ? (
               <WordInput
                 onWordSubmit={handleWordSubmit}
@@ -518,15 +525,15 @@ export const BombaOnlineGame: React.FC<BombaOnlineGameProps> = ({
                 onTypingChange={handleTypingChange}
               />
             ) : (
-              <div className="w-full max-w-md mx-auto px-4 text-center">
-                <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
+              <div className="w-full max-w-md md:max-w-xl xl:max-w-2xl mx-auto px-4 text-center">
+                <div className="p-3 md:p-4 xl:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
                   <div className="flex items-center justify-center gap-2 mb-1">
-                    <span className="text-lg">{castActivePlayer.avatar}</span>
-                    <span className="text-sm font-bold text-white">
+                    <span className="text-lg md:text-xl">{castActivePlayer.avatar}</span>
+                    <span className="text-sm md:text-base xl:text-lg font-bold text-white">
                       Turno de <span style={{ color: castActivePlayer.color }}>{castActivePlayer.name}</span>
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs md:text-sm text-slate-400">
                     {activeTyping &&
                     activeTyping.playerId === activePlayer.id &&
                     activeTyping.text ? (

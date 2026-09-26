@@ -96,20 +96,22 @@ export const BombVisual: React.FC<BombVisualProps> = ({
     <div className="relative flex flex-col items-center justify-center select-none pointer-events-none">
       {/* Outer pulsating danger aura */}
       {dangerLevel === 'CRITICAL' && (
-        <div className="absolute inset-0 -m-8 rounded-full bg-rose-600/30 blur-2xl animate-ping pointer-events-none" />
+        <div className="absolute inset-0 -m-8 md:-m-12 xl:-m-14 rounded-full bg-rose-600/30 blur-2xl animate-ping pointer-events-none" />
       )}
       {dangerLevel === 'DANGER' && (
-        <div className="absolute inset-0 -m-6 rounded-full bg-amber-500/20 blur-xl animate-pulse pointer-events-none" />
+        <div className="absolute inset-0 -m-6 md:-m-10 xl:-m-12 rounded-full bg-amber-500/20 blur-xl animate-pulse pointer-events-none" />
       )}
 
       {/* 
         MAIN BOMB CONTAINER:
         The Bomb, the Socket, the Fuse, and the Flame are all inside this SAME container.
         When this container shakes or wobbles, everything moves together as ONE connected object.
+        Mobile (< 768px): w-28 h-28 sm:w-32 sm:h-32 (unchanged).
+        Desktop (>= 768px): scales substantially (1.4x - 1.78x) across breakpoints.
       */}
       <div
         id="bomb-interactive-unit"
-        className={`relative w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 transition-transform duration-75 ${shakeClass}`}
+        className={`relative w-28 h-28 sm:w-32 sm:h-32 md:w-44 md:h-44 lg:w-52 lg:h-52 xl:w-60 xl:h-60 2xl:w-64 2xl:h-64 transition-transform duration-75 ${shakeClass}`}
         style={shakeStyle}
       >
         <svg
@@ -444,16 +446,16 @@ export const BombVisual: React.FC<BombVisualProps> = ({
 
         {/* Speed Multiplier Badge */}
         {speedMultiplier > 1.0 && (
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg flex items-center gap-1 border-2 border-amber-300 animate-pulse whitespace-nowrap z-20">
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-amber-500 text-slate-950 font-black text-xs sm:text-sm md:text-sm xl:text-base shadow-lg flex items-center gap-1 border-2 border-amber-300 animate-pulse whitespace-nowrap z-20">
             <span>⚡ Velocidad ×{Math.round(speedMultiplier)}</span>
           </div>
         )}
       </div>
 
       {/* Danger Level Text Pill (Visual hint without numbers) */}
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 md:mt-4 xl:mt-5 flex items-center gap-2">
         <span
-          className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider transition-colors duration-300 shadow-md ${
+          className={`px-3 py-1 md:px-4 md:py-1.5 xl:px-5 xl:py-2 rounded-full text-xs md:text-xs lg:text-sm xl:text-[15px] font-black uppercase tracking-wider transition-colors duration-300 shadow-md ${
             dangerLevel === 'CRITICAL'
               ? 'bg-rose-600/90 text-white animate-pulse'
               : dangerLevel === 'DANGER'
