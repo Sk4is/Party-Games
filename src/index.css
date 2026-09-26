@@ -131,14 +131,179 @@
   animation: countdown-pop 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Ambient Background Drift Animations (Very slow: 25s - 40s) */
+/* Ambient Background Drift Animations (Very slow: 18s - 32s) */
 @keyframes ambient-drift-1 {
   0%, 100% {
     transform: translate(0px, 0px) scale(1);
+    opacity: 0.12;
+  }
+  33% {
+    transform: translate(35px, -20px) scale(1.08);
+    opacity: 0.15;
+  }
+  66% {
+    transform: translate(-20px, 25px) scale(0.96);
+    opacity: 0.10;
+  }
+}
+
+@keyframes ambient-drift-2 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.10;
+  }
+  40% {
+    transform: translate(-30px, 30px) scale(1.1);
+    opacity: 0.14;
+  }
+  75% {
+    transform: translate(25px, -15px) scale(0.94);
+    opacity: 0.08;
+  }
+}
+
+@keyframes ambient-drift-3 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.09;
   }
   50% {
-    transform: translate(30px, 25px) scale(1.08);
+    transform: translate(25px, 35px) scale(1.06);
+    opacity: 0.12;
   }
+}
+
+@keyframes ambient-drift-4 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.08;
+  }
+  45% {
+    transform: translate(-25px, -25px) scale(1.07);
+    opacity: 0.11;
+  }
+}
+
+/* Atmospheric light motes / micro-specks */
+@keyframes speck-drift-1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translate(15px, -25px) scale(1.3);
+    opacity: 0.45;
+  }
+}
+
+@keyframes speck-drift-2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.18;
+  }
+  50% {
+    transform: translate(-20px, -35px) scale(0.8);
+    opacity: 0.38;
+  }
+}
+
+/* Hero Entrance Animations (Single run on load) */
+@keyframes hero-title-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes hero-sub-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes card-fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Status dot slow pulse */
+@keyframes status-dot-breathe {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
+.animate-ambient-1 {
+  animation: ambient-drift-1 24s ease-in-out infinite;
+}
+
+.animate-ambient-2 {
+  animation: ambient-drift-2 28s ease-in-out infinite;
+}
+
+.animate-ambient-3 {
+  animation: ambient-drift-3 22s ease-in-out infinite;
+}
+
+.animate-ambient-4 {
+  animation: ambient-drift-4 30s ease-in-out infinite;
+}
+
+.animate-speck-1 {
+  animation: speck-drift-1 16s ease-in-out infinite;
+}
+
+.animate-speck-2 {
+  animation: speck-drift-2 20s ease-in-out infinite;
+}
+
+.animate-hero-title {
+  animation: hero-title-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-hero-sub {
+  animation: hero-sub-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.12s forwards;
+  opacity: 0;
+}
+
+.animate-card-reveal {
+  animation: card-fade-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-status-breathe {
+  animation: status-dot-breathe 2.8s ease-in-out infinite;
+}
+
+/* Subtle background textures */
+.bg-subtle-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.hero-title-shadow {
+  text-shadow: 
+    0 2px 14px rgba(251, 146, 60, 0.22),
+    0 8px 30px rgba(234, 88, 12, 0.12);
 }
 
 /* Pinturillo Interactive UI Animations */
