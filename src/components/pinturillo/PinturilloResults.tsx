@@ -191,26 +191,26 @@ export const PinturilloResults: React.FC<PinturilloResultsProps> = ({
           </div>
         </div>
 
-        {/* Buttons */}
+        {/* Buttons: VOLVER A LA SALA & VOLVER AL MENÚ */}
         <div className="flex flex-wrap items-center justify-center gap-3">
-          {isHost && onRestartGame && (
+          {onRestartGame && (
             <button
               type="button"
               onClick={onRestartGame}
-              className="px-6 py-3 rounded-2xl bg-[#00BCEB] hover:bg-[#009ED0] text-slate-950 font-black text-sm shadow-xl shadow-[#00BCEB]/25 transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+              className="px-6 py-3.5 rounded-2xl bg-[#00BCEB] hover:bg-[#009ED0] text-slate-950 font-black text-sm uppercase tracking-wide shadow-xl shadow-[#00BCEB]/25 transition-all cursor-pointer flex items-center gap-2 active:scale-95"
             >
-              <RotateCcw className="w-4 h-4" />
-              <span>Jugar otra vez</span>
+              <RotateCcw className="w-4.5 h-4.5" />
+              <span>VOLVER A LA SALA</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={onLeaveGame}
-            className="px-6 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm border border-slate-700 transition-all cursor-pointer flex items-center gap-2"
+            className="px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm uppercase tracking-wide border border-slate-700 transition-all cursor-pointer flex items-center gap-2 active:scale-95"
           >
-            <Home className="w-4 h-4" />
-            <span>Menú principal</span>
+            <Home className="w-4.5 h-4.5" />
+            <span>VOLVER AL MENÚ</span>
           </button>
         </div>
       </div>

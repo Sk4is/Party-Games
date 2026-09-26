@@ -623,74 +623,49 @@ class AudioManager {
   }
 
   // ==========================================
-  // PINTURILLO AUDIO & CHILL MUSIC
+  // PINTURILLO / LIENZO LOCO AUDIO & SFX
   // ==========================================
+  private sfxVolume: number = (() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('fiesta_sfx_volume');
+      if (saved !== null) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) return parsed;
+      }
+    }
+    return 0.8;
+  })();
   private musicPlaying: boolean = false;
   private musicInterval: any = null;
   private lastStrokeSoundTime: number = 0;
 
-  public getIsMusicPlaying(): boolean {
-    return this.musicPlaying;
+  public getSfxVolume(): number {
+    return this.sfxVolume;
   }
 
-  public toggleMusic(): boolean {
-    if (this.musicPlaying) {
-      this.stopPinturilloMusic();
-      return false;
-    } else {
-      this.startPinturilloMusic();
-      return true;
+  public setSfxVolume(volume: number) {
+    this.sfxVolume = Math.max(0, Math.min(1, volume));
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('fiesta_sfx_volume', String(this.sfxVolume));
+      } catch {
+        // Ignore
+      }
     }
   }
 
+  public getIsMusicPlaying(): boolean {
+    return false; // Background music is completely removed
+  }
+
+  public toggleMusic(): boolean {
+    this.stopPinturilloMusic();
+    return false;
+  }
+
   public startPinturilloMusic() {
-    if (this.isMuted) return;
-    this.initContext();
-    if (!this.ctx) return;
-
-    if (this.musicPlaying) return;
-    this.musicPlaying = true;
-
-    // Chill, playful pentatonic chords sequence (C major pentatonic: C, D, E, G, A)
-    const melodyNotes = [
-      523.25, 659.25, 783.99, 659.25, // C5, E5, G5, E5
-      587.33, 659.25, 523.25, 440.00, // D5, E5, C5, A4
-      523.25, 783.99, 880.00, 783.99, // C5, G5, A5, G5
-      659.25, 587.33, 523.25, 0,      // E5, D5, C5, rest
-    ];
-
-    let step = 0;
-    const tempoMs = 280;
-
-    this.musicInterval = setInterval(() => {
-      if (!this.musicPlaying || this.isMuted || !this.ctx) return;
-
-      const freq = melodyNotes[step % melodyNotes.length];
-      step++;
-
-      if (freq > 0) {
-        try {
-          const now = this.ctx.currentTime;
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-
-          osc.type = 'sine'; // Soft, warm bell/marimba tone
-          osc.frequency.setValueAtTime(freq, now);
-
-          // Subdued gentle background volume
-          gain.gain.setValueAtTime(0.025, now);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-
-          osc.start(now);
-          osc.stop(now + 0.35);
-        } catch {
-          // Ignore
-        }
-      }
-    }, tempoMs);
+    // MUSIC COMPLETELY REMOVED: no background music plays
+    this.stopPinturilloMusic();
   }
 
   public stopPinturilloMusic() {
@@ -701,9 +676,9 @@ class AudioManager {
     }
   }
 
-  // Pinturillo countdown tick (3, 2, 1, ¡A dibujar!)
+  // Pinturillo / Lienzo Loco countdown tick (3, 2, 1, ¡A dibujar!)
   public playPinturilloCountdown(count: number) {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0.01) return;
     this.initContext();
     if (!this.ctx) return;
 
@@ -715,7 +690,8 @@ class AudioManager {
     const freq = count > 0 ? 440 + (4 - count) * 80 : 880;
     osc.frequency.setValueAtTime(freq, now);
 
-    gain.gain.setValueAtTime(0.18, now);
+    const baseGain = 0.18 * this.sfxVolume;
+    gain.gain.setValueAtTime(baseGain, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + (count > 0 ? 0.15 : 0.4));
 
     osc.connect(gain);
@@ -725,9 +701,9 @@ class AudioManager {
     osc.stop(now + (count > 0 ? 0.15 : 0.4));
   }
 
-  // Pinturillo correct guess fanfare
+  // Pinturillo / Lienzo Loco correct guess fanfare
   public playPinturilloCorrect() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0.01) return;
     this.initContext();
     if (!this.ctx) return;
 
@@ -742,7 +718,8 @@ class AudioManager {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, start);
 
-      gain.gain.setValueAtTime(0.2, start);
+      const baseGain = 0.2 * this.sfxVolume;
+      gain.gain.setValueAtTime(baseGain, start);
       gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
 
       osc.connect(gain);
@@ -753,9 +730,9 @@ class AudioManager {
     });
   }
 
-  // Pinturillo "casi" / near miss subtle warm alert
+  // Pinturillo / Lienzo Loco "casi" / near miss subtle warm alert
   public playPinturilloNearMiss() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0.01) return;
     this.initContext();
     if (!this.ctx) return;
 
@@ -767,7 +744,8 @@ class AudioManager {
     osc.frequency.setValueAtTime(620, now);
     osc.frequency.exponentialRampToValueAtTime(740, now + 0.1);
 
-    gain.gain.setValueAtTime(0.15, now);
+    const baseGain = 0.15 * this.sfxVolume;
+    gain.gain.setValueAtTime(baseGain, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
 
     osc.connect(gain);
@@ -777,9 +755,9 @@ class AudioManager {
     osc.stop(now + 0.2);
   }
 
-  // Pinturillo soft drawing stroke sound (throttled)
+  // Pinturillo / Lienzo Loco soft drawing stroke sound (throttled)
   public playPinturilloStroke() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0.01) return;
     const nowMs = Date.now();
     if (nowMs - this.lastStrokeSoundTime < 80) return; // limit frequency
     this.lastStrokeSoundTime = nowMs;
@@ -794,7 +772,8 @@ class AudioManager {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(320 + Math.random() * 40, now);
 
-    gain.gain.setValueAtTime(0.015, now);
+    const baseGain = 0.015 * this.sfxVolume;
+    gain.gain.setValueAtTime(baseGain, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
 
     osc.connect(gain);
@@ -804,9 +783,9 @@ class AudioManager {
     osc.stop(now + 0.05);
   }
 
-  // Pinturillo tool select
+  // Pinturillo / Lienzo Loco tool select
   public playPinturilloToolSelect() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0.01) return;
     this.initContext();
     if (!this.ctx) return;
 
@@ -817,7 +796,8 @@ class AudioManager {
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(580, now);
 
-    gain.gain.setValueAtTime(0.08, now);
+    const baseGain = 0.08 * this.sfxVolume;
+    gain.gain.setValueAtTime(baseGain, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
 
     osc.connect(gain);
@@ -827,9 +807,9 @@ class AudioManager {
     osc.stop(now + 0.06);
   }
 
-  // Pinturillo bucket flood fill sound: splash
+  // Pinturillo / Lienzo Loco bucket flood fill sound: splash
   public playPinturilloFill() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0.01) return;
     this.initContext();
     if (!this.ctx) return;
 
@@ -841,7 +821,8 @@ class AudioManager {
     osc.frequency.setValueAtTime(350, now);
     osc.frequency.exponentialRampToValueAtTime(700, now + 0.12);
 
-    gain.gain.setValueAtTime(0.18, now);
+    const baseGain = 0.18 * this.sfxVolume;
+    gain.gain.setValueAtTime(baseGain, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
     osc.connect(gain);
@@ -851,9 +832,9 @@ class AudioManager {
     osc.stop(now + 0.22);
   }
 
-  // Pinturillo timer clock tick in last 10s
+  // Pinturillo / Lienzo Loco timer clock tick in last 10s
   public playPinturilloClockTick(isCritical: boolean = false) {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0.01) return;
     this.initContext();
     if (!this.ctx) return;
 
@@ -864,7 +845,8 @@ class AudioManager {
     osc.type = isCritical ? 'square' : 'triangle';
     osc.frequency.setValueAtTime(isCritical ? 880 : 660, now);
 
-    gain.gain.setValueAtTime(isCritical ? 0.12 : 0.06, now);
+    const baseGain = (isCritical ? 0.12 : 0.06) * this.sfxVolume;
+    gain.gain.setValueAtTime(baseGain, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
 
     osc.connect(gain);

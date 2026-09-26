@@ -1,6 +1,6 @@
 {
   "name": "Fiesta de Juegos",
-  "description": "Juegos de fiesta multijugador para jugar con amigos: La Bomba, La Peor Respuesta, Pinturillo Online, Palabra Secreta, Código Rojo y Coartada (juego de deducción e interrogatorio para 2 jugadores).",
+  "description": "Juegos de fiesta multijugador para jugar con amigos: La Bomba, La Peor Respuesta, Lienzo Loco, Palabra Secreta, Código Rojo y Coartada (juego de deducción e interrogatorio para 2 jugadores).",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

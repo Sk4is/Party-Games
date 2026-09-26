@@ -34,7 +34,7 @@ export const PinturilloLobby: React.FC<PinturilloLobbyProps> = ({
 
   return (
     <GameLobbyLayout
-      title="Pinturillo"
+      title="Lienzo Loco"
       icon="🎨"
       description="Dibuja la palabra secreta mientras tus amigos intentan adivinarla antes de que se acabe el tiempo."
       minPlayers={2}

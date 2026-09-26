@@ -70,7 +70,7 @@ export const GAME_THEMES: Record<GameSlug, GameTheme> = {
   },
   'pinturillo': {
     slug: 'pinturillo',
-    name: 'Pinturillo',
+    name: 'Lienzo Loco',
     primary: '#00BCEB',
     secondary: '#009ED0',
     glow: 'rgba(0, 188, 235, 0.18)',

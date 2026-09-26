@@ -773,7 +773,9 @@ export class PinturilloServer {
         const client = this.clients.get(ws);
         if (!client) return;
         const room = this.rooms.get(client.roomId);
-        if (!room || room.hostId !== client.playerId) return;
+        if (!room) return;
+        // In FINAL_RESULTS or MATCH_ABORTED or if host requests it, return to lobby
+        if (room.hostId !== client.playerId && room.phase !== 'FINAL_RESULTS' && room.phase !== 'MATCH_ABORTED') return;
 
         this.clearAllTimers(room);
         room.phase = 'LOBBY';

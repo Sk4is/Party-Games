@@ -167,7 +167,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             </div>
           </div>
 
-          {/* CARD 3: PINTURILLO (ACTIVE & ONLINE MULTIPLAYER) */}
+          {/* CARD 3: LIENZO LOCO (ACTIVE & ONLINE MULTIPLAYER) */}
           <div
             id="card-pinturillo"
             onClick={() => handleSelectGame('pinturillo')}
@@ -188,7 +188,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
               </div>
 
               <h2 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#00BCEB] transition-colors">
-                PINTURILLO
+                LIENZO LOCO
               </h2>
               <p className="text-slate-300 text-base sm:text-lg font-medium leading-snug">
                 &ldquo;Dibuja, adivina y compite en tiempo real.&rdquo;

@@ -21,8 +21,8 @@ import { usePinturilloSocket } from '../../hooks/usePinturilloSocket';
 import {
   Clock,
   Volume2,
+  Volume1,
   VolumeX,
-  Music,
   ArrowLeft,
   Eye,
   AlertCircle,
@@ -95,9 +95,9 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
     onWrongGame: onSwitchGame,
   });
 
-  // Audio / Music states
-  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  // Audio SFX states (Music completely removed)
+  const [sfxVolume, setSfxVolume] = useState<number>(() => audio.getSfxVolume());
+  const [isMuted, setIsMuted] = useState<boolean>(() => audio.getIsMuted());
 
   // Drawing tool state
   const [currentTool, setCurrentTool] = useState<DrawingTool>('pencil');
@@ -109,13 +109,6 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
   useEffect(() => {
     setIsClearConfirmOpen(false);
   }, [roomState?.currentTurn, roomState?.phase]);
-
-  // Clean up audio on unmount
-  useEffect(() => {
-    return () => {
-      audio.stopPinturilloMusic();
-    };
-  }, []);
 
   // Fail-safe cleanup: Ensure countdown overlay never lingers after DRAWING phase begins
   useEffect(() => {
@@ -259,16 +252,22 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
     sendChat(text);
   };
 
-  // Music toggle
-  const handleToggleMusic = () => {
-    const isPlaying = audio.toggleMusic();
-    setIsMusicPlaying(isPlaying);
-  };
-
-  // Sound toggle
+  // Sound toggle & volume controls
   const handleToggleMute = () => {
     const isMutedNow = audio.toggleMute();
     setIsMuted(isMutedNow);
+  };
+
+  const handleVolumeChange = (newVol: number) => {
+    audio.setSfxVolume(newVol);
+    setSfxVolume(newVol);
+    if (newVol > 0 && isMuted) {
+      audio.setMuted(false);
+      setIsMuted(false);
+    } else if (newVol === 0 && !isMuted) {
+      audio.setMuted(true);
+      setIsMuted(true);
+    }
   };
 
   // Current active roles
@@ -565,33 +564,37 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
               </div>
             </div>
 
-            {/* Right: Audio Toggles & Round Timer */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {/* Chill Music Synth Toggle */}
-              <button
-                type="button"
-                onClick={handleToggleMusic}
-                title={isMusicPlaying ? 'Pausar música chill' : 'Activar música chill'}
-                aria-label="Música chill"
-                className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center ${
-                  isMusicPlaying
-                    ? 'bg-[#00BCEB]/20 border-[#00BCEB]/50 text-cyan-300 shadow-sm'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
-                }`}
-              >
-                <Music className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isMusicPlaying ? 'animate-bounce' : ''}`} />
-              </button>
-
-              {/* Mute SFX Toggle */}
-              <button
-                type="button"
-                onClick={handleToggleMute}
-                title={isMuted ? 'Activar sonido' : 'Silenciar sonido'}
-                aria-label="Sonido"
-                className="p-1.5 sm:p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer border border-slate-700 min-h-[36px] min-w-[36px] flex items-center justify-center"
-              >
-                {isMuted ? <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-              </button>
+            {/* Right: Sound Volume Controls & Round Timer */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              {/* SFX Volume & Mute Control (Music completely removed) */}
+              <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-xl bg-slate-800/90 border border-slate-700 min-h-[36px]">
+                <button
+                  type="button"
+                  onClick={handleToggleMute}
+                  title={isMuted || sfxVolume <= 0.01 ? 'Activar sonido' : `Sonido: ${Math.round(sfxVolume * 100)}% (clic para silenciar)`}
+                  aria-label="Silenciar o activar sonido"
+                  className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/80 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0"
+                >
+                  {isMuted || sfxVolume <= 0.01 ? (
+                    <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+                  ) : sfxVolume < 0.5 ? (
+                    <Volume1 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#00BCEB]" />
+                  ) : (
+                    <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#00BCEB]" />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isMuted ? 0 : sfxVolume}
+                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                  title={`Volumen: ${Math.round((isMuted ? 0 : sfxVolume) * 100)}%`}
+                  aria-label="Ajuste de volumen"
+                  className="w-12 sm:w-20 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#00BCEB]"
+                />
+              </div>
 
               {/* Round Timer with multi-tier playful colors */}
               <div

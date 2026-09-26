@@ -947,12 +947,12 @@ export class PartyGameServer {
           return;
         }
 
-        // Check if room exists in Pinturillo
+        // Check if room exists in Lienzo Loco
         const roomMeta = roomRegistry.get(code);
         if (roomMeta && roomMeta.gameType === 'pinturillo') {
           return this.send(ws, {
             type: 'error',
-            message: `Este código de sala (${code}) pertenece a Pinturillo.`,
+            message: `Este código de sala (${code}) pertenece a Lienzo Loco.`,
           });
         }
 

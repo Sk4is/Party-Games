@@ -75,7 +75,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
             }`}
           >
             <span>🎨</span>
-            <span>Pinturillo</span>
+            <span>Lienzo Loco</span>
           </button>
 
           <button
@@ -201,7 +201,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
           </div>
         )}
 
-        {/* TAB 3: PINTURILLO */}
+        {/* TAB 3: LIENZO LOCO */}
         {activeTab === 'pinturillo' && (
           <div className="space-y-4 text-sm leading-relaxed text-slate-300">
             <div className="flex items-center gap-3 mb-2">
@@ -209,7 +209,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose 
                 🎨
               </div>
               <div>
-                <h3 className="text-xl font-bold font-display text-[#00BCEB]">Reglas de Pinturillo Online</h3>
+                <h3 className="text-xl font-bold font-display text-[#00BCEB]">Reglas de Lienzo Loco</h3>
                 <p className="text-xs text-slate-400">Dibuja, adivina y compite en tiempo real</p>
               </div>
             </div>
