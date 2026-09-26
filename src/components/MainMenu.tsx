@@ -360,7 +360,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 </span>
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-black font-serif text-stone-100 tracking-wide mb-2 group-hover:text-[#f59e0b] transition-colors duration-200">
+              <h2 className="text-2xl sm:text-3xl font-black font-display text-stone-100 tracking-wide mb-2 group-hover:text-[#f59e0b] transition-colors duration-200">
                 COARTADA
               </h2>
               <p className="text-stone-300/90 text-sm sm:text-base font-normal leading-snug">
