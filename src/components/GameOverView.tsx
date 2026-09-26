@@ -269,7 +269,7 @@ export const GameOverView: React.FC<GameOverViewProps> = ({
 
       {/* Footer */}
       <footer className="relative z-10 text-center text-xs text-slate-500 py-2">
-        Fiesta de Juegos &bull; La Bomba
+        FAM2PLAY &bull; La Bomba
       </footer>
     </div>
   );

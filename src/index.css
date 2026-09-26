@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Blazter";
+  src: url("/assets/fonts/BLAZTER.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+html,
+body,
+#root {
+  background-color: #020617;
+  color: #f8fafc;
+  min-height: 100vh;
+}
+
 :root {
   --bomb-primary: #FFB000;
   --bomb-secondary: #FF8A00;
@@ -15,6 +31,11 @@
 }
 
 @layer utilities {
+  .font-brand {
+    font-family: "Blazter", "Titan One", "Fredoka", cursive, sans-serif;
+    font-weight: normal;
+    font-style: normal;
+  }
   .font-display {
     font-family: 'Titan One', 'Fredoka', cursive, sans-serif;
   }
@@ -326,6 +347,38 @@
   text-shadow: 
     0 2px 14px rgba(251, 146, 60, 0.22),
     0 8px 30px rgba(234, 88, 12, 0.12);
+}
+
+@keyframes fam2play-glow-breathe {
+  0%, 100% {
+    filter:
+      drop-shadow(0 3px 16px rgba(251, 146, 60, 0.25))
+      drop-shadow(0 10px 32px rgba(244, 63, 94, 0.13));
+  }
+  50% {
+    filter:
+      drop-shadow(0 4px 22px rgba(251, 146, 60, 0.34))
+      drop-shadow(0 12px 38px rgba(244, 63, 94, 0.18));
+  }
+}
+
+.fam2play-wordmark {
+  font-family: "Blazter", "Titan One", "Fredoka", sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: clamp(2.5rem, 11.5vw, 6.8rem);
+  line-height: 1.22;
+  letter-spacing: 0.03em;
+  padding: 0.14em 0.2em 0.18em;
+  white-space: nowrap;
+  display: inline-block;
+  overflow: visible;
+  filter:
+    drop-shadow(0 3px 16px rgba(251, 146, 60, 0.25))
+    drop-shadow(0 10px 32px rgba(244, 63, 94, 0.13));
+  animation:
+    hero-title-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    fam2play-glow-breathe 5.5s ease-in-out 0.7s infinite;
 }
 
 /* Pinturillo Interactive UI Animations */

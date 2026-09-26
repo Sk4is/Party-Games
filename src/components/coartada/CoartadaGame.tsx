@@ -292,7 +292,7 @@ export const CoartadaGame: React.FC<CoartadaGameProps> = ({
                 onClick={onBackToMenu}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900/80 hover:bg-stone-800 text-stone-300 text-xs font-mono font-bold border border-stone-800 transition-colors cursor-pointer"
               >
-                <ArrowLeft className="w-3.5 h-3.5" /> Volver a Fiesta de Juegos
+                <ArrowLeft className="w-3.5 h-3.5" /> Volver a FAM2PLAY
               </button>
             </div>
 

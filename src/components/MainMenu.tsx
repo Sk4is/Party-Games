@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Sparkles, HelpCircle, ArrowRight } from 'lucide-react';
 import { SoundToggle } from './SoundToggle';
 import { HowToPlayModal } from './HowToPlayModal';
@@ -11,6 +11,29 @@ interface MainMenuProps {
 export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [comingSoonToast, setComingSoonToast] = useState<string | null>(null);
+
+  // Isolated dev-only diagnostic check for /assets/fonts/BLAZTER.ttf (never blocks or throws)
+  useEffect(() => {
+    try {
+      const isDev = typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV;
+      if (!isDev || typeof window === 'undefined' || typeof fetch !== 'function') return;
+
+      fetch('/assets/fonts/BLAZTER.ttf', { method: 'HEAD' })
+        .then((res) => {
+          const contentType = res.headers.get('content-type') || '';
+          if (!res.ok || contentType.includes('text/html')) {
+            console.warn(
+              '[FAM2PLAY][Font] /assets/fonts/BLAZTER.ttf not found or returned HTML fallback — rendering FAM2PLAY with fallback display font.'
+            );
+          }
+        })
+        .catch((err) => {
+          console.warn('[FAM2PLAY][Font] Could not verify /assets/fonts/BLAZTER.ttf:', err);
+        });
+    } catch {
+      // Never propagate diagnostic errors
+    }
+  }, []);
 
   const handleSelectGame = (gameId: string) => {
     audio.playTurnChange();
@@ -72,12 +95,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
       </header>
 
       {/* =========================================================================
-          HERO SECTION: FIESTA DE JUEGOS TITLE & POLISHED SUBTITLE
+          HERO SECTION: FAM2PLAY BRAND WORDMARK & POLISHED SUBTITLE
           ========================================================================= */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center max-w-6xl mx-auto w-full py-4 sm:py-6 md:py-8">
-        <div className="text-center mb-8 sm:mb-12 max-w-3xl mx-auto">
-          <h1 className="text-5xl sm:text-7xl md:text-8xl font-black font-display tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500 hero-title-shadow leading-[1.12] pb-2 sm:pb-3 mb-1.5 sm:mb-2 animate-hero-title select-none">
-            FIESTA DE JUEGOS
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center max-w-6xl mx-auto w-full py-3 sm:py-5 md:py-7">
+        <div className="text-center mb-6 sm:mb-9 md:mb-11 max-w-4xl mx-auto px-2 overflow-visible">
+          <h1 className="fam2play-wordmark text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-rose-500 mb-1 sm:mb-2 select-none">
+            FAM2PLAY
           </h1>
           <p className="text-base sm:text-xl text-slate-300/90 font-medium max-w-2xl mx-auto leading-relaxed animate-hero-sub">
             Juegos multijugador rápidos, competitivos y ligeramente caóticos para jugar con amigos.
@@ -389,7 +412,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
           FOOTER BAR
           ========================================================================= */}
       <footer className="relative z-10 text-center text-xs text-slate-500 py-4 max-w-6xl mx-auto w-full select-none">
-        Fiesta de Juegos &bull; Diseñado para jugar con amigos en directo &bull; 100% en castellano
+        FAM2PLAY &bull; Diseñado para jugar con amigos en directo &bull; 100% en castellano
       </footer>
 
       {/* How to play modal */}

@@ -702,7 +702,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose,
         <div className="shrink-0 px-6 py-3 bg-[#0a0d14] border-t border-slate-800/70 flex items-center justify-between text-xs text-slate-500 select-none">
           <div className="flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-amber-400/80" />
-            <span>Fiesta de Juegos &bull; Manual de Reglas</span>
+            <span>FAM2PLAY &bull; Manual de Reglas</span>
           </div>
           <button
             type="button"

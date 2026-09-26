@@ -249,7 +249,7 @@ export const LaPeorRespuestaGame: React.FC<LaPeorRespuestaGameProps> = ({
 
       {/* Footer copyright / info */}
       <footer className="text-center text-[11px] text-stone-600 py-2 border-t border-stone-900/60 max-w-6xl mx-auto w-full">
-        La Peor Respuesta &bull; &laquo;Cuanto peor, mejor&raquo; &bull; Fiesta de Juegos
+        La Peor Respuesta &bull; &laquo;Cuanto peor, mejor&raquo; &bull; FAM2PLAY
       </footer>
 
       {/* Abandon Game Confirmation Modal */}

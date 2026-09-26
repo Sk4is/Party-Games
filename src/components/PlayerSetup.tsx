@@ -419,7 +419,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
 
       {/* Footer */}
       <footer className="relative z-10 text-center text-xs text-slate-500 py-2">
-        La Bomba &bull; Fiesta de Juegos
+        La Bomba &bull; FAM2PLAY
       </footer>
 
       {/* Avatar Picker Modal */}

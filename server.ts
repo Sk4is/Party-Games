@@ -328,6 +328,22 @@ async function startServer() {
   coartadaServer = new CoartadaServer();
 
   let vite: any = null;
+  app.use('/assets/fonts', (req, res, next) => {
+    if (req.url.includes('?import')) {
+      return next();
+    }
+    const cleanRelative = req.path.replace(/^\/+/, '');
+    const candidateRoot = path.join(process.cwd(), 'assets', 'fonts', cleanRelative);
+    const candidatePublic = path.join(process.cwd(), 'public', 'assets', 'fonts', cleanRelative);
+    if (fs.existsSync(candidateRoot) && fs.statSync(candidateRoot).isFile()) {
+      return res.sendFile(candidateRoot);
+    }
+    if (fs.existsSync(candidatePublic) && fs.statSync(candidatePublic).isFile()) {
+      return res.sendFile(candidatePublic);
+    }
+    return res.status(404).end();
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     vite = await createViteServer({
       server: { middlewareMode: true, hmr: false },
