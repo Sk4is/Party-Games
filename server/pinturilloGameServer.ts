@@ -371,6 +371,18 @@ export class PinturilloServer {
         // Check if player is reconnecting
         const existingPlayer = room.players.find(p => p.id === message.player.id);
         if (existingPlayer) {
+          // Remove any previous socket mapping for this player before registering the new socket
+          for (const [oldWs, clientInfo] of this.clients.entries()) {
+            if (clientInfo.roomId === code && clientInfo.playerId === existingPlayer.id && oldWs !== ws) {
+              this.clients.delete(oldWs);
+              try {
+                oldWs.close(1000, 'Replaced by newer session connection');
+              } catch {
+                // Ignore
+              }
+            }
+          }
+
           matchDepartureHandler.cancelGracePeriod(code, existingPlayer.id);
           existingPlayer.isConnected = true;
           existingPlayer.name = message.player.name.trim() || existingPlayer.name;
@@ -1069,6 +1081,19 @@ export class PinturilloServer {
     if (!client) return;
 
     this.clients.delete(ws);
+
+    // If the same player already has another active socket in this room, ignore this stale close
+    for (const [otherWs, otherClient] of this.clients.entries()) {
+      if (
+        otherWs !== ws &&
+        otherClient.roomId === client.roomId &&
+        otherClient.playerId === client.playerId &&
+        otherWs.readyState === WebSocket.OPEN
+      ) {
+        return;
+      }
+    }
+
     const room = this.rooms.get(client.roomId);
     if (!room) return;
 

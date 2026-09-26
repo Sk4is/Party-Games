@@ -13,6 +13,7 @@ interface PinturilloEntryProps {
   initialName?: string;
   initialAvatar?: string;
   initialColor?: string;
+  isSubmitting?: boolean;
   onCreateRoom: (player: { id: string; name: string; avatar: string; color: string }, config?: Partial<PinturilloConfig>) => void;
   onJoinRoom: (code: string, player: { id: string; name: string; avatar: string; color: string }) => void;
   onBackToMenu: () => void;
@@ -24,6 +25,7 @@ export const PinturilloEntry: React.FC<PinturilloEntryProps> = ({
   initialName,
   initialAvatar,
   initialColor,
+  isSubmitting: externalIsSubmitting = false,
   onCreateRoom,
   onJoinRoom,
   onBackToMenu,
@@ -41,7 +43,15 @@ export const PinturilloEntry: React.FC<PinturilloEntryProps> = ({
   });
 
   const [mode, setMode] = useState<RoomMode>(initialRoomCode ? 'join' : 'create');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localSubmitting, setLocalSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (errorMessage) {
+      setLocalSubmitting(false);
+    }
+  }, [errorMessage]);
+
+  const isSubmitting = externalIsSubmitting || localSubmitting;
 
   // Pinturillo initial room settings
   const [config, setConfig] = useState<PinturilloConfig>({
@@ -60,12 +70,12 @@ export const PinturilloEntry: React.FC<PinturilloEntryProps> = ({
   };
 
   const handleCreate = () => {
-    setIsSubmitting(true);
+    setLocalSubmitting(true);
     onCreateRoom(profile, config);
   };
 
   const handleJoin = (code: string) => {
-    setIsSubmitting(true);
+    setLocalSubmitting(true);
     onJoinRoom(code, profile);
   };
 

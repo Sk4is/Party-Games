@@ -73,6 +73,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
     countdownInfo,
     setCountdownInfo,
     nearMissAlert,
+    isSubmitting,
     createRoom,
     joinRoom,
     leaveRoom,
@@ -334,6 +335,7 @@ export const PinturilloGame: React.FC<PinturilloGameProps> = ({
           )}
           <PinturilloEntry
             initialRoomCode={initialRoomCode}
+            isSubmitting={isSubmitting}
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
             onBackToMenu={onBackToMenu}

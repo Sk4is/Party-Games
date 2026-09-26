@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   PinturilloRoomState,
-  PinturilloPlayer,
   PinturilloConfig,
   DrawStroke,
   NormalizedPoint,
@@ -15,7 +14,6 @@ import {
 } from '../services/multiplayerRoomService';
 import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
-import { createConnectionResilience } from '../utils/connectionResilience';
 
 export type PinturilloConnectionStatus =
   | 'idle'
@@ -31,6 +29,17 @@ interface UsePinturilloSocketOptions {
   onWrongGame?: (actualGameType: 'la-bomba' | 'la-peor-respuesta', roomCode: string) => void;
 }
 
+function getInitialActiveRoom(initialRoomCode?: string): { code: string } | null {
+  if (initialRoomCode && initialRoomCode.trim().length >= 4) {
+    return { code: initialRoomCode.trim().toUpperCase() };
+  }
+  const saved = sessionRecovery.getActiveSession();
+  if (saved && saved.gameType === 'pinturillo' && saved.roomCode) {
+    return { code: saved.roomCode.trim().toUpperCase() };
+  }
+  return null;
+}
+
 export function usePinturilloSocket({
   player,
   initialRoomCode,
@@ -43,26 +52,55 @@ export function usePinturilloSocket({
   const [nearMissAlert, setNearMissAlert] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // References to keep socket lifecycle decoupled from component render cycles
+  // References to keep socket lifecycle completely decoupled from React render cycles
   const wsRef = useRef<WebSocket | null>(null);
   const messageQueueRef = useRef<ClientMessage[]>([]);
   const reconnectAttemptsRef = useRef<number>(0);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownDismissTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isManuallyClosedRef = useRef<boolean>(false);
   const lastActivityRef = useRef<number>(Date.now());
-  const lastActiveRoomRef = useRef<{ code: string } | null>(() => {
-    if (initialRoomCode) return { code: initialRoomCode.trim().toUpperCase() };
-    const saved = sessionRecovery.getActiveSession();
-    if (saved && saved.gameType === 'pinturillo' && saved.roomCode) {
-      return { code: saved.roomCode };
-    }
-    return null;
-  });
+  const lastActiveRoomRef = useRef<{ code: string } | null>(getInitialActiveRoom(initialRoomCode));
 
   const playerRef = useRef(player);
   playerRef.current = player;
+
+  const onWrongGameRef = useRef(onWrongGame);
+  onWrongGameRef.current = onWrongGame;
+
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearPingTimer = useCallback(() => {
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+  }, []);
+
+  // Safely detach and close a socket without triggering its onclose reconnect logic
+  const closeAndDetachSocket = useCallback((reason: string) => {
+    const sock = wsRef.current;
+    if (!sock) return;
+    wsRef.current = null;
+    sock.onopen = null;
+    sock.onmessage = null;
+    sock.onerror = null;
+    sock.onclose = null;
+
+    try {
+      if (sock.readyState === WebSocket.OPEN || sock.readyState === WebSocket.CONNECTING) {
+        sock.close(1000, reason);
+      }
+    } catch {
+      // Ignore close errors
+    }
+  }, []);
 
   // Resolve sanitized WebSocket URL
   const getSanitizedSocketUrl = useCallback((): string => {
@@ -81,25 +119,38 @@ export function usePinturilloSocket({
     return `${protocol}//${host}/ws/pinturillo`;
   }, []);
 
-  // Primary WebSocket Connect function
+  // Primary WebSocket Connect function — strictly idempotent for OPEN / CONNECTING sockets
   const connect = useCallback(() => {
+    const existing = wsRef.current;
     if (
-      wsRef.current &&
-      (wsRef.current.readyState === WebSocket.OPEN ||
-        wsRef.current.readyState === WebSocket.CONNECTING)
+      existing &&
+      (existing.readyState === WebSocket.OPEN ||
+        existing.readyState === WebSocket.CONNECTING)
     ) {
       return;
     }
+
+    // If a stale socket is in CLOSING/CLOSED state, detach its handlers before creating a new one
+    if (existing) {
+      existing.onopen = null;
+      existing.onmessage = null;
+      existing.onerror = null;
+      existing.onclose = null;
+      wsRef.current = null;
+    }
+
+    clearReconnectTimer();
 
     const wsUrl = getSanitizedSocketUrl();
     const isInitial = reconnectAttemptsRef.current === 0;
     setConnectionStatus(isInitial ? 'connecting' : 'reconnecting');
     isManuallyClosedRef.current = false;
+    lastActivityRef.current = Date.now();
 
     console.log(
       isInitial
         ? `[Pinturillo Client] Connecting to: ${wsUrl}`
-        : `[Pinturillo Client] Reconnecting (attempt ${reconnectAttemptsRef.current + 1}) to: ${wsUrl}`
+        : `[Pinturillo Client] Reconnecting (attempt ${reconnectAttemptsRef.current}) to: ${wsUrl}`
     );
 
     try {
@@ -107,31 +158,20 @@ export function usePinturilloSocket({
       wsRef.current = socket;
 
       socket.onopen = () => {
+        if (wsRef.current !== socket) return;
+
+        lastActivityRef.current = Date.now();
+        clearReconnectTimer();
+        reconnectAttemptsRef.current = 0;
+
         console.log('[Pinturillo Client] Connected', {
           url: wsUrl,
           readyState: socket.readyState,
         });
         setConnectionStatus('connected');
         setErrorMessage(null);
-        reconnectAttemptsRef.current = 0;
 
-        // Flush any queued client messages
-        while (messageQueueRef.current.length > 0) {
-          const queued = messageQueueRef.current.shift();
-          if (queued && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify(queued));
-          }
-        }
-
-        // Heartbeat ping interval (every 20s)
-        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-        pingIntervalRef.current = setInterval(() => {
-          if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, 20000);
-
-        // Auto-rejoin active room if session exists or reconnecting
+        // Auto-rejoin active room if a room code is set and not already queued in messageQueue
         const activeSession = sessionRecovery.getActiveSession();
         const roomToJoin =
           lastActiveRoomRef.current?.code ||
@@ -139,7 +179,11 @@ export function usePinturilloSocket({
             ? activeSession.roomCode
             : null);
 
-        if (roomToJoin) {
+        const hasQueuedJoinOrCreate = messageQueueRef.current.some(
+          (m) => m.type === 'join_room' || m.type === 'create_room'
+        );
+
+        if (roomToJoin && !hasQueuedJoinOrCreate) {
           lastActiveRoomRef.current = { code: roomToJoin };
           socket.send(
             JSON.stringify({
@@ -149,10 +193,28 @@ export function usePinturilloSocket({
             })
           );
         }
+
+        // Flush any queued client messages
+        while (messageQueueRef.current.length > 0) {
+          const queued = messageQueueRef.current.shift();
+          if (queued && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify(queued));
+          }
+        }
+
+        // Heartbeat ping interval (every 15s to keep Render / proxy connections warm)
+        clearPingTimer();
+        pingIntervalRef.current = setInterval(() => {
+          if (wsRef.current === socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 15000);
       };
 
       socket.onmessage = (event: MessageEvent) => {
+        if (wsRef.current !== socket) return;
         lastActivityRef.current = Date.now();
+
         try {
           const msg: ServerMessage = JSON.parse(event.data);
 
@@ -345,6 +407,7 @@ export function usePinturilloSocket({
       };
 
       socket.onerror = (event: Event) => {
+        if (wsRef.current !== socket) return;
         console.error('[Pinturillo Client] WebSocket error', {
           type: event.type,
           readyState: socket.readyState,
@@ -353,6 +416,10 @@ export function usePinturilloSocket({
       };
 
       socket.onclose = (event: CloseEvent) => {
+        if (wsRef.current !== socket) return;
+        wsRef.current = null;
+        clearPingTimer();
+
         console.log('[Pinturillo Client] WebSocket closed', {
           code: event.code,
           reason: event.reason,
@@ -361,16 +428,14 @@ export function usePinturilloSocket({
           url: wsUrl,
         });
 
-        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-
-        // If manually closed (e.g. user clicked Exit / Volver), don't reconnect
-        if (isManuallyClosedRef.current) {
+        // If manually closed (e.g. user clicked Exit / Volver), or no active room, do not reconnect
+        if (isManuallyClosedRef.current || !lastActiveRoomRef.current?.code) {
           setConnectionStatus('disconnected');
           return;
         }
 
         // Automatic controlled exponential backoff reconnection
-        const maxAttempts = 5;
+        const maxAttempts = 6;
         if (reconnectAttemptsRef.current < maxAttempts) {
           reconnectAttemptsRef.current += 1;
           const delay = Math.min(
@@ -382,9 +447,12 @@ export function usePinturilloSocket({
             `[Pinturillo Client] Scheduling reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxAttempts})`
           );
 
-          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          clearReconnectTimer();
           reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
+            reconnectTimeoutRef.current = null;
+            if (!isManuallyClosedRef.current && lastActiveRoomRef.current?.code) {
+              connect();
+            }
           }, delay);
         } else {
           console.warn('[Pinturillo Client] Max reconnection attempts reached');
@@ -399,48 +467,75 @@ export function usePinturilloSocket({
       setConnectionStatus('error');
       setErrorMessage('Error al inicializar la conexión con el servidor.');
     }
-  }, [getSanitizedSocketUrl]);
+  }, [clearPingTimer, clearReconnectTimer, getSanitizedSocketUrl]);
 
-  // Clean unmount & Tab Visibility Change Recovery
+  // Lifecycle & Non-Destructive Foreground Recovery
+  // NEVER closes an OPEN or CONNECTING socket on focus, blur, or visibilitychange
   useEffect(() => {
-    // If there is an active saved session or initial code, connect immediately
-    const saved = sessionRecovery.getActiveSession();
-    if (
-      (saved && saved.gameType === 'pinturillo' && saved.roomCode) ||
-      (initialRoomCode && initialRoomCode.trim().length >= 4)
-    ) {
+    isManuallyClosedRef.current = false;
+
+    const initialRoom = getInitialActiveRoom(initialRoomCode);
+    if (initialRoom) {
+      lastActiveRoomRef.current = initialRoom;
       connect();
     }
 
-    // Mobile background & connection resilience manager
-    const cleanupResilience = createConnectionResilience({
-      getSocket: () => wsRef.current,
-      onReconnect: () => {
-        isManuallyClosedRef.current = false;
+    const handleNonDestructiveWakeup = () => {
+      // Do nothing if the user intentionally left or hasn't joined/created a room yet
+      if (isManuallyClosedRef.current || !lastActiveRoomRef.current?.code) {
+        return;
+      }
+
+      const ws = wsRef.current;
+
+      // If socket is currently OPEN, keep it open and send a lightweight heartbeat ping
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        } catch {
+          // If send fails synchronously, onclose will handle reconnection
+        }
+        return;
+      }
+
+      // If socket is currently CONNECTING, let the handshake complete untouched
+      if (ws && ws.readyState === WebSocket.CONNECTING) {
+        return;
+      }
+
+      // Only if socket is missing or CLOSED, trigger a clean reconnection for the active room
+      if (!ws || ws.readyState === WebSocket.CLOSED) {
         reconnectAttemptsRef.current = 0;
         connect();
-      },
-      sendPing: () => {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ type: 'ping' }));
-        }
-      },
-      getLastActivityTime: () => lastActivityRef.current,
-      logTag: '[Pinturillo Client]',
-    });
-
-    return () => {
-      cleanupResilience();
-      isManuallyClosedRef.current = true;
-      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (countdownDismissTimeoutRef.current)
-        clearTimeout(countdownDismissTimeoutRef.current);
-      if (wsRef.current) {
-        wsRef.current.close(1000, 'Component unmounted');
       }
     };
-  }, [connect, initialRoomCode]);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleNonDestructiveWakeup();
+      }
+    };
+
+    const handleOnline = () => {
+      handleNonDestructiveWakeup();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+      isManuallyClosedRef.current = true;
+      clearPingTimer();
+      clearReconnectTimer();
+      if (countdownDismissTimeoutRef.current) {
+        clearTimeout(countdownDismissTimeoutRef.current);
+        countdownDismissTimeoutRef.current = null;
+      }
+      closeAndDetachSocket('Component unmounted');
+    };
+  }, [connect, initialRoomCode, clearPingTimer, clearReconnectTimer, closeAndDetachSocket]);
 
   // Send message helper with automatic queueing
   const send = useCallback(
@@ -461,18 +556,14 @@ export function usePinturilloSocket({
     [connect]
   );
 
-  // Manual retry handler
+  // Manual retry handler (only used when user explicitly clicks REINTENTAR button)
   const retryConnection = useCallback(() => {
     reconnectAttemptsRef.current = 0;
     setErrorMessage(null);
-    setConnectionStatus('connecting');
-    if (wsRef.current) {
-      try {
-        wsRef.current.close(1000, 'Manual retry');
-      } catch {}
-    }
+    isManuallyClosedRef.current = false;
+    closeAndDetachSocket('Manual retry');
     connect();
-  }, [connect]);
+  }, [closeAndDetachSocket, connect]);
 
   // Create room with REST pre-registration and WebSocket join
   const createRoom = useCallback(
@@ -482,6 +573,7 @@ export function usePinturilloSocket({
     ) => {
       setErrorMessage(null);
       setIsSubmitting(true);
+      isManuallyClosedRef.current = false;
       playerRef.current = creatorPlayer;
 
       try {
@@ -523,6 +615,7 @@ export function usePinturilloSocket({
 
       setErrorMessage(null);
       setIsSubmitting(true);
+      isManuallyClosedRef.current = false;
       playerRef.current = joiningPlayer;
 
       try {
@@ -534,8 +627,8 @@ export function usePinturilloSocket({
 
         if (!validation.valid) {
           setIsSubmitting(false);
-          if (validation.wrongGame && validation.actualGameType && onWrongGame) {
-            onWrongGame(
+          if (validation.wrongGame && validation.actualGameType && onWrongGameRef.current) {
+            onWrongGameRef.current(
               validation.actualGameType as 'la-bomba' | 'la-peor-respuesta',
               cleanCode
             );
@@ -561,7 +654,7 @@ export function usePinturilloSocket({
         });
       }
     },
-    [send, onWrongGame]
+    [send]
   );
 
   // Explicit leave room
@@ -569,17 +662,24 @@ export function usePinturilloSocket({
     isManuallyClosedRef.current = true;
     sessionRecovery.clearActiveSession();
     lastActiveRoomRef.current = null;
-    send({ type: 'leave_room' });
+    messageQueueRef.current = [];
+    clearPingTimer();
+    clearReconnectTimer();
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(JSON.stringify({ type: 'leave_room' }));
+      } catch {
+        // Ignore send error on leave
+      }
+    }
+
+    closeAndDetachSocket('User left room');
     setRoomState(null);
     setCountdownInfo(null);
     setErrorMessage(null);
-
-    if (wsRef.current) {
-      wsRef.current.close(1000, 'User left room');
-      wsRef.current = null;
-    }
     setConnectionStatus('idle');
-  }, [send]);
+  }, [clearPingTimer, clearReconnectTimer, closeAndDetachSocket]);
 
   return {
     connectionStatus,
