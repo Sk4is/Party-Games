@@ -322,19 +322,19 @@ body,
   }
 }
 
-/* Ambient Background Blob Animations (18s - 38s independent cycles) */
+/* Ambient Background Blob Animations (18s - 36s independent cycles with 5-12vw / 3-8vh drift) */
 @keyframes home-blob-amber {
   0% {
     transform: translate3d(0, 0, 0) scale(1);
     opacity: 0.85;
   }
   50% {
-    transform: translate3d(75px, 50px, 0) scale(1.18);
+    transform: translate3d(8vw, 5vh, 0) scale(1.15);
     opacity: 1;
   }
   100% {
-    transform: translate3d(-35px, 25px, 0) scale(0.92);
-    opacity: 0.75;
+    transform: translate3d(-4vw, 3vh, 0) scale(0.92);
+    opacity: 0.78;
   }
 }
 
@@ -344,27 +344,27 @@ body,
     opacity: 0.8;
   }
   50% {
-    transform: translate3d(-80px, 60px, 0) scale(1.14);
+    transform: translate3d(-9vw, 6vh, 0) scale(1.16);
     opacity: 1;
   }
   100% {
-    transform: translate3d(30px, -45px, 0) scale(0.88);
-    opacity: 0.7;
+    transform: translate3d(4vw, -4vh, 0) scale(0.88);
+    opacity: 0.72;
   }
 }
 
 @keyframes home-blob-cyan {
   0% {
-    transform: translate3d(0, 0, 0) scale(0.95);
-    opacity: 0.75;
+    transform: translate3d(0, 0, 0) scale(0.94);
+    opacity: 0.78;
   }
   50% {
-    transform: translate3d(65px, -55px, 0) scale(1.2);
+    transform: translate3d(8vw, -6vh, 0) scale(1.2);
     opacity: 1;
   }
   100% {
-    transform: translate3d(-40px, 40px, 0) scale(0.9);
-    opacity: 0.8;
+    transform: translate3d(-5vw, 4vh, 0) scale(0.9);
+    opacity: 0.82;
   }
 }
 
@@ -374,12 +374,12 @@ body,
     opacity: 0.85;
   }
   50% {
-    transform: translate3d(-50%, -46%, 0) scale(1.16);
+    transform: translate3d(calc(-50% + 5vw), calc(-50% + 4vh), 0) scale(1.16);
     opacity: 1;
   }
   100% {
-    transform: translate3d(-48%, -54%, 0) scale(0.94);
-    opacity: 0.75;
+    transform: translate3d(calc(-50% - 4vw), calc(-50% - 3vh), 0) scale(0.92);
+    opacity: 0.8;
   }
 }
 
@@ -389,11 +389,11 @@ body,
     opacity: 0.7;
   }
   50% {
-    transform: translate3d(55px, -40px, 0) scale(1.15);
-    opacity: 1;
+    transform: translate3d(6vw, -5vh, 0) scale(1.15);
+    opacity: 0.95;
   }
   100% {
-    transform: translate3d(-25px, 35px, 0) scale(0.92);
+    transform: translate3d(-3vw, 4vh, 0) scale(0.92);
     opacity: 0.75;
   }
 }
@@ -404,64 +404,64 @@ body,
     opacity: 0.8;
   }
   50% {
-    transform: translate3d(-60px, -45px, 0) scale(1.15);
+    transform: translate3d(-8vw, -5vh, 0) scale(1.18);
     opacity: 1;
   }
   100% {
-    transform: translate3d(40px, 30px, 0) scale(0.9);
-    opacity: 0.7;
+    transform: translate3d(5vw, 3vh, 0) scale(0.9);
+    opacity: 0.72;
   }
 }
 
-/* Secondary Dynamic Layer: Aurora ribbons */
+/* Secondary Dynamic Layer: Moving Atmospheric Light Veil */
 @keyframes home-aurora-stream {
   0% {
-    transform: translate3d(-4%, -3%, 0) rotate(0deg) scale(1);
-    opacity: 0.35;
+    transform: translate3d(-8vw, -4vh, 0) rotate(0deg) scale(1);
+    opacity: 0.38;
   }
   50% {
-    transform: translate3d(5%, 4%, 0) rotate(2deg) scale(1.06);
-    opacity: 0.55;
+    transform: translate3d(9vw, 6vh, 0) rotate(3deg) scale(1.12);
+    opacity: 0.58;
   }
   100% {
-    transform: translate3d(-4%, -3%, 0) rotate(0deg) scale(1);
-    opacity: 0.35;
+    transform: translate3d(-8vw, -4vh, 0) rotate(0deg) scale(1);
+    opacity: 0.38;
   }
 }
 
 @keyframes home-aurora-counter {
   0% {
-    transform: translate3d(4%, 3%, 0) rotate(0deg) scale(1);
-    opacity: 0.22;
+    transform: translate3d(6vw, 4vh, 0) rotate(0deg) scale(1);
+    opacity: 0.25;
   }
   50% {
-    transform: translate3d(-5%, -3%, 0) rotate(-2deg) scale(1.08);
-    opacity: 0.40;
+    transform: translate3d(-8vw, -5vh, 0) rotate(-3deg) scale(1.14);
+    opacity: 0.45;
   }
   100% {
-    transform: translate3d(4%, 3%, 0) rotate(0deg) scale(1);
-    opacity: 0.22;
+    transform: translate3d(6vw, 4vh, 0) rotate(0deg) scale(1);
+    opacity: 0.25;
   }
 }
 
 .animate-home-blob-amber {
-  animation: home-blob-amber 21s ease-in-out infinite alternate;
+  animation: home-blob-amber 20s ease-in-out infinite alternate;
 }
 
 .animate-home-blob-rose {
-  animation: home-blob-rose 28s ease-in-out infinite alternate;
+  animation: home-blob-rose 27s ease-in-out infinite alternate;
 }
 
 .animate-home-blob-cyan {
-  animation: home-blob-cyan 24s ease-in-out infinite alternate;
+  animation: home-blob-cyan 34s ease-in-out infinite alternate;
 }
 
 .animate-home-blob-violet {
-  animation: home-blob-violet 32s ease-in-out infinite alternate;
+  animation: home-blob-violet 26s ease-in-out infinite alternate;
 }
 
 .animate-home-blob-emerald {
-  animation: home-blob-emerald 26s ease-in-out infinite alternate;
+  animation: home-blob-emerald 23s ease-in-out infinite alternate;
 }
 
 .animate-home-blob-orange {
@@ -469,11 +469,11 @@ body,
 }
 
 .animate-home-aurora-stream {
-  animation: home-aurora-stream 25s ease-in-out infinite;
+  animation: home-aurora-stream 22s ease-in-out infinite;
 }
 
 .animate-home-aurora-counter {
-  animation: home-aurora-counter 33s ease-in-out infinite;
+  animation: home-aurora-counter 31s ease-in-out infinite;
 }
 
 .animate-ambient-1 {
@@ -548,16 +548,25 @@ body,
     0 8px 30px rgba(234, 88, 12, 0.12);
 }
 
+@keyframes fam2play-gradient-drift {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
 @keyframes fam2play-glow-breathe {
   0%, 100% {
     filter:
-      drop-shadow(0 3px 16px rgba(251, 146, 60, 0.25))
-      drop-shadow(0 10px 32px rgba(244, 63, 94, 0.13));
+      drop-shadow(0 3px 18px rgba(251, 146, 60, 0.28))
+      drop-shadow(0 10px 34px rgba(244, 63, 94, 0.14));
   }
   50% {
     filter:
-      drop-shadow(0 4px 22px rgba(251, 146, 60, 0.34))
-      drop-shadow(0 12px 38px rgba(244, 63, 94, 0.18));
+      drop-shadow(0 4px 26px rgba(251, 146, 60, 0.38))
+      drop-shadow(0 12px 42px rgba(244, 63, 94, 0.22));
   }
 }
 
@@ -565,19 +574,37 @@ body,
   font-family: "Blazter", "Titan One", "Fredoka", sans-serif;
   font-weight: normal;
   font-style: normal;
-  font-size: clamp(2.5rem, 11.5vw, 6.8rem);
+  font-size: clamp(2.75rem, 12vw, 7.8rem);
   line-height: 1.22;
   letter-spacing: 0.03em;
-  padding: 0.14em 0.2em 0.18em;
+  padding: 0.12em 0.25em 0.18em;
   white-space: nowrap;
   display: inline-block;
   overflow: visible;
+  background: linear-gradient(
+    90deg,
+    #fde047 0%,
+    #f59e0b 10%,
+    #fb923c 22%,
+    #f43f5e 36%,
+    #e11d48 48%,
+    #f43f5e 60%,
+    #fb923c 74%,
+    #f59e0b 86%,
+    #fde047 100%
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
   filter:
-    drop-shadow(0 3px 16px rgba(251, 146, 60, 0.25))
-    drop-shadow(0 10px 32px rgba(244, 63, 94, 0.13));
+    drop-shadow(0 3px 18px rgba(251, 146, 60, 0.28))
+    drop-shadow(0 10px 34px rgba(244, 63, 94, 0.14));
   animation:
     hero-title-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards,
-    fam2play-glow-breathe 5.5s ease-in-out 0.7s infinite;
+    fam2play-gradient-drift 16s ease-in-out infinite alternate,
+    fam2play-glow-breathe 8s ease-in-out 0.7s infinite;
 }
 
 /* Pinturillo Interactive UI Animations */
@@ -722,6 +749,24 @@ body,
   pointer-events: none;
   opacity: 0.38;
   border-radius: inherit;
+}
+
+/* Accessibility: Respect user reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .fam2play-wordmark {
+    animation: hero-title-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    background-position: 40% 50% !important;
+  }
+  .animate-home-blob-amber,
+  .animate-home-blob-rose,
+  .animate-home-blob-cyan,
+  .animate-home-blob-violet,
+  .animate-home-blob-emerald,
+  .animate-home-blob-orange,
+  .animate-home-aurora-stream,
+  .animate-home-aurora-counter {
+    animation: none !important;
+  }
 }
 
 

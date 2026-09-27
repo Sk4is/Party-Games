@@ -84,7 +84,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
           ========================================================================= */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center max-w-6xl mx-auto w-full py-3 sm:py-5 md:py-7">
         <div className="text-center mb-6 sm:mb-9 md:mb-11 max-w-4xl mx-auto px-2 overflow-visible">
-          <h1 className="fam2play-wordmark text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-rose-500 mb-1 sm:mb-2 select-none">
+          <h1 className="fam2play-wordmark mb-1 sm:mb-2 select-none">
             FAM2PLAY
           </h1>
           <p className="text-base sm:text-xl text-slate-300/90 font-medium max-w-2xl mx-auto leading-relaxed animate-hero-sub">
