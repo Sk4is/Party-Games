@@ -175,7 +175,7 @@ export function useEntreToposSocket({
           // Retrieve persisted mole customization
           let savedMole: MoleCustomization = DEFAULT_MOLE_CUSTOMIZATION;
           try {
-            const raw = localStorage.getItem('entre_topos_mole_customization');
+            const raw = localStorage.getItem('entre_topos_mole_customization_v2');
             if (raw) savedMole = JSON.parse(raw);
           } catch {
             // fallback
@@ -310,7 +310,7 @@ export function useEntreToposSocket({
       try {
         let savedMole: MoleCustomization = DEFAULT_MOLE_CUSTOMIZATION;
         try {
-          const raw = localStorage.getItem('entre_topos_mole_customization');
+          const raw = localStorage.getItem('entre_topos_mole_customization_v2');
           if (raw) savedMole = JSON.parse(raw);
         } catch {}
 
@@ -434,12 +434,20 @@ export function useEntreToposSocket({
     [sendClientMessage]
   );
 
+  const continueVoteReveal = useCallback(() => {
+    sendClientMessage({ type: 'CONTINUE_VOTE_REVEAL' });
+  }, [sendClientMessage]);
+
   const nextRound = useCallback(() => {
     sendClientMessage({ type: 'NEXT_ROUND' });
   }, [sendClientMessage]);
 
   const playAgain = useCallback(() => {
     sendClientMessage({ type: 'PLAY_AGAIN' });
+  }, [sendClientMessage]);
+
+  const returnToLobby = useCallback(() => {
+    sendClientMessage({ type: 'RETURN_TO_LOBBY' });
   }, [sendClientMessage]);
 
   const leaveRoom = useCallback(() => {
@@ -517,8 +525,10 @@ export function useEntreToposSocket({
     submitClue,
     castVote,
     moleGuessWord,
+    continueVoteReveal,
     nextRound,
     playAgain,
+    returnToLobby,
     leaveRoom,
   };
 }

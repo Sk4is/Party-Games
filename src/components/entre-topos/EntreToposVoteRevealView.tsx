@@ -2,17 +2,24 @@ import React from 'react';
 import { EntreToposRoomState } from '../../types/entreTopos';
 import { MolePortrait } from './MolePortrait';
 import { BlackboardView } from './BlackboardView';
-import { AlertTriangle, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Clock } from 'lucide-react';
+import { audio } from '../../utils/audio';
 
 interface EntreToposVoteRevealViewProps {
   roomState: EntreToposRoomState;
+  localPlayerId: string;
+  onContinue: () => void;
 }
 
 export const EntreToposVoteRevealView: React.FC<EntreToposVoteRevealViewProps> = ({
   roomState,
+  localPlayerId,
+  onContinue,
 }) => {
   const accusedPlayer = roomState.players.find((p) => p.id === roomState.accusedPlayerId);
   const isMoleCaught = roomState.isMoleCaught ?? false;
+  const localPlayer = roomState.players.find((p) => p.id === localPlayerId);
+  const isHost = localPlayer?.isHost ?? roomState.hostId === localPlayerId;
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col gap-6 select-none animate-fade-in text-center items-center">
@@ -37,14 +44,16 @@ export const EntreToposVoteRevealView: React.FC<EntreToposVoteRevealViewProps> =
         <p className="text-sm sm:text-lg font-bold max-w-xl text-slate-200">
           {isMoleCaught
             ? `¡La mayoría ha votado a ${accusedPlayer?.name || 'este sospechoso'} y efectivamente era el Topo! Pero aún tiene una oportunidad para robar la victoria...`
-            : `El sospechoso más votado (${accusedPlayer?.name || 'el acusado'}) era inocente. ¡El verdadero Topo ha burlado a todos!`}
+            : accusedPlayer
+            ? `El sospechoso más votado (${accusedPlayer.name}) era inocente. ¡El verdadero Topo ha burlado a todos!`
+            : 'Hubo empate en la votación y nadie fue acusado por mayoría. ¡El verdadero Topo ha burlado a todos!'}
         </p>
       </div>
 
       {/* ACCUSED SUSPECT SPOTLIGHT */}
       {accusedPlayer && (
         <div className="relative p-6 rounded-3xl bg-[#1e1b18] border-4 border-[#3d3229] shadow-2xl flex flex-col items-center max-w-md w-full">
-          <div className="w-36 h-36 relative -mb-2">
+          <div className="w-36 h-36 flex items-center justify-center mb-1">
             <MolePortrait
               customization={accusedPlayer.moleCustomization}
               size="lg"
@@ -59,7 +68,7 @@ export const EntreToposVoteRevealView: React.FC<EntreToposVoteRevealViewProps> =
           </h3>
 
           <span className="text-xs font-mono font-bold text-amber-400 uppercase mt-0.5">
-            Recibió {accusedPlayer.votesReceived} votos
+            Recibió {accusedPlayer.votesReceived} {accusedPlayer.votesReceived === 1 ? 'voto' : 'votos'}
           </span>
 
           <div className="w-full mt-3">
@@ -94,6 +103,28 @@ export const EntreToposVoteRevealView: React.FC<EntreToposVoteRevealViewProps> =
             </div>
           ))}
         </div>
+      </div>
+
+      {/* HOST PROGRESSION CONTROL (SYNCHRONIZED ACROSS ALL CLIENTS) */}
+      <div className="w-full max-w-md flex flex-col items-center">
+        {isHost ? (
+          <button
+            type="button"
+            onClick={() => {
+              audio.playTurnChange();
+              onContinue();
+            }}
+            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-sm sm:text-base uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition-all active:scale-95 cursor-pointer font-display"
+          >
+            <span>CONTINUAR</span>
+            <ArrowRight className="w-5 h-5" />
+          </button>
+        ) : (
+          <div className="w-full py-3.5 px-5 rounded-2xl bg-[#1e1b18]/90 border-2 border-[#3d3229] flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-amber-300 uppercase tracking-wider">
+            <Clock className="w-4 h-4 animate-pulse shrink-0" />
+            <span>Esperando a que el anfitrión pulse CONTINUAR...</span>
+          </div>
+        )}
       </div>
     </div>
   );

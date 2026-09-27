@@ -44,7 +44,7 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
 
     let mole: MoleCustomization = DEFAULT_MOLE_CUSTOMIZATION;
     try {
-      const raw = localStorage.getItem('entre_topos_mole_customization');
+      const raw = localStorage.getItem('entre_topos_mole_customization_v2');
       if (raw) mole = JSON.parse(raw);
     } catch {}
 
@@ -60,6 +60,7 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
   const [inputCode, setInputCode] = useState(initialRoomCode);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
 
   const {
     connectionStatus,
@@ -73,8 +74,10 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
     submitClue,
     castVote,
     moleGuessWord,
+    continueVoteReveal,
     nextRound,
     playAgain,
+    returnToLobby,
     leaveRoom,
   } = useEntreToposSocket({
     player,
@@ -87,6 +90,13 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
     },
   });
 
+  // Close confirmation modal automatically if room state resets
+  useEffect(() => {
+    if (!roomState) {
+      setShowBackConfirm(false);
+    }
+  }, [roomState]);
+
   const handleCreate = async () => {
     audio.playTurnChange();
     await createRoom();
@@ -97,6 +107,29 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
     if (!inputCode.trim()) return;
     audio.playTurnChange();
     await joinRoom(inputCode.trim().toUpperCase());
+  };
+
+  const handleTopLeftBackClick = () => {
+    audio.playTurnChange();
+    if (roomState) {
+      setShowBackConfirm(true);
+    } else {
+      onBackToMenu();
+    }
+  };
+
+  const handleConfirmReturnToEntreToposLobby = () => {
+    audio.playTurnChange();
+    setShowBackConfirm(false);
+    if (!roomState) return;
+
+    if (roomState.phase !== 'LOBBY') {
+      // Return to the active Entre Topos Room / Lobby
+      returnToLobby();
+    } else {
+      // Already in the room lobby -> return to the Entre Topos entry lobby (not global FAM2PLAY menu)
+      leaveRoom();
+    }
   };
 
   // =========================================================================
@@ -112,14 +145,7 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => {
-              if (roomState) {
-                leaveRoom();
-                onBackToMenu();
-              } else {
-                onBackToMenu();
-              }
-            }}
+            onClick={handleTopLeftBackClick}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -157,17 +183,22 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
         {/* 1. NOT IN ROOM YET: ROOM CREATION & JOIN VIEW */}
         {!roomState ? (
           <div className="w-full max-w-md p-6 sm:p-8 rounded-3xl bg-[#1e1b18]/90 border-2 border-[#3d3229] shadow-2xl flex flex-col items-center text-center animate-fade-in">
-            {/* Top Mole illustration */}
-            <div
-              onClick={() => setShowCustomizer(true)}
-              className="cursor-pointer group flex flex-col items-center mb-3"
-            >
-              <div className="w-28 h-28 relative transform group-hover:scale-105 transition-all">
+            {/* Top Mole illustration cleanly separated above EDITAR TOPO button */}
+            <div className="flex flex-col items-center mb-5 w-full">
+              <div
+                onClick={() => setShowCustomizer(true)}
+                className="w-36 h-36 flex items-center justify-center mb-3 cursor-pointer transform hover:scale-105 transition-all"
+              >
                 <MolePortrait customization={player.moleCustomization} size="lg" />
               </div>
-              <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mt-1 group-hover:underline">
-                ✏️ Editar mi aspecto
-              </span>
+
+              <button
+                type="button"
+                onClick={() => setShowCustomizer(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#2b241e] hover:bg-[#3d3229] border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-black uppercase tracking-wider shadow-md transition-all active:scale-95 cursor-pointer"
+              >
+                <span>✏️ EDITAR TOPO</span>
+              </button>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black font-display text-white tracking-wide uppercase mb-1">
@@ -263,7 +294,11 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
             )}
 
             {roomState.phase === 'VOTE_REVEAL' && (
-              <EntreToposVoteRevealView roomState={roomState} />
+              <EntreToposVoteRevealView
+                roomState={roomState}
+                localPlayerId={player.id}
+                onContinue={continueVoteReveal}
+              />
             )}
 
             {roomState.phase === 'MOLE_GUESS' && (
@@ -288,7 +323,7 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
                 roomState={roomState}
                 localPlayerId={player.id}
                 onPlayAgain={playAgain}
-                onBackToMenu={onBackToMenu}
+                onBackToMenu={returnToLobby}
               />
             )}
 
@@ -303,10 +338,10 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
                 </p>
                 <button
                   type="button"
-                  onClick={leaveRoom}
-                  className="mt-5 px-6 py-2.5 rounded-xl bg-white text-slate-950 font-black text-xs uppercase tracking-wider"
+                  onClick={returnToLobby}
+                  className="mt-5 px-6 py-2.5 rounded-xl bg-white text-slate-950 font-black text-xs uppercase tracking-wider cursor-pointer"
                 >
-                  Volver al lobby
+                  Volver a la sala
                 </button>
               </div>
             )}
@@ -318,6 +353,57 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
       <footer className="relative z-20 text-center text-[11px] text-slate-500 font-mono py-2">
         ENTRE TOPOS &bull; FAM2PLAY &bull; MÍNIMO 3 &bull; MÁXIMO 10 JUGADORES
       </footer>
+
+      {/* TOP-LEFT VOLVER CONFIRMATION MODAL */}
+      {showBackConfirm && roomState && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+        >
+          <div className="relative w-full max-w-md p-6 sm:p-7 rounded-3xl bg-[#1e1b18] border-4 border-[#3d3229] shadow-2xl text-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 mx-auto mb-4 flex items-center justify-center">
+              <AlertCircle className="w-7 h-7" />
+            </div>
+
+            <h3 className="text-xl sm:text-2xl font-black font-display text-white uppercase tracking-wide mb-2">
+              {roomState.phase !== 'LOBBY'
+                ? '¿VOLVER A LA SALA DE ENTRE TOPOS?'
+                : '¿SALIR DE LA SALA ACTUAL?'}
+            </h3>
+
+            <p className="text-xs sm:text-sm text-slate-300 font-medium mb-6 leading-relaxed">
+              {roomState.phase !== 'LOBBY'
+                ? 'Se finalizará la ronda en curso y regresarás a la sala de espera de Entre Topos con el grupo.'
+                : 'Saldrás de esta sala y volverás a la pantalla principal de Entre Topos.'}
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  audio.playTurnChange();
+                  setShowBackConfirm(false);
+                }}
+                className="flex-1 py-3 px-4 rounded-xl bg-[#2b241e] hover:bg-[#3d3229] border border-white/10 text-slate-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmReturnToEntreToposLobby}
+                className="flex-1 py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>
+                  {roomState.phase !== 'LOBBY' ? 'Volver a la sala' : 'Volver a Entre Topos'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MOLE CUSTOMIZER MODAL */}
       <MoleCustomizerModal
@@ -334,7 +420,7 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
           updateMole(newCustomization, newName);
           try {
             localStorage.setItem('fam2play_player_name', newName);
-            localStorage.setItem('entre_topos_mole_customization', JSON.stringify(newCustomization));
+            localStorage.setItem('entre_topos_mole_customization_v2', JSON.stringify(newCustomization));
           } catch {}
         }}
       />

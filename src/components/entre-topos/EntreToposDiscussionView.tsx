@@ -83,9 +83,9 @@ export const EntreToposDiscussionView: React.FC<EntreToposDiscussionViewProps> =
       )}
 
       {/* =========================================================================
-          SUSPECT MOLES LINEUP (3 TO 10 PLAYERS WITH THEIR CHALKBOARDS)
+          SUSPECT MOLES LINEUP (3 TO 10 PLAYERS WITH THEIR WHITE CLUE BOARDS)
           ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 items-stretch">
         {roomState.players.map((p) => {
           const isMe = p.id === localPlayerId;
           const isVotedByMe = myVotedId === p.id;
@@ -93,29 +93,56 @@ export const EntreToposDiscussionView: React.FC<EntreToposDiscussionViewProps> =
           return (
             <div
               key={p.id}
-              className={`relative p-4 rounded-3xl border-2 flex flex-col items-center justify-between transition-all duration-300 ${
+              role={!isMe ? 'button' : undefined}
+              tabIndex={!isMe ? 0 : undefined}
+              aria-pressed={!isMe ? isVotedByMe : undefined}
+              onClick={() => {
+                if (!isMe) handleVote(p.id);
+              }}
+              onKeyDown={(e) => {
+                if (!isMe && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  handleVote(p.id);
+                }
+              }}
+              className={`group relative p-4 sm:p-5 rounded-3xl border-2 flex flex-col items-center justify-between h-full min-h-[290px] transition-all duration-200 ${
                 isVotedByMe
-                  ? 'bg-amber-500/15 border-amber-400 ring-4 ring-amber-400/30 shadow-2xl scale-[1.02]'
+                  ? 'bg-amber-500/20 border-amber-400 ring-4 ring-amber-400/30 shadow-2xl scale-[1.02] cursor-pointer'
                   : isMe
-                  ? 'bg-[#1e1b18]/80 border-slate-700/60'
-                  : 'bg-[#1e1b18]/90 border-[#3d3229] hover:border-amber-500/50'
+                  ? 'bg-[#1e1b18]/90 border-[#3d3229] cursor-default'
+                  : 'bg-[#1e1b18]/90 border-[#3d3229] hover:border-amber-400/80 hover:bg-[#27221d] hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] cursor-pointer'
               }`}
             >
-              {/* Badge: YOU or VOTED */}
-              <div className="w-full flex items-center justify-between mb-2">
-                <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest truncate max-w-[120px]">
-                  {p.name} {isMe && '(TÚ)'}
-                </span>
-
-                {p.hasVoted && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 font-mono">
-                    <CheckCircle2 className="w-3 h-3" /> Voto listo
+              {/* TOP HEADER ROW: Fixed height for uniform alignment */}
+              <div className="w-full h-6 flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-xs font-mono font-black text-amber-300 uppercase tracking-wider truncate">
+                    {p.name}
                   </span>
-                )}
+                  {isMe && (
+                    <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/40 text-[10px] font-mono font-black text-amber-300 uppercase">
+                      TÚ
+                    </span>
+                  )}
+                </div>
+
+                <div className="shrink-0 flex items-center gap-1.5">
+                  {isVotedByMe && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow">
+                      ✓ Sospechoso
+                    </span>
+                  )}
+                  {p.hasVoted && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 font-mono">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Listo</span>
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Custom Mole portrait */}
-              <div className="w-24 h-24 sm:w-28 sm:h-28 relative my-1">
+              {/* MIDDLE: Custom Mole portrait (Fixed box so cards never shift) */}
+              <div className="w-28 h-28 flex items-center justify-center my-1 shrink-0">
                 <MolePortrait
                   customization={p.moleCustomization}
                   size="md"
@@ -123,8 +150,8 @@ export const EntreToposDiscussionView: React.FC<EntreToposDiscussionViewProps> =
                 />
               </div>
 
-              {/* The revealed clue blackboard */}
-              <div className="w-full my-2">
+              {/* BOTTOM: The revealed clue board (White board with black text) */}
+              <div className="w-full mt-2">
                 <BlackboardView
                   clue={p.clue}
                   isEditable={false}
@@ -132,22 +159,6 @@ export const EntreToposDiscussionView: React.FC<EntreToposDiscussionViewProps> =
                   className="w-full"
                 />
               </div>
-
-              {/* Voting button */}
-              {!isMe && (
-                <button
-                  type="button"
-                  onClick={() => handleVote(p.id)}
-                  className={`w-full mt-2 py-2 px-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow ${
-                    isVotedByMe
-                      ? 'bg-amber-500 text-slate-950 shadow-amber-500/30'
-                      : 'bg-[#2b241e] hover:bg-[#3d3229] border border-white/10 text-slate-200 hover:text-white'
-                  }`}
-                >
-                  <Vote className="w-3.5 h-3.5" />
-                  <span>{isVotedByMe ? '¡VOTADO COMO TOPO!' : 'Votar sospechoso'}</span>
-                </button>
-              )}
             </div>
           );
         })}

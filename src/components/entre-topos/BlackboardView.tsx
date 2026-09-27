@@ -38,16 +38,16 @@ export const BlackboardView: React.FC<BlackboardViewProps> = ({
 
   return (
     <div
-      className={`relative inline-flex flex-col items-center select-none ${
-        isCompact ? 'w-36 sm:w-44' : 'w-full max-w-md'
+      className={`relative flex flex-col items-center select-none ${
+        isCompact ? 'w-full' : 'w-full max-w-md'
       } ${className}`}
     >
       {/* =========================================================================
-          WOODEN FRAME AROUND CHALKBOARD SLATE
+          WOODEN FRAME AROUND WHITE CLUE BOARD
           ========================================================================= */}
       <div
-        className={`relative w-full bg-[#3e2723] rounded-2xl border-4 border-[#271815] shadow-[0_10px_25px_rgba(0,0,0,0.65)] ${
-          isCompact ? 'p-2' : 'p-3.5 sm:p-4'
+        className={`relative w-full bg-[#3e2723] rounded-2xl border-4 border-[#271815] shadow-[0_10px_25px_rgba(0,0,0,0.5)] ${
+          isCompact ? 'p-2' : 'p-3 sm:p-4'
         }`}
       >
         {/* Corner wood joints / rivets */}
@@ -56,53 +56,38 @@ export const BlackboardView: React.FC<BlackboardViewProps> = ({
         <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-[#1b100e]" />
         <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#1b100e]" />
 
-        {/* CHALKBOARD SLATE SURFACE */}
+        {/* WHITE CLUE BOARD SURFACE WITH BLACK TEXT */}
         <div
-          className={`relative w-full rounded-xl bg-[#1e293b] border border-black/40 overflow-hidden flex flex-col justify-center items-center shadow-inner ${
-            isCompact ? 'min-h-[58px] p-1.5' : 'min-h-[96px] p-3'
+          className={`relative w-full rounded-xl bg-white border-2 border-slate-300 overflow-hidden flex flex-col justify-center items-center shadow-inner ${
+            isCompact ? 'min-h-[64px] px-2.5 py-2' : 'min-h-[96px] p-3.5'
           }`}
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 0%, transparent 80%)',
-          }}
         >
-          {/* Faint chalk dust smudges */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.08),transparent_50%)] pointer-events-none" />
-
           {/* Player name tag if in compact grid */}
           {playerName && (
-            <span className="text-[10px] font-mono uppercase font-black text-amber-300/80 tracking-wider mb-0.5 truncate max-w-[90%]">
+            <span className="text-[10px] font-mono uppercase font-black text-slate-500 tracking-wider mb-0.5 truncate max-w-[90%]">
               {playerName}
             </span>
           )}
 
-          {/* CLUE DISPLAY IN BLAZE CHALK FONT */}
+          {/* CLUE DISPLAY IN BOLD BLACK TEXT */}
           {!isEditable ? (
             <p
-              className={`font-blackboard text-center tracking-wide leading-tight break-words uppercase ${
-                isCompact ? 'text-sm sm:text-base' : 'text-xl sm:text-2xl md:text-3xl'
+              className={`font-blackboard text-center tracking-wide leading-tight break-words uppercase font-black ${
+                isCompact ? 'text-base sm:text-lg' : 'text-xl sm:text-2xl md:text-3xl'
               } ${
                 displayText === 'SIN RESPUESTA'
-                  ? 'text-rose-400/80 italic font-mono text-xs sm:text-sm'
-                  : 'text-white'
+                  ? 'text-rose-600 italic font-mono text-xs sm:text-sm'
+                  : 'text-black'
               }`}
-              style={{
-                textShadow: '0 0 2px rgba(255,255,255,0.7), 0 0 10px rgba(255,255,255,0.25)',
-              }}
             >
               {displayText}
             </p>
           ) : isSubmitted ? (
             <div className="flex flex-col items-center justify-center gap-1">
-              <p
-                className="font-blackboard text-center text-xl sm:text-2xl text-emerald-300 font-bold uppercase tracking-wider"
-                style={{
-                  textShadow: '0 0 3px rgba(110,231,183,0.8)',
-                }}
-              >
+              <p className="font-blackboard text-center text-xl sm:text-2xl text-black font-black uppercase tracking-wider">
                 {clue || inputVal}
               </p>
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 font-mono">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 font-mono">
                 <CheckCircle2 className="w-3.5 h-3.5" /> PISTA ENVIADA Y BLOQUEADA
               </span>
             </div>
@@ -115,13 +100,10 @@ export const BlackboardView: React.FC<BlackboardViewProps> = ({
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value.slice(0, 20))}
                   placeholder="Tu pista (máx. 20 car.)..."
-                  className="font-blackboard w-full text-center bg-transparent border-b-2 border-dashed border-white/40 focus:border-amber-400 text-white placeholder-slate-400 focus:outline-none text-xl sm:text-2xl uppercase tracking-wider px-2 py-1"
-                  style={{
-                    textShadow: '0 0 3px rgba(255,255,255,0.7)',
-                  }}
+                  className="font-blackboard w-full text-center bg-transparent border-b-2 border-dashed border-slate-400 focus:border-amber-600 text-black font-black placeholder-slate-400 focus:outline-none text-xl sm:text-2xl uppercase tracking-wider px-2 py-1"
                   autoFocus
                 />
-                <span className="absolute right-0 -bottom-4 text-[10px] font-mono text-slate-400">
+                <span className="absolute right-0 -bottom-4 text-[10px] font-mono font-bold text-slate-500">
                   {inputVal.trim().length}/20
                 </span>
               </div>

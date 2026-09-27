@@ -65,11 +65,14 @@ export const MOLE_COLORS = [
 ];
 
 export const DEFAULT_MOLE_CUSTOMIZATION: MoleCustomization = {
-  hat: 'detective',
-  face: 'bigote',
-  clothing: 'gabardina',
+  hat: 'none',
+  face: 'none',
+  clothing: 'none',
   color: '#78523A',
 };
+
+const TORSO_PATH = 'M 38 196 C 40 152, 58 134, 100 134 C 142 134, 160 152, 162 196 Z';
+const PONCHO_PATH = 'M 32 196 C 36 148, 56 132, 100 132 C 144 132, 164 148, 168 196 Z';
 
 export const MolePortrait: React.FC<MolePortraitProps> = ({
   customization,
@@ -80,6 +83,7 @@ export const MolePortrait: React.FC<MolePortraitProps> = ({
   isTopoReveal = false,
   showShadow = true,
 }) => {
+  const uniqueId = React.useId().replace(/:/g, '');
   const hat = customization?.hat || 'none';
   const face = customization?.face || 'none';
   const clothing = customization?.clothing || 'none';
@@ -98,6 +102,12 @@ export const MolePortrait: React.FC<MolePortraitProps> = ({
   const outlineColor = '#18120e';
   const snoutColor = '#f4a49c';
   const snoutOutline = '#7a3b35';
+  const torsoClipId = `torso-clip-${uniqueId}`;
+  const ponchoClipId = `poncho-clip-${uniqueId}`;
+  const halftoneId = `halftone-${uniqueId}`;
+
+  // Full-torso garments replace the outer fur torso silhouette so fur never protrudes around edges
+  const showBaseFurTorso = clothing === 'none' || clothing === 'bufanda';
 
   return (
     <div
@@ -113,211 +123,278 @@ export const MolePortrait: React.FC<MolePortraitProps> = ({
       >
         <defs>
           {/* Halftone / comic ink texture pattern */}
-          <pattern id="halftone" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
+          <pattern id={halftoneId} x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
             <circle cx="2" cy="2" r="0.8" fill="rgba(0,0,0,0.12)" />
           </pattern>
-          {/* Shading gradient */}
-          <radialGradient id={`fur-grad-${furColor.replace('#', '')}`} cx="45%" cy="40%" r="55%">
-            <stop offset="0%" stopColor={furColor} />
-            <stop offset="100%" stopColor="#1e140d" stopOpacity="0.4" />
-          </radialGradient>
+          <clipPath id={torsoClipId}>
+            <path d={TORSO_PATH} />
+          </clipPath>
+          <clipPath id={ponchoClipId}>
+            <path d={PONCHO_PATH} />
+          </clipPath>
         </defs>
 
         {/* 1. BACKGROUND SHADOW BEHIND MOLE */}
         <ellipse cx="100" cy="188" rx="65" ry="12" fill="rgba(0,0,0,0.3)" />
 
-        {/* 2. BODY / SHOULDERS / UPPER TORSO (Hand-drawn comic curve) */}
-        <g id="torso">
-          <path
-            d="M 40 196 C 42 155, 60 135, 100 135 C 140 135, 158 155, 160 196 Z"
-            fill={furColor}
-            stroke={outlineColor}
-            strokeWidth="5"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M 40 196 C 42 155, 60 135, 100 135 C 140 135, 158 155, 160 196 Z"
-            fill="url(#halftone)"
-          />
-        </g>
+        {/* 2. BODY / SHOULDERS / UPPER TORSO (Shown when plain or wearing neck scarf) */}
+        {showBaseFurTorso && (
+          <g id="torso">
+            <path
+              d={TORSO_PATH}
+              fill={furColor}
+              stroke={outlineColor}
+              strokeWidth="5"
+              strokeLinejoin="round"
+            />
+            <path d={TORSO_PATH} fill={`url(#${halftoneId})`} />
+          </g>
+        )}
 
         {/* 3. CLOTHING (Slots) */}
         <g id="clothing">
           {clothing === 'gabardina' && (
             <g>
-              {/* Trench coat base */}
+              <g clipPath={`url(#${torsoClipId})`}>
+                <path d={TORSO_PATH} fill="#d4b483" />
+                {/* Inner dark shirt V */}
+                <polygon points="80,132 120,132 100,168" fill="#27272a" stroke={outlineColor} strokeWidth="2.5" />
+                {/* Center seam */}
+                <line x1="100" y1="166" x2="100" y2="198" stroke={outlineColor} strokeWidth="3" />
+                {/* Wide collar & lapels */}
+                <path
+                  d="M 66 134 L 48 164 L 76 168 L 70 198 L 100 198 L 100 166 Z"
+                  fill="#c19d67"
+                  stroke={outlineColor}
+                  strokeWidth="3.5"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M 134 134 L 152 164 L 124 168 L 130 198 L 100 198 L 100 166 Z"
+                  fill="#c19d67"
+                  stroke={outlineColor}
+                  strokeWidth="3.5"
+                  strokeLinejoin="round"
+                />
+                {/* Buttons */}
+                <circle cx="91" cy="175" r="3" fill="#5c4028" stroke={outlineColor} strokeWidth="1.5" />
+                <circle cx="91" cy="188" r="3" fill="#5c4028" stroke={outlineColor} strokeWidth="1.5" />
+                <circle cx="109" cy="175" r="3" fill="#5c4028" stroke={outlineColor} strokeWidth="1.5" />
+                <circle cx="109" cy="188" r="3" fill="#5c4028" stroke={outlineColor} strokeWidth="1.5" />
+              </g>
               <path
-                d="M 42 196 C 45 158, 62 142, 100 142 C 138 142, 155 158, 158 196 Z"
-                fill="#d4b483"
+                d={TORSO_PATH}
+                fill="none"
                 stroke={outlineColor}
-                strokeWidth="4"
-              />
-              {/* Wide collar & lapels */}
-              <path
-                d="M 68 142 L 52 165 L 75 168 L 70 196 M 132 142 L 148 165 L 125 168 L 130 196"
-                fill="#c19d67"
-                stroke={outlineColor}
-                strokeWidth="3.5"
+                strokeWidth="5"
                 strokeLinejoin="round"
               />
-              {/* Buttons */}
-              <circle cx="94" cy="172" r="3" fill="#6d5435" stroke={outlineColor} strokeWidth="1.5" />
-              <circle cx="94" cy="188" r="3" fill="#6d5435" stroke={outlineColor} strokeWidth="1.5" />
             </g>
           )}
 
           {clothing === 'traje' && (
             <g>
-              {/* Jacket */}
+              <g clipPath={`url(#${torsoClipId})`}>
+                {/* Jacket base */}
+                <path d={TORSO_PATH} fill="#1e293b" />
+                {/* White shirt V-zone */}
+                <polygon points="78,132 122,132 100,178" fill="#f8fafc" stroke={outlineColor} strokeWidth="2.5" />
+                {/* Suit lapels */}
+                <polygon points="78,134 64,160 86,166 100,178" fill="#0f172a" stroke={outlineColor} strokeWidth="2.5" />
+                <polygon points="122,134 136,160 114,166 100,178" fill="#0f172a" stroke={outlineColor} strokeWidth="2.5" />
+                {/* Red tie */}
+                <polygon points="96,144 104,144 106,178 100,190 94,178" fill="#e11d48" stroke={outlineColor} strokeWidth="2" />
+                <polygon points="94,138 106,138 103,146 97,146" fill="#be123c" stroke={outlineColor} strokeWidth="1.5" />
+              </g>
               <path
-                d="M 42 196 C 45 158, 62 142, 100 142 C 138 142, 155 158, 158 196 Z"
-                fill="#1e293b"
+                d={TORSO_PATH}
+                fill="none"
                 stroke={outlineColor}
-                strokeWidth="4"
+                strokeWidth="5"
+                strokeLinejoin="round"
               />
-              {/* White shirt triangle */}
-              <polygon points="85,142 115,142 100,172" fill="#f8fafc" stroke={outlineColor} strokeWidth="2" />
-              {/* Red tie */}
-              <polygon points="97,148 103,148 105,178 100,190 95,178" fill="#e11d48" stroke={outlineColor} strokeWidth="2" />
-              <polygon points="96,145 104,145 102,152 98,152" fill="#be123c" />
             </g>
           )}
 
           {clothing === 'sudadera' && (
             <g>
+              <g clipPath={`url(#${torsoClipId})`}>
+                <path d={TORSO_PATH} fill="#2563eb" />
+                {/* Pocket seam */}
+                <path d="M 64 196 L 72 174 L 128 174 L 136 196 Z" fill="#1d4ed8" stroke={outlineColor} strokeWidth="3" />
+                {/* Hood rim */}
+                <path
+                  d="M 58 136 Q 100 156 142 136 Q 100 166 58 136 Z"
+                  fill="#1e40af"
+                  stroke={outlineColor}
+                  strokeWidth="3.5"
+                />
+                {/* Drawstrings */}
+                <line x1="90" y1="152" x2="88" y2="180" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
+                <line x1="110" y1="152" x2="112" y2="180" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
+              </g>
               <path
-                d="M 42 196 C 45 158, 62 140, 100 140 C 138 140, 155 158, 158 196 Z"
-                fill="#3b82f6"
+                d={TORSO_PATH}
+                fill="none"
                 stroke={outlineColor}
-                strokeWidth="4"
+                strokeWidth="5"
+                strokeLinejoin="round"
               />
-              {/* Hood rim */}
-              <path
-                d="M 65 142 Q 100 156 135 142 Q 100 162 65 142 Z"
-                fill="#1d4ed8"
-                stroke={outlineColor}
-                strokeWidth="3"
-              />
-              {/* Drawstrings */}
-              <line x1="92" y1="156" x2="90" y2="182" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
-              <line x1="108" y1="156" x2="110" y2="182" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
             </g>
           )}
 
           {clothing === 'rayas' && (
             <g>
-              {/* Shirt with convict / mariniere stripes */}
+              <g clipPath={`url(#${torsoClipId})`}>
+                <path d={TORSO_PATH} fill="#f8fafc" />
+                <path d="M 30 152 Q 100 156 170 152" stroke="#0f172a" strokeWidth="7" fill="none" />
+                <path d="M 30 167 Q 100 171 170 167" stroke="#0f172a" strokeWidth="7" fill="none" />
+                <path d="M 30 182 Q 100 186 170 182" stroke="#0f172a" strokeWidth="7" fill="none" />
+                {/* Collar trim */}
+                <path d="M 70 135 Q 100 148 130 135" fill="none" stroke="#0f172a" strokeWidth="5" />
+              </g>
               <path
-                d="M 42 196 C 45 158, 62 142, 100 142 C 138 142, 155 158, 158 196 Z"
-                fill="#f1f5f9"
+                d={TORSO_PATH}
+                fill="none"
                 stroke={outlineColor}
-                strokeWidth="4"
+                strokeWidth="5"
+                strokeLinejoin="round"
               />
-              <path d="M 48 155 Q 100 158 152 155" stroke="#0f172a" strokeWidth="6" />
-              <path d="M 44 170 Q 100 173 156 170" stroke="#0f172a" strokeWidth="6" />
-              <path d="M 42 185 Q 100 188 158 185" stroke="#0f172a" strokeWidth="6" />
             </g>
           )}
 
           {clothing === 'pajarita' && (
             <g>
-              {/* Formal shirt */}
+              <g clipPath={`url(#${torsoClipId})`}>
+                {/* Formal white shirt */}
+                <path d={TORSO_PATH} fill="#ffffff" />
+                {/* Placket and buttons */}
+                <line x1="94" y1="146" x2="94" y2="196" stroke="#cbd5e1" strokeWidth="2" />
+                <line x1="106" y1="146" x2="106" y2="196" stroke="#cbd5e1" strokeWidth="2" />
+                <circle cx="100" cy="168" r="2.5" fill="#1e293b" />
+                <circle cx="100" cy="182" r="2.5" fill="#1e293b" />
+                {/* Black bow tie */}
+                <polygon points="100,152 80,141 80,163" fill="#09090b" stroke={outlineColor} strokeWidth="2.5" />
+                <polygon points="100,152 120,141 120,163" fill="#09090b" stroke={outlineColor} strokeWidth="2.5" />
+                <circle cx="100" cy="152" r="5" fill="#27272a" stroke={outlineColor} strokeWidth="2" />
+              </g>
               <path
-                d="M 42 196 C 45 158, 62 142, 100 142 C 138 142, 155 158, 158 196 Z"
-                fill="#ffffff"
+                d={TORSO_PATH}
+                fill="none"
                 stroke={outlineColor}
-                strokeWidth="4"
+                strokeWidth="5"
+                strokeLinejoin="round"
               />
-              {/* Black bow tie */}
-              <polygon points="100,152 82,142 82,162" fill="#09090b" stroke={outlineColor} strokeWidth="2" />
-              <polygon points="100,152 118,142 118,162" fill="#09090b" stroke={outlineColor} strokeWidth="2" />
-              <circle cx="100" cy="152" r="4.5" fill="#27272a" stroke={outlineColor} strokeWidth="1.5" />
             </g>
           )}
 
           {clothing === 'bufanda' && (
             <g>
-              {/* Scarf bundle */}
+              {/* Scarf bundle around neck */}
               <path
-                d="M 58 140 Q 100 154 142 140 Q 146 158 100 162 Q 54 158 58 140 Z"
+                d="M 52 138 Q 100 152 148 138 Q 152 158 100 163 Q 48 158 52 138 Z"
                 fill="#ea580c"
                 stroke={outlineColor}
                 strokeWidth="4"
               />
               {/* Hanging scarf tail */}
               <path
-                d="M 112 156 L 118 196 L 138 196 L 132 156 Z"
+                d="M 112 155 L 118 194 L 138 194 L 132 155 Z"
                 fill="#c2410c"
                 stroke={outlineColor}
                 strokeWidth="3.5"
               />
               {/* Fringe */}
-              <line x1="120" y1="196" x2="120" y2="200" stroke="#7c2d12" strokeWidth="2" />
-              <line x1="126" y1="196" x2="126" y2="200" stroke="#7c2d12" strokeWidth="2" />
-              <line x1="132" y1="196" x2="132" y2="200" stroke="#7c2d12" strokeWidth="2" />
+              <line x1="120" y1="194" x2="120" y2="199" stroke="#7c2d12" strokeWidth="2.5" />
+              <line x1="126" y1="194" x2="126" y2="199" stroke="#7c2d12" strokeWidth="2.5" />
+              <line x1="132" y1="194" x2="132" y2="199" stroke="#7c2d12" strokeWidth="2.5" />
             </g>
           )}
 
           {clothing === 'chaleco' && (
             <g>
+              <g clipPath={`url(#${torsoClipId})`}>
+                <path d={TORSO_PATH} fill="#f8fafc" />
+                {/* Tweed vest panels */}
+                <path
+                  d="M 36 198 L 36 134 L 78 134 L 94 162 L 92 198 Z"
+                  fill="#854d0e"
+                  stroke={outlineColor}
+                  strokeWidth="3.5"
+                />
+                <path
+                  d="M 164 198 L 164 134 L 122 134 L 106 162 L 108 198 Z"
+                  fill="#854d0e"
+                  stroke={outlineColor}
+                  strokeWidth="3.5"
+                />
+                <circle cx="100" cy="170" r="2.5" fill="#facc15" stroke={outlineColor} strokeWidth="1.2" />
+                <circle cx="100" cy="184" r="2.5" fill="#facc15" stroke={outlineColor} strokeWidth="1.2" />
+              </g>
               <path
-                d="M 42 196 C 45 158, 62 142, 100 142 C 138 142, 155 158, 158 196 Z"
-                fill="#f8fafc"
+                d={TORSO_PATH}
+                fill="none"
                 stroke={outlineColor}
-                strokeWidth="4"
+                strokeWidth="5"
+                strokeLinejoin="round"
               />
-              {/* Tweed vest */}
-              <path
-                d="M 45 196 L 62 150 L 88 154 L 84 196 Z M 155 196 L 138 150 L 112 154 L 116 196 Z"
-                fill="#854d0e"
-                stroke={outlineColor}
-                strokeWidth="3.5"
-              />
-              <circle cx="100" cy="168" r="2.5" fill="#facc15" stroke={outlineColor} strokeWidth="1" />
-              <circle cx="100" cy="182" r="2.5" fill="#facc15" stroke={outlineColor} strokeWidth="1" />
             </g>
           )}
 
           {clothing === 'poncho' && (
             <g>
-              <polygon
-                points="100,138 165,196 35,196"
-                fill="#059669"
+              <g clipPath={`url(#${ponchoClipId})`}>
+                <path d={PONCHO_PATH} fill="#059669" />
+                <polygon points="100,142 162,196 38,196" fill="#f59e0b" stroke={outlineColor} strokeWidth="2.5" />
+                <polygon points="100,154 144,196 56,196" fill="#dc2626" stroke={outlineColor} strokeWidth="2.5" />
+                <polygon points="78,132 122,132 100,154" fill="#78350f" stroke={outlineColor} strokeWidth="2.5" />
+              </g>
+              <path
+                d={PONCHO_PATH}
+                fill="none"
                 stroke={outlineColor}
-                strokeWidth="4"
+                strokeWidth="5"
+                strokeLinejoin="round"
               />
-              <polygon points="100,146 150,192 50,192" fill="#f59e0b" />
-              <polygon points="100,154 135,188 65,188" fill="#dc2626" />
             </g>
           )}
 
           {clothing === 'cuello-alto' && (
             <g>
               <path
-                d="M 42 196 C 45 158, 62 142, 100 142 C 138 142, 155 158, 158 196 Z"
+                d={TORSO_PATH}
                 fill="#09090b"
                 stroke={outlineColor}
-                strokeWidth="4"
+                strokeWidth="5"
+                strokeLinejoin="round"
               />
-              <ellipse cx="100" cy="138" rx="26" ry="10" fill="#18181b" stroke={outlineColor} strokeWidth="3.5" />
+              <ellipse cx="100" cy="138" rx="30" ry="11" fill="#18181b" stroke={outlineColor} strokeWidth="4" />
             </g>
           )}
 
           {clothing === 'peto' && (
             <g>
+              <g clipPath={`url(#${torsoClipId})`}>
+                {/* Under-shirt */}
+                <path d={TORSO_PATH} fill="#e2e8f0" />
+                {/* Straps */}
+                <rect x="65" y="132" width="12" height="34" fill="#1e40af" stroke={outlineColor} strokeWidth="3" />
+                <rect x="123" y="132" width="12" height="34" fill="#1e40af" stroke={outlineColor} strokeWidth="3" />
+                {/* Denim front bib */}
+                <polygon points="62,160 138,160 142,198 58,198" fill="#1d4ed8" stroke={outlineColor} strokeWidth="3.5" />
+                {/* Front pocket */}
+                <rect x="84" y="170" width="32" height="18" rx="3" fill="#1e40af" stroke={outlineColor} strokeWidth="2" />
+                {/* Brass buttons */}
+                <circle cx="71" cy="164" r="3.5" fill="#eab308" stroke={outlineColor} strokeWidth="1.5" />
+                <circle cx="129" cy="164" r="3.5" fill="#eab308" stroke={outlineColor} strokeWidth="1.5" />
+              </g>
               <path
-                d="M 42 196 C 45 158, 62 142, 100 142 C 138 142, 155 158, 158 196 Z"
-                fill="#e2e8f0"
+                d={TORSO_PATH}
+                fill="none"
                 stroke={outlineColor}
-                strokeWidth="4"
+                strokeWidth="5"
+                strokeLinejoin="round"
               />
-              {/* Denim front */}
-              <polygon points="70,160 130,160 134,196 66,196" fill="#1d4ed8" stroke={outlineColor} strokeWidth="3" />
-              {/* Straps */}
-              <line x1="72" y1="142" x2="72" y2="162" stroke="#1e40af" strokeWidth="6" />
-              <line x1="128" y1="142" x2="128" y2="162" stroke="#1e40af" strokeWidth="6" />
-              <circle cx="72" cy="162" r="3" fill="#eab308" stroke={outlineColor} strokeWidth="1" />
-              <circle cx="128" cy="162" r="3" fill="#eab308" stroke={outlineColor} strokeWidth="1" />
             </g>
           )}
         </g>
@@ -346,7 +423,7 @@ export const MolePortrait: React.FC<MolePortraitProps> = ({
             cy="95"
             rx="56"
             ry="50"
-            fill="url(#halftone)"
+            fill={`url(#${halftoneId})`}
           />
         </g>
 
@@ -528,15 +605,15 @@ export const MolePortrait: React.FC<MolePortraitProps> = ({
           )}
         </g>
 
-        {/* 9. PAWS (Holding position) */}
+        {/* 9. PAWS (Resting at bottom rim so they never protrude through torso clothing) */}
         <g id="paws">
-          <ellipse cx="62" cy="166" rx="10" ry="7" fill={furColor} stroke={outlineColor} strokeWidth="3" />
-          <line x1="58" y1="168" x2="58" y2="162" stroke={outlineColor} strokeWidth="1.5" />
-          <line x1="62" y1="169" x2="62" y2="162" stroke={outlineColor} strokeWidth="1.5" />
+          <ellipse cx="60" cy="192" rx="10" ry="6.5" fill={furColor} stroke={outlineColor} strokeWidth="3" />
+          <line x1="56" y1="194" x2="56" y2="188" stroke={outlineColor} strokeWidth="1.5" />
+          <line x1="60" y1="195" x2="60" y2="188" stroke={outlineColor} strokeWidth="1.5" />
 
-          <ellipse cx="138" cy="166" rx="10" ry="7" fill={furColor} stroke={outlineColor} strokeWidth="3" />
-          <line x1="138" y1="169" x2="138" y2="162" stroke={outlineColor} strokeWidth="1.5" />
-          <line x1="142" y1="168" x2="142" y2="162" stroke={outlineColor} strokeWidth="1.5" />
+          <ellipse cx="140" cy="192" rx="10" ry="6.5" fill={furColor} stroke={outlineColor} strokeWidth="3" />
+          <line x1="140" y1="195" x2="140" y2="188" stroke={outlineColor} strokeWidth="1.5" />
+          <line x1="144" y1="194" x2="144" y2="188" stroke={outlineColor} strokeWidth="1.5" />
         </g>
 
         {/* 10. HATS (Slots) */}
@@ -562,7 +639,7 @@ export const MolePortrait: React.FC<MolePortraitProps> = ({
             <g>
               {/* Deerstalker cap */}
               <path d="M 62 60 C 62 26, 138 26, 138 60 Z" fill="#a89276" stroke={outlineColor} strokeWidth="4" />
-              <path d="M 62 60 C 62 26, 138 26, 138 60 Z" fill="url(#halftone)" />
+              <path d="M 62 60 C 62 26, 138 26, 138 60 Z" fill={`url(#${halftoneId})`} />
               {/* Front and back peaks */}
               <path d="M 52 64 Q 100 52 148 64 Q 100 58 52 64 Z" fill="#8c785e" stroke={outlineColor} strokeWidth="3" />
               {/* Ear flap tied at top */}

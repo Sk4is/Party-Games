@@ -97,9 +97,9 @@ export class EntreToposServer {
     const moleCustomization: MoleCustomization =
       hostPlayer.moleCustomization ||
       (config as any)?.moleCustomization || {
-        hat: 'detective',
-        face: 'bigote',
-        clothing: 'gabardina',
+        hat: 'none',
+        face: 'none',
+        clothing: 'none',
         color: '#78523A',
       };
 
@@ -204,9 +204,9 @@ export class EntreToposServer {
         }
 
         const moleCustomization = msg.player.moleCustomization || {
-          hat: 'detective',
-          face: 'bigote',
-          clothing: 'gabardina',
+          hat: 'none',
+          face: 'none',
+          clothing: 'none',
           color: '#78523A',
         };
 
@@ -345,9 +345,34 @@ export class EntreToposServer {
       return;
     }
 
+    // CONTINUE FROM VOTE REVEAL (HOST ONLY)
+    if (msg.type === 'CONTINUE_VOTE_REVEAL') {
+      if (room.hostId !== client.playerId || room.phase !== 'VOTE_REVEAL') return;
+      if (room.timerInterval) clearInterval(room.timerInterval);
+      if (room.phaseTransitionTimeout) clearTimeout(room.phaseTransitionTimeout);
+
+      if (room.isMoleCaught) {
+        this.startMoleGuessPhase(room);
+      } else {
+        this.finishRound(room, true, false);
+      }
+      return;
+    }
+
     // NEXT ROUND
     if (msg.type === 'NEXT_ROUND') {
-      if (room.hostId !== client.playerId || room.phase !== 'ROUND_RESULTS') return;
+      if (room.hostId !== client.playerId) return;
+      if (room.phase === 'VOTE_REVEAL') {
+        if (room.timerInterval) clearInterval(room.timerInterval);
+        if (room.phaseTransitionTimeout) clearTimeout(room.phaseTransitionTimeout);
+        if (room.isMoleCaught) {
+          this.startMoleGuessPhase(room);
+        } else {
+          this.finishRound(room, true, false);
+        }
+        return;
+      }
+      if (room.phase !== 'ROUND_RESULTS') return;
       const nextRoundNum = room.currentRound + 1;
       if (nextRoundNum <= room.config.totalRounds) {
         this.startRound(room, nextRoundNum);
@@ -358,9 +383,14 @@ export class EntreToposServer {
       return;
     }
 
-    // PLAY AGAIN
-    if (msg.type === 'PLAY_AGAIN') {
-      if (room.hostId !== client.playerId) return;
+    // PLAY AGAIN / RETURN TO LOBBY
+    if (msg.type === 'PLAY_AGAIN' || msg.type === 'RETURN_TO_LOBBY') {
+      if (msg.type === 'PLAY_AGAIN' && room.hostId !== client.playerId) return;
+      if (room.timerInterval) clearInterval(room.timerInterval);
+      if (room.phaseTransitionTimeout) clearTimeout(room.phaseTransitionTimeout);
+      room.timerInterval = null;
+      room.phaseTransitionTimeout = null;
+
       // Reset players state and return to LOBBY
       room.players.forEach((p) => {
         p.score = 0;
@@ -370,12 +400,18 @@ export class EntreToposServer {
         p.hasVoted = false;
         p.votedPlayerId = undefined;
         p.votesReceived = 0;
+        p.isAccused = undefined;
       });
       room.currentRound = 1;
       room.phase = 'LOBBY';
       room.boardInternal = null;
       room.topoPlayerId = null;
+      room.allVotes = [];
+      room.accusedPlayerId = undefined;
+      room.isMoleCaught = undefined;
+      room.moleGuessSelectedWord = undefined;
       room.roundSummary = undefined;
+      room.abortReason = undefined;
       this.broadcastRoom(room);
       return;
     }
@@ -556,18 +592,8 @@ export class EntreToposServer {
     const isMoleCaught = accusedId === room.topoPlayerId;
     room.isMoleCaught = isMoleCaught;
 
+    // Host controls progression from VOTE_REVEAL via CONTINUAR button (no auto-advance)
     this.broadcastRoom(room);
-
-    // Wait 5 seconds for dramatic suspense reveal
-    room.phaseTransitionTimeout = setTimeout(() => {
-      if (isMoleCaught) {
-        // Mole gets last chance: MOLE_GUESS
-        this.startMoleGuessPhase(room);
-      } else {
-        // Mole escaped!
-        this.finishRound(room, true, false);
-      }
-    }, 5000);
   }
 
   /**

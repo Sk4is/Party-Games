@@ -102,7 +102,7 @@ export const EntreToposLobby: React.FC<EntreToposLobbyProps> = ({
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-md"
           >
             <Palette className="w-4 h-4" />
-            <span>Mi Topo</span>
+            <span>Editar Topo</span>
           </button>
 
           {onOpenHowToPlay && (
@@ -152,35 +152,48 @@ export const EntreToposLobby: React.FC<EntreToposLobbyProps> = ({
               return (
                 <div
                   key={p.id}
-                  className={`relative p-3 rounded-2xl border-2 flex flex-col items-center transition-all ${
+                  className={`relative p-3.5 rounded-2xl border-2 flex flex-col items-center justify-between transition-all ${
                     isLocal
                       ? 'bg-amber-500/10 border-amber-400/80 shadow-md ring-2 ring-amber-400/30'
                       : 'bg-[#2b241e]/70 border-[#3d3229]'
                   }`}
                 >
-                  {/* Host badge */}
-                  {p.isHost && (
-                    <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-wider flex items-center gap-1 shadow">
-                      <Crown className="w-3 h-3 fill-current" />
-                      <span>ANFITRIÓN</span>
-                    </div>
-                  )}
+                  {/* Top row badges (never overlap the mole portrait) */}
+                  <div className="w-full min-h-[20px] flex items-center justify-between gap-1 mb-1">
+                    {p.isHost ? (
+                      <div className="px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-wider flex items-center gap-1 shadow">
+                        <Crown className="w-3 h-3 fill-current" />
+                        <span>ANFITRIÓN</span>
+                      </div>
+                    ) : (
+                      <span />
+                    )}
 
-                  {/* You indicator */}
-                  {isLocal && (
-                    <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow">
-                      TÚ
-                    </div>
-                  )}
+                    {isLocal && (
+                      <div className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow">
+                        TÚ
+                      </div>
+                    )}
+                  </div>
 
                   {/* Mole Portrait */}
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 my-1 flex items-center justify-center">
+                  <div className="w-24 h-24 my-1.5 flex items-center justify-center shrink-0">
                     <MolePortrait
                       customization={p.moleCustomization}
                       size="md"
                       showShadow={true}
                     />
                   </div>
+
+                  {isLocal && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomizer(true)}
+                      className="mt-1 mb-1 px-2.5 py-1 rounded-lg bg-[#2b241e] hover:bg-[#3d3229] border border-amber-400/40 text-[10px] font-black text-amber-300 uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      ✏️ EDITAR TOPO
+                    </button>
+                  )}
 
                   {/* Player Name */}
                   <span className="font-black text-sm text-white tracking-wide truncate max-w-full uppercase text-center mt-1">
@@ -347,7 +360,7 @@ export const EntreToposLobby: React.FC<EntreToposLobbyProps> = ({
         initialCustomization={localPlayer?.moleCustomization}
         onSave={(newCustomization, newName) => {
           onUpdateMole(newCustomization, newName);
-          localStorage.setItem('entre_topos_mole_customization', JSON.stringify(newCustomization));
+          localStorage.setItem('entre_topos_mole_customization_v2', JSON.stringify(newCustomization));
         }}
       />
     </div>

@@ -65,7 +65,7 @@ export const EntreToposFinalResultsView: React.FC<EntreToposFinalResultsViewProp
               <div className="text-amber-400 mb-1">
                 <Crown className="w-8 h-8 fill-current animate-bounce" />
               </div>
-              <div className="w-24 h-24 sm:w-28 sm:h-28 relative mb-2">
+              <div className="w-36 h-36 flex items-center justify-center mb-2">
                 <MolePortrait customization={winner.moleCustomization} size="lg" />
               </div>
               <span className="text-sm font-black text-amber-300 uppercase truncate max-w-[110px]">

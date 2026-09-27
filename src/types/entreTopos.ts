@@ -138,10 +138,16 @@ export type EntreToposClientMessage =
       word: string;
     }
   | {
+      type: 'CONTINUE_VOTE_REVEAL';
+    }
+  | {
       type: 'NEXT_ROUND';
     }
   | {
       type: 'PLAY_AGAIN';
+    }
+  | {
+      type: 'RETURN_TO_LOBBY';
     }
   | {
       type: 'KICK_PLAYER';

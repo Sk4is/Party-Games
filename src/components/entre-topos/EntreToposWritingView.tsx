@@ -69,7 +69,7 @@ export const EntreToposWritingView: React.FC<EntreToposWritingViewProps> = ({
             </span>
 
             {/* Mole portrait holding the board */}
-            <div className="w-28 h-28 relative -mb-3 z-10">
+            <div className="w-24 h-24 flex items-center justify-center mb-2 z-10">
               <MolePortrait
                 customization={localPlayer?.moleCustomization}
                 size="md"
