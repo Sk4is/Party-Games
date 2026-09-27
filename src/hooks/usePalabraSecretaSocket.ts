@@ -15,6 +15,7 @@ import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
 import { createConnectionResilience } from '../utils/connectionResilience';
 import { getGameWsUrl } from '../config/network';
+import { backendHealth } from '../services/backendHealth';
 
 export type PalabraSecretaConnectionStatus =
   | 'idle'
@@ -104,6 +105,7 @@ export function usePalabraSecretaSocket({
         console.log('[PalabraSecretaSocket] WebSocket connected successfully');
         setConnectionStatus('connected');
         setErrorMessage(null);
+        backendHealth.markHealthy();
         reconnectAttemptsRef.current = 0;
 
         // Join room message
@@ -280,6 +282,10 @@ export function usePalabraSecretaSocket({
         });
         connect();
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          setConnectionStatus('idle');
+          return;
+        }
         console.error('[PalabraSecretaSocket] Error creating room:', err);
         setConnectionStatus('error');
         setErrorMessage(err.message || 'Error al crear la sala');
@@ -326,6 +332,10 @@ export function usePalabraSecretaSocket({
         });
         connect();
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          setConnectionStatus('idle');
+          return;
+        }
         console.error('[PalabraSecretaSocket] Error joining room:', err);
         setConnectionStatus('error');
         setErrorMessage(err.message || 'Error al unirse a la sala');
@@ -464,12 +474,16 @@ export function usePalabraSecretaSocket({
   useEffect(() => {
     if (initialRoomCode) {
       lastActiveRoomRef.current = { code: initialRoomCode.toUpperCase().trim() };
-      connect();
+      backendHealth.ensureBackendAvailable().then(() => {
+        if (!isManuallyClosedRef.current) connect();
+      }).catch(() => {});
     } else {
       const active = sessionRecovery.getActiveSession();
       if (active && active.gameType === 'palabra-secreta' && active.roomCode) {
         lastActiveRoomRef.current = { code: active.roomCode };
-        connect();
+        backendHealth.ensureBackendAvailable().then(() => {
+          if (!isManuallyClosedRef.current) connect();
+        }).catch(() => {});
       }
     }
 

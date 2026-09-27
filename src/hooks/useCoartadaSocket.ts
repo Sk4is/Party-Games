@@ -16,6 +16,7 @@ import {
 import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
 import { getGameWsUrl } from '../config/network';
+import { backendHealth } from '../services/backendHealth';
 
 export type CoartadaConnectionStatus =
   | 'idle'
@@ -134,6 +135,7 @@ export function useCoartadaSocket({
           reconnectAttemptsRef.current = 0;
           setConnectionStatus('connected');
           setErrorMessage(null);
+          backendHealth.markHealthy();
 
           const joinMsg: CoartadaClientMessage = {
             type: 'JOIN_ROOM',
@@ -247,6 +249,9 @@ export function useCoartadaSocket({
         );
         connectToRoom(roomMeta.code);
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          return;
+        }
         setErrorMessage(err.message || 'Error al crear la sala');
       } finally {
         isCreatingOrJoiningRef.current = false;
@@ -273,6 +278,9 @@ export function useCoartadaSocket({
         }
         connectToRoom(code);
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          return;
+        }
         setErrorMessage(err.message || 'Error al validar la sala');
       } finally {
         isCreatingOrJoiningRef.current = false;
@@ -346,7 +354,9 @@ export function useCoartadaSocket({
     if (!enabled) return;
     const initial = lastActiveRoomRef.current;
     if (initial && initial.code && connectionStatus === 'idle') {
-      connectToRoom(initial.code);
+      backendHealth.ensureBackendAvailable().then(() => {
+        if (!isManuallyClosedRef.current) connectToRoom(initial.code);
+      }).catch(() => {});
     }
   }, [enabled, connectionStatus, connectToRoom]);
 

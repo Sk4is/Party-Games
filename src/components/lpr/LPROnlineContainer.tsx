@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePartySocket } from '../../hooks/usePartySocket';
 import { getOrCreateUserProfile, saveUserProfile, UserProfile } from '../../utils/userProfile';
 import { GameRoomEntry } from '../common/GameRoomEntry';
@@ -53,12 +53,14 @@ export const LPROnlineContainer: React.FC<LPROnlineContainerProps> = ({
     },
   });
 
-  // Auto-join from URL parameter if provided
+  // Auto-join from URL parameter or active session if provided
+  const autoJoinAttemptedRef = useRef(false);
   useEffect(() => {
-    if (initialRoomCode && initialRoomCode.length >= 4 && !lprState && connected) {
+    if (initialRoomCode && initialRoomCode.length >= 4 && !lprState && !autoJoinAttemptedRef.current) {
+      autoJoinAttemptedRef.current = true;
       joinRoom(initialRoomCode);
     }
-  }, [initialRoomCode, connected, lprState, joinRoom]);
+  }, [initialRoomCode, lprState, joinRoom]);
 
   const handleCreateRoom = () => {
     clearError();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePartySocket } from '../../hooks/usePartySocket';
 import { getOrCreateUserProfile, saveUserProfile, UserProfile } from '../../utils/userProfile';
 import { GameRoomEntry } from '../common/GameRoomEntry';
@@ -51,12 +51,14 @@ export const BombaOnlineContainer: React.FC<BombaOnlineContainerProps> = ({
     },
   });
 
-  // Auto-join from URL parameter if provided
+  // Auto-join from URL parameter or active session if provided
+  const autoJoinAttemptedRef = useRef(false);
   useEffect(() => {
-    if (initialRoomCode && initialRoomCode.length >= 4 && !bombaState && connected) {
+    if (initialRoomCode && initialRoomCode.length >= 4 && !bombaState && !autoJoinAttemptedRef.current) {
+      autoJoinAttemptedRef.current = true;
       joinRoom(initialRoomCode);
     }
-  }, [initialRoomCode, connected, bombaState, joinRoom]);
+  }, [initialRoomCode, bombaState, joinRoom]);
 
   const handleCreateRoom = () => {
     clearError();

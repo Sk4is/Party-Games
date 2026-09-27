@@ -15,6 +15,7 @@ import {
 import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
 import { getGameWsUrl } from '../config/network';
+import { backendHealth } from '../services/backendHealth';
 
 export type PinturilloConnectionStatus =
   | 'idle'
@@ -159,6 +160,7 @@ export function usePinturilloSocket({
         });
         setConnectionStatus('connected');
         setErrorMessage(null);
+        backendHealth.markHealthy();
 
         // Auto-rejoin active room if a room code is set and not already queued in messageQueue
         const activeSession = sessionRecovery.getActiveSession();
@@ -466,7 +468,11 @@ export function usePinturilloSocket({
     const initialRoom = getInitialActiveRoom(initialRoomCode);
     if (initialRoom) {
       lastActiveRoomRef.current = initialRoom;
-      connect();
+      backendHealth.ensureBackendAvailable().then(() => {
+        if (!isManuallyClosedRef.current) {
+          connect();
+        }
+      }).catch(() => {});
     }
 
     const handleNonDestructiveWakeup = () => {
@@ -574,6 +580,10 @@ export function usePinturilloSocket({
           player: creatorPlayer,
         });
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          setIsSubmitting(false);
+          return;
+        }
         console.warn('[Pinturillo Client] REST create failed, attempting direct WS create:', err);
         send({
           type: 'create_room',
@@ -634,6 +644,10 @@ export function usePinturilloSocket({
           player: joiningPlayer,
         });
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          setIsSubmitting(false);
+          return;
+        }
         console.warn('[Pinturillo Client] REST validate-join failed, attempting direct WS join:', err);
         lastActiveRoomRef.current = { code: cleanCode };
         send({

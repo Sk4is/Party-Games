@@ -17,6 +17,7 @@ import { CodigoRojoGame } from './components/codigo-rojo/CodigoRojoGame';
 import { CoartadaGame } from './components/coartada/CoartadaGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 import { sessionRecovery } from './services/sessionRecovery';
+import { BackendConnectingModal } from './components/common/BackendConnectingModal';
 
 type AppView =
   | 'MENU'
@@ -120,6 +121,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-['Plus_Jakarta_Sans',sans-serif]">
+      {/* Backend cold-start / connection modal (indeterminate, Spanish Spain, non-intrusive) */}
+      <BackendConnectingModal />
+
       {currentView === 'MENU' && (
         <MainMenu onSelectGame={handleSelectGame} />
       )}

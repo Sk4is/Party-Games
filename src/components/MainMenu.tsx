@@ -48,34 +48,40 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between p-4 sm:p-8 md:p-12 overflow-hidden bg-[#07090e]">
+    <div className="relative min-h-screen w-full flex flex-col justify-between p-4 sm:p-8 md:p-12 overflow-hidden bg-[#060813]">
       {/* =========================================================================
-          BACKGROUND: SOFT DRIFTING AMBIENT GLOWS + SUBTLE VIGNETTE + DOT TEXTURE
+          BACKGROUND: THREE-LAYER DEPTH (NAVY BASE + SOFT AMBIENT GLOWS + VIGNETTE/TEXTURE)
           ========================================================================= */}
-      {/* Drifting soft ambient color lights */}
-      <div className="absolute -top-24 -left-24 w-[36rem] h-[36rem] bg-amber-500/10 rounded-full blur-[130px] pointer-events-none animate-ambient-1" />
-      <div className="absolute top-1/3 -right-28 w-[38rem] h-[38rem] bg-rose-600/10 rounded-full blur-[140px] pointer-events-none animate-ambient-2" />
-      <div className="absolute -bottom-24 left-1/4 w-[34rem] h-[34rem] bg-sky-500/10 rounded-full blur-[130px] pointer-events-none animate-ambient-3" />
-      <div className="absolute top-2/3 -left-20 w-[30rem] h-[30rem] bg-emerald-500/8 rounded-full blur-[120px] pointer-events-none animate-ambient-4" />
+      {/* LAYER 2: Oversized, very soft animated ambient color fields (15-34s elegant cycles) */}
+      {/* Warm Yellow/Orange (La Bomba inspiration) */}
+      <div className="absolute -top-24 -left-20 w-[42rem] h-[42rem] bg-amber-500/[0.08] rounded-full blur-[150px] pointer-events-none animate-ambient-1" />
+      {/* Coral/Rose Red (La Peor Respuesta inspiration) */}
+      <div className="absolute top-1/4 -right-28 w-[44rem] h-[44rem] bg-rose-600/[0.08] rounded-full blur-[160px] pointer-events-none animate-ambient-2" />
+      {/* Cyan/Sky Blue (Lienzo Loco inspiration) */}
+      <div className="absolute -bottom-28 left-1/4 w-[40rem] h-[40rem] bg-cyan-500/[0.08] rounded-full blur-[150px] pointer-events-none animate-ambient-3" />
+      {/* Emerald/Green (Palabra Secreta inspiration) */}
+      <div className="absolute top-2/3 -left-24 w-[36rem] h-[36rem] bg-emerald-500/[0.07] rounded-full blur-[140px] pointer-events-none animate-ambient-4" />
+      {/* Deep Purple/Indigo depth field */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[48rem] h-[48rem] bg-indigo-600/[0.06] rounded-full blur-[170px] pointer-events-none animate-ambient-5" />
+      {/* Warm Amber/Gold (Coartada inspiration) */}
+      <div className="absolute bottom-10 -right-20 w-[38rem] h-[38rem] bg-amber-600/[0.07] rounded-full blur-[150px] pointer-events-none animate-ambient-6" />
 
-      {/* Atmospheric micro-specks (quiet, floating dust motes) */}
-      <div className="absolute top-1/4 left-1/5 w-1 h-1 bg-amber-300/30 rounded-full blur-[0.5px] pointer-events-none animate-speck-1" />
-      <div className="absolute top-3/5 right-1/4 w-1.5 h-1.5 bg-rose-300/25 rounded-full blur-[0.5px] pointer-events-none animate-speck-2" />
-      <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-sky-300/25 rounded-full blur-[0.5px] pointer-events-none animate-speck-1" style={{ animationDelay: '-6s' }} />
-      <div className="absolute top-1/6 right-1/3 w-1 h-1 bg-emerald-300/20 rounded-full blur-[0.5px] pointer-events-none animate-speck-2" style={{ animationDelay: '-10s' }} />
+      {/* Atmospheric micro-specks (quiet, floating dust motes with very low opacity) */}
+      <div className="absolute top-1/4 left-1/5 w-1 h-1 bg-amber-300/25 rounded-full blur-[0.5px] pointer-events-none animate-speck-1" />
+      <div className="absolute top-3/5 right-1/4 w-1.5 h-1.5 bg-rose-300/20 rounded-full blur-[0.5px] pointer-events-none animate-speck-2" />
+      <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-sky-300/20 rounded-full blur-[0.5px] pointer-events-none animate-speck-1" style={{ animationDelay: '-6s' }} />
+      <div className="absolute top-1/6 right-1/3 w-1 h-1 bg-emerald-300/15 rounded-full blur-[0.5px] pointer-events-none animate-speck-2" style={{ animationDelay: '-10s' }} />
 
-      {/* Subtle dot texture pattern */}
-      <div className="absolute inset-0 bg-subtle-dots pointer-events-none opacity-40 mix-blend-screen" />
-
-      {/* Soft radial vignette darkening towards edges */}
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_95%_75%_at_50%_40%,transparent_35%,rgba(6,8,14,0.65)_80%,rgba(3,4,8,0.95)_100%)]" />
+      {/* LAYER 3: Subtle texture pattern & soft radial vignette */}
+      <div className="absolute inset-0 bg-subtle-dots pointer-events-none opacity-25 mix-blend-screen" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_100%_80%_at_50%_35%,transparent_25%,rgba(6,8,19,0.55)_70%,rgba(3,4,10,0.92)_100%)]" />
 
       {/* =========================================================================
           TOP BAR: EDICIÓN AMIGOS BADGE + ACTIONS (CÓMO JUGAR & SONIDO)
           ========================================================================= */}
       <header className="relative z-10 flex items-center justify-between w-full max-w-6xl mx-auto pb-4 sm:pb-6">
         <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.08)] backdrop-blur-sm select-none">
+          <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.08)] backdrop-blur-md select-none">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Edición Amigos
           </span>
         </div>
@@ -85,7 +91,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             id="how-to-play-header-button"
             type="button"
             onClick={() => setShowHowToPlay(true)}
-            className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800/90 border border-slate-700/70 hover:border-slate-600 text-slate-200 hover:text-white text-xs sm:text-sm font-semibold transition-all duration-200 shadow-md backdrop-blur-md cursor-pointer active:scale-95 select-none"
+            className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full fam-card-surface hover:bg-slate-800/80 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-semibold transition-all duration-200 shadow-md backdrop-blur-md cursor-pointer active:scale-95 select-none"
           >
             <HelpCircle className="w-4 h-4 text-amber-400 group-hover:rotate-12 transition-transform duration-200" />
             <span>Cómo jugar</span>
@@ -116,7 +122,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
         )}
 
         {/* =========================================================================
-            GAME GRID: STRICT 3-COLUMN DESKTOP (3 PER ROW) WITH ACCENT GLOWS
+            GAME GRID: STRICT 3-COLUMN DESKTOP (3 PER ROW) WITH UNIFIED TRANSLUCENT SURFACES
             ========================================================================= */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7 w-full max-w-6xl mx-auto items-stretch">
           {/* CARD 1: LA BOMBA */}
@@ -126,18 +132,19 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             tabIndex={0}
             onClick={() => handleSelectGame('la-bomba')}
             onKeyDown={(e) => handleKeyDown(e, 'la-bomba')}
-            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-[#FFB000]/30 hover:border-[#FFB000] shadow-xl hover:shadow-[0_14px_40px_-10px_rgba(255,176,0,0.25)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-[0.98] overflow-hidden backdrop-blur-sm animate-card-reveal"
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#FFB000]/30 hover:border-[#FFB000] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(255,176,0,0.28)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
           >
-            {/* Top inner sheen and radial accent light */}
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/20 to-transparent" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,176,0,0.13),transparent_65%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity" />
+            {/* Unified top inner sheen and game-specific radial spotlight */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,176,0,0.12),transparent_65%)] pointer-events-none opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-15 bg-[#FFB000] blur-2xl transition-opacity duration-500" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-5">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#FFB000] to-[#FF8A00] flex items-center justify-center text-3xl shadow-lg shadow-[#FFB000]/25 group-hover:scale-105 group-hover:-translate-y-1 group-hover:rotate-2 transition-all duration-300">
                   💣
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
                   ONLINE
                 </span>
@@ -150,13 +157,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 &ldquo;Piensa rápido antes de que explote.&rdquo;
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">2–10 Jugadores</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">Multijugador Online</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-amber-300/90">Alta tensión</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">2–10 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">Multijugador Online</span>
+                <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300/90 font-bold">Alta tensión</span>
               </div>
             </div>
 
-            <div className="relative z-10 mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between">
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
               <span className="text-sm font-bold text-[#FFB000] group-hover:text-[#ffc338] group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
                 Entrar a la sala <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </span>
@@ -173,19 +180,20 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             tabIndex={0}
             onClick={() => handleSelectGame('la-peor-respuesta')}
             onKeyDown={(e) => handleKeyDown(e, 'la-peor-respuesta')}
-            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-[#FF3B4F]/30 hover:border-[#FF3B4F] shadow-xl hover:shadow-[0_14px_40px_-10px_rgba(255,59,79,0.25)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-[0.98] overflow-hidden backdrop-blur-sm animate-card-reveal"
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#FF3B4F]/30 hover:border-[#FF3B4F] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(255,59,79,0.28)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
             style={{ animationDelay: '0.04s' }}
           >
-            {/* Top inner sheen and radial accent light */}
-            <div className="inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-rose-300/20 to-transparent absolute" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,59,79,0.13),transparent_65%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity" />
+            {/* Unified top inner sheen and game-specific radial spotlight */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,59,79,0.12),transparent_65%)] pointer-events-none opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-15 bg-[#FF3B4F] blur-2xl transition-opacity duration-500" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-5">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#FF3B4F] to-[#E6293D] flex items-center justify-center text-3xl shadow-lg shadow-[#FF3B4F]/25 group-hover:scale-105 group-hover:-translate-y-1 group-hover:-rotate-2 transition-all duration-300">
                   💀
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
                   ONLINE
                 </span>
@@ -198,13 +206,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 &ldquo;Cuanto peor, mejor.&rdquo;
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">3–10 Jugadores</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">Multijugador Online</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-rose-300/90">Votación simultánea</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">3–10 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">Multijugador Online</span>
+                <span className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300/90 font-bold">Votación simultánea</span>
               </div>
             </div>
 
-            <div className="relative z-10 mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between">
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
               <span className="text-sm font-bold text-[#FF3B4F] group-hover:text-[#ff5c6d] group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
                 Entrar a la sala <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </span>
@@ -221,19 +229,20 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             tabIndex={0}
             onClick={() => handleSelectGame('pinturillo')}
             onKeyDown={(e) => handleKeyDown(e, 'pinturillo')}
-            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-[#00BCEB]/30 hover:border-[#00BCEB] shadow-xl hover:shadow-[0_14px_40px_-10px_rgba(0,188,235,0.25)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-[0.98] overflow-hidden backdrop-blur-sm animate-card-reveal"
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#00BCEB]/30 hover:border-[#00BCEB] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(0,188,235,0.28)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
             style={{ animationDelay: '0.08s' }}
           >
-            {/* Top inner sheen and radial accent light */}
-            <div className="inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/20 to-transparent absolute" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(0,188,235,0.13),transparent_65%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity" />
+            {/* Unified top inner sheen and game-specific radial spotlight */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(0,188,235,0.12),transparent_65%)] pointer-events-none opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-15 bg-[#00BCEB] blur-2xl transition-opacity duration-500" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-5">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#00BCEB] to-[#009ED0] flex items-center justify-center text-3xl shadow-lg shadow-[#00BCEB]/25 group-hover:scale-105 group-hover:-translate-y-1 group-hover:rotate-2 transition-all duration-300">
                   🎨
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
                   ONLINE
                 </span>
@@ -246,13 +255,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 &ldquo;Dibuja, adivina y compite en tiempo real.&rdquo;
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">2–10 Jugadores</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">Multijugador Online</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-cyan-300/90">Lienzo en vivo</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">2–10 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">Multijugador Online</span>
+                <span className="px-2.5 py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300/90 font-bold">Lienzo en vivo</span>
               </div>
             </div>
 
-            <div className="relative z-10 mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between">
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
               <span className="text-sm font-bold text-[#00BCEB] group-hover:text-[#38d4fc] group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
                 Entrar a la sala <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </span>
@@ -269,19 +278,20 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             tabIndex={0}
             onClick={() => handleSelectGame('palabra-secreta')}
             onKeyDown={(e) => handleKeyDown(e, 'palabra-secreta')}
-            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-[#10B981]/30 hover:border-[#10B981] shadow-xl hover:shadow-[0_14px_40px_-10px_rgba(16,185,129,0.25)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-[0.98] overflow-hidden backdrop-blur-sm animate-card-reveal"
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#10B981]/30 hover:border-[#10B981] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(16,185,129,0.28)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
             style={{ animationDelay: '0.12s' }}
           >
-            {/* Top inner sheen and radial accent light */}
-            <div className="inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/20 to-transparent absolute" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.13),transparent_65%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity" />
+            {/* Unified top inner sheen and game-specific radial spotlight */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_65%)] pointer-events-none opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-15 bg-[#10B981] blur-2xl transition-opacity duration-500" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-5">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] flex items-center justify-center text-3xl shadow-lg shadow-[#10B981]/25 group-hover:scale-105 group-hover:-translate-y-1 group-hover:-rotate-2 transition-all duration-300">
                   🗣️
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
                   ONLINE
                 </span>
@@ -294,13 +304,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 &ldquo;3 modos de juego: Clásico, Contraseña y Emoji Misterioso.&rdquo;
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">4–16 Jugadores</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">Por Equipos</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">4–16 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">Por Equipos</span>
                 <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold">3 Modos de Juego</span>
               </div>
             </div>
 
-            <div className="relative z-10 mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between">
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
               <span className="text-sm font-bold text-[#10B981] group-hover:text-[#34d399] group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
                 Entrar a la sala <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </span>
@@ -317,19 +327,20 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             tabIndex={0}
             onClick={() => handleSelectGame('codigo-rojo')}
             onKeyDown={(e) => handleKeyDown(e, 'codigo-rojo')}
-            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-slate-900/80 border border-[#FF3B30]/30 hover:border-[#FF3B30] shadow-xl hover:shadow-[0_14px_40px_-10px_rgba(255,59,48,0.25)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-[0.98] overflow-hidden backdrop-blur-sm animate-card-reveal"
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#FF3B30]/30 hover:border-[#FF3B30] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(255,59,48,0.28)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
             style={{ animationDelay: '0.16s' }}
           >
-            {/* Top inner sheen and radial accent light */}
-            <div className="inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-300/20 to-transparent absolute" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,59,48,0.13),transparent_65%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity" />
+            {/* Unified top inner sheen and game-specific radial spotlight */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,59,48,0.12),transparent_65%)] pointer-events-none opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-15 bg-[#FF3B30] blur-2xl transition-opacity duration-500" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-5">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#FF3B30] to-[#991B1B] flex items-center justify-center text-3xl shadow-lg shadow-[#FF3B30]/25 group-hover:scale-105 group-hover:-translate-y-1 group-hover:rotate-2 transition-all duration-300">
                   🚨
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
                   ONLINE
                 </span>
@@ -342,13 +353,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
                 &ldquo;Describe la máquina. Sigue el manual. Que no cunda el pánico.&rdquo;
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">2–6 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">2–6 Jugadores</span>
                 <span className="px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 font-bold">Cooperativo</span>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-300">Comunicación</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">Comunicación</span>
               </div>
             </div>
 
-            <div className="relative z-10 mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between">
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
               <span className="text-sm font-bold text-[#FF453A] group-hover:text-[#ff6b62] group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
                 Entrar a la sala <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </span>
@@ -365,42 +376,43 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
             tabIndex={0}
             onClick={() => handleSelectGame('coartada')}
             onKeyDown={(e) => handleKeyDown(e, 'coartada')}
-            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-[#120f0d]/90 border border-[#d97706]/35 hover:border-[#f59e0b] shadow-xl hover:shadow-[0_14px_40px_-10px_rgba(217,119,6,0.25)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 active:scale-[0.98] overflow-hidden backdrop-blur-sm animate-card-reveal"
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#f59e0b]/30 hover:border-[#f59e0b] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(245,158,11,0.28)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
             style={{ animationDelay: '0.2s' }}
           >
-            {/* Top inner sheen and radial accent light */}
-            <div className="inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/20 to-transparent absolute" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,119,6,0.13),transparent_65%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity" />
+            {/* Unified top inner sheen and game-specific radial spotlight */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_65%)] pointer-events-none opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-15 bg-[#f59e0b] blur-2xl transition-opacity duration-500" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-5">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#78350f] to-[#451a03] border border-[#d97706]/40 flex items-center justify-center text-3xl shadow-lg shadow-[#d97706]/20 group-hover:scale-105 group-hover:-translate-y-1 group-hover:-rotate-2 transition-all duration-300">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#b45309] to-[#78350f] border border-[#f59e0b]/40 flex items-center justify-center text-3xl shadow-lg shadow-[#d97706]/20 group-hover:scale-105 group-hover:-translate-y-1 group-hover:-rotate-2 transition-all duration-300">
                   🕵️
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
                   ONLINE
                 </span>
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-black font-display text-stone-100 tracking-wide mb-2 group-hover:text-[#f59e0b] transition-colors duration-200">
+              <h2 className="text-2xl sm:text-3xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#f59e0b] transition-colors duration-200">
                 COARTADA
               </h2>
-              <p className="text-stone-300/90 text-sm sm:text-base font-normal leading-snug">
+              <p className="text-slate-300/90 text-sm sm:text-base font-normal leading-snug">
                 &ldquo;Uno es el detective, el otro el sospechoso. Interrogatorio, coartadas y una verdad oculta bajo la lluvia.&rdquo;
               </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-stone-400">
-                <span className="px-2.5 py-1 rounded-lg bg-stone-900 border border-stone-800 text-amber-300 font-bold">2 Jugadores</span>
-                <span className="px-2.5 py-1 rounded-lg bg-amber-950/40 border border-amber-900/60 text-amber-200">Deducción 1v1</span>
-                <span className="px-2.5 py-1 rounded-lg bg-stone-900 border border-stone-800 text-stone-300">Interrogatorio</span>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-amber-300 font-bold">2 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-200">Deducción 1v1</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">Interrogatorio</span>
               </div>
             </div>
 
-            <div className="relative z-10 mt-6 pt-5 border-t border-stone-800/80 flex items-center justify-between">
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
               <span className="text-sm font-bold text-[#f59e0b] group-hover:text-[#fbbf24] group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
                 Entrar a la sala <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </span>
-              <div className="w-10 h-10 rounded-full bg-[#d97706] group-hover:bg-[#b45309] text-stone-950 flex items-center justify-center font-black shadow-md shadow-[#d97706]/25 group-hover:scale-110 transition-all duration-300">
+              <div className="w-10 h-10 rounded-full bg-[#f59e0b] group-hover:bg-[#d97706] text-slate-950 flex items-center justify-center font-black shadow-md shadow-[#d97706]/25 group-hover:scale-110 transition-all duration-300">
                 <Play className="w-4 h-4 fill-current ml-0.5" />
               </div>
             </div>

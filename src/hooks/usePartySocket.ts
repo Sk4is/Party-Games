@@ -15,6 +15,7 @@ import {
 import { sessionRecovery } from '../services/sessionRecovery';
 import { createConnectionResilience } from '../utils/connectionResilience';
 import { getGameWsUrl } from '../config/network';
+import { backendHealth } from '../services/backendHealth';
 
 export type SocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -102,6 +103,7 @@ export function usePartySocket(options: UsePartySocketOptions) {
       socket.onopen = () => {
         setStatus('connected');
         setErrorMessage(null);
+        backendHealth.markHealthy();
 
         // Flush any queued messages
         while (messageQueueRef.current.length > 0) {
@@ -323,6 +325,10 @@ export function usePartySocket(options: UsePartySocketOptions) {
           player: currentUser,
         });
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          setIsJoiningOrCreating(false);
+          return;
+        }
         console.warn('[usePartySocket] REST create failed, falling back to WS create:', err);
         // Fallback directly through WebSocket
         send({
@@ -367,6 +373,10 @@ export function usePartySocket(options: UsePartySocketOptions) {
           player: currentUser,
         });
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          setIsJoiningOrCreating(false);
+          return;
+        }
         console.warn('[usePartySocket] Validation error, trying direct WS join:', err);
         send({
           type: 'join_room',

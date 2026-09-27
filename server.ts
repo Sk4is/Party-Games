@@ -128,10 +128,11 @@ function normalizeSimple(str: string): string {
     .replace(/[^a-zñ]/g, ''); // keep only spanish alphabet
 }
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoints
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({
     status: 'ok',
+    uptime: process.uptime(),
     dictionaryWordsCount: spanishDictionarySet?.size || 0,
     hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
   });

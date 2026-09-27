@@ -4,6 +4,7 @@
  */
 
 import { getApiUrl } from '../config/network';
+import { backendHealth } from './backendHealth';
 
 export interface PlayerProfile {
   id: string;
@@ -38,12 +39,16 @@ export interface ValidateJoinResult {
 
 /**
  * Creates an online room on the server and returns its metadata and unique room code.
+ * Ensures backend is awake first if sleeping, without duplicating requests.
  */
 export async function createOnlineRoom(
   gameType: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada',
   hostPlayer: PlayerProfile,
   config?: any
 ): Promise<SharedRoomSummary> {
+  // Ensure backend is awake before sending room creation request
+  await backendHealth.ensureBackendAvailable();
+
   const res = await fetch(getApiUrl('/api/rooms/create'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -64,6 +69,7 @@ export async function createOnlineRoom(
     throw new Error(data.message || 'NO SE HA PODIDO CREAR LA SALA ONLINE');
   }
 
+  backendHealth.markHealthy();
   return data.room;
 }
 
@@ -76,6 +82,9 @@ export async function findOnlineRoom(code: string): Promise<SharedRoomSummary> {
     throw new Error('Código de sala vacío');
   }
 
+  // Ensure backend is awake
+  await backendHealth.ensureBackendAvailable();
+
   const res = await fetch(getApiUrl(`/api/rooms/${encodeURIComponent(cleanCode)}`));
   const data = await res.json().catch(() => ({}));
 
@@ -83,6 +92,7 @@ export async function findOnlineRoom(code: string): Promise<SharedRoomSummary> {
     throw new Error(data.message || 'NO SE HA ENCONTRADO ESA SALA');
   }
 
+  backendHealth.markHealthy();
   return data.room;
 }
 
@@ -91,7 +101,7 @@ export async function findOnlineRoom(code: string): Promise<SharedRoomSummary> {
  */
 export async function validateJoinOnlineRoom(
   code: string,
-  gameType?: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo',
+  gameType?: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada',
   player?: PlayerProfile
 ): Promise<ValidateJoinResult> {
   const cleanCode = code.trim().toUpperCase();
@@ -100,6 +110,9 @@ export async function validateJoinOnlineRoom(
   }
 
   try {
+    // Ensure backend is awake
+    await backendHealth.ensureBackendAvailable();
+
     const res = await fetch(getApiUrl('/api/rooms/validate-join'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -122,11 +135,15 @@ export async function validateJoinOnlineRoom(
       };
     }
 
+    backendHealth.markHealthy();
     return {
       valid: true,
       room: data.room,
     };
   } catch (err: any) {
+    if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+      throw err;
+    }
     return {
       valid: false,
       message: 'ERROR DE CONEXIÓN CON EL SERVIDOR',

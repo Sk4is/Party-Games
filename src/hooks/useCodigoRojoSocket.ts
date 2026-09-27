@@ -15,6 +15,7 @@ import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
 import { createConnectionResilience } from '../utils/connectionResilience';
 import { getGameWsUrl } from '../config/network';
+import { backendHealth } from '../services/backendHealth';
 
 export type CodigoRojoConnectionStatus =
   | 'idle'
@@ -170,6 +171,7 @@ export function useCodigoRojoSocket({
           hasOpened = true;
           setConnectionStatus('connected');
           setErrorMessage(null);
+          backendHealth.markHealthy();
           reconnectAttemptsRef.current = 0;
           lastActivityRef.current = Date.now();
 
@@ -417,6 +419,10 @@ export function useCodigoRojoSocket({
         connectToRoom(summary.code, false);
         return summary.code;
       } catch (e: any) {
+        if (e?.name === 'AbortError' || e?.message === 'OPERATION_CANCELLED') {
+          setConnectionStatus('idle');
+          return;
+        }
         setConnectionStatus('failed');
         setErrorMessage(e.message || 'NO SE HA PODIDO CREAR LA SALA');
         throw e;
@@ -461,6 +467,10 @@ export function useCodigoRojoSocket({
 
         connectToRoom(cleanCode, false);
       } catch (e: any) {
+        if (e?.name === 'AbortError' || e?.message === 'OPERATION_CANCELLED') {
+          setConnectionStatus('idle');
+          return;
+        }
         setConnectionStatus('idle');
         setErrorMessage(e.message || 'Error al validar sala');
       } finally {
