@@ -68,16 +68,18 @@ export function useCodigoRojoSocket({
   onWrongGameRef.current = onWrongGame;
 
   // Compute initial target room (if any) from prop or active session
-  const lastActiveRoomRef = useRef<{ code: string } | null>(() => {
-    if (initialRoomCode && initialRoomCode.trim()) {
-      return { code: initialRoomCode.trim().toUpperCase() };
-    }
-    const saved = sessionRecovery.getActiveSession();
-    if (saved && saved.gameType === 'codigo-rojo' && saved.roomCode) {
-      return { code: saved.roomCode.trim().toUpperCase() };
-    }
-    return null;
-  });
+  const lastActiveRoomRef = useRef<{ code: string } | null>(
+    (() => {
+      if (initialRoomCode && initialRoomCode.trim()) {
+        return { code: initialRoomCode.trim().toUpperCase() };
+      }
+      const saved = sessionRecovery.getActiveSession();
+      if (saved && saved.gameType === 'codigo-rojo' && saved.roomCode) {
+        return { code: saved.roomCode.trim().toUpperCase() };
+      }
+      return null;
+    })()
+  );
 
   const clearReconnectTimer = () => {
     if (reconnectTimeoutRef.current) {

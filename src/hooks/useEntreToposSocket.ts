@@ -32,6 +32,17 @@ interface UseEntreToposSocketOptions {
   onWrongGame?: (actualGameType: any, roomCode: string) => void;
 }
 
+function getInitialEntreToposRoom(initialRoomCode?: string): { code: string } | null {
+  if (initialRoomCode && initialRoomCode.trim()) {
+    return { code: initialRoomCode.trim().toUpperCase() };
+  }
+  const saved = sessionRecovery.getActiveSession();
+  if (saved && (saved.gameType as string) === 'entre-topos' && saved.roomCode) {
+    return { code: saved.roomCode.trim().toUpperCase() };
+  }
+  return null;
+}
+
 export function useEntreToposSocket({
   player,
   initialRoomCode,
@@ -45,10 +56,11 @@ export function useEntreToposSocket({
   const wsRef = useRef<WebSocket | null>(null);
   const messageQueueRef = useRef<EntreToposClientMessage[]>([]);
   const reconnectAttemptsRef = useRef<number>(0);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isManuallyClosedRef = useRef<boolean>(false);
   const isCreatingOrJoiningRef = useRef<boolean>(false);
+  const lastActiveRoomRef = useRef<{ code: string } | null>(getInitialEntreToposRoom(initialRoomCode));
 
   const playerRef = useRef(player);
   playerRef.current = player;
@@ -56,16 +68,48 @@ export function useEntreToposSocket({
   const onWrongGameRef = useRef(onWrongGame);
   onWrongGameRef.current = onWrongGame;
 
-  const lastActiveRoomRef = useRef<{ code: string } | null>(() => {
-    if (initialRoomCode && initialRoomCode.trim()) {
-      return { code: initialRoomCode.trim().toUpperCase() };
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
-    const saved = sessionRecovery.getActiveSession();
-    if (saved && (saved.gameType as string) === 'entre-topos' && saved.roomCode) {
-      return { code: saved.roomCode.trim().toUpperCase() };
+  }, []);
+
+  const clearPingTimer = useCallback(() => {
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
     }
-    return null;
-  });
+  }, []);
+
+  // Safely detach and close an existing socket without triggering its onclose reconnect loop
+  const cleanupExistingSocket = useCallback((reason = 'Conexión reemplazada') => {
+    const sock = wsRef.current;
+    if (!sock) return;
+    wsRef.current = null;
+
+    sock.onopen = null;
+    sock.onmessage = null;
+    sock.onerror = null;
+    sock.onclose = null;
+
+    if (sock.readyState === WebSocket.OPEN) {
+      try {
+        sock.close(1000, reason);
+      } catch {
+        // ignore
+      }
+    } else if (sock.readyState === WebSocket.CONNECTING) {
+      sock.onopen = () => {
+        try {
+          sock.close(1000, reason);
+        } catch {
+          // ignore
+        }
+      };
+      sock.onerror = () => {};
+    }
+  }, []);
 
   const getSanitizedSocketUrl = useCallback((): string => {
     return getGameWsUrl('/ws/entre-topos', 'VITE_ENTRE_TOPOS_WS_URL');
@@ -90,121 +134,171 @@ export function useEntreToposSocket({
   }, []);
 
   const connectToRoom = useCallback(
-    (roomCode: string) => {
+    (roomCode: string, isReconnection = false) => {
       if (!enabled) return;
 
       const code = roomCode.trim().toUpperCase();
       if (!code) return;
 
-      if (wsRef.current) {
-        try {
-          wsRef.current.close();
-        } catch {
-          // ignore
-        }
+      // Avoid replacing a healthy open/connecting socket for the same room
+      if (
+        wsRef.current &&
+        (wsRef.current.readyState === WebSocket.OPEN ||
+          wsRef.current.readyState === WebSocket.CONNECTING) &&
+        lastActiveRoomRef.current?.code === code
+      ) {
+        return;
       }
 
+      clearReconnectTimer();
+      clearPingTimer();
+      cleanupExistingSocket('Nueva conexión a sala');
+
       isManuallyClosedRef.current = false;
-      setConnectionStatus((prev) => (prev === 'connected' ? 'reconnecting' : 'connecting'));
+      lastActiveRoomRef.current = { code };
+      setConnectionStatus(isReconnection ? 'reconnecting' : 'connecting');
       setErrorMessage(null);
 
-      const targetWsUrl = getSanitizedSocketUrl();
-      const ws = new WebSocket(targetWsUrl);
-      wsRef.current = ws;
+      try {
+        const targetWsUrl = getSanitizedSocketUrl();
+        const ws = new WebSocket(targetWsUrl);
+        wsRef.current = ws;
 
-      ws.onopen = () => {
-        setConnectionStatus('connected');
-        reconnectAttemptsRef.current = 0;
+        ws.onopen = () => {
+          if (wsRef.current !== ws) return;
 
-        // Retrieve persisted mole customization
-        let savedMole: MoleCustomization = DEFAULT_MOLE_CUSTOMIZATION;
-        try {
-          const raw = localStorage.getItem('entre_topos_mole_customization');
-          if (raw) savedMole = JSON.parse(raw);
-        } catch {
-          // fallback
-        }
+          setConnectionStatus('connected');
+          setErrorMessage(null);
+          reconnectAttemptsRef.current = 0;
+          backendHealth.markHealthy();
 
-        const joinMsg: EntreToposClientMessage = {
-          type: 'JOIN_ROOM',
-          code,
-          player: {
-            id: playerRef.current.id,
-            name: playerRef.current.name,
-            avatar: playerRef.current.avatar,
-            color: playerRef.current.color,
-            moleCustomization: playerRef.current.moleCustomization || savedMole,
-          },
+          // Retrieve persisted mole customization
+          let savedMole: MoleCustomization = DEFAULT_MOLE_CUSTOMIZATION;
+          try {
+            const raw = localStorage.getItem('entre_topos_mole_customization');
+            if (raw) savedMole = JSON.parse(raw);
+          } catch {
+            // fallback
+          }
+
+          const joinMsg: EntreToposClientMessage = {
+            type: 'JOIN_ROOM',
+            code,
+            player: {
+              id: playerRef.current.id,
+              name: playerRef.current.name,
+              avatar: playerRef.current.avatar,
+              color: playerRef.current.color,
+              moleCustomization: playerRef.current.moleCustomization || savedMole,
+            },
+          };
+
+          ws.send(JSON.stringify(joinMsg));
+          flushMessageQueue();
+
+          sessionRecovery.saveActiveSession({
+            gameType: 'entre-topos',
+            roomCode: code,
+            playerId: playerRef.current.id,
+          });
+
+          clearPingTimer();
+          pingIntervalRef.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'PING' }));
+            }
+          }, 15000);
         };
 
-        ws.send(JSON.stringify(joinMsg));
-        flushMessageQueue();
+        ws.onmessage = (event) => {
+          if (wsRef.current !== ws) return;
+          try {
+            const msg = JSON.parse(event.data) as EntreToposServerMessage;
+            if (msg.type === 'PONG') return;
 
-        sessionRecovery.saveActiveSession({
-          gameType: 'entre-topos' as any,
-          roomCode: code,
-          playerId: playerRef.current.id,
-        });
-
-        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-        pingIntervalRef.current = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'PING' }));
-          }
-        }, 15000);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data) as EntreToposServerMessage;
-          if (msg.type === 'SYNC_STATE') {
-            setRoomState(msg.state);
-
-            // Audio cues based on state
-            if (msg.state.phase === 'WRITING' && msg.state.timerSecondsRemaining === 45) {
-              audio.playTurnChange();
-            } else if (msg.state.phase === 'VOTE_REVEAL') {
-              audio.playExplosion();
-            } else if (msg.state.phase === 'ROUND_RESULTS') {
-              audio.playVictory();
+            if (msg.type === 'SYNC_STATE') {
+              setRoomState((prev) => {
+                const prevPhase = prev?.phase;
+                const nextPhase = msg.state.phase;
+                if (prevPhase !== nextPhase) {
+                  if (nextPhase === 'WRITING') {
+                    audio.playTurnChange();
+                  } else if (nextPhase === 'VOTE_REVEAL') {
+                    audio.playExplosion();
+                  } else if (nextPhase === 'ROUND_RESULTS') {
+                    audio.playVictory();
+                  }
+                }
+                return msg.state;
+              });
+            } else if (msg.type === 'ERROR') {
+              if (
+                msg.message === 'NO SE HA ENCONTRADO ESA SALA' ||
+                msg.message === 'NO SE HA ENCONTRADO LA SALA' ||
+                msg.message === 'SALA NO ENCONTRADA'
+              ) {
+                isManuallyClosedRef.current = true;
+                sessionRecovery.clearActiveSession();
+                lastActiveRoomRef.current = null;
+                setRoomState(null);
+                setConnectionStatus('idle');
+                setErrorMessage(msg.message);
+                cleanupExistingSocket('Sala no encontrada');
+              } else {
+                setErrorMessage(msg.message);
+              }
             }
-          } else if (msg.type === 'ERROR') {
-            setErrorMessage(msg.message);
+          } catch (e) {
+            console.warn('[useEntreToposSocket] Error parsing server message:', e);
           }
-        } catch (e) {
-          console.warn('[useEntreToposSocket] Error parsing server message:', e);
-        }
-      };
+        };
 
-      ws.onclose = () => {
-        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+        ws.onclose = () => {
+          if (wsRef.current === ws) {
+            wsRef.current = null;
+          }
+          clearPingTimer();
 
-        if (isManuallyClosedRef.current) {
-          setConnectionStatus('disconnected');
-          return;
-        }
+          if (isManuallyClosedRef.current) {
+            setConnectionStatus('disconnected');
+            return;
+          }
 
-        setConnectionStatus('reconnecting');
-        const attempts = reconnectAttemptsRef.current + 1;
-        reconnectAttemptsRef.current = attempts;
+          setConnectionStatus('reconnecting');
+          const attempts = reconnectAttemptsRef.current + 1;
+          reconnectAttemptsRef.current = attempts;
 
-        if (attempts <= 10) {
-          const delay = Math.min(1000 * Math.pow(1.3, attempts), 8000);
-          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connectToRoom(code);
-          }, delay);
-        } else {
-          setConnectionStatus('failed');
-          setErrorMessage('Se ha perdido la conexión con la sala. Comprueba tu red.');
-        }
-      };
+          if (attempts <= 10) {
+            const delay = Math.min(1000 * Math.pow(1.3, attempts), 8000);
+            clearReconnectTimer();
+            reconnectTimeoutRef.current = setTimeout(() => {
+              if (!isManuallyClosedRef.current && lastActiveRoomRef.current?.code) {
+                connectToRoom(lastActiveRoomRef.current.code, true);
+              }
+            }, delay);
+          } else {
+            setConnectionStatus('failed');
+            setErrorMessage('Se ha perdido la conexión con la sala. Comprueba tu red.');
+          }
+        };
 
-      ws.onerror = (err) => {
-        console.warn('[useEntreToposSocket] WebSocket error:', err);
-      };
+        ws.onerror = (err) => {
+          console.warn('[useEntreToposSocket] WebSocket error:', err);
+        };
+      } catch (err) {
+        console.error('[useEntreToposSocket] Failed to create WebSocket:', err);
+        setConnectionStatus('failed');
+        setErrorMessage('Error al conectar con el servidor de Entre Topos.');
+      }
     },
-    [enabled, getSanitizedSocketUrl, flushMessageQueue]
+    [
+      enabled,
+      clearReconnectTimer,
+      clearPingTimer,
+      cleanupExistingSocket,
+      getSanitizedSocketUrl,
+      flushMessageQueue,
+    ]
   );
 
   const createRoom = useCallback(
@@ -236,9 +330,12 @@ export function useEntreToposSocket({
 
         const newCode = res.code.toUpperCase().trim();
         lastActiveRoomRef.current = { code: newCode };
-        connectToRoom(newCode);
+        connectToRoom(newCode, false);
         return newCode;
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          return null;
+        }
         console.error('[useEntreToposSocket] Error creating room:', err);
         setErrorMessage(err.message || 'Error al crear la sala');
         return null;
@@ -263,11 +360,11 @@ export function useEntreToposSocket({
 
       try {
         await backendHealth.ensureBackendAvailable();
-        const res = await validateJoinOnlineRoom(code, 'entre-topos');
+        const res = await validateJoinOnlineRoom(code, 'entre-topos', playerRef.current);
 
         if (res.valid) {
           lastActiveRoomRef.current = { code };
-          connectToRoom(code);
+          connectToRoom(code, false);
           return true;
         } else {
           if (res.wrongGame && res.actualGameType && onWrongGameRef.current) {
@@ -278,6 +375,9 @@ export function useEntreToposSocket({
           return false;
         }
       } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message === 'OPERATION_CANCELLED') {
+          return false;
+        }
         console.error('[useEntreToposSocket] Error joining room:', err);
         setErrorMessage(err.message || 'Error al unirse a la sala');
         return false;
@@ -291,11 +391,13 @@ export function useEntreToposSocket({
   // Client gameplay actions
   const updateMole = useCallback(
     (customization: MoleCustomization, newName?: string) => {
-      sendClientMessage({
-        type: 'UPDATE_MOLE',
-        moleCustomization: customization,
-        name: newName,
-      });
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        sendClientMessage({
+          type: 'UPDATE_MOLE',
+          moleCustomization: customization,
+          name: newName,
+        });
+      }
     },
     [sendClientMessage]
   );
@@ -342,35 +444,66 @@ export function useEntreToposSocket({
 
   const leaveRoom = useCallback(() => {
     isManuallyClosedRef.current = true;
-    sendClientMessage({ type: 'LEAVE_ROOM' });
-    if (wsRef.current) {
+    lastActiveRoomRef.current = null;
+    clearReconnectTimer();
+    clearPingTimer();
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try {
-        wsRef.current.close();
-      } catch {}
+        wsRef.current.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
+      } catch {
+        // ignore
+      }
     }
+
+    cleanupExistingSocket('Salida voluntaria de la sala');
     sessionRecovery.clearActiveSession();
     setRoomState(null);
     setConnectionStatus('idle');
-  }, [sendClientMessage]);
+  }, [clearReconnectTimer, clearPingTimer, cleanupExistingSocket]);
 
-  // Auto-connect on mount if room code exists
+  // Auto-connect on mount if an initial room code or saved session exists
   useEffect(() => {
     if (!enabled) return;
+    const initial = lastActiveRoomRef.current;
+    if (!initial || !initial.code) return;
 
-    if (lastActiveRoomRef.current?.code && connectionStatus === 'idle') {
-      connectToRoom(lastActiveRoomRef.current.code);
-    }
+    let cancelled = false;
+    validateJoinOnlineRoom(initial.code, 'entre-topos', playerRef.current)
+      .then((res) => {
+        if (cancelled || isManuallyClosedRef.current) return;
+        if (res.valid) {
+          connectToRoom(initial.code, true);
+        } else {
+          sessionRecovery.clearActiveSession();
+          lastActiveRoomRef.current = null;
+          setConnectionStatus('idle');
+          if (res.wrongGame && res.actualGameType && onWrongGameRef.current) {
+            onWrongGameRef.current(res.actualGameType, initial.code);
+          }
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        sessionRecovery.clearActiveSession();
+        lastActiveRoomRef.current = null;
+        setConnectionStatus('idle');
+      });
 
     return () => {
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-      if (wsRef.current) {
-        try {
-          wsRef.current.close();
-        } catch {}
-      }
+      cancelled = true;
     };
-  }, [enabled, connectToRoom, connectionStatus]);
+  }, [enabled, connectToRoom]);
+
+  // Unmount-only cleanup (never closes active socket on state updates)
+  useEffect(() => {
+    return () => {
+      isManuallyClosedRef.current = true;
+      clearReconnectTimer();
+      clearPingTimer();
+      cleanupExistingSocket('Componente desmontado');
+    };
+  }, [clearReconnectTimer, clearPingTimer, cleanupExistingSocket]);
 
   return {
     connectionStatus,

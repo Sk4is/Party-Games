@@ -314,6 +314,7 @@ app.post('/api/rooms/create', (req, res) => {
       name: (hostPlayer.name || 'Jugador').trim(),
       avatar: hostPlayer.avatar || '🦊',
       color: hostPlayer.color || '#f59e0b',
+      moleCustomization: hostPlayer.moleCustomization || config?.moleCustomization,
     };
 
     if (gameType === 'la-bomba' || gameType === 'la-peor-respuesta') {
@@ -346,7 +347,7 @@ app.post('/api/rooms/create', (req, res) => {
 // Validate join room HTTP endpoint (instant validation before connecting socket)
 app.post('/api/rooms/validate-join', (req, res) => {
   try {
-    const { code: rawCode, gameType } = req.body;
+    const { code: rawCode, gameType, player } = req.body;
     const code = (rawCode || '').toUpperCase().trim();
     if (!code) {
       return res.status(400).json({ valid: false, message: 'Introduce un código de sala' });
@@ -388,7 +389,12 @@ app.post('/api/rooms/validate-join', (req, res) => {
       });
     }
 
-    if (roomInfo.phase !== 'LOBBY') {
+    const isExistingPlayer =
+      Boolean(player?.id) &&
+      Array.isArray((roomInfo as any).playerIds) &&
+      (roomInfo as any).playerIds.includes(player.id);
+
+    if (roomInfo.phase !== 'LOBBY' && !isExistingPlayer) {
       return res.status(400).json({
         valid: false,
         message: 'LA PARTIDA YA HA EMPEZADO',
@@ -396,7 +402,7 @@ app.post('/api/rooms/validate-join', (req, res) => {
       });
     }
 
-    if (roomInfo.isFull) {
+    if (roomInfo.isFull && !isExistingPlayer) {
       return res.status(400).json({
         valid: false,
         message: 'LA SALA ESTÁ COMPLETA',

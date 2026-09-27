@@ -80,8 +80,24 @@ export const sessionRecovery = {
       }
 
       // 3. Fallback to URL parameters if valid
-      if (urlRoom && urlGame && ['la-bomba', 'la-peor-respuesta', 'pinturillo', 'palabra-secreta'].includes(urlGame)) {
-        const playerId = localStorage.getItem('fiesta_playerId') || localStorage.getItem('pinturillo_playerId') || '';
+      if (
+        urlRoom &&
+        urlGame &&
+        [
+          'la-bomba',
+          'la-peor-respuesta',
+          'pinturillo',
+          'palabra-secreta',
+          'codigo-rojo',
+          'coartada',
+          'entre-topos',
+        ].includes(urlGame)
+      ) {
+        const playerId =
+          localStorage.getItem('fam2play_player_id') ||
+          localStorage.getItem('fiesta_playerId') ||
+          localStorage.getItem('pinturillo_playerId') ||
+          '';
         return {
           gameType: urlGame,
           roomCode: urlRoom.toUpperCase().trim(),

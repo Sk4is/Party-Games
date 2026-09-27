@@ -150,11 +150,7 @@ export const EntreToposRoundResultsView: React.FC<EntreToposRoundResultsViewProp
                 type="button"
                 onClick={() => {
                   audio.playTurnChange();
-                  if (isFinalRound) {
-                    onPlayAgain();
-                  } else {
-                    onNextRound();
-                  }
+                  onNextRound();
                 }}
                 className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer font-display"
               >

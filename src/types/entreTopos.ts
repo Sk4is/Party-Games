@@ -149,6 +149,14 @@ export type EntreToposClientMessage =
     }
   | {
       type: 'LEAVE_ROOM';
+    }
+  | {
+      type: 'PING';
+    }
+  | {
+      type: 'RECONNECT';
+      code: string;
+      playerId: string;
     };
 
 // Server-to-Client message
@@ -165,4 +173,7 @@ export type EntreToposServerMessage =
       type: 'NOTIFICATION';
       text: string;
       level?: 'info' | 'warning' | 'success';
+    }
+  | {
+      type: 'PONG';
     };

@@ -762,6 +762,15 @@ body,
   border-radius: inherit;
 }
 
+@keyframes marker-draw {
+  0% {
+    stroke-dashoffset: 400;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* Accessibility: Respect user reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   .fam2play-wordmark {

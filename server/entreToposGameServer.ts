@@ -88,17 +88,20 @@ export class EntreToposServer {
       playerCount: room.players.length,
       maxPlayers: 10,
       isFull: room.players.length >= 10,
+      playerIds: room.players.map((p) => p.id),
     };
   }
 
   public createRoomDirect(hostPlayer: any, config?: Partial<EntreToposConfig>) {
     const code = roomRegistry.generateCode();
-    const moleCustomization: MoleCustomization = hostPlayer.moleCustomization || {
-      hat: 'detective',
-      face: 'bigote',
-      clothing: 'gabardina',
-      color: '#78523A',
-    };
+    const moleCustomization: MoleCustomization =
+      hostPlayer.moleCustomization ||
+      (config as any)?.moleCustomization || {
+        hat: 'detective',
+        face: 'bigote',
+        clothing: 'gabardina',
+        color: '#78523A',
+      };
 
     const player: EntreToposPlayer = {
       id: hostPlayer.id,
@@ -114,12 +117,18 @@ export class EntreToposServer {
       votesReceived: 0,
     };
 
+    const sanitizedConfig: EntreToposConfig = {
+      writingTimeSeconds: config?.writingTimeSeconds || DEFAULT_CONFIG.writingTimeSeconds,
+      discussionTimeSeconds: config?.discussionTimeSeconds || DEFAULT_CONFIG.discussionTimeSeconds,
+      totalRounds: config?.totalRounds || DEFAULT_CONFIG.totalRounds,
+    };
+
     const room: ServerRoom = {
       code,
       gameType: 'entre-topos',
       hostId: player.id,
       phase: 'LOBBY',
-      config: { ...DEFAULT_CONFIG, ...config },
+      config: sanitizedConfig,
       currentRound: 1,
       players: [player],
       boardInternal: null,
@@ -136,50 +145,47 @@ export class EntreToposServer {
   }
 
   private handleClientMessage(ws: WebSocket, msg: EntreToposClientMessage) {
+    if (msg.type === 'PING') {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'PONG' }));
+      }
+      return;
+    }
+
+    if (msg.type === 'RECONNECT') {
+      const code = (msg.code || '').toUpperCase().trim();
+      const room = this.rooms.get(code);
+      if (!room) {
+        ws.send(JSON.stringify({ type: 'ERROR', message: 'NO SE HA ENCONTRADO ESA SALA' }));
+        return;
+      }
+      const player = room.players.find((p) => p.id === msg.playerId);
+      if (!player) {
+        ws.send(JSON.stringify({ type: 'ERROR', message: 'NO SE HA ENCONTRADO ESA SALA' }));
+        return;
+      }
+      // Clean up any stale sockets for this player
+      this.clients.forEach((existingClient, existingWs) => {
+        if (existingClient.playerId === player.id && existingWs !== ws) {
+          this.clients.delete(existingWs);
+          try {
+            existingWs.close(1000, 'Reemplazado por nueva conexión');
+          } catch {}
+        }
+      });
+      player.isConnected = true;
+      this.clients.set(ws, { ws, playerId: player.id, roomId: room.code });
+      this.broadcastRoom(room);
+      return;
+    }
+
     if (msg.type === 'JOIN_ROOM') {
       const code = (msg.code || '').toUpperCase().trim();
       let room = this.rooms.get(code);
 
       if (!room) {
-        // Create if does not exist
-        const moleCustomization = msg.player.moleCustomization || {
-          hat: 'detective',
-          face: 'bigote',
-          clothing: 'gabardina',
-          color: '#78523A',
-        };
-        const player: EntreToposPlayer = {
-          id: msg.player.id,
-          name: (msg.player.name || 'Sospechoso').trim(),
-          avatar: msg.player.avatar || '🕵️',
-          color: msg.player.color || '#f59e0b',
-          isConnected: true,
-          isHost: true,
-          score: 0,
-          moleCustomization,
-          hasSubmittedClue: false,
-          hasVoted: false,
-          votesReceived: 0,
-        };
-
-        room = {
-          code,
-          gameType: 'entre-topos',
-          hostId: player.id,
-          phase: 'LOBBY',
-          config: { ...DEFAULT_CONFIG },
-          currentRound: 1,
-          players: [player],
-          boardInternal: null,
-          topoPlayerId: null,
-          timerInterval: null,
-          phaseTransitionTimeout: null,
-          timerSecondsRemaining: 0,
-          allVotes: [],
-        };
-
-        this.rooms.set(code, room);
-        roomRegistry.register(code, 'entre-topos', 'party');
+        ws.send(JSON.stringify({ type: 'ERROR', message: 'NO SE HA ENCONTRADO ESA SALA' }));
+        return;
       }
 
       let player = room.players.find((p) => p.id === msg.player.id);
@@ -188,6 +194,10 @@ export class EntreToposServer {
         if (msg.player.name) player.name = msg.player.name.trim();
         if (msg.player.moleCustomization) player.moleCustomization = msg.player.moleCustomization;
       } else {
+        if (room.phase !== 'LOBBY') {
+          ws.send(JSON.stringify({ type: 'ERROR', message: 'LA PARTIDA YA HA EMPEZADO' }));
+          return;
+        }
         if (room.players.length >= 10) {
           ws.send(JSON.stringify({ type: 'ERROR', message: 'La sala está completa (máximo 10 jugadores)' }));
           return;
@@ -215,6 +225,17 @@ export class EntreToposServer {
         };
         room.players.push(player);
       }
+
+      // Unregister any previous socket for this same player before setting the new one
+      const targetPlayerId = player.id;
+      this.clients.forEach((existingClient, existingWs) => {
+        if (existingClient.playerId === targetPlayerId && existingWs !== ws) {
+          this.clients.delete(existingWs);
+          try {
+            existingWs.close(1000, 'Reemplazado por nueva conexión');
+          } catch {}
+        }
+      });
 
       this.clients.set(ws, { ws, playerId: player.id, roomId: room.code });
       this.broadcastRoom(room);
@@ -359,8 +380,17 @@ export class EntreToposServer {
       return;
     }
 
+    // KICK PLAYER (HOST ONLY IN LOBBY)
+    if (msg.type === 'KICK_PLAYER') {
+      if (room.hostId === client.playerId && room.phase === 'LOBBY' && msg.targetPlayerId !== client.playerId) {
+        this.removePlayer(msg.targetPlayerId, room);
+      }
+      return;
+    }
+
     // LEAVE ROOM
     if (msg.type === 'LEAVE_ROOM') {
+      this.clients.delete(ws);
       this.removePlayer(client.playerId, room);
     }
   }
@@ -659,6 +689,22 @@ export class EntreToposServer {
     const room = this.rooms.get(client.roomId);
     if (!room) return;
 
+    // Check if the player already reconnected via another open socket
+    let hasAnotherActiveSocket = false;
+    this.clients.forEach((c) => {
+      if (
+        c.roomId === client.roomId &&
+        c.playerId === client.playerId &&
+        c.ws.readyState === WebSocket.OPEN
+      ) {
+        hasAnotherActiveSocket = true;
+      }
+    });
+
+    if (hasAnotherActiveSocket) {
+      return;
+    }
+
     const player = room.players.find((p) => p.id === client.playerId);
     if (player) {
       player.isConnected = false;
@@ -671,16 +717,33 @@ export class EntreToposServer {
 
       const currentPlayer = currentRoom.players.find((p) => p.id === client.playerId);
       if (currentPlayer && !currentPlayer.isConnected) {
+        const connectedPlayers = currentRoom.players.filter((p) => p.isConnected);
+        if (connectedPlayers.length === 0) {
+          if (currentRoom.timerInterval) clearInterval(currentRoom.timerInterval);
+          if (currentRoom.phaseTransitionTimeout) clearTimeout(currentRoom.phaseTransitionTimeout);
+          this.rooms.delete(currentRoom.code);
+          roomRegistry.unregister(currentRoom.code);
+          return;
+        }
+
+        // Reassign host if disconnected player was host
+        if (currentRoom.hostId === currentPlayer.id && connectedPlayers.length > 0) {
+          currentRoom.players.forEach((p) => {
+            p.isHost = false;
+          });
+          currentRoom.hostId = connectedPlayers[0].id;
+          connectedPlayers[0].isHost = true;
+        }
+
         if (currentRoom.phase !== 'LOBBY' && currentRoom.phase !== 'FINAL_RESULTS') {
-          const connected = currentRoom.players.filter((p) => p.isConnected).length;
-          if (connected < 3) {
+          if (connectedPlayers.length < 3) {
             if (currentRoom.timerInterval) clearInterval(currentRoom.timerInterval);
             if (currentRoom.phaseTransitionTimeout) clearTimeout(currentRoom.phaseTransitionTimeout);
             currentRoom.phase = 'MATCH_ABORTED';
             currentRoom.abortReason = `${currentPlayer.name} se ha desconectado. Menos de 3 jugadores restantes.`;
-            this.broadcastRoom(currentRoom);
           }
         }
+        this.broadcastRoom(currentRoom);
       }
     }, 30000);
 

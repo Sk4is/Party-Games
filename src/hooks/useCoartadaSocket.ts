@@ -64,16 +64,18 @@ export function useCoartadaSocket({
   const onWrongGameRef = useRef(onWrongGame);
   onWrongGameRef.current = onWrongGame;
 
-  const lastActiveRoomRef = useRef<{ code: string } | null>(() => {
-    if (initialRoomCode && initialRoomCode.trim()) {
-      return { code: initialRoomCode.trim().toUpperCase() };
-    }
-    const saved = sessionRecovery.getActiveSession();
-    if (saved && (saved.gameType as string) === 'coartada' && saved.roomCode) {
-      return { code: saved.roomCode.trim().toUpperCase() };
-    }
-    return null;
-  });
+  const lastActiveRoomRef = useRef<{ code: string } | null>(
+    (() => {
+      if (initialRoomCode && initialRoomCode.trim()) {
+        return { code: initialRoomCode.trim().toUpperCase() };
+      }
+      const saved = sessionRecovery.getActiveSession();
+      if (saved && (saved.gameType as string) === 'coartada' && saved.roomCode) {
+        return { code: saved.roomCode.trim().toUpperCase() };
+      }
+      return null;
+    })()
+  );
 
   const getSanitizedSocketUrl = useCallback((): string => {
     return getGameWsUrl('/ws/coartada', 'VITE_COARTADA_WS_URL');

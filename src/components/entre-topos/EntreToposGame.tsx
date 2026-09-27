@@ -27,7 +27,7 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
   onSwitchGame,
 }) => {
   // Local player profile with persistent ID and custom mole
-  const [player] = useState(() => {
+  const [player, setPlayer] = useState(() => {
     let id = '';
     let name = 'Sospechoso';
     try {
@@ -114,10 +114,8 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
             type="button"
             onClick={() => {
               if (roomState) {
-                if (window.confirm('¿Seguro que quieres salir de la partida?')) {
-                  leaveRoom();
-                  onBackToMenu();
-                }
+                leaveRoom();
+                onBackToMenu();
               } else {
                 onBackToMenu();
               }
@@ -328,11 +326,16 @@ export const EntreToposGame: React.FC<EntreToposGameProps> = ({
         playerName={player.name}
         initialCustomization={player.moleCustomization}
         onSave={(newCustomization, newName) => {
-          player.moleCustomization = newCustomization;
-          player.name = newName;
+          setPlayer((prev) => ({
+            ...prev,
+            moleCustomization: newCustomization,
+            name: newName,
+          }));
           updateMole(newCustomization, newName);
-          localStorage.setItem('fam2play_player_name', newName);
-          localStorage.setItem('entre_topos_mole_customization', JSON.stringify(newCustomization));
+          try {
+            localStorage.setItem('fam2play_player_name', newName);
+            localStorage.setItem('entre_topos_mole_customization', JSON.stringify(newCustomization));
+          } catch {}
         }}
       />
 
