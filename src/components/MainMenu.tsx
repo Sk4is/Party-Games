@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, Sparkles, HelpCircle, ArrowRight } from 'lucide-react';
 import { SoundToggle } from './SoundToggle';
 import { HowToPlayModal } from './HowToPlayModal';
+import { HomeAnimatedBackground } from './HomeAnimatedBackground';
 import { audio } from '../utils/audio';
 
 interface MainMenuProps {
@@ -48,41 +49,19 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between p-4 sm:p-8 md:p-12 overflow-hidden bg-[#060813]">
+    <div className="relative min-h-screen w-full flex flex-col justify-between p-4 sm:p-8 md:p-12 overflow-hidden bg-[#050713]">
       {/* =========================================================================
-          BACKGROUND: THREE-LAYER DEPTH (NAVY BASE + SOFT AMBIENT GLOWS + VIGNETTE/TEXTURE)
+          ATMOSPHERIC ANIMATED BACKGROUND (MULTI-LAYER DEPTH + LIVING AMBIENT BLOBS + AURORA)
           ========================================================================= */}
-      {/* LAYER 2: Oversized, very soft animated ambient color fields (15-34s elegant cycles) */}
-      {/* Warm Yellow/Orange (La Bomba inspiration) */}
-      <div className="absolute -top-24 -left-20 w-[42rem] h-[42rem] bg-amber-500/[0.08] rounded-full blur-[150px] pointer-events-none animate-ambient-1" />
-      {/* Coral/Rose Red (La Peor Respuesta inspiration) */}
-      <div className="absolute top-1/4 -right-28 w-[44rem] h-[44rem] bg-rose-600/[0.08] rounded-full blur-[160px] pointer-events-none animate-ambient-2" />
-      {/* Cyan/Sky Blue (Lienzo Loco inspiration) */}
-      <div className="absolute -bottom-28 left-1/4 w-[40rem] h-[40rem] bg-cyan-500/[0.08] rounded-full blur-[150px] pointer-events-none animate-ambient-3" />
-      {/* Emerald/Green (Palabra Secreta inspiration) */}
-      <div className="absolute top-2/3 -left-24 w-[36rem] h-[36rem] bg-emerald-500/[0.07] rounded-full blur-[140px] pointer-events-none animate-ambient-4" />
-      {/* Deep Purple/Indigo depth field */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[48rem] h-[48rem] bg-indigo-600/[0.06] rounded-full blur-[170px] pointer-events-none animate-ambient-5" />
-      {/* Warm Amber/Gold (Coartada inspiration) */}
-      <div className="absolute bottom-10 -right-20 w-[38rem] h-[38rem] bg-amber-600/[0.07] rounded-full blur-[150px] pointer-events-none animate-ambient-6" />
-
-      {/* Atmospheric micro-specks (quiet, floating dust motes with very low opacity) */}
-      <div className="absolute top-1/4 left-1/5 w-1 h-1 bg-amber-300/25 rounded-full blur-[0.5px] pointer-events-none animate-speck-1" />
-      <div className="absolute top-3/5 right-1/4 w-1.5 h-1.5 bg-rose-300/20 rounded-full blur-[0.5px] pointer-events-none animate-speck-2" />
-      <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-sky-300/20 rounded-full blur-[0.5px] pointer-events-none animate-speck-1" style={{ animationDelay: '-6s' }} />
-      <div className="absolute top-1/6 right-1/3 w-1 h-1 bg-emerald-300/15 rounded-full blur-[0.5px] pointer-events-none animate-speck-2" style={{ animationDelay: '-10s' }} />
-
-      {/* LAYER 3: Subtle texture pattern & soft radial vignette */}
-      <div className="absolute inset-0 bg-subtle-dots pointer-events-none opacity-25 mix-blend-screen" />
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_100%_80%_at_50%_35%,transparent_25%,rgba(6,8,19,0.55)_70%,rgba(3,4,10,0.92)_100%)]" />
+      <HomeAnimatedBackground />
 
       {/* =========================================================================
-          TOP BAR: EDICIÓN AMIGOS BADGE + ACTIONS (CÓMO JUGAR & SONIDO)
+          TOP BAR: EDICIÓN AMIGOS Y FAMILIA BADGE + ACTIONS (CÓMO JUGAR & SONIDO)
           ========================================================================= */}
       <header className="relative z-10 flex items-center justify-between w-full max-w-6xl mx-auto pb-4 sm:pb-6">
         <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.08)] backdrop-blur-md select-none">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Edición Amigos
+          <span className="px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.12)] backdrop-blur-md select-none">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" /> EDICIÓN AMIGOS Y FAMILIA
           </span>
         </div>
 
@@ -423,8 +402,15 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
       {/* =========================================================================
           FOOTER BAR
           ========================================================================= */}
-      <footer className="relative z-10 text-center text-xs text-slate-500 py-4 max-w-6xl mx-auto w-full select-none">
-        FAM2PLAY &bull; Diseñado para jugar con amigos en directo &bull; 100% en castellano
+      <footer className="relative z-10 text-center text-xs py-4 max-w-6xl mx-auto w-full select-none text-slate-400/80 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+        <span>FAM2PLAY &bull; Diseñado para jugar con amigos y familia en directo &bull; 100% en castellano</span>
+        <span className="hidden sm:inline text-slate-600">&bull;</span>
+        <span className="inline-flex items-center gap-1 text-slate-400">
+          Una creación de{' '}
+          <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 drop-shadow-[0_0_10px_rgba(251,146,60,0.4)]">
+            Sk4is
+          </span>
+        </span>
       </footer>
 
       {/* How to play modal */}

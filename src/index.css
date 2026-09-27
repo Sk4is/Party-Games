@@ -322,6 +322,160 @@ body,
   }
 }
 
+/* Ambient Background Blob Animations (18s - 38s independent cycles) */
+@keyframes home-blob-amber {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate3d(75px, 50px, 0) scale(1.18);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-35px, 25px, 0) scale(0.92);
+    opacity: 0.75;
+  }
+}
+
+@keyframes home-blob-rose {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate3d(-80px, 60px, 0) scale(1.14);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(30px, -45px, 0) scale(0.88);
+    opacity: 0.7;
+  }
+}
+
+@keyframes home-blob-cyan {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.95);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate3d(65px, -55px, 0) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-40px, 40px, 0) scale(0.9);
+    opacity: 0.8;
+  }
+}
+
+@keyframes home-blob-violet {
+  0% {
+    transform: translate3d(-50%, -50%, 0) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate3d(-50%, -46%, 0) scale(1.16);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-48%, -54%, 0) scale(0.94);
+    opacity: 0.75;
+  }
+}
+
+@keyframes home-blob-emerald {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(55px, -40px, 0) scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-25px, 35px, 0) scale(0.92);
+    opacity: 0.75;
+  }
+}
+
+@keyframes home-blob-orange {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate3d(-60px, -45px, 0) scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(40px, 30px, 0) scale(0.9);
+    opacity: 0.7;
+  }
+}
+
+/* Secondary Dynamic Layer: Aurora ribbons */
+@keyframes home-aurora-stream {
+  0% {
+    transform: translate3d(-4%, -3%, 0) rotate(0deg) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate3d(5%, 4%, 0) rotate(2deg) scale(1.06);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate3d(-4%, -3%, 0) rotate(0deg) scale(1);
+    opacity: 0.35;
+  }
+}
+
+@keyframes home-aurora-counter {
+  0% {
+    transform: translate3d(4%, 3%, 0) rotate(0deg) scale(1);
+    opacity: 0.22;
+  }
+  50% {
+    transform: translate3d(-5%, -3%, 0) rotate(-2deg) scale(1.08);
+    opacity: 0.40;
+  }
+  100% {
+    transform: translate3d(4%, 3%, 0) rotate(0deg) scale(1);
+    opacity: 0.22;
+  }
+}
+
+.animate-home-blob-amber {
+  animation: home-blob-amber 21s ease-in-out infinite alternate;
+}
+
+.animate-home-blob-rose {
+  animation: home-blob-rose 28s ease-in-out infinite alternate;
+}
+
+.animate-home-blob-cyan {
+  animation: home-blob-cyan 24s ease-in-out infinite alternate;
+}
+
+.animate-home-blob-violet {
+  animation: home-blob-violet 32s ease-in-out infinite alternate;
+}
+
+.animate-home-blob-emerald {
+  animation: home-blob-emerald 26s ease-in-out infinite alternate;
+}
+
+.animate-home-blob-orange {
+  animation: home-blob-orange 30s ease-in-out infinite alternate;
+}
+
+.animate-home-aurora-stream {
+  animation: home-aurora-stream 25s ease-in-out infinite;
+}
+
+.animate-home-aurora-counter {
+  animation: home-aurora-counter 33s ease-in-out infinite;
+}
+
 .animate-ambient-1 {
   animation: ambient-drift-1 26s ease-in-out infinite;
 }
@@ -348,9 +502,13 @@ body,
 
 /* Unified translucent dark surface for all FAM2PLAY game cards */
 .fam-card-surface {
-  background-color: rgba(12, 18, 34, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background-color: rgba(9, 14, 28, 0.52);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+.fam-card-surface:hover {
+  background-color: rgba(13, 20, 38, 0.62);
 }
 
 .animate-speck-1 {
