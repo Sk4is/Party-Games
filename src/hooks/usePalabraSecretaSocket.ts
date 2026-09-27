@@ -14,6 +14,7 @@ import {
 import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
 import { createConnectionResilience } from '../utils/connectionResilience';
+import { getGameWsUrl } from '../config/network';
 
 export type PalabraSecretaConnectionStatus =
   | 'idle'
@@ -71,19 +72,7 @@ export function usePalabraSecretaSocket({
 
   // Resolve sanitized WebSocket URL
   const getSanitizedSocketUrl = useCallback((): string => {
-    const envUrl =
-      (import.meta as any).env?.VITE_WS_URL ||
-      (import.meta as any).env?.VITE_PALABRA_SECRETA_WS_URL;
-    if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
-      return envUrl.trim();
-    }
-    if (typeof window === 'undefined') {
-      return 'ws://localhost:3000/ws/palabra-secreta';
-    }
-    const isHttps = window.location.protocol === 'https:';
-    const protocol = isHttps ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    return `${protocol}//${host}/ws/palabra-secreta`;
+    return getGameWsUrl('/ws/palabra-secreta', 'VITE_PALABRA_SECRETA_WS_URL');
   }, []);
 
   const connect = useCallback(() => {

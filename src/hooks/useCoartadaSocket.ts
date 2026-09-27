@@ -15,6 +15,7 @@ import {
 } from '../services/multiplayerRoomService';
 import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
+import { getGameWsUrl } from '../config/network';
 
 export type CoartadaConnectionStatus =
   | 'idle'
@@ -74,18 +75,7 @@ export function useCoartadaSocket({
   });
 
   const getSanitizedSocketUrl = useCallback((): string => {
-    const envUrl =
-      (import.meta as any).env?.VITE_WS_URL ||
-      (import.meta as any).env?.VITE_COARTADA_WS_URL;
-    if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
-      return envUrl.trim();
-    }
-    if (typeof window !== 'undefined') {
-      const loc = window.location;
-      const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${protocol}//${loc.host}/ws/coartada`;
-    }
-    return 'ws://localhost:3000/ws/coartada';
+    return getGameWsUrl('/ws/coartada', 'VITE_COARTADA_WS_URL');
   }, []);
 
   const sendClientMessage = useCallback((msg: CoartadaClientMessage) => {

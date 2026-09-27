@@ -14,6 +14,7 @@ import {
 } from '../services/multiplayerRoomService';
 import { sessionRecovery } from '../services/sessionRecovery';
 import { createConnectionResilience } from '../utils/connectionResilience';
+import { getGameWsUrl } from '../config/network';
 
 export type SocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -92,9 +93,7 @@ export function usePartySocket(options: UsePartySocketOptions) {
     setStatus('connecting');
     isManuallyClosedRef.current = false;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/party`;
+    const wsUrl = getGameWsUrl('/ws/party', 'VITE_PARTY_WS_URL');
 
     try {
       const socket = new WebSocket(wsUrl);

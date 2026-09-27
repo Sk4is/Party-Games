@@ -3,6 +3,8 @@
  * Shared client infrastructure for La Bomba, La Peor Respuesta, and Pinturillo.
  */
 
+import { getApiUrl } from '../config/network';
+
 export interface PlayerProfile {
   id: string;
   name: string;
@@ -42,7 +44,7 @@ export async function createOnlineRoom(
   hostPlayer: PlayerProfile,
   config?: any
 ): Promise<SharedRoomSummary> {
-  const res = await fetch('/api/rooms/create', {
+  const res = await fetch(getApiUrl('/api/rooms/create'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -74,7 +76,7 @@ export async function findOnlineRoom(code: string): Promise<SharedRoomSummary> {
     throw new Error('Código de sala vacío');
   }
 
-  const res = await fetch(`/api/rooms/${encodeURIComponent(cleanCode)}`);
+  const res = await fetch(getApiUrl(`/api/rooms/${encodeURIComponent(cleanCode)}`));
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok || !data.exists) {
@@ -98,7 +100,7 @@ export async function validateJoinOnlineRoom(
   }
 
   try {
-    const res = await fetch('/api/rooms/validate-join', {
+    const res = await fetch(getApiUrl('/api/rooms/validate-join'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

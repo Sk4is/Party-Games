@@ -1,4 +1,5 @@
 import { WordValidationResult } from '../types';
+import { getApiUrl } from '../config/network';
 
 /**
  * Normalizes a Spanish word:
@@ -79,7 +80,7 @@ export async function validateSpanishWordAsync(
 
   // STEP 2: FAST LEXICAL LOOKUP (Local server dictionary with 636,598 Spanish words)
   try {
-    const response = await fetch('/api/validate-word', {
+    const response = await fetch(getApiUrl('/api/validate-word'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

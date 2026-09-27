@@ -14,6 +14,7 @@ import {
 } from '../services/multiplayerRoomService';
 import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
+import { getGameWsUrl } from '../config/network';
 
 export type PinturilloConnectionStatus =
   | 'idle'
@@ -104,19 +105,7 @@ export function usePinturilloSocket({
 
   // Resolve sanitized WebSocket URL
   const getSanitizedSocketUrl = useCallback((): string => {
-    const envUrl =
-      (import.meta as any).env?.VITE_WS_URL ||
-      (import.meta as any).env?.VITE_PINTURILLO_WS_URL;
-    if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
-      return envUrl.trim();
-    }
-    if (typeof window === 'undefined') {
-      return 'ws://localhost:3000/ws/pinturillo';
-    }
-    const isHttps = window.location.protocol === 'https:';
-    const protocol = isHttps ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    return `${protocol}//${host}/ws/pinturillo`;
+    return getGameWsUrl('/ws/pinturillo', 'VITE_PINTURILLO_WS_URL');
   }, []);
 
   // Primary WebSocket Connect function — strictly idempotent for OPEN / CONNECTING sockets

@@ -30,6 +30,84 @@ try {
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// ============================================================================
+// CORS & ALLOWED ORIGINS CONFIGURATION (SPLIT RENDER DEPLOYMENT)
+// Supports Frontend (Render Static Site) & Backend (Render Web Service) separation
+// ============================================================================
+const rawAllowedOrigins = [
+  process.env.ALLOWED_ORIGINS,
+  process.env.FRONTEND_URL,
+  process.env.CLIENT_URL,
+]
+  .filter(Boolean)
+  .join(',');
+
+const customOrigins = rawAllowedOrigins
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const defaultAllowedOrigins = [
+  'https://fam2play-web.onrender.com',
+  'https://fam2play.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+];
+
+const allowedOriginsSet = new Set([...defaultAllowedOrigins, ...customOrigins]);
+
+function isOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true; // Server-to-server, curl, health checks, direct connections
+  if (allowedOriginsSet.has(origin)) return true;
+  if (allowedOriginsSet.has('*')) return true;
+
+  try {
+    const parsed = new URL(origin);
+    const hostname = parsed.hostname;
+
+    // Allow localhost and local loopback IPs on any port
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+      return true;
+    }
+
+    // Allow onrender.com subdomains for FAM2PLAY deployments
+    if (hostname.endsWith('.onrender.com')) {
+      return true;
+    }
+
+    // Allow Google Cloud / AI Studio preview iframe origins
+    if (hostname.endsWith('.googleusercontent.com') || hostname.endsWith('.run.app')) {
+      return true;
+    }
+  } catch {
+    // Malformed origin
+  }
+
+  return false;
+}
+
+// CORS middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && isOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Requested-With, Accept, Origin'
+    );
+    res.setHeader('Vary', 'Origin');
+  }
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 app.use(express.json());
 
 // Lazy-initialized Gemini client (only used as optional fallback for rare slang/modern words)
@@ -282,7 +360,7 @@ app.post('/api/rooms/validate-join', (req, res) => {
           : roomInfo.gameType === 'la-peor-respuesta'
           ? 'LA PEOR RESPUESTA'
           : roomInfo.gameType === 'pinturillo'
-          ? 'PINTURILLO'
+          ? 'LIENZO LOCO'
           : roomInfo.gameType === 'palabra-secreta'
           ? 'PALABRA SECRETA'
           : roomInfo.gameType === 'codigo-rojo'
@@ -362,8 +440,16 @@ async function startServer() {
 
   const httpServer = http.createServer(app);
 
-  // Explicit WebSocket upgrade routing
+  // Explicit WebSocket upgrade routing with Origin verification
   httpServer.on('upgrade', (request, socket, head) => {
+    const origin = request.headers.origin;
+    if (origin && !isOriginAllowed(origin)) {
+      console.warn(`[WebSocket Upgrade] Rejected forbidden origin: ${origin}`);
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
     const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
     const pathname = url.pathname.replace(/\/+$/, '') || '/';
 

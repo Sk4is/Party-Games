@@ -14,6 +14,7 @@ import {
 import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
 import { createConnectionResilience } from '../utils/connectionResilience';
+import { getGameWsUrl } from '../config/network';
 
 export type CodigoRojoConnectionStatus =
   | 'idle'
@@ -93,19 +94,7 @@ export function useCodigoRojoSocket({
 
   // Safe sanitized WebSocket URL resolution
   const getSanitizedSocketUrl = useCallback((): string => {
-    const envUrl =
-      (import.meta as any).env?.VITE_WS_URL ||
-      (import.meta as any).env?.VITE_CODIGO_ROJO_WS_URL;
-    if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
-      return envUrl.trim();
-    }
-    if (typeof window === 'undefined') {
-      return 'ws://localhost:3000/ws/codigo-rojo';
-    }
-    const isHttps = window.location.protocol === 'https:';
-    const protocol = isHttps ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    return `${protocol}//${host}/ws/codigo-rojo`;
+    return getGameWsUrl('/ws/codigo-rojo', 'VITE_CODIGO_ROJO_WS_URL');
   }, []);
 
   // Gracefully close any existing socket without triggering unhandled rejections

@@ -357,7 +357,18 @@ export class PinturilloServer {
         if (!room) {
           const roomMeta = roomRegistry.get(code);
           if (roomMeta && roomMeta.gameType !== 'pinturillo') {
-            const gameName = roomMeta.gameType === 'la-bomba' ? 'La Bomba' : 'La Peor Respuesta';
+            const gameName =
+              roomMeta.gameType === 'la-bomba'
+                ? 'La Bomba'
+                : roomMeta.gameType === 'la-peor-respuesta'
+                ? 'La Peor Respuesta'
+                : roomMeta.gameType === 'palabra-secreta'
+                ? 'Palabra Secreta'
+                : roomMeta.gameType === 'codigo-rojo'
+                ? 'Código Rojo'
+                : roomMeta.gameType === 'coartada'
+                ? 'Coartada'
+                : roomMeta.gameType;
             this.send(ws, {
               type: 'error',
               message: `Este código de sala (${code}) pertenece a ${gameName}.`,
