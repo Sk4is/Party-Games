@@ -1,16 +1,71 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Activity, Minus, Plus } from 'lucide-react';
 import { audio } from '../../../utils/audio';
 
+type WaveformType = 'SENOIDAL' | 'CUADRADA' | 'TRIANGULAR' | 'DIENTE_SIERRA';
+
 interface ModuladorFrecuenciaModuleProps {
   operatorState: {
-    waveform: 'SENOIDAL' | 'CUADRADA' | 'TRIANGULAR' | 'DIENTE_SIERRA';
+    waveform: WaveformType;
     channel: 'CANAL-ALPHA' | 'CANAL-BETA' | 'CANAL-GAMMA' | 'CANAL-DELTA';
     currentFreq: number;
     baseFreq: number;
   };
   solved: boolean;
   onAction: (action: { tunedFreq: number }) => void;
+}
+
+// Waveform mathematical evaluator: returns normalized amplitude in [-1, 1]
+// u = (x / wavelength) - phase
+function evalWaveform(type: WaveformType, u: number): number {
+  const f = u - Math.floor(u); // fractional cycle in [0, 1)
+
+  if (type === 'SENOIDAL') {
+    return Math.sin(2 * Math.PI * f);
+  }
+
+  if (type === 'TRIANGULAR') {
+    if (f < 0.25) return 4 * f;
+    if (f < 0.75) return 2 - 4 * f;
+    return 4 * f - 4;
+  }
+
+  if (type === 'CUADRADA') {
+    const eps = 0.025; // 2.5% slew transition for authentic oscilloscope trace
+    if (f < eps) return -1 + 2 * (f / eps);
+    if (f < 0.5 - eps) return 1;
+    if (f < 0.5 + eps) return 1 - (f - (0.5 - eps)) / eps;
+    if (f < 1.0 - eps) return -1;
+    return -1 + (f - (1.0 - eps)) / eps;
+  }
+
+  if (type === 'DIENTE_SIERRA') {
+    const tr = 0.94; // 94% linear ramp, 6% sharp flyback drop
+    if (f < tr) return -1 + 2 * (f / tr);
+    return 1 - 2 * ((f - tr) / (1 - tr));
+  }
+
+  return 0;
+}
+
+// Generate SVG path d string for 300px width
+function generateWavePath(
+  type: WaveformType,
+  wavelength: number,
+  phase: number,
+  width = 300,
+  y0 = 40,
+  amp = 24,
+  step = 2.5
+): string {
+  let d = '';
+  for (let x = 0; x <= width; x += step) {
+    const u = x / wavelength - phase;
+    const v = evalWaveform(type, u);
+    const y = y0 - amp * v;
+    d += (x === 0 ? 'M ' : ' L ') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }
+  return d;
 }
 
 export const ModuladorFrecuenciaModule: React.FC<ModuladorFrecuenciaModuleProps> = ({
@@ -21,10 +76,31 @@ export const ModuladorFrecuenciaModule: React.FC<ModuladorFrecuenciaModuleProps>
   const { waveform, channel, baseFreq } = operatorState;
   const [freq, setFreq] = useState<number>(baseFreq);
 
+  const pathRef = useRef<SVGPathElement>(null);
+  const scanLineRef = useRef<SVGLineElement>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(performance.now());
+  const phaseRef = useRef<number>(0);
+  const scanXRef = useRef<number>(0);
+  const visualFreqRef = useRef<number>(baseFreq);
+  const targetFreqRef = useRef<number>(baseFreq);
+  const pulseRef = useRef<number>(0);
+
+  // Sync state if baseFreq changes from room updates/reconnect
+  useEffect(() => {
+    setFreq(baseFreq);
+    targetFreqRef.current = baseFreq;
+  }, [baseFreq]);
+
   const handleAdjust = (delta: number) => {
     if (solved) return;
     audio.playDialClick();
-    setFreq((prev) => Math.max(50, Math.min(300, prev + delta)));
+    setFreq((prev) => {
+      const next = Math.max(50, Math.min(300, prev + delta));
+      targetFreqRef.current = next;
+      pulseRef.current = 1.0;
+      return next;
+    });
   };
 
   const handleCalibrate = () => {
@@ -32,6 +108,73 @@ export const ModuladorFrecuenciaModule: React.FC<ModuladorFrecuenciaModuleProps>
     audio.playMechanicalSwitch();
     onAction({ tunedFreq: freq });
   };
+
+  // High-performance continuous animation loop updating SVG path and scanline directly without React re-renders
+  useEffect(() => {
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    lastTimeRef.current = performance.now();
+
+    const loop = (now: number) => {
+      const dt = Math.min(0.1, (now - lastTimeRef.current) / 1000);
+      lastTimeRef.current = now;
+
+      // Exponential smoothing toward target frequency (~220ms convergence)
+      const target = targetFreqRef.current;
+      visualFreqRef.current += (target - visualFreqRef.current) * (1 - Math.exp(-dt / 0.08));
+
+      // Instrument button pulse decay
+      if (pulseRef.current > 0) {
+        pulseRef.current = Math.max(0, pulseRef.current - dt * 4.0);
+      }
+
+      // Continuous propagation: subtle speed scaling with frequency
+      if (!prefersReducedMotion && !solved) {
+        const currentSpeed = 0.95 + (visualFreqRef.current - 50) * 0.0018;
+        phaseRef.current = (phaseRef.current + dt * currentSpeed) % 1;
+      }
+
+      // CRT scanline sweep
+      if (!prefersReducedMotion) {
+        scanXRef.current = (scanXRef.current + dt * 110) % 300;
+        if (scanLineRef.current) {
+          scanLineRef.current.setAttribute('x1', scanXRef.current.toFixed(1));
+          scanLineRef.current.setAttribute('x2', scanXRef.current.toFixed(1));
+        }
+      }
+
+      // Compute normalized wave density: higher kHz -> more cycles; lower kHz -> fewer cycles
+      const cycles = Math.max(2.0, Math.min(10.0, 4.5 + (visualFreqRef.current - 110) * 0.032));
+      const wavelength = 300 / cycles;
+
+      // Generate wave path
+      const pathD = generateWavePath(waveform, wavelength, phaseRef.current, 300, 40, 24, 2.5);
+
+      if (pathRef.current) {
+        pathRef.current.setAttribute('d', pathD);
+        const glow = 5 + 5 * pulseRef.current;
+        const strokeWidth = (2.8 + 0.5 * pulseRef.current).toFixed(1);
+        pathRef.current.setAttribute('stroke-width', strokeWidth);
+        pathRef.current.style.filter = `drop-shadow(0 0 ${glow}px rgba(16, 185, 129, ${0.75 + 0.25 * pulseRef.current}))`;
+      }
+
+      animFrameRef.current = requestAnimationFrame(loop);
+    };
+
+    animFrameRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+    };
+  }, [waveform, solved]);
+
+  // Initial fallback path for immediate paint
+  const initialCycles = Math.max(2.0, Math.min(10.0, 4.5 + (baseFreq - 110) * 0.032));
+  const initialPath = generateWavePath(waveform, 300 / initialCycles, 0, 300, 40, 24, 2.5);
 
   return (
     <div className="flex flex-col items-center justify-between w-full h-full p-6 bg-slate-900/90 rounded-2xl border border-slate-700 select-none">
@@ -73,42 +216,33 @@ export const ModuladorFrecuenciaModule: React.FC<ModuladorFrecuenciaModuleProps>
               </pattern>
             </defs>
             <rect width="300" height="80" fill="url(#grid)" />
-            {waveform === 'SENOIDAL' && (
-              <path
-                d="M 0 40 Q 25 0 50 40 T 100 40 T 150 40 T 200 40 T 250 40 T 300 40"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3"
-                className="drop-shadow-[0_0_6px_#10b981]"
-              />
-            )}
-            {waveform === 'CUADRADA' && (
-              <path
-                d="M 0 60 L 40 60 L 40 20 L 80 20 L 80 60 L 120 60 L 120 20 L 160 20 L 160 60 L 200 60 L 200 20 L 240 20 L 240 60 L 280 60 L 280 20 L 300 20"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3"
-                className="drop-shadow-[0_0_6px_#10b981]"
-              />
-            )}
-            {waveform === 'TRIANGULAR' && (
-              <path
-                d="M 0 40 L 30 15 L 60 65 L 90 15 L 120 65 L 150 15 L 180 65 L 210 15 L 240 65 L 270 15 L 300 65"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3"
-                className="drop-shadow-[0_0_6px_#10b981]"
-              />
-            )}
-            {waveform === 'DIENTE_SIERRA' && (
-              <path
-                d="M 0 65 L 50 15 L 50 65 L 100 15 L 100 65 L 150 15 L 150 65 L 200 15 L 200 65 L 250 15 L 250 65 L 300 15"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3"
-                className="drop-shadow-[0_0_6px_#10b981]"
-              />
-            )}
+
+            {/* Oscilloscope Centerline Axes */}
+            <line x1="0" y1="40" x2="300" y2="40" stroke="rgba(16, 185, 129, 0.22)" strokeWidth="1" strokeDasharray="4 4" />
+            <line x1="150" y1="0" x2="150" y2="80" stroke="rgba(16, 185, 129, 0.22)" strokeWidth="1" strokeDasharray="4 4" />
+
+            {/* Faint CRT Sweep Line */}
+            <line
+              ref={scanLineRef}
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="80"
+              stroke="rgba(52, 211, 153, 0.25)"
+              strokeWidth="1.2"
+            />
+
+            {/* Continuous Live Waveform Path */}
+            <path
+              ref={pathRef}
+              d={initialPath}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="2.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ filter: 'drop-shadow(0 0 5px rgba(16, 185, 129, 0.75))' }}
+            />
           </svg>
         </div>
 

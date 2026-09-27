@@ -15,6 +15,26 @@ interface ValvulasPresionModuleProps {
   onAction: (action: { a: number; b: number; c: number }) => void;
 }
 
+// Shared Semicircular Gauge Geometry: cx = 80, cy = 90, r = 58
+const GAUGE_CX = 80;
+const GAUGE_CY = 90;
+const GAUGE_R = 58;
+
+function polarToCartesian(cx: number, cy: number, r: number, angleDegrees: number) {
+  const rad = (angleDegrees * Math.PI) / 180;
+  return {
+    x: cx + r * Math.cos(rad),
+    y: cy - r * Math.sin(rad),
+  };
+}
+
+function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
+  const start = polarToCartesian(cx, cy, r, startAngle);
+  const end = polarToCartesian(cx, cy, r, endAngle);
+  const largeArcFlag = Math.abs(startAngle - endAngle) <= 180 ? 0 : 1;
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+}
+
 export const ValvulasPresionModule: React.FC<ValvulasPresionModuleProps> = ({
   operatorState,
   solved,
@@ -90,9 +110,17 @@ export const ValvulasPresionModule: React.FC<ValvulasPresionModuleProps> = ({
         <div className="relative w-36 h-24 sm:w-44 sm:h-28 bg-slate-950 rounded-t-full border-2 border-slate-700 flex flex-col items-center justify-end overflow-hidden p-2 shadow-inner">
           {/* Gauge Arc Graphic */}
           <svg className="absolute inset-0 w-full h-full" viewBox="0 0 160 100">
+            {/* Background Gauge Track */}
+            <path
+              d={describeArc(GAUGE_CX, GAUGE_CY, GAUGE_R, 180, 0)}
+              fill="none"
+              stroke="#1e293b"
+              strokeWidth="6"
+              strokeLinecap="round"
+            />
             {/* Green arc (0 to 40 PSI) */}
             <path
-              d="M 20 90 A 60 60 0 0 1 58 38"
+              d={describeArc(GAUGE_CX, GAUGE_CY, GAUGE_R, 177, 112.5)}
               fill="none"
               stroke="#10b981"
               strokeWidth="6"
@@ -100,33 +128,52 @@ export const ValvulasPresionModule: React.FC<ValvulasPresionModuleProps> = ({
             />
             {/* Amber arc (40 to 80 PSI) */}
             <path
-              d="M 64 33 A 60 60 0 0 1 122 47"
+              d={describeArc(GAUGE_CX, GAUGE_CY, GAUGE_R, 103.5, 40.5)}
               fill="none"
               stroke="#f59e0b"
               strokeWidth="6"
+              strokeLinecap="round"
             />
             {/* Red arc (80 to 100 PSI) */}
             <path
-              d="M 127 52 A 60 60 0 0 1 140 90"
+              d={describeArc(GAUGE_CX, GAUGE_CY, GAUGE_R, 31.5, 3)}
               fill="none"
               stroke="#ef4444"
               strokeWidth="6"
               strokeLinecap="round"
             />
-            {/* Dial center pin */}
-            <circle cx="80" cy="90" r="5" fill="#f8fafc" />
+            {/* Minor tick marks along the arc for mechanical precision */}
+            {[0, 20, 40, 60, 80, 100].map((psi) => {
+              const ang = 180 - (psi / 100) * 180;
+              const inner = polarToCartesian(GAUGE_CX, GAUGE_CY, GAUGE_R - 8, ang);
+              const outer = polarToCartesian(GAUGE_CX, GAUGE_CY, GAUGE_R - 4, ang);
+              return (
+                <line
+                  key={psi}
+                  x1={inner.x.toFixed(2)}
+                  y1={inner.y.toFixed(2)}
+                  x2={outer.x.toFixed(2)}
+                  y2={outer.y.toFixed(2)}
+                  stroke="#475569"
+                  strokeWidth="1.2"
+                />
+              );
+            })}
             {/* Needle */}
             <line
-              x1="80"
-              y1="90"
-              x2="80"
-              y2="34"
+              x1={GAUGE_CX}
+              y1={GAUGE_CY}
+              x2={GAUGE_CX}
+              y2={GAUGE_CY - 52}
               stroke="#f8fafc"
               strokeWidth="2.5"
               strokeLinecap="round"
-              transform={`rotate(${needleAngle} 80 90)`}
+              transform={`rotate(${needleAngle} ${GAUGE_CX} ${GAUGE_CY})`}
               className="transition-transform duration-500 ease-out"
             />
+            {/* Dial center pin / hub */}
+            <circle cx={GAUGE_CX} cy={GAUGE_CY} r="5.5" fill="#0f172a" stroke="#64748b" strokeWidth="1.5" />
+            <circle cx={GAUGE_CX} cy={GAUGE_CY} r="2.5" fill="#f8fafc" />
           </svg>
           <div className="relative z-10 px-3 py-0.5 rounded bg-slate-900/90 border border-slate-700 text-center font-mono font-black text-amber-300 text-sm sm:text-base tracking-widest shadow">
             {pressure} PSI

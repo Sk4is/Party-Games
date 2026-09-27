@@ -13,7 +13,7 @@ import {
 export interface GeneratedModuleInternal {
   moduleState: CodigoRojoModuleState;
   internalSolution: any;
-  validateAction: (action: any, currentProgress: any) => { valid: boolean; solved: boolean; updatedProgress?: any };
+  validateAction: (action: any, currentProgress?: any) => { valid: boolean; solved: boolean; updatedProgress?: any };
 }
 
 export function generateMachineSerial(rng: Mulberry32): string {
@@ -216,9 +216,10 @@ function generateFilamentos(
       },
       manualSection,
     },
-    internalSolution: { targetIndex },
-    validateAction: (action: { wireIndex: number }) => {
-      if (action.wireIndex === targetIndex) {
+    internalSolution: { targetIndex, wireIndex: targetIndex },
+    validateAction: (action: { wireIndex?: number; targetIndex?: number }) => {
+      const idx = action.wireIndex !== undefined ? action.wireIndex : action.targetIndex;
+      if (idx === targetIndex) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -295,9 +296,10 @@ function generateModuladorFrecuencia(rng: Mulberry32, difficulty: CodigoRojoDiff
       },
       manualSection,
     },
-    internalSolution: { targetFreq },
-    validateAction: (action: { tunedFreq: number }) => {
-      if (Math.abs(action.tunedFreq - targetFreq) < 0.1) {
+    internalSolution: { targetFreq, tunedFreq: targetFreq },
+    validateAction: (action: { tunedFreq?: number; targetFreq?: number }) => {
+      const freq = action.tunedFreq !== undefined ? action.tunedFreq : action.targetFreq;
+      if (freq !== undefined && Math.abs(freq - targetFreq) < 0.1) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -337,8 +339,18 @@ function generateGlifosCriptograficos(rng: Mulberry32): GeneratedModuleInternal 
       },
       manualSection,
     },
-    internalSolution: { correctSymbolsInOrder, progressIndex: 0 },
-    validateAction: (action: { symbol: string }, currentProgress: { progressIndex: number }) => {
+    internalSolution: { correctSymbolsInOrder, symbols: correctSymbolsInOrder, progressIndex: 0 },
+    validateAction: (
+      action: { symbol?: string; symbols?: string[]; correctSymbolsInOrder?: string[] },
+      currentProgress?: { progressIndex: number }
+    ) => {
+      const fullList = action.correctSymbolsInOrder || action.symbols;
+      if (Array.isArray(fullList)) {
+        const matches =
+          fullList.length === correctSymbolsInOrder.length &&
+          fullList.every((s, i) => s === correctSymbolsInOrder[i]);
+        return { valid: matches, solved: matches };
+      }
       const currentIndex = currentProgress?.progressIndex || 0;
       const expectedSymbol = correctSymbolsInOrder[currentIndex];
       if (action.symbol === expectedSymbol) {
@@ -395,9 +407,11 @@ function generateMatrizEnergia(rng: Mulberry32): GeneratedModuleInternal {
       },
       manualSection,
     },
-    internalSolution: { targetCells: targetCells.sort() },
-    validateAction: (action: { activeCells: string[] }) => {
-      const sortedInput = [...action.activeCells].sort();
+    internalSolution: { targetCells: targetCells.sort(), activeCells: targetCells.sort() },
+    validateAction: (action: { activeCells?: string[]; targetCells?: string[] }) => {
+      const cells = action.activeCells || action.targetCells;
+      if (!cells || !Array.isArray(cells)) return { valid: false, solved: false };
+      const sortedInput = [...cells].sort();
       const sortedTarget = [...targetCells].sort();
       const match =
         sortedInput.length === sortedTarget.length &&
@@ -522,9 +536,26 @@ function generateValvulasPresion(rng: Mulberry32, serial: string = 'CR-4821-X7')
       },
       manualSection,
     },
-    internalSolution: { targetA, targetB, targetC },
-    validateAction: (action: { a: number; b: number; c: number }) => {
-      if (action.a === targetA && action.b === targetB && action.c === targetC) {
+    internalSolution: {
+      targetA,
+      targetB,
+      targetC,
+      a: targetA,
+      b: targetB,
+      c: targetC,
+    },
+    validateAction: (action: {
+      a?: number;
+      b?: number;
+      c?: number;
+      targetA?: number;
+      targetB?: number;
+      targetC?: number;
+    }) => {
+      const a = action.a !== undefined ? action.a : action.targetA;
+      const b = action.b !== undefined ? action.b : action.targetB;
+      const c = action.c !== undefined ? action.c : action.targetC;
+      if (a === targetA && b === targetB && c === targetC) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -611,12 +642,13 @@ function generateRelesHexadecimales(rng: Mulberry32, serial: string = 'CR-4821-X
       },
       manualSection,
     },
-    internalSolution: { targetSwitches },
-    validateAction: (action: { switches: number[] }) => {
+    internalSolution: { targetSwitches, switches: targetSwitches },
+    validateAction: (action: { switches?: number[]; targetSwitches?: number[] }) => {
+      const switches = action.switches || action.targetSwitches;
       const match =
-        Array.isArray(action.switches) &&
-        action.switches.length === 4 &&
-        action.switches.every((s, i) => s === targetSwitches[i]);
+        Array.isArray(switches) &&
+        switches.length === 4 &&
+        switches.every((s, i) => s === targetSwitches[i]);
       if (match) {
         return { valid: true, solved: true };
       }
@@ -695,9 +727,10 @@ function generateRadarVectorial(rng: Mulberry32): GeneratedModuleInternal {
       },
       manualSection,
     },
-    internalSolution: { targetBlipName },
-    validateAction: (action: { blipName: string }) => {
-      if (action.blipName === targetBlipName) {
+    internalSolution: { targetBlipName, blipName: targetBlipName },
+    validateAction: (action: { blipName?: string; targetBlipName?: string }) => {
+      const blip = action.blipName ?? action.targetBlipName;
+      if (blip === targetBlipName) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -766,9 +799,10 @@ function generateSeñalOptica(rng: Mulberry32): GeneratedModuleInternal {
       },
       manualSection,
     },
-    internalSolution: { correctFreq: targetStation.freq },
-    validateAction: (action: { freq: string }) => {
-      if (action.freq === targetStation.freq) {
+    internalSolution: { correctFreq: targetStation.freq, freq: targetStation.freq },
+    validateAction: (action: { freq?: string; correctFreq?: string }) => {
+      const freq = action.freq ?? action.correctFreq;
+      if (freq === targetStation.freq) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -859,9 +893,10 @@ function generateTecladoMaestro(
       },
       manualSection,
     },
-    internalSolution: { targetPin },
-    validateAction: (action: { pin: string }) => {
-      if (action.pin === targetPin) {
+    internalSolution: { targetPin, pin: targetPin },
+    validateAction: (action: { pin?: string; targetPin?: string }) => {
+      const pin = action.pin ?? action.targetPin;
+      if (pin === targetPin) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -925,11 +960,16 @@ function generatePalancaSobrecarga(rng: Mulberry32): GeneratedModuleInternal {
       },
       manualSection,
     },
-    internalSolution: { validLastDigits },
-    validateAction: (action: { secondRemaining: number }) => {
-      const lastDigit = Math.abs(action.secondRemaining % 10);
-      if (validLastDigits.includes(lastDigit)) {
+    internalSolution: { validLastDigits, secondRemaining: validLastDigits[0] },
+    validateAction: (action: { secondRemaining?: number; validLastDigits?: number[] }) => {
+      if (action.validLastDigits && Array.isArray(action.validLastDigits)) {
         return { valid: true, solved: true };
+      }
+      if (action.secondRemaining !== undefined) {
+        const lastDigit = Math.abs(action.secondRemaining % 10);
+        if (validLastDigits.includes(lastDigit)) {
+          return { valid: true, solved: true };
+        }
       }
       return { valid: false, solved: false };
     },
@@ -1007,12 +1047,14 @@ function generateCompuertasLogicas(rng: Mulberry32): GeneratedModuleInternal {
       },
       manualSection,
     },
-    internalSolution: { targetPins },
-    validateAction: (action: { pins: boolean[] }) => {
+    internalSolution: { targetPins, pins: targetPins },
+    validateAction: (action: { pins?: boolean[]; targetPins?: boolean[] }) => {
+      const pins = action.pins || action.targetPins;
+      if (!pins || !Array.isArray(pins)) return { valid: false, solved: false };
       const match =
-        action.pins[0] === targetPins[0] &&
-        action.pins[1] === targetPins[1] &&
-        action.pins[2] === targetPins[2];
+        pins[0] === targetPins[0] &&
+        pins[1] === targetPins[1] &&
+        pins[2] === targetPins[2];
       if (match) {
         return { valid: true, solved: true };
       }
@@ -1095,12 +1137,29 @@ function generateRefrigeranteQuimico(rng: Mulberry32): GeneratedModuleInternal {
       },
       manualSection,
     },
-    internalSolution: { targetBlue, targetGreen, targetRed },
-    validateAction: (action: { blue: number; green: number; red: number }) => {
+    internalSolution: {
+      targetBlue,
+      targetGreen,
+      targetRed,
+      blue: targetBlue,
+      green: targetGreen,
+      red: targetRed,
+    },
+    validateAction: (action: {
+      blue?: number;
+      green?: number;
+      red?: number;
+      targetBlue?: number;
+      targetGreen?: number;
+      targetRed?: number;
+    }) => {
+      const blue = action.blue !== undefined ? action.blue : action.targetBlue;
+      const green = action.green !== undefined ? action.green : action.targetGreen;
+      const red = action.red !== undefined ? action.red : action.targetRed;
       if (
-        action.blue === targetBlue &&
-        action.green === targetGreen &&
-        action.red === targetRed
+        blue === targetBlue &&
+        green === targetGreen &&
+        red === targetRed
       ) {
         return { valid: true, solved: true };
       }
@@ -1254,20 +1313,21 @@ function generatePuertosConexion(
       },
       manualSection,
     },
-    internalSolution: { targetConnections },
-    validateAction: (action: { connections: Record<string, string> }) => {
-      if (!action || !action.connections || typeof action.connections !== 'object') {
+    internalSolution: { targetConnections, connections: targetConnections },
+    validateAction: (action: { connections?: Record<string, string>; targetConnections?: Record<string, string> }) => {
+      const connections = action.connections || action.targetConnections;
+      if (!connections || typeof connections !== 'object') {
         return { valid: false, solved: false };
       }
       const allCablesConnected = activeCables.every(
-        (c) => action.connections[c.id] && typeof action.connections[c.id] === 'string'
+        (c) => connections[c.id] && typeof connections[c.id] === 'string'
       );
       if (!allCablesConnected) {
         return { valid: false, solved: false };
       }
 
       const isCorrect = activeCables.every(
-        (c) => action.connections[c.id] === targetConnections[c.id]
+        (c) => connections[c.id] === targetConnections[c.id]
       );
 
       if (isCorrect) {
@@ -1349,9 +1409,11 @@ function generateDisipadorTermico(rng: Mulberry32): GeneratedModuleInternal {
       },
       manualSection,
     },
-    internalSolution: { target },
-    validateAction: (action: { baffles: boolean[] }) => {
-      const match = action.baffles.every((b, i) => b === target[i]);
+    internalSolution: { target, baffles: target },
+    validateAction: (action: { baffles?: boolean[]; target?: boolean[] }) => {
+      const baffles = action.baffles || action.target;
+      if (!baffles || !Array.isArray(baffles)) return { valid: false, solved: false };
+      const match = baffles.every((b, i) => b === target[i]);
       if (match) {
         return { valid: true, solved: true };
       }
@@ -1417,9 +1479,11 @@ function generateSincronizadorFases(rng: Mulberry32): GeneratedModuleInternal {
       },
       manualSection,
     },
-    internalSolution: { targetOuterAngle },
-    validateAction: (action: { outerAngle: number }) => {
-      if ((action.outerAngle % 360) === (targetOuterAngle % 360)) {
+    internalSolution: { targetOuterAngle, outerAngle: targetOuterAngle },
+    validateAction: (action: { outerAngle?: number; targetOuterAngle?: number }) => {
+      const angle = action.outerAngle !== undefined ? action.outerAngle : action.targetOuterAngle;
+      if (angle === undefined) return { valid: false, solved: false };
+      if ((angle % 360) === (targetOuterAngle % 360)) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -1480,9 +1544,11 @@ function generateCalibradorGiroscopio(rng: Mulberry32, serial: string): Generate
       },
       manualSection,
     },
-    internalSolution: { targetHeading },
-    validateAction: (action: { lockedHeading: number }) => {
-      let diff = Math.abs(action.lockedHeading - targetHeading) % 360;
+    internalSolution: { targetHeading, lockedHeading: targetHeading },
+    validateAction: (action: { lockedHeading?: number; targetHeading?: number }) => {
+      const heading = action.lockedHeading !== undefined ? action.lockedHeading : action.targetHeading;
+      if (heading === undefined) return { valid: false, solved: false };
+      let diff = Math.abs(heading - targetHeading) % 360;
       if (diff > 180) diff = 360 - diff;
       if (diff <= 2) {
         return { valid: true, solved: true };
@@ -1618,9 +1684,14 @@ function generateFrecuenciaResonancia(rng: Mulberry32, serial: string): Generate
       },
       manualSection,
     },
-    internalSolution: { targetFilters: targetFilters.sort((a, b) => a - b) },
-    validateAction: (action: { activeFilters: number[] }) => {
-      const sortedAct = [...action.activeFilters].sort((a, b) => a - b);
+    internalSolution: {
+      targetFilters: targetFilters.sort((a, b) => a - b),
+      activeFilters: targetFilters.sort((a, b) => a - b),
+    },
+    validateAction: (action: { activeFilters?: number[]; targetFilters?: number[] }) => {
+      const filters = action.activeFilters || action.targetFilters;
+      if (!filters || !Array.isArray(filters)) return { valid: false, solved: false };
+      const sortedAct = [...filters].sort((a, b) => a - b);
       const isMatch =
         sortedAct.length === targetFilters.length &&
         sortedAct.every((v, i) => v === targetFilters[i]);
@@ -1714,7 +1785,11 @@ function generateSecuenciaCinetica(rng: Mulberry32, serial: string): GeneratedMo
       manualSection,
     },
     internalSolution: { sequence },
-    validateAction: (action: { pressedPistonId: number }, currentProgress: any) => {
+    validateAction: (action: { pressedPistonId?: number; sequence?: number[] }, currentProgress?: any) => {
+      if (Array.isArray(action.sequence)) {
+        const matches = action.sequence.length === sequence.length && action.sequence.every((p, i) => p === sequence[i]);
+        return { valid: matches, solved: matches };
+      }
       const stepIndex = currentProgress?.stepProgress || 0;
       const expectedPiston = sequence[stepIndex];
 
@@ -1779,9 +1854,10 @@ function generateDivisorVoltaje(rng: Mulberry32, serial: string): GeneratedModul
       },
       manualSection,
     },
-    internalSolution: { targetValue },
-    validateAction: (action: { dialValue: number }) => {
-      if (action.dialValue === targetValue) {
+    internalSolution: { targetValue, dialValue: targetValue },
+    validateAction: (action: { dialValue?: number; targetValue?: number }) => {
+      const dial = action.dialValue !== undefined ? action.dialValue : action.targetValue;
+      if (dial === targetValue) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -1852,9 +1928,9 @@ function generateCamaraContrapesos(
       },
       manualSection,
     },
-    internalSolution: { expectedSlots },
-    validateAction: (action: { slots: { A: number; B: number; C: number } }) => {
-      const { slots } = action;
+    internalSolution: { expectedSlots, slots: expectedSlots },
+    validateAction: (action: { slots?: { A: number; B: number; C: number }; expectedSlots?: { A: number; B: number; C: number } }) => {
+      const slots = action.slots || action.expectedSlots;
       if (!slots || slots.A === undefined || slots.B === undefined || slots.C === undefined) {
         return { valid: false, solved: false };
       }
@@ -1938,9 +2014,24 @@ function generatePrismaRefraccion(
       },
       manualSection,
     },
-    internalSolution: { targetSensor, targetAngle },
-    validateAction: (action: { sensor: string; angle: number }) => {
-      if (action.sensor === targetSensor || Math.abs(action.angle - targetAngle) <= 8) {
+    internalSolution: {
+      targetSensor,
+      targetAngle,
+      sensor: targetSensor,
+      angle: targetAngle,
+    },
+    validateAction: (action: {
+      sensor?: string;
+      angle?: number;
+      targetSensor?: string;
+      targetAngle?: number;
+    }) => {
+      const actSensor = action.sensor ?? action.targetSensor;
+      const actAngle = action.angle !== undefined ? action.angle : action.targetAngle;
+      if (
+        (actSensor && actSensor === targetSensor) ||
+        (actAngle !== undefined && Math.abs(actAngle - targetAngle) <= 8)
+      ) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -2072,12 +2163,29 @@ function generateAnillosCifrado(
       },
       manualSection,
     },
-    internalSolution: { targetSymbol, targetLetter, targetNumber },
-    validateAction: (action: { symbol: string; letter: string; number: number }) => {
+    internalSolution: {
+      targetSymbol,
+      targetLetter,
+      targetNumber,
+      symbol: targetSymbol,
+      letter: targetLetter,
+      number: targetNumber,
+    },
+    validateAction: (action: {
+      symbol?: string;
+      letter?: string;
+      number?: number;
+      targetSymbol?: string;
+      targetLetter?: string;
+      targetNumber?: number;
+    }) => {
+      const actSym = action.symbol ?? action.targetSymbol;
+      const actLet = action.letter ?? action.targetLetter;
+      const actNum = action.number ?? action.targetNumber;
       if (
-        action.symbol === targetSymbol &&
-        action.letter === targetLetter &&
-        Number(action.number) === targetNumber
+        actSym === targetSymbol &&
+        actLet === targetLetter &&
+        Number(actNum) === targetNumber
       ) {
         return { valid: true, solved: true };
       }
@@ -2133,9 +2241,9 @@ function generateMasasMagneticas(
       },
       manualSection,
     },
-    internalSolution: { expectedPositions },
-    validateAction: (action: { grid: Record<string, 'N' | 'S' | null> }) => {
-      const { grid } = action;
+    internalSolution: { expectedPositions, grid: expectedPositions },
+    validateAction: (action: { grid?: Record<string, 'N' | 'S' | null>; expectedPositions?: Record<string, 'N' | 'S' | null> }) => {
+      const grid = action.grid || action.expectedPositions;
       if (!grid) return { valid: false, solved: false };
 
       const allMatch = Object.entries(expectedPositions).every(
@@ -2206,9 +2314,10 @@ function generatePresionPiston(
       },
       manualSection,
     },
-    internalSolution: { targetNotch },
-    validateAction: (action: { notch: number }) => {
-      if (Number(action.notch) === targetNotch) {
+    internalSolution: { targetNotch, notch: targetNotch },
+    validateAction: (action: { notch?: number; targetNotch?: number }) => {
+      const selected = action.notch !== undefined ? Number(action.notch) : Number(action.targetNotch);
+      if (selected === targetNotch) {
         return { valid: true, solved: true };
       }
       return { valid: false, solved: false };
@@ -2274,12 +2383,15 @@ function generateGiroscopioEstabilizacion(
       },
       manualSection,
     },
-    internalSolution: { targetX, targetY, targetZ },
-    validateAction: (action: { x: number; y: number; z: number }) => {
+    internalSolution: { targetX, targetY, targetZ, x: targetX, y: targetY, z: targetZ },
+    validateAction: (action: { x?: number; y?: number; z?: number; targetX?: number; targetY?: number; targetZ?: number }) => {
+      const actX = action.x !== undefined ? Number(action.x) : Number(action.targetX);
+      const actY = action.y !== undefined ? Number(action.y) : Number(action.targetY);
+      const actZ = action.z !== undefined ? Number(action.z) : Number(action.targetZ);
       if (
-        Number(action.x) === targetX &&
-        Number(action.y) === targetY &&
-        Number(action.z) === targetZ
+        actX === targetX &&
+        actY === targetY &&
+        actZ === targetZ
       ) {
         return { valid: true, solved: true };
       }
@@ -2333,7 +2445,7 @@ function generateCamaraCartuchos(
       },
       manualSection,
     },
-    internalSolution: { targetOrder },
+    internalSolution: { targetOrder, materialsOrder: targetOrder, correctMaterialsOrder: targetOrder },
     validateAction: (action: { materialsOrder: string[] }) => {
       const { materialsOrder } = action;
       if (!materialsOrder || materialsOrder.length !== 4) {
@@ -2366,6 +2478,13 @@ function generateFlujoGravitacional(
     (s) => s.moduleType === 'FLUJO_GRAVITACIONAL'
   )!;
 
+  // Solutions:
+  // Par: Red to A (v1=IZQ, v2=IZQ), Blue to B (v3=IZQ or v1=IZQ/v2=IZQ/v3=IZQ)
+  // Impar: Red to B (v1=REC), Blue to C (v3=DER)
+  const solutionValves = isEven
+    ? { v1: 'IZQ', v2: 'IZQ', v3: 'IZQ' }
+    : { v1: 'REC', v2: 'REC', v3: 'DER' };
+
   return {
     moduleState: {
       id: `mod-flujo-${rng.range(1000, 9999)}`,
@@ -2380,7 +2499,7 @@ function generateFlujoGravitacional(
       },
       manualSection,
     },
-    internalSolution: { targetRed, targetBlue },
+    internalSolution: { targetRed, targetBlue, valves: solutionValves },
     validateAction: (action: { valves: { v1: string; v2: string; v3: string } }) => {
       const { valves } = action;
       if (!valves) return { valid: false, solved: false };
