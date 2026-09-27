@@ -8,6 +8,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "BLAZE";
+  src: url("/assets/fonts/BLAZE.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 html,
 body,
 #root {
@@ -41,6 +49,9 @@ body,
   }
   .font-game {
     font-family: 'Fredoka', 'Plus Jakarta Sans', sans-serif;
+  }
+  .font-blackboard {
+    font-family: 'BLAZE', 'Chalkboard SE', 'Comic Sans MS', 'Caveat', cursive, sans-serif;
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;

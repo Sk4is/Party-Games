@@ -369,6 +369,57 @@ const GAMES: GameGuide[] = [
       },
     ],
   },
+  {
+    id: 'entre-topos',
+    name: 'Entre Topos',
+    icon: '🐾',
+    tagline: '16 palabras, un infiltrado y un círculo rojo',
+    playersBadge: '3–10 Jugadores',
+    typeBadge: 'Deducción Social',
+    accent: {
+      primary: '#EAB308',
+      contrastText: '#0a0f1d',
+      borderClass: 'border-[#EAB308]/40',
+      glowColor: 'rgba(234, 179, 8, 0.18)',
+      titleColor: 'text-[#EAB308]',
+      iconBg: 'bg-[#EAB308]/15',
+      iconBorder: 'border-[#EAB308]/30',
+      numberBg: 'rgba(234, 179, 8, 0.18)',
+      numberColor: '#EAB308',
+      tagBg: 'bg-amber-500/10',
+      tagBorder: 'border-amber-500/30',
+      tagText: 'text-amber-300',
+    },
+    rules: [
+      {
+        num: '01',
+        title: 'El Cuaderno de 16 Palabras y el Rotulador Rojo',
+        content: (
+          <p>
+            Al comenzar cada ronda se elige una categoría y un panel de <strong>16 palabras</strong>. Para los <strong className="text-emerald-300">Inocentes</strong>, una palabra está rodeada con un rotulador rojo: es la <strong className="text-white">palabra secreta</strong>. En cambio, <strong className="text-amber-300">El Topo</strong> ve las 16 palabras pero <em>ninguna está marcada</em>.
+          </p>
+        ),
+      },
+      {
+        num: '02',
+        title: 'La Pizarra de Pistas (Máx. 20 caracteres)',
+        content: (
+          <p>
+            Cada jugador escribe en su pizarra una pista corta (máximo 20 caracteres). Los inocentes quieren demostrar que conocen la palabra sin ponérselo en bandeja al topo. El topo debe observar la temática y lanzar una pista plausible para pasar desapercibido.
+          </p>
+        ),
+      },
+      {
+        num: '03',
+        title: 'Charla, Votación y el Intento Final del Topo',
+        content: (
+          <p>
+            Todas las pizarras se desvelan a la vez. Tras el debate, cada jugador vota en secreto a su principal sospechoso. Si el topo no es el más votado, ¡gana la ronda! Si el topo es descubierto, tiene una <strong className="text-amber-300">última oportunidad para robar la victoria</strong>: si adivina cuál era la palabra secreta entre las 16, ¡la victoria será suya!
+          </p>
+        ),
+      },
+    ],
+  },
 ];
 
 export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose, initialGame }) => {
