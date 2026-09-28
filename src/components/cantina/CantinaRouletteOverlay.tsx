@@ -450,7 +450,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
         isImpactBang
           ? 'bg-red-950/95'
           : isImpactClick
-          ? 'bg-stone-950/90'
+          ? 'bg-emerald-950/88 backdrop-blur-md'
           : 'bg-black/88 backdrop-blur-md'
       }`}
     >
@@ -466,20 +466,32 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
         />
       )}
 
-      {/* Main Saloon Revolver Card */}
+      {/* Relief Emerald Halo on Safe Shot (Clásico / Diablo) */}
+      {isImpactClick && (
+        <div
+          className="fixed inset-0 pointer-events-none z-0"
+          style={{
+            background:
+              'radial-gradient(circle at 50% 45%, rgba(16, 185, 129, 0.34) 0%, rgba(5, 150, 105, 0.22) 44%, rgba(6, 46, 34, 0.82) 100%)',
+            animation: 'pulse 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1',
+          }}
+        />
+      )}
+
+      {/* Main Saloon Revolver Card — FIXED GEOMETRY so it never jumps or resizes across states */}
       <div
-        className={`relative z-10 w-full max-w-lg rounded-3xl border-2 px-6 py-6 sm:px-8 sm:py-7 text-center shadow-[0_28px_90px_rgba(0,0,0,0.95)] transition-all duration-300 ${
+        className={`relative z-10 w-full max-w-lg h-[572px] sm:h-[596px] rounded-3xl border-2 px-6 py-5 sm:px-8 sm:py-6 text-center shadow-[0_28px_90px_rgba(0,0,0,0.95)] flex flex-col justify-between overflow-hidden transition-colors duration-300 ${
           isImpactBang
-            ? 'bg-gradient-to-b from-red-950 via-[#240707] to-stone-950 border-red-500 shadow-[0_0_90px_rgba(220,38,38,0.65)] scale-[1.02]'
+            ? 'bg-gradient-to-b from-red-950 via-[#240707] to-stone-950 border-red-500 shadow-[0_0_90px_rgba(220,38,38,0.65)]'
             : isImpactClick
-            ? 'bg-gradient-to-b from-stone-900 via-[#171311] to-stone-950 border-emerald-500/80 shadow-[0_0_70px_rgba(16,185,129,0.35)]'
+            ? 'bg-gradient-to-b from-emerald-950/95 via-[#0f241d] to-stone-950 border-emerald-400 shadow-[0_0_85px_rgba(16,185,129,0.55)]'
             : rouletteResult.isDevilSequence
             ? 'bg-gradient-to-b from-[#290b0b] via-[#170909] to-stone-950 border-red-600/80 shadow-[0_0_70px_rgba(220,38,38,0.35)]'
             : 'bg-gradient-to-b from-[#231914] via-[#16100d] to-[#0c0907] border-amber-500/60'
         }`}
       >
-        {/* Top Tag: Devil Sequence or Personal Revolver */}
-        <div className="flex flex-col items-center gap-1.5 mb-4">
+        {/* Top Header Zone — Fixed Height */}
+        <div className="h-[112px] shrink-0 flex flex-col items-center justify-center gap-1">
           {rouletteResult.isDevilSequence ? (
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-red-950/90 border border-red-500/60 text-red-300 text-xs font-black uppercase tracking-[0.2em]">
               <Flame className="w-3.5 h-3.5 text-red-400 animate-bounce" />
@@ -493,45 +505,67 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
             </div>
           )}
 
-          <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wide text-amber-100 drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]">
-            {isTargetPlayer
+          <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wide text-amber-100 drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] truncate max-w-full">
+            {isImpactClick
+              ? isTargetPlayer
+                ? '¡CLICK! ¡ESTÁS A SALVO!'
+                : `¡${rouletteResult.targetPlayerName} SE SALVA!`
+              : isImpactBang
+              ? isTargetPlayer
+                ? '¡BANG! ¡HAS CAÍDO!'
+                : `¡${rouletteResult.targetPlayerName} ELIMINADO!`
+              : isTargetPlayer
               ? '¡TU REVÓLVER EN JUEGO!'
               : `TURNO DE ${rouletteResult.targetPlayerName}`}
           </h2>
 
-          <p className="text-xs sm:text-sm font-bold text-amber-200/75 uppercase tracking-widest">
-            TAMBOR PERSONAL: {chambersTestedBefore}/6 PROBADAS • TIRO{' '}
-            {rouletteResult.chamberNumber}/6
-          </p>
+          {/* Sub-header / Devil Sequence Previous Shots Strip — Fixed 24px slot */}
+          <div className="h-6 flex items-center justify-center overflow-hidden">
+            {rouletteResult.isDevilSequence &&
+            rouletteResult.shots &&
+            rouletteResult.shots.length > 0 ? (
+              <div className="flex items-center justify-center gap-1.5 overflow-hidden">
+                {rouletteResult.shots.map((s, idx) => (
+                  <div
+                    key={`${s.playerId}_${idx}`}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${
+                      s.fired
+                        ? 'bg-red-950/80 border-red-500/60 text-red-300'
+                        : 'bg-emerald-950/75 border-emerald-400/60 text-emerald-300'
+                    }`}
+                  >
+                    <span>{s.playerName}:</span>
+                    <span>{s.fired ? '¡BANG!' : '✓ SALVO'}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs sm:text-sm font-bold text-amber-200/75 uppercase tracking-widest whitespace-nowrap">
+                TAMBOR PERSONAL: {chambersTestedBefore}/6 PROBADAS • TIRO{' '}
+                {rouletteResult.chamberNumber}/6
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* Devil Sequence Previous Shots Strip */}
-        {rouletteResult.isDevilSequence &&
-          rouletteResult.shots &&
-          rouletteResult.shots.length > 0 && (
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
-              {rouletteResult.shots.map((s, idx) => (
-                <div
-                  key={`${s.playerId}_${idx}`}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wider border ${
-                    s.fired
-                      ? 'bg-red-950/80 border-red-500/60 text-red-300'
-                      : 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
-                  }`}
-                >
-                  <span>{s.playerName}:</span>
-                  <span>{s.fired ? '¡BANG!' : 'CLICK'}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-        {/* Interactive 6-Chamber Revolver Cylinder — Fixed Top Firing Marker at 12 O'Clock */}
-        <div className="relative flex flex-col items-center justify-center my-3">
+        {/* Center Interactive 6-Chamber Revolver Cylinder Zone — Fixed Height */}
+        <div className="relative flex-1 flex flex-col items-center justify-center">
           {/* FIXED TOP FIRING MARKER (12 O'CLOCK — NEVER ROTATES WITH CYLINDER) */}
           <div className="z-20 flex flex-col items-center pointer-events-none -mb-1.5">
-            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400/90 mb-0.5">
-              CAÑÓN / 12 EN PUNTO
+            <span
+              className={`text-[9px] font-black uppercase tracking-[0.2em] mb-0.5 transition-colors ${
+                isImpactClick
+                  ? 'text-emerald-300'
+                  : isImpactBang
+                  ? 'text-red-300'
+                  : 'text-amber-400/90'
+              }`}
+            >
+              {isImpactClick
+                ? '✓ CÁMARA VACÍA • SIN BALA'
+                : isImpactBang
+                ? '☠ BALA DISPARADA'
+                : 'CAÑÓN / 12 EN PUNTO'}
             </span>
             <div
               className={`w-9 h-7 rounded-t-xl rounded-b-md border-2 flex flex-col items-center justify-center transition-transform duration-150 ${
@@ -540,7 +574,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                   : isImpactBang
                   ? 'translate-y-2 bg-red-500 border-yellow-200 shadow-[0_0_28px_rgba(239,68,68,1)]'
                   : isImpactClick
-                  ? 'translate-y-1.5 bg-emerald-500 border-emerald-200 shadow-[0_0_18px_rgba(16,185,129,0.8)]'
+                  ? 'translate-y-1.5 bg-emerald-500 border-emerald-100 shadow-[0_0_26px_rgba(16,185,129,0.95)]'
                   : 'bg-stone-800 border-amber-500/75 shadow-md'
               }`}
               title="Posición de disparo fija (12 en punto)"
@@ -557,7 +591,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                 isImpactBang
                   ? 'bg-red-500/60 opacity-100'
                   : isImpactClick
-                  ? 'bg-emerald-500/35 opacity-100'
+                  ? 'bg-emerald-400/55 opacity-100'
                   : isCylinderMoving
                   ? 'bg-amber-500/35 opacity-100'
                   : 'bg-amber-500/15 opacity-75'
@@ -573,12 +607,24 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                 isImpactBang
                   ? 'border-red-400 shadow-[0_0_28px_rgba(239,68,68,0.95)] scale-110'
                   : isImpactClick
-                  ? 'border-emerald-400 shadow-[0_0_22px_rgba(16,185,129,0.8)] scale-105'
+                  ? 'border-emerald-300 bg-emerald-400/15 shadow-[0_0_32px_rgba(16,185,129,0.95)] scale-110'
                   : resolveStage === 'TENSION'
                   ? 'border-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.75)] scale-105'
                   : 'border-amber-400/50 border-dashed'
               }`}
             />
+
+            {/* Prominent Center SAFE Stamp Overlay on Cylinder when SAFE Shot Resolves */}
+            {isImpactClick && (
+              <div className="absolute z-40 pointer-events-none flex flex-col items-center justify-center animate-in zoom-in-90 fade-in duration-200">
+                <div className="px-4 py-1.5 rounded-2xl bg-emerald-950/95 border-2 border-emerald-300 shadow-[0_0_35px_rgba(16,185,129,0.9)] flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-300 shrink-0" />
+                  <span className="text-sm sm:text-base font-black uppercase tracking-[0.18em] text-emerald-100 whitespace-nowrap">
+                    ¡CLICK! • A SALVO
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Rotating Cylinder Body — ZERO rotation transition after pressing DISPARAR */}
             <div
@@ -597,7 +643,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                   : isImpactBang
                   ? 'border-red-500 bg-gradient-to-br from-red-950 via-stone-900 to-black'
                   : isImpactClick
-                  ? 'border-emerald-500/80 bg-gradient-to-br from-stone-800 via-stone-900 to-black'
+                  ? 'border-emerald-400 bg-gradient-to-br from-emerald-950/80 via-stone-900 to-black shadow-[inset_0_0_30px_rgba(16,185,129,0.25),0_0_35px_rgba(16,185,129,0.35)]'
                   : 'border-stone-600 bg-gradient-to-br from-stone-800 via-stone-900 to-stone-950'
               }`}
             >
@@ -615,14 +661,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                 );
               })}
 
-              {/* 6 Revolver Chambers:
-                  chamber 0 = -90° (TOP / 12 o'clock when cylinderAngle = 0)
-                  chamber 1 = -30° (upper-right)
-                  chamber 2 =  30° (lower-right)
-                  chamber 3 =  90° (bottom)
-                  chamber 4 = 150° (lower-left)
-                  chamber 5 = 210° (upper-left)
-              */}
+              {/* 6 Revolver Chambers */}
               {CHAMBER_BASE_ANGLES_DEG.map((angleDeg, idx) => {
                 const rad = (angleDeg * Math.PI) / 180;
                 const radius = 64;
@@ -630,7 +669,6 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                 const y = Math.sin(rad) * radius;
 
                 const isSpentBefore = firedChambersBeforeSet.has(idx);
-                // The chamber physically at 12 o'clock is the ONLY chamber fired when DISPARAR is pressed
                 const isCurrentlyAtTop = idx === currentTopChamberIdx;
 
                 let chamberStyle =
@@ -641,7 +679,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                     'bg-gradient-to-br from-yellow-300 via-amber-500 to-red-600 border-white text-black shadow-[0_0_24px_rgba(239,68,68,1)] scale-110';
                 } else if (isCurrentlyAtTop && isImpactClick) {
                   chamberStyle =
-                    'bg-emerald-950/90 border-emerald-400 text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.6)]';
+                    'bg-gradient-to-br from-emerald-400 via-emerald-600 to-emerald-900 border-emerald-100 text-stone-950 shadow-[0_0_24px_rgba(16,185,129,0.95)] scale-110';
                 } else if (isSpentBefore) {
                   chamberStyle =
                     'bg-stone-900/70 border-stone-700/70 text-stone-500 shadow-inner opacity-60';
@@ -664,9 +702,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                     {isCurrentlyAtTop && isImpactBang ? (
                       <Skull className="w-6 h-6 text-red-950 animate-pulse" />
                     ) : isCurrentlyAtTop && isImpactClick ? (
-                      <span className="text-[10px] font-black text-emerald-300">
-                        VACÍA
-                      </span>
+                      <ShieldCheck className="w-6 h-6 text-stone-950 stroke-[2.5]" />
                     ) : isSpentBefore ? (
                       <span className="text-[10px] font-bold text-stone-500">
                         ✕
@@ -687,18 +723,18 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
             </div>
           </div>
 
-          {/* Interactive Spin Hint / Quick Spin Button for Shooter */}
-          {resolveStage === 'WAITING' && !hasRequestedPull && (
-            <div className="mt-3 flex items-center justify-center gap-3">
-              {isTargetPlayer ? (
+          {/* Interactive Spin Hint / Status Row — ALWAYS occupies fixed 36px height so modal never jumps */}
+          <div className="mt-3 h-9 flex items-center justify-center gap-3 shrink-0">
+            {resolveStage === 'WAITING' && !hasRequestedPull ? (
+              isTargetPlayer ? (
                 <>
-                  <span className="text-xs font-bold text-amber-200/80">
+                  <span className="text-xs font-bold text-amber-200/80 whitespace-nowrap">
                     Arrastra el tambor las veces que quieras
                   </span>
                   <button
                     type="button"
                     onClick={handleQuickFlickSpin}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-stone-800/90 hover:bg-stone-700 border border-amber-500/40 text-amber-300 text-xs font-black uppercase tracking-wider transition-all active:scale-95"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-stone-800/90 hover:bg-stone-700 border border-amber-500/40 text-amber-300 text-xs font-black uppercase tracking-wider transition-all active:scale-95 whitespace-nowrap"
                   >
                     <RotateCw
                       className={`w-3.5 h-3.5 ${isSpinning ? 'animate-spin' : ''}`}
@@ -707,27 +743,43 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                   </button>
                 </>
               ) : (
-                <span className="text-xs font-bold text-amber-200/75 uppercase tracking-wider">
+                <span className="text-xs font-bold text-amber-200/75 uppercase tracking-wider whitespace-nowrap">
                   {isSpinning
                     ? `¡${rouletteResult.targetPlayerName} ESTÁ GIRANDO SU TAMBOR!`
                     : `EL REVÓLVER APUNTA A ${rouletteResult.targetPlayerName}`}
                 </span>
-              )}
-            </div>
-          )}
+              )
+            ) : (
+              <span
+                className={`text-xs font-black uppercase tracking-widest whitespace-nowrap ${
+                  isImpactClick
+                    ? 'text-emerald-300'
+                    : isImpactBang
+                    ? 'text-red-300'
+                    : 'text-amber-300/80'
+                }`}
+              >
+                {isImpactClick
+                  ? `✓ RECÁMARA ${rouletteResult.chamberNumber}/6 VACÍA • SIGUE CON VIDA`
+                  : isImpactBang
+                  ? `☠ BALA EN LA RECÁMARA ${rouletteResult.chamberNumber}/6`
+                  : 'TAMBOR BLOQUEADO EN LAS 12 EN PUNTO'}
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Bottom Action or Verdict Area */}
-        <div className="mt-4 min-h-[96px] flex flex-col items-center justify-center">
+        {/* Bottom Action or Verdict Area — Strictly Fixed 108px Height */}
+        <div className="h-[108px] shrink-0 flex flex-col items-center justify-center">
           {resolveStage === 'WAITING' && (
             <>
               {isTargetPlayer ? (
-                <div className="w-full flex flex-col items-center gap-2.5">
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                   <button
                     type="button"
                     disabled={hasRequestedPull || isCylinderMoving}
                     onClick={handleTriggerClick}
-                    className="w-full max-w-xs py-4 px-6 rounded-2xl font-black text-base sm:text-lg uppercase tracking-wider text-white bg-gradient-to-b from-red-600 via-red-700 to-red-900 hover:from-red-500 hover:to-red-800 border-2 border-amber-400/80 shadow-[0_10px_30px_rgba(220,38,38,0.5)] active:scale-95 transition-all disabled:opacity-45 disabled:cursor-not-allowed"
+                    className="w-full max-w-xs py-3.5 px-6 rounded-2xl font-black text-base sm:text-lg uppercase tracking-wider text-white bg-gradient-to-b from-red-600 via-red-700 to-red-900 hover:from-red-500 hover:to-red-800 border-2 border-amber-400/80 shadow-[0_10px_30px_rgba(220,38,38,0.5)] active:scale-95 transition-all disabled:opacity-45 disabled:cursor-not-allowed whitespace-nowrap"
                   >
                     {isCylinderMoving
                       ? 'GIRANDO EL TAMBOR...'
@@ -735,16 +787,18 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                       ? 'DISPARANDO...'
                       : 'DISPARAR'}
                   </button>
-                  <p className="text-[11px] font-bold text-amber-200/65 uppercase tracking-widest">
+                  <p className="text-[11px] font-bold text-amber-200/65 uppercase tracking-widest whitespace-nowrap">
                     Se disparará la cámara situada a las 12 en punto sin rotar más
                   </p>
                 </div>
               ) : (
-                <div className="w-full py-4 px-5 rounded-2xl bg-black/55 border border-amber-500/30 flex flex-col items-center gap-1.5">
+                <div className="w-full h-full px-5 rounded-2xl bg-black/55 border border-amber-500/30 flex flex-col items-center justify-center gap-1">
                   <div className="flex items-center gap-2 text-amber-300 font-black text-sm sm:text-base uppercase tracking-wider animate-pulse">
-                    <Crosshair className="w-4 h-4 text-red-400" />
-                    ESPERANDO A QUE {rouletteResult.targetPlayerName} PULSE
-                    DISPARAR...
+                    <Crosshair className="w-4 h-4 text-red-400 shrink-0" />
+                    <span className="truncate">
+                      ESPERANDO A QUE {rouletteResult.targetPlayerName} PULSE
+                      DISPARAR...
+                    </span>
                   </div>
                   <p className="text-xs text-stone-400 font-medium">
                     Revólver personal de {rouletteResult.targetPlayerName} (
@@ -756,7 +810,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
           )}
 
           {resolveStage === 'TENSION' && (
-            <div className="w-full py-4 px-5 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col items-center gap-1">
+            <div className="w-full h-full px-5 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col items-center justify-center gap-1">
               <div className="text-lg sm:text-xl font-black text-amber-300 uppercase tracking-[0.2em] animate-pulse">
                 ¡MARTILLO CAYENDO...!
               </div>
@@ -768,17 +822,17 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
 
           {resolveStage === 'IMPACT' && (
             <div
-              className={`w-full py-4 px-5 rounded-2xl border-2 transition-all duration-300 ${
+              className={`w-full h-full px-5 rounded-2xl border-2 flex flex-col items-center justify-center transition-colors duration-300 ${
                 rouletteResult.fired
                   ? 'bg-red-950/90 border-red-400 shadow-[0_0_35px_rgba(239,68,68,0.5)]'
-                  : 'bg-emerald-950/80 border-emerald-400/80 shadow-[0_0_30px_rgba(16,185,129,0.35)]'
+                  : 'bg-gradient-to-b from-emerald-900/90 to-emerald-950/95 border-emerald-300 shadow-[0_0_40px_rgba(16,185,129,0.5)]'
               }`}
             >
               <div className="flex items-center justify-center gap-2.5 mb-1">
                 {rouletteResult.fired ? (
                   <>
-                    <Skull className="w-7 h-7 text-red-300 animate-bounce" />
-                    <span className="text-2xl sm:text-3xl font-black text-red-200 uppercase tracking-wider">
+                    <Skull className="w-7 h-7 text-red-300 animate-bounce shrink-0" />
+                    <span className="text-xl sm:text-2xl font-black text-red-100 uppercase tracking-wider truncate">
                       ¡BANG!{' '}
                       {isTargetPlayer
                         ? '¡HAS MUERTO!'
@@ -787,8 +841,8 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                   </>
                 ) : (
                   <>
-                    <ShieldCheck className="w-7 h-7 text-emerald-300" />
-                    <span className="text-2xl sm:text-3xl font-black text-emerald-200 uppercase tracking-wider">
+                    <ShieldCheck className="w-7 h-7 text-emerald-300 shrink-0" />
+                    <span className="text-xl sm:text-2xl font-black text-emerald-100 uppercase tracking-wider truncate">
                       ¡CLICK!{' '}
                       {isTargetPlayer
                         ? '¡TE HAS SALVADO!'
@@ -800,12 +854,12 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
 
               <p
                 className={`text-xs sm:text-sm font-bold uppercase tracking-wider ${
-                  rouletteResult.fired ? 'text-red-200/90' : 'text-emerald-200/90'
+                  rouletteResult.fired ? 'text-red-200/90' : 'text-emerald-200'
                 }`}
               >
                 {rouletteResult.fired
-                  ? `La bala estaba en la cámara superior (${rouletteResult.chamberNumber}/6) — Eliminado`
-                  : `Cámara superior vacía (${rouletteResult.chamberNumber}/6 probadas) — Sigue con vida`}
+                  ? `La bala estaba en la cámara (${rouletteResult.chamberNumber}/6) — Eliminado`
+                  : `Cámara vacía (${rouletteResult.chamberNumber}/6 probadas) — ¡Sigue en la partida!`}
               </p>
             </div>
           )}

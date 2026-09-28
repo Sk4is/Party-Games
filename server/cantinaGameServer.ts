@@ -294,10 +294,12 @@ export class CantinaServer {
           return;
         }
 
-        const seatIndex = room.players.length;
+        const occupiedSeats = new Set(room.players.map((p) => p.seatIndex));
+        const seatIndex =
+          [0, 1, 2, 3].find((s) => !occupiedSeats.has(s)) ?? room.players.length;
         player = {
           id: msg.player.id,
-          name: (msg.player.name || `Jugador ${room.players.length + 1}`).trim(),
+          name: (msg.player.name || `Jugador ${seatIndex + 1}`).trim(),
           avatar: msg.player.avatar || '🤠',
           color: msg.player.color || '#eab308',
           seatIndex,
@@ -313,6 +315,7 @@ export class CantinaServer {
           lastReflectableEffectReceived: null,
         };
         room.players.push(player);
+        room.players.sort((a, b) => a.seatIndex - b.seatIndex);
       }
 
       this.clients.set(ws, { ws, playerId: msg.player.id, roomCode: code });
@@ -669,25 +672,13 @@ export class CantinaServer {
       }
 
       case 'HAND_INTERACTION': {
-        let broadcastedHoverIndex = msg.hoveredIndex;
-        if (
-          room.config.mode === 'CADENA' &&
-          typeof msg.hoveredIndex === 'number'
-        ) {
-          const sender = room.players.find((p) => p.id === conn.playerId);
-          const count = Math.max(1, sender?.cardsCount || 1);
-          // Scramble hovered slot index for remote spectators in Cadena mode so sorted local hands never leak card rank positions
-          broadcastedHoverIndex =
-            ((msg.hoveredIndex * 3 + (sender?.seatIndex || 1) + room.currentRound) %
-              count +
-              count) %
-            count;
-        }
         this.broadcastHandInteraction(
-          room.code,
+          room,
           conn.playerId,
           msg.interaction,
-          broadcastedHoverIndex
+          msg.hoveredIndex,
+          msg.hoveredCardId,
+          msg.selectedCardIds
         );
         break;
       }
@@ -732,7 +723,13 @@ export class CantinaServer {
     room.centerPileHistory = [];
 
     room.players.forEach((p, idx) => {
-      p.seatIndex = idx;
+      if (
+        typeof p.seatIndex !== 'number' ||
+        p.seatIndex < 0 ||
+        p.seatIndex > 3
+      ) {
+        p.seatIndex = idx;
+      }
       p.isAlive = true;
       p.isEliminated = false;
       p.eliminatedRound = undefined;
@@ -2897,10 +2894,9 @@ export class CantinaServer {
     }
 
     if (room.phase === 'LOBBY') {
-      room.players = room.players.filter((p) => p.id !== conn.playerId || (!isExplicitLeave && p.isHost));
-      room.players.forEach((p, idx) => {
-        p.seatIndex = idx;
-      });
+      if (isExplicitLeave) {
+        room.players = room.players.filter((p) => p.id !== conn.playerId);
+      }
     } else {
       // Explicit permanent leave during an active match (Requirements 52 & 53)
       if (isExplicitLeave && player) {
@@ -2975,12 +2971,9 @@ export class CantinaServer {
       const connectedCount = room.players.filter((p) => p.isConnected).length;
 
       if (connectedCount < 2 || (room.phase !== 'GAME_OVER' && activeConnectedCount < 2 && isExplicitLeave)) {
-        // Remove explicitly left players so lobby only has remaining players
+        // Remove explicitly left players so lobby only has remaining players, while preserving remaining players' fixed seatIndex
         if (isExplicitLeave) {
           room.players = room.players.filter((p) => p.id !== conn.playerId);
-          room.players.forEach((p, idx) => {
-            p.seatIndex = idx;
-          });
         }
         this.resetMatchToLobby(
           room,
@@ -3041,8 +3034,17 @@ export class CantinaServer {
   }
 
   private sanitizeRoomForPlayer(room: ServerRoom, playerId: string): CantinaRoomState {
+    const recipientPlayer = room.players.find((p) => p.id === playerId);
+    const isRecipientEliminatedSpectator = Boolean(
+      recipientPlayer &&
+        (!recipientPlayer.isAlive || recipientPlayer.isEliminated) &&
+        room.phase !== 'LOBBY'
+    );
+
     const sanitizedPlayers: CantinaPlayer[] = room.players.map((p) => {
       const isSelf = p.id === playerId;
+      // Private hand is strictly visible ONLY to the player themselves, OR to an authoritatively eliminated/dead spectator
+      const canSeePrivateHand = isSelf || isRecipientEliminatedSpectator;
       const rev = ensurePlayerRevolver(p);
       return {
         id: p.id,
@@ -3054,8 +3056,7 @@ export class CantinaServer {
         isConnected: p.isConnected,
         isAlive: p.isAlive,
         cardsCount: p.hand ? p.hand.length : p.cardsCount,
-        // Private hand is ONLY visible to the player themselves!
-        hand: isSelf ? p.hand || [] : undefined,
+        hand: canSeePrivateHand ? p.hand || [] : undefined,
         chamberPulls: rev.shotsTaken,
         bulletChamber: p.isEliminated ? p.bulletChamber : -1,
         revolver: {
@@ -3067,7 +3068,7 @@ export class CantinaServer {
         },
         isEliminated: p.isEliminated,
         eliminatedRound: p.eliminatedRound,
-        lastReflectableEffectReceived: isSelf
+        lastReflectableEffectReceived: canSeePrivateHand
           ? p.lastReflectableEffectReceived || null
           : null,
       };
@@ -3100,18 +3101,21 @@ export class CantinaServer {
       const rawDrawEvent = room.cadenaState.lastDrawEvent;
       sanitizedCadenaState = {
         ...room.cadenaState,
-        // Stolen card identity is ONLY exposed to the active thief!
-        stolenCard: isActiveSelf ? room.cadenaState.stolenCard || null : null,
-        // Drawn card identities are ONLY exposed to the player who drew them!
+        // Stolen card identity is ONLY exposed to the active thief or eliminated spectator!
+        stolenCard:
+          isActiveSelf || isRecipientEliminatedSpectator
+            ? room.cadenaState.stolenCard || null
+            : null,
+        // Drawn card identities are ONLY exposed to the player who drew them or eliminated spectator!
         lastDrawEvent: rawDrawEvent
           ? {
               ...rawDrawEvent,
               drawnCardIds:
-                rawDrawEvent.playerId === playerId
+                rawDrawEvent.playerId === playerId || isRecipientEliminatedSpectator
                   ? rawDrawEvent.drawnCardIds
                   : undefined,
               drawnCards:
-                rawDrawEvent.playerId === playerId
+                rawDrawEvent.playerId === playerId || isRecipientEliminatedSpectator
                   ? rawDrawEvent.drawnCards
                   : undefined,
             }
@@ -3157,23 +3161,46 @@ export class CantinaServer {
   }
 
   private broadcastHandInteraction(
-    roomCode: string,
+    room: ServerRoom,
     senderPlayerId: string,
     interaction: string,
-    hoveredIndex?: number
+    hoveredIndex?: number,
+    hoveredCardId?: string | null,
+    selectedCardIds?: string[]
   ) {
+    const sender = room.players.find((p) => p.id === senderPlayerId);
+    const count = Math.max(1, sender?.cardsCount || 1);
+    const scrambledHoverIndex =
+      room.config.mode === 'CADENA' && typeof hoveredIndex === 'number'
+        ? (((hoveredIndex * 3 + (sender?.seatIndex || 1) + room.currentRound) %
+            count) +
+            count) %
+          count
+        : hoveredIndex;
+
     for (const [ws, conn] of this.clients.entries()) {
       if (
-        conn.roomCode === roomCode &&
+        conn.roomCode === room.code &&
         conn.playerId !== senderPlayerId &&
         ws.readyState === WebSocket.OPEN
       ) {
+        const recipient = room.players.find((p) => p.id === conn.playerId);
+        const isEliminatedSpectator = Boolean(
+          recipient &&
+            (!recipient.isAlive || recipient.isEliminated) &&
+            room.phase !== 'LOBBY'
+        );
+
         ws.send(
           JSON.stringify({
             type: 'PLAYER_HAND_INTERACTION',
             playerId: senderPlayerId,
             interaction,
-            hoveredIndex,
+            hoveredIndex: isEliminatedSpectator
+              ? hoveredIndex
+              : scrambledHoverIndex,
+            hoveredCardId: isEliminatedSpectator ? hoveredCardId : undefined,
+            selectedCardIds: isEliminatedSpectator ? selectedCardIds : undefined,
           })
         );
       }

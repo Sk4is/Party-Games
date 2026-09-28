@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CantinaPlayer, CantinaRoomState } from '../../types/cantina';
 import { CantinaCard } from './CantinaCard';
+import { sortCadenaHand } from '../../utils/cadenaRules';
 import { audio } from '../../utils/audio';
 import { Check, Crown, RotateCcw, Sparkles, Users } from 'lucide-react';
 
@@ -107,12 +108,15 @@ export const CantinaCadenaGameOverOverlay: React.FC<CantinaCadenaGameOverOverlay
   ).length;
   const totalEligible = eligibleRematchPlayers.length;
 
-  const localRemainingCards = localPlayer?.hand || [];
+  const localRemainingCards = useMemo(
+    () => sortCadenaHand(localPlayer?.hand || []),
+    [localPlayer?.hand]
+  );
   const localRemainingCount =
     localPlayer?.cardsCount ?? localRemainingCards.length;
 
   return (
-    <div className="fixed inset-0 z-[90] flex flex-col items-center justify-center p-4 pointer-events-none select-none overflow-y-auto">
+    <div className="fixed inset-0 z-[90] flex flex-col items-center justify-center p-4 pointer-events-none select-none overflow-hidden">
       <style>{`
         @keyframes cadenaBurstPulse {
           0% { transform: scale(0.55); opacity: 0; }
@@ -256,37 +260,57 @@ export const CantinaCadenaGameOverOverlay: React.FC<CantinaCadenaGameOverOverlay
                 : 'max-h-0 opacity-0 mt-0 pointer-events-none'
             }`}
           >
-            {/* Requirement 25: Loser's remaining cards preview */}
+            {/* Loser's remaining cards preview — zero scrollbars, centered overlapping fan with bounded height */}
             {isLocalLoser && localRemainingCount > 0 && (
-              <div className="mb-4 rounded-2xl bg-stone-950/85 border border-stone-800/90 px-4 py-3">
-                <p className="text-[11px] font-black tracking-[0.16em] text-amber-200/90 uppercase mb-2">
+              <div className="mb-3.5 rounded-2xl bg-stone-950/85 border border-stone-800/90 px-4 py-2.5 overflow-visible">
+                <p className="text-[11px] font-black tracking-[0.16em] text-amber-200/90 uppercase mb-1.5">
                   TE QUEDABAN {localRemainingCount} CARTA{localRemainingCount === 1 ? '' : 'S'}
                 </p>
                 {localRemainingCards.length > 0 && (
-                  <div className="flex items-center justify-center py-1 overflow-x-auto">
-                    <div className="flex items-center justify-center">
-                      {localRemainingCards.slice(0, 10).map((c, idx, arr) => {
-                        const mid = (arr.length - 1) / 2;
-                        const rot = (idx - mid) * 3.5;
+                  <div className="relative w-full h-[84px] flex items-center justify-center overflow-visible pointer-events-none select-none">
+                    {(() => {
+                      const count = localRemainingCards.length;
+                      const mid = (count - 1) / 2;
+                      const stepPx =
+                        count <= 1
+                          ? 0
+                          : Math.max(
+                              9,
+                              Math.min(28, Math.floor(256 / (count - 1)))
+                            );
+                      const cardScale =
+                        count > 18 ? 0.82 : count > 13 ? 0.88 : count > 9 ? 0.94 : 1;
+                      const maxFanAngle = Math.min(11, count * 1.35);
+
+                      return localRemainingCards.map((c, idx) => {
+                        const offsetFromMid = idx - mid;
+                        const xPx = offsetFromMid * stepPx;
+                        const norm =
+                          count > 1 ? offsetFromMid / Math.max(1, mid) : 0;
+                        const rot = norm * maxFanAngle;
+                        const arcY = Math.round(norm * norm * 4);
+
                         return (
                           <div
                             key={c.id}
                             style={{
-                              marginLeft: idx === 0 ? '0px' : '-18px',
-                              transform: `rotate(${rot}deg)`,
+                              position: 'absolute',
+                              transform: `translate3d(${xPx}px, ${arcY}px, 0) rotate(${rot}deg) scale(${cardScale})`,
+                              transformOrigin: '50% 85%',
                               zIndex: idx + 1,
                             }}
-                            className="w-11 sm:w-12 aspect-[2/3] opacity-85 brightness-90 transition-transform hover:scale-110 hover:z-20 hover:opacity-100"
+                            className="w-12 h-[72px] opacity-92 brightness-95 pointer-events-none"
                           >
                             <CantinaCard
                               rank={c.rank}
                               mapId={roomState.config.mapId}
                               size="sm"
+                              style={{ width: '48px', height: '72px' }}
                             />
                           </div>
                         );
-                      })}
-                    </div>
+                      });
+                    })()}
                   </div>
                 )}
               </div>

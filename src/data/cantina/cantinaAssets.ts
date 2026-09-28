@@ -88,26 +88,107 @@ export const CANTINA_MAP_ASSETS: Record<CantinaMapId, CantinaMapDefinition> = {
 
 export const CANTINA_MAPS = CANTINA_MAP_ASSETS;
 
+export type CantinaPhysicalSeat = 'south' | 'north' | 'west' | 'east';
+
+export interface CantinaSeatConfigEntry {
+  seatIndex: 0 | 1 | 2 | 3;
+  playerNumber: 1 | 2 | 3 | 4;
+  pov: 1 | 2 | 3 | 4;
+  povKey: CantinaPovKey;
+  physicalSeat: CantinaPhysicalSeat;
+  /** Clockwise physical chair index around the 4-seat table: 0=south, 1=west, 2=north, 3=east */
+  clockwiseChairIndex: 0 | 1 | 2 | 3;
+}
+
 /**
- * Deliberate seat-to-POV mapping:
- * PLAYER / SEAT 1 (seatIndex 0) -> POV1 ('pov1')
- * PLAYER / SEAT 2 (seatIndex 1) -> POV3 ('pov3')
- * PLAYER / SEAT 3 (seatIndex 2) -> POV2 ('pov2')
- * PLAYER / SEAT 4 (seatIndex 3) -> POV4 ('pov4')
+ * ONLY canonical player-to-POV and physical seat mapping for La Cantina del Farol:
+ * - PLAYER 1 (seatIndex 0) -> POV 1 ('pov1'), physicalSeat: 'south' (Chair 0)
+ * - PLAYER 2 (seatIndex 1) -> POV 3 ('pov3'), physicalSeat: 'north' (Chair 2, directly opposite P1)
+ * - PLAYER 3 (seatIndex 2) -> POV 4 ('pov4'), physicalSeat: 'west'  (Chair 1, left of P1)
+ * - PLAYER 4 (seatIndex 3) -> POV 2 ('pov2'), physicalSeat: 'east'  (Chair 3, right of P1, directly opposite P3)
  */
+export const CANTINA_SEAT_CONFIG: Record<0 | 1 | 2 | 3, CantinaSeatConfigEntry> = {
+  0: {
+    seatIndex: 0,
+    playerNumber: 1,
+    pov: 1,
+    povKey: 'pov1',
+    physicalSeat: 'south',
+    clockwiseChairIndex: 0,
+  },
+  1: {
+    seatIndex: 1,
+    playerNumber: 2,
+    pov: 3,
+    povKey: 'pov3',
+    physicalSeat: 'north',
+    clockwiseChairIndex: 2,
+  },
+  2: {
+    seatIndex: 2,
+    playerNumber: 3,
+    pov: 4,
+    povKey: 'pov4',
+    physicalSeat: 'west',
+    clockwiseChairIndex: 1,
+  },
+  3: {
+    seatIndex: 3,
+    playerNumber: 4,
+    pov: 2,
+    povKey: 'pov2',
+    physicalSeat: 'east',
+    clockwiseChairIndex: 3,
+  },
+};
+
+export const SEAT_TO_POV: Record<number, CantinaPovKey> = {
+  0: 'pov1',
+  1: 'pov3',
+  2: 'pov4',
+  3: 'pov2',
+};
+
+/**
+ * Physical clockwise chair index (0..3) around the 4-seat Cantina table for each seatIndex:
+ * - Chair 0 (South / POV1): seatIndex 0 (Player 1)
+ * - Chair 1 (West  / POV4): seatIndex 2 (Player 3, left of P1)
+ * - Chair 2 (North / POV3): seatIndex 1 (Player 2, directly opposite P1)
+ * - Chair 3 (East  / POV2): seatIndex 3 (Player 4, right of P1, directly opposite P3)
+ */
+export const SEAT_TO_PHYSICAL_CHAIR: Record<number, number> = {
+  0: 0,
+  1: 2,
+  2: 1,
+  3: 3,
+};
+
 export function getSeatPovKey(seatIndex: number): CantinaPovKey {
-  switch (seatIndex % 4) {
-    case 0:
-      return 'pov1';
-    case 1:
-      return 'pov3';
-    case 2:
-      return 'pov2';
-    case 3:
-      return 'pov4';
-    default:
-      return 'pov1';
-  }
+  const normalized = (((seatIndex % 4) + 4) % 4) as 0 | 1 | 2 | 3;
+  return CANTINA_SEAT_CONFIG[normalized]?.povKey ?? 'pov1';
+}
+
+export const getMapPovForSeat = getSeatPovKey;
+
+export function getPhysicalChairForSeat(seatIndex: number): number {
+  const normalized = (((seatIndex % 4) + 4) % 4) as 0 | 1 | 2 | 3;
+  return CANTINA_SEAT_CONFIG[normalized]?.clockwiseChairIndex ?? 0;
+}
+
+/**
+ * Computes the clockwise relative physical seat offset (0..3) from viewerSeatIndex to targetSeatIndex:
+ * - 0: viewer's own bottom seat
+ * - 1: physical seat to the viewer's LEFT
+ * - 2: physical seat DIRECTLY OPPOSITE (across the table from) the viewer
+ * - 3: physical seat to the viewer's RIGHT
+ */
+export function getRelativeSeat(
+  viewerSeatIndex: number,
+  targetSeatIndex: number
+): 0 | 1 | 2 | 3 {
+  const viewerChair = getPhysicalChairForSeat(viewerSeatIndex);
+  const targetChair = getPhysicalChairForSeat(targetSeatIndex);
+  return (((targetChair - viewerChair + 4) % 4) as 0 | 1 | 2 | 3);
 }
 
 export function resolveCantinaSeatBackground(

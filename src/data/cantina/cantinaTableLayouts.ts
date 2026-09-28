@@ -2,7 +2,9 @@
 // Centralized configuration for player positions, perspectives, table pile geometry, and card animations.
 // We will tune these values later.
 
-import { CantinaMapId } from './cantinaAssets';
+import { CantinaMapId, getRelativeSeat } from './cantinaAssets';
+
+export type OpponentSeatRole = 'left' | 'far' | 'right';
 
 export interface SeatVisualLayout {
   topPercent: number; // percentage from top (0-100)
@@ -166,4 +168,46 @@ export function getStableCardScatter(seedKey: string, cardIndex: number) {
   const y = Number((f3 * 13).toFixed(2)); // -13 to +13 px
   const rotXDelta = Number((f4 * 2).toFixed(2)); // -2 to +2 deg subtle perspective variation
   return { rotZ, x, y, rotXDelta };
+}
+
+/**
+ * Maps a relative physical seat offset (1 = left, 2 = opposite/far, 3 = right)
+ * to its fixed visual layout around the 4-seat Cantina table.
+ * NEVER depends on player count, filtered array indices, or join order.
+ */
+export function getVisualPositionForRelativeSeat(
+  relativeSeat: number,
+  layout: CantinaLayoutConfig
+): { seatLayout: SeatVisualLayout; seatRole: OpponentSeatRole } {
+  switch (((relativeSeat % 4) + 4) % 4) {
+    case 1:
+      return { seatLayout: layout.leftOpponent, seatRole: 'left' };
+    case 2:
+      return { seatLayout: layout.farOpponent, seatRole: 'far' };
+    case 3:
+      return { seatLayout: layout.rightOpponent, seatRole: 'right' };
+    default:
+      return { seatLayout: layout.farOpponent, seatRole: 'far' };
+  }
+}
+
+/**
+ * Single source of truth for resolving an opponent's visual table seat
+ * strictly from the viewer's authoritative seatIndex and the opponent's authoritative seatIndex.
+ */
+export function getOpponentSeatVisualForPlayer(
+  viewerSeatIndex: number,
+  opponentSeatIndex: number,
+  layout: CantinaLayoutConfig
+): {
+  relativeSeat: 0 | 1 | 2 | 3;
+  seatLayout: SeatVisualLayout;
+  seatRole: OpponentSeatRole;
+} {
+  const relativeSeat = getRelativeSeat(viewerSeatIndex, opponentSeatIndex);
+  const { seatLayout, seatRole } = getVisualPositionForRelativeSeat(
+    relativeSeat,
+    layout
+  );
+  return { relativeSeat, seatLayout, seatRole };
 }

@@ -223,7 +223,9 @@ export const CantinaLobby: React.FC<CantinaLobbyProps> = ({
 
             <div className="flex flex-col gap-3">
               {[0, 1, 2, 3].map((slotIdx) => {
-                const player = roomState.players[slotIdx];
+                const player = roomState.players.find(
+                  (p) => p.seatIndex === slotIdx
+                );
                 const isMe = player?.id === localPlayerId;
                 return (
                   <div

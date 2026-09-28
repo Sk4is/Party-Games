@@ -22,6 +22,7 @@ interface CantinaCardProps {
   substitutedNumber?: number;
   selectionOrder?: number;
   invalidShakeKey?: number;
+  isInvalidReveal?: boolean;
   isFaceDown?: boolean;
   mapId?: CantinaMapId;
   selected?: boolean;
@@ -56,6 +57,7 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
   substitutedNumber,
   selectionOrder,
   invalidShakeKey = 0,
+  isInvalidReveal = false,
   isFaceDown = false,
   mapId = 'mapa1',
   selected = false,
@@ -132,9 +134,11 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
       onClick={disabled ? undefined : onClick}
       style={{ ...mergedStyle, ...shakeStyle }}
       className={`relative select-none overflow-hidden shadow-2xl transition-shadow duration-200 ${
-        disabled ? 'cursor-not-allowed' : 'cursor-pointer'
+        disabled ? 'cursor-not-allowed' : onClick ? 'cursor-pointer' : ''
       } ${sizeClasses[size]} ${
-        selected
+        isInvalidReveal
+          ? 'ring-4 ring-red-500 shadow-[0_0_32px_rgba(239,68,68,0.85)]'
+          : selected
           ? 'ring-3 ring-amber-400 shadow-[0_0_26px_rgba(251,191,36,0.55)] brightness-105'
           : 'shadow-black/90 hover:brightness-105'
       } ${className}`}
@@ -204,6 +208,17 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
 
       {selected && (
         <div className="absolute inset-0 bg-amber-400/10 pointer-events-none rounded-inherit ring-2 ring-amber-300" />
+      )}
+
+      {isInvalidReveal && (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-b from-red-600/25 via-red-600/18 to-red-900/45 pointer-events-none rounded-inherit ring-2 ring-inset ring-red-400" />
+          <div className="absolute bottom-2 inset-x-1.5 flex items-center justify-center pointer-events-none z-20">
+            <span className="px-2 py-0.5 rounded-md bg-red-600/95 border border-red-200 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
+              ✕ FAROL
+            </span>
+          </div>
+        </>
       )}
     </div>
   );

@@ -74,7 +74,15 @@ export function useCantinaSocket({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ text: string; variant?: string } | null>(null);
   const [remoteInteractions, setRemoteInteractions] = useState<
-    Record<string, { interaction: HandInteractionType; hoveredIndex?: number }>
+    Record<
+      string,
+      {
+        interaction: HandInteractionType;
+        hoveredIndex?: number;
+        hoveredCardId?: string | null;
+        selectedCardIds?: string[];
+      }
+    >
   >({});
   const [cardPlayedEvent, setCardPlayedEvent] = useState<CardPlayedEventData | null>(null);
   const [dealCardsEvent, setDealCardsEvent] = useState<DealCardsEventData | null>(null);
@@ -101,7 +109,12 @@ export function useCantinaSocket({
   const onDealCardsEventRef = useRef(onDealCardsEvent);
   onDealCardsEventRef.current = onDealCardsEvent;
 
-  const lastSentInteractionRef = useRef<{ interaction: string; hoveredIndex?: number }>({
+  const lastSentInteractionRef = useRef<{
+    interaction: string;
+    hoveredIndex?: number;
+    hoveredCardId?: string | null;
+    selectedKey?: string;
+  }>({
     interaction: '',
   });
 
@@ -128,19 +141,36 @@ export function useCantinaSocket({
   }, []);
 
   const sendHandInteraction = useCallback(
-    (interaction: HandInteractionType, hoveredIndex?: number) => {
-      // Throttle: only send when state or index changes
+    (
+      interaction: HandInteractionType,
+      hoveredIndex?: number,
+      hoveredCardId?: string | null,
+      selectedCardIds?: string[]
+    ) => {
+      const selectedKey = Array.isArray(selectedCardIds)
+        ? selectedCardIds.join(',')
+        : '';
+      // Throttle: only send when state, index, cardId, or selection changes
       if (
         lastSentInteractionRef.current.interaction === interaction &&
-        lastSentInteractionRef.current.hoveredIndex === hoveredIndex
+        lastSentInteractionRef.current.hoveredIndex === hoveredIndex &&
+        lastSentInteractionRef.current.hoveredCardId === hoveredCardId &&
+        lastSentInteractionRef.current.selectedKey === selectedKey
       ) {
         return;
       }
-      lastSentInteractionRef.current = { interaction, hoveredIndex };
+      lastSentInteractionRef.current = {
+        interaction,
+        hoveredIndex,
+        hoveredCardId,
+        selectedKey,
+      };
       sendMessage({
         type: 'HAND_INTERACTION',
         interaction,
         hoveredIndex,
+        hoveredCardId,
+        selectedCardIds,
       });
     },
     [sendMessage]
@@ -217,6 +247,11 @@ export function useCantinaSocket({
             [msg.playerId]: {
               interaction: msg.interaction,
               hoveredIndex: msg.hoveredIndex,
+              hoveredCardId: msg.hoveredCardId,
+              selectedCardIds:
+                msg.selectedCardIds !== undefined
+                  ? msg.selectedCardIds
+                  : prev[msg.playerId]?.selectedCardIds,
             },
           }));
         } else if (msg.type === 'CARD_PLAYED_EVENT') {

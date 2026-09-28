@@ -352,7 +352,13 @@ export type CantinaClientMessage =
   | { type: 'RESTART_MATCH' }
   | { type: 'RETURN_TO_LOBBY' }
   | { type: 'LEAVE_ROOM' }
-  | { type: 'HAND_INTERACTION'; interaction: HandInteractionType; hoveredIndex?: number }
+  | {
+      type: 'HAND_INTERACTION';
+      interaction: HandInteractionType;
+      hoveredIndex?: number;
+      hoveredCardId?: string | null;
+      selectedCardIds?: string[];
+    }
   // Cadena Mode Actions:
   | { type: 'CADENA_PLAY_CHAIN'; cardIds: string[]; playId?: string }
   | { type: 'CADENA_PLAY_SPECIAL'; cardId: string; targetPlayerId?: string; playId?: string }
@@ -371,7 +377,14 @@ export type CantinaServerMessage =
   | { type: 'ROOM_STATE'; state: CantinaRoomState }
   | { type: 'ERROR'; message: string }
   | { type: 'NOTIFICATION'; text: string; variant?: 'info' | 'warning' | 'danger' | 'success' }
-  | { type: 'PLAYER_HAND_INTERACTION'; playerId: string; interaction: HandInteractionType; hoveredIndex?: number }
+  | {
+      type: 'PLAYER_HAND_INTERACTION';
+      playerId: string;
+      interaction: HandInteractionType;
+      hoveredIndex?: number;
+      hoveredCardId?: string | null;
+      selectedCardIds?: string[];
+    }
   | { type: 'CARD_PLAYED_EVENT'; playerId: string; playerName: string; cardsCount: number; playId: string; claimedRank: TableRank; cards?: Card[] }
   | { type: 'DEAL_CARDS_EVENT'; round: number; roundStartEventId: string; startingPlayerId: string; startingPlayerName: string; tableRank: TableRank; cardsPerPlayer?: number }
   | { type: 'ROULETTE_SPIN_EVENT'; rouletteEventId: string; playerId: string; velocity: number; angle: number; spinId: string; settled?: boolean };

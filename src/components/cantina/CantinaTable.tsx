@@ -14,6 +14,7 @@ import {
   CANTINA_MAP_ASSETS,
   CANTINA_CARD_ASSETS,
   getSeatPovKey,
+  getRelativeSeat,
   resolveCantinaSeatBackground,
   logCantinaMapAssetError,
   logCantinaCardAssetError,
@@ -23,6 +24,8 @@ import {
   CANTINA_TABLE_LAYOUTS,
   MAX_VISIBLE_PILE_CARDS,
   getStableCardScatter,
+  getOpponentSeatVisualForPlayer,
+  OpponentSeatRole,
   SeatVisualLayout,
 } from '../../data/cantina/cantinaTableLayouts';
 import {
@@ -69,6 +72,9 @@ import {
   Hand,
   Megaphone,
   Shuffle,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface CantinaTableProps {
@@ -76,7 +82,12 @@ interface CantinaTableProps {
   localPlayerId: string;
   remoteInteractions: Record<
     string,
-    { interaction: HandInteractionType; hoveredIndex?: number }
+    {
+      interaction: HandInteractionType;
+      hoveredIndex?: number;
+      hoveredCardId?: string | null;
+      selectedCardIds?: string[];
+    }
   >;
   cardPlayedEvent?: CardPlayedEventData | null;
   dealCardsEvent?: DealCardsEventData | null;
@@ -99,7 +110,9 @@ interface CantinaTableProps {
   onLeaveRoom: () => void;
   onSendHandInteraction: (
     interaction: HandInteractionType,
-    hoveredIndex?: number
+    hoveredIndex?: number,
+    hoveredCardId?: string | null,
+    selectedCardIds?: string[]
   ) => void;
   // Cadena mode callbacks:
   onCadenaPlayChain?: (cardIds: string[], playId?: string) => void;
@@ -184,6 +197,7 @@ export const CantinaTable = ({
   const [showExitModal, setShowExitModal] = useState(false);
   const [showCadenaGuideModal, setShowCadenaGuideModal] = useState(false);
   const [selectedStealRivalId, setSelectedStealRivalId] = useState<string | null>(null);
+  const [spectatedPlayerId, setSpectatedPlayerId] = useState<string | null>(null);
   const [activeVisualEffect, setActiveVisualEffect] = useState<{
     eventId: string;
     kind: string;
@@ -255,35 +269,121 @@ export const CantinaTable = ({
   );
   const isMyTurn =
     roomState.activePlayerId === localPlayerId && roomState.phase === 'PLAYING';
-  const isLocalAlive = localPlayer?.isAlive ?? false;
+  const isLocalAlive = Boolean(localPlayer?.isAlive && !localPlayer?.isEliminated);
   const isMandatoryChallenge = Boolean(
     !isCadenaMode && roomState.mandatoryChallenge && roomState.lastPlay
   );
 
-  // 1. Authoritative Map & Independent Seat POV
+  // Surviving players for True Spectator POV Mode after localPlayer dies
+  const survivingPlayers = useMemo(
+    () => roomState.players.filter((p) => p.isAlive && !p.isEliminated),
+    [roomState.players]
+  );
+
+  const isLocalSpectator = Boolean(
+    !isLocalAlive &&
+      roomState.phase !== 'LOBBY' &&
+      roomState.phase !== 'GAME_OVER' &&
+      survivingPlayers.length > 0
+  );
+
+  useEffect(() => {
+    if (!isLocalSpectator) {
+      if (spectatedPlayerId !== null) {
+        setSpectatedPlayerId(null);
+      }
+      return;
+    }
+    if (
+      !spectatedPlayerId ||
+      !survivingPlayers.some((p) => p.id === spectatedPlayerId)
+    ) {
+      const preferredActive = survivingPlayers.find(
+        (p) => p.id === roomState.activePlayerId
+      );
+      setSpectatedPlayerId(
+        preferredActive?.id || survivingPlayers[0]?.id || null
+      );
+    }
+  }, [
+    isLocalSpectator,
+    spectatedPlayerId,
+    survivingPlayers,
+    roomState.activePlayerId,
+  ]);
+
+  const watchedPlayer = useMemo(() => {
+    if (!isLocalSpectator || survivingPlayers.length === 0) return null;
+    return (
+      survivingPlayers.find((p) => p.id === spectatedPlayerId) ||
+      survivingPlayers[0] ||
+      null
+    );
+  }, [isLocalSpectator, survivingPlayers, spectatedPlayerId]);
+
+  const isSpectatingOther = Boolean(
+    isLocalSpectator && watchedPlayer && watchedPlayer.id !== localPlayerId
+  );
+
+  const perspectivePlayer =
+    isSpectatingOther && watchedPlayer ? watchedPlayer : localPlayer;
+  const perspectivePlayerId = perspectivePlayer?.id || localPlayerId;
+  const isPerspectivePlayerTurn =
+    roomState.activePlayerId === perspectivePlayerId &&
+    roomState.phase === 'PLAYING';
+
+  const cycleSpectatedPlayer = useCallback(
+    (direction: -1 | 1) => {
+      if (survivingPlayers.length <= 1) return;
+      audio.playClick();
+      const currentIdx = watchedPlayer
+        ? survivingPlayers.findIndex((p) => p.id === watchedPlayer.id)
+        : 0;
+      const safeIdx = currentIdx >= 0 ? currentIdx : 0;
+      const nextIdx =
+        (safeIdx + direction + survivingPlayers.length) %
+        survivingPlayers.length;
+      setSpectatedPlayerId(survivingPlayers[nextIdx].id);
+    },
+    [survivingPlayers, watchedPlayer]
+  );
+
+  useEffect(() => {
+    if (!isSpectatingOther || survivingPlayers.length <= 1) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        cycleSpectatedPlayer(-1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        cycleSpectatedPlayer(1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSpectatingOther, survivingPlayers.length, cycleSpectatedPlayer]);
+
+  // 1. Authoritative Map & Independent Seat POV (uses watched player's exact seat POV when spectating!)
   const selectedMapId: CantinaMapId = roomState.config.mapId;
   const mapDef = CANTINA_MAP_ASSETS[selectedMapId];
-  const seatIndex = localPlayer?.seatIndex ?? 0;
+  const seatIndex = perspectivePlayer?.seatIndex ?? localPlayer?.seatIndex ?? 0;
   const povKey = getSeatPovKey(seatIndex);
   const povImageSrc = resolveCantinaSeatBackground(selectedMapId, seatIndex);
 
   const layout =
     CANTINA_TABLE_LAYOUTS[selectedMapId] || CANTINA_TABLE_LAYOUTS.mapa1;
 
-  // Order opponents clockwise relative to localPlayer's seat around the table
+  // Order opponents clockwise around the physical 4-seat table relative to perspectivePlayer's authoritative seatIndex
   const opponents = useMemo(() => {
-    const total = roomState.players.length;
-    if (total <= 1) return [];
-    const myIdx = roomState.players.findIndex((p) => p.id === localPlayerId);
-    if (myIdx < 0) {
-      return roomState.players.filter((p) => p.id !== localPlayerId);
-    }
-    const ordered: CantinaPlayer[] = [];
-    for (let offset = 1; offset < total; offset++) {
-      ordered.push(roomState.players[(myIdx + offset) % total]);
-    }
-    return ordered;
-  }, [roomState.players, localPlayerId]);
+    return roomState.players
+      .filter((p) => p.id !== perspectivePlayerId)
+      .slice()
+      .sort(
+        (a, b) =>
+          getRelativeSeat(seatIndex, a.seatIndex) -
+          getRelativeSeat(seatIndex, b.seatIndex)
+      );
+  }, [roomState.players, perspectivePlayerId, seatIndex]);
 
   const aliveOpponents = useMemo(
     () => opponents.filter((o) => o.isAlive),
@@ -389,28 +489,22 @@ export const CantinaTable = ({
     return () => clearTimeout(timer);
   }, [isCadenaMode, cadenaState?.lastEvent]);
 
-  const getOpponentSeatInfo = useCallback(
+  // Resolve an opponent's fixed physical table seat strictly from viewer's seatIndex and opponent's seatIndex
+  const getOpponentSeatInfoForPlayer = useCallback(
     (
-      oppIndex: number,
-      totalOpponents: number
-    ): { seatLayout: SeatVisualLayout; seatRole: 'far' | 'left' | 'right' } => {
-      if (totalOpponents === 1) {
-        return { seatLayout: layout.farOpponent, seatRole: 'far' };
-      }
-      if (totalOpponents === 2) {
-        return oppIndex === 0
-          ? { seatLayout: layout.leftOpponent, seatRole: 'left' }
-          : { seatLayout: layout.rightOpponent, seatRole: 'right' };
-      }
-      if (oppIndex === 0) {
-        return { seatLayout: layout.leftOpponent, seatRole: 'left' };
-      }
-      if (oppIndex === 1) {
-        return { seatLayout: layout.farOpponent, seatRole: 'far' };
-      }
-      return { seatLayout: layout.rightOpponent, seatRole: 'right' };
+      opponentSeatIndex: number
+    ): {
+      relativeSeat: 0 | 1 | 2 | 3;
+      seatLayout: SeatVisualLayout;
+      seatRole: OpponentSeatRole;
+    } => {
+      return getOpponentSeatVisualForPlayer(
+        seatIndex,
+        opponentSeatIndex,
+        layout
+      );
     },
-    [layout]
+    [seatIndex, layout]
   );
 
   // Reset submission lock when active turn, subPhase, or round changes
@@ -511,9 +605,9 @@ export const CantinaTable = ({
     targetInitialDealCount,
   ]);
 
-  // Ensure all cards in hand (including newly drawn/stolen cards in Cadena) are face-up once in PLAYING phase
+  // Ensure all cards in hand (including newly drawn/stolen cards in Cadena or watched player's hand) are face-up once in PLAYING phase
   useEffect(() => {
-    const handLen = (localPlayer?.hand || []).length;
+    const handLen = (perspectivePlayer?.hand || []).length;
     if (roomState.phase === 'PLAYING') {
       if (dealtCardCount < targetInitialDealCount) {
         const fallbackTimer = setTimeout(() => {
@@ -537,7 +631,7 @@ export const CantinaTable = ({
     roomState.phase,
     dealtCardCount,
     targetInitialDealCount,
-    localPlayer?.hand,
+    perspectivePlayer?.hand,
     flippedCardIndices.size,
   ]);
 
@@ -708,26 +802,27 @@ export const CantinaTable = ({
     let runningDeckCount = drawEv.drawPileCountBefore;
     setVisualDeckCountOverride(runningDeckCount);
 
-    const isLocalDraw = drawEv.playerId === localPlayerId;
-    if (isLocalDraw && drawEv.drawnCardIds && drawEv.drawnCardIds.length > 0) {
+    const isForegroundDraw = drawEv.playerId === perspectivePlayerId;
+    if (isForegroundDraw && drawEv.drawnCardIds && drawEv.drawnCardIds.length > 0) {
       setInFlightDrawnCardIds((prev) => [
         ...prev,
         ...(drawEv.drawnCardIds || []),
       ]);
     }
 
-    // Determine target coordinates (local hand vs opponent seat)
+    // Determine target coordinates (foreground hand vs opponent seat)
     let targetBaseX = vw / 2;
     let targetBaseY = vh - 125;
     let targetRotZBase = 0;
     let targetRotXBase = 6;
     let targetScaleBase = 1.0;
 
-    if (!isLocalDraw) {
-      const oppIdx = opponents.findIndex((o) => o.id === drawEv.playerId);
-      const { seatLayout } = getOpponentSeatInfo(
-        oppIdx >= 0 ? oppIdx : 0,
-        Math.max(opponents.length, 1)
+    if (!isForegroundDraw) {
+      const drawnOpponent = roomState.players.find(
+        (p) => p.id === drawEv.playerId
+      );
+      const { seatLayout } = getOpponentSeatInfoForPlayer(
+        drawnOpponent?.seatIndex ?? 0
       );
       const seatEl = opponentSeatRefs.current[drawEv.playerId];
       const seatRect = seatEl ? seatEl.getBoundingClientRect() : null;
@@ -751,15 +846,15 @@ export const CantinaTable = ({
       const drawnCardId = drawEv.drawnCards?.[i]?.id || drawEv.drawnCardIds?.[i];
       const drawnCardObj =
         drawEv.drawnCards?.[i] ||
-        (isLocalDraw && drawnCardId
-          ? (localPlayer?.hand || []).find((c) => c.id === drawnCardId)
+        (isForegroundDraw && drawnCardId
+          ? (perspectivePlayer?.hand || []).find((c) => c.id === drawnCardId)
           : undefined);
       const visualId = drawnCardId
         ? `draw_${drawEv.eventId}_${drawnCardId}`
         : `draw_${drawEv.eventId}_${i}`;
       const seqZ = ++sequenceCounterRef.current + 140;
 
-      const spreadOffset = (i - midIdx) * (isLocalDraw ? 38 : 18);
+      const spreadOffset = (i - midIdx) * (isForegroundDraw ? 38 : 18);
       const targetX = targetBaseX + spreadOffset;
       const targetY = targetBaseY + Math.abs(i - midIdx) * 4;
 
@@ -767,9 +862,9 @@ export const CantinaTable = ({
         id: visualId,
         playId: drawEv.eventId,
         cardIndex: i,
-        animationKind: isLocalDraw ? 'DRAW_TO_LOCAL' : 'DRAW_TO_OPPONENT',
+        animationKind: isForegroundDraw ? 'DRAW_TO_LOCAL' : 'DRAW_TO_OPPONENT',
         rank: drawnCardObj?.rank,
-        isFaceDown: !isLocalDraw,
+        isFaceDown: !isForegroundDraw,
         mapId: selectedMapId,
         startX: deckCoords.x,
         startY: deckCoords.y - 6,
@@ -786,7 +881,7 @@ export const CantinaTable = ({
         controlPointX: (deckCoords.x + targetX) / 2 + (i - midIdx) * 20,
         controlPointY: Math.min(deckCoords.y, targetY) - (65 + i * 10),
         delayMs: reshuffleOffsetMs + i * 155,
-        durationMs: isLocalDraw ? 380 : 350,
+        durationMs: isForegroundDraw ? 380 : 350,
         settlingMs: 65,
         zIndex: seqZ,
       });
@@ -804,9 +899,10 @@ export const CantinaTable = ({
   }, [
     isCadenaMode,
     cadenaState?.lastDrawEvent,
-    localPlayerId,
-    opponents,
-    getOpponentSeatInfo,
+    perspectivePlayerId,
+    perspectivePlayer?.hand,
+    roomState.players,
+    getOpponentSeatInfoForPlayer,
     getDeckCenterCoords,
     getPileCenterCoords,
     selectedMapId,
@@ -837,29 +933,40 @@ export const CantinaTable = ({
         return;
       }
 
-      const shooterIndex = opponents.findIndex((o) => o.id === play.playerId);
       const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
       const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+      const isWatchedPlayerThrow =
+        isSpectatingOther && play.playerId === perspectivePlayerId;
 
-      const { seatLayout } = getOpponentSeatInfo(
-        shooterIndex >= 0 ? shooterIndex : 0,
-        Math.max(opponents.length, 1)
-      );
+      let baseStartX = vw / 2;
+      let baseStartY = vh - 110;
+      let startRotZBase = 0;
+      let startRotX = 8;
+      let startScale = 1.04;
 
-      const seatEl = opponentSeatRefs.current[play.playerId];
-      const seatRect = seatEl ? seatEl.getBoundingClientRect() : null;
-      const baseStartX =
-        seatRect && seatRect.width > 0
-          ? seatRect.left + seatRect.width / 2
-          : vw * (seatLayout.leftPercent / 100);
-      const baseStartY =
-        seatRect && seatRect.height > 0
-          ? seatRect.top + seatRect.height / 2
-          : vh * (seatLayout.topPercent / 100);
+      if (!isWatchedPlayerThrow) {
+        const shooterOpponent = roomState.players.find(
+          (p) => p.id === play.playerId
+        );
+        const { seatLayout } = getOpponentSeatInfoForPlayer(
+          shooterOpponent?.seatIndex ?? 0
+        );
 
-      const startRotZBase = seatLayout.rotationZ;
-      const startRotX = seatLayout.perspectiveTiltX;
-      const startScale = seatLayout.scale * 0.78;
+        const seatEl = opponentSeatRefs.current[play.playerId];
+        const seatRect = seatEl ? seatEl.getBoundingClientRect() : null;
+        baseStartX =
+          seatRect && seatRect.width > 0
+            ? seatRect.left + seatRect.width / 2
+            : vw * (seatLayout.leftPercent / 100);
+        baseStartY =
+          seatRect && seatRect.height > 0
+            ? seatRect.top + seatRect.height / 2
+            : vh * (seatLayout.topPercent / 100);
+
+        startRotZBase = seatLayout.rotationZ;
+        startRotX = seatLayout.perspectiveTiltX;
+        startScale = seatLayout.scale * 0.78;
+      }
 
       const pileCenter = getPileCenterCoords();
       const midIdx = (play.cardsCount - 1) / 2;
@@ -915,8 +1022,10 @@ export const CantinaTable = ({
     },
     [
       localPlayerId,
-      opponents,
-      getOpponentSeatInfo,
+      isSpectatingOther,
+      perspectivePlayerId,
+      roomState.players,
+      getOpponentSeatInfoForPlayer,
       getPileCenterCoords,
       selectedMapId,
       layout,
@@ -1041,7 +1150,12 @@ export const CantinaTable = ({
         } else {
           next = [...prev, cardId];
         }
-        onSendHandInteraction('CARD_SELECTED', hoveredCardIndex ?? undefined);
+        onSendHandInteraction(
+          next.length > 0 ? 'CARD_SELECTED' : 'HAND_HOVER',
+          hoveredCardIndex ?? undefined,
+          null,
+          next
+        );
         return next;
       });
       return;
@@ -1082,8 +1196,10 @@ export const CantinaTable = ({
       const next = selectedCardIds.slice(0, existingIdx);
       setSelectedCardIds(next);
       onSendHandInteraction(
-        'CARD_SELECTED',
-        isCadenaMode ? undefined : hoveredCardIndex ?? undefined
+        next.length > 0 ? 'CARD_SELECTED' : 'HAND_HOVER',
+        isCadenaMode ? undefined : hoveredCardIndex ?? undefined,
+        null,
+        next
       );
       return;
     }
@@ -1111,10 +1227,13 @@ export const CantinaTable = ({
         return;
       }
       audio.playCardSelect();
-      setSelectedCardIds([cardId]);
+      const next = [cardId];
+      setSelectedCardIds(next);
       onSendHandInteraction(
         'CARD_SELECTED',
-        isCadenaMode ? undefined : hoveredCardIndex ?? undefined
+        isCadenaMode ? undefined : hoveredCardIndex ?? undefined,
+        cardId,
+        next
       );
       return;
     }
@@ -1134,10 +1253,13 @@ export const CantinaTable = ({
       )
     ) {
       audio.playCardSelect();
-      setSelectedCardIds([...selectedCardIds, cardId]);
+      const next = [...selectedCardIds, cardId];
+      setSelectedCardIds(next);
       onSendHandInteraction(
         'CARD_SELECTED',
-        isCadenaMode ? undefined : hoveredCardIndex ?? undefined
+        isCadenaMode ? undefined : hoveredCardIndex ?? undefined,
+        cardId,
+        next
       );
       return;
     }
@@ -1148,10 +1270,13 @@ export const CantinaTable = ({
       canAppendCardToSelection(cadenaState.currentNumber, [], clickedCard, hand)
     ) {
       audio.playCardSelect();
-      setSelectedCardIds([cardId]);
+      const next = [cardId];
+      setSelectedCardIds(next);
       onSendHandInteraction(
         'CARD_SELECTED',
-        isCadenaMode ? undefined : hoveredCardIndex ?? undefined
+        isCadenaMode ? undefined : hoveredCardIndex ?? undefined,
+        cardId,
+        next
       );
       return;
     }
@@ -1267,7 +1392,7 @@ export const CantinaTable = ({
 
     onPlayCards(cardsToPlay, playId);
     setSelectedCardIds([]);
-    onSendHandInteraction('HAND_IDLE');
+    onSendHandInteraction('HAND_IDLE', undefined, null, []);
   };
 
   // Confirm numeric chain play in CADENA mode
@@ -1323,7 +1448,7 @@ export const CantinaTable = ({
     launchLocalThrowAnimation(cadenaValidation.resolvedCards, playId, false);
     onCadenaPlayChain(cardsToPlay, playId);
     setSelectedCardIds([]);
-    onSendHandInteraction('HAND_IDLE');
+    onSendHandInteraction('HAND_IDLE', undefined, null, []);
   };
 
   // Confirm special action card play in CADENA mode
@@ -1354,7 +1479,7 @@ export const CantinaTable = ({
 
     onCadenaPlaySpecial(specialCard.id, targetPlayerId, playId);
     setSelectedCardIds([]);
-    onSendHandInteraction('HAND_IDLE');
+    onSendHandInteraction('HAND_IDLE', undefined, null, []);
   };
 
   const handleCardDeparted = useCallback((cardVisualKey: string) => {
@@ -1429,21 +1554,34 @@ export const CantinaTable = ({
     setAnimatingCards((prev) => prev.filter((c) => c.id !== cardVisualKey));
   }, []);
 
-  const handleCardMouseEnter = (index: number) => {
+  const handleCardMouseEnter = (index: number, cardId?: string) => {
+    if (isSpectatingOther) return;
     setHoveredCardIndex(index);
     audio.playCardHover();
-    onSendHandInteraction('CARD_HOVER', isCadenaMode ? undefined : index);
+    onSendHandInteraction(
+      'CARD_HOVER',
+      index,
+      cardId || null,
+      selectedCardIds
+    );
   };
 
   const handleHandMouseEnter = () => {
+    if (isSpectatingOther) return;
     setIsHandHovered(true);
-    onSendHandInteraction('HAND_HOVER');
+    onSendHandInteraction('HAND_HOVER', undefined, null, selectedCardIds);
   };
 
   const handleHandMouseLeave = () => {
+    if (isSpectatingOther) return;
     setIsHandHovered(false);
     setHoveredCardIndex(null);
-    onSendHandInteraction('HAND_IDLE');
+    onSendHandInteraction(
+      selectedCardIds.length > 0 ? 'CARD_SELECTED' : 'HAND_IDLE',
+      undefined,
+      null,
+      selectedCardIds
+    );
   };
 
   const handleChallenge = () => {
@@ -1528,25 +1666,76 @@ export const CantinaTable = ({
 
   // Filter visible hand cards (subtract in-flight cards during throw or draw, and respect dealing count during ROUND_INTRO)
   // Requirement 1 & 2: In CADENA mode, derive a sorted visual hand (1..10 ascending, then J, Q, K, JOKER, ESPEJO, BOMBA, REVOLVER)
+  // In True Spectator POV Mode, derive from perspectivePlayer (the watched surviving player)
   const visibleHandCards = useMemo(() => {
-    const base = (localPlayer?.hand || []).filter(
+    const base = (perspectivePlayer?.hand || []).filter(
       (c) =>
         !inFlightCardIds.includes(c.id) && !inFlightDrawnCardIds.includes(c.id)
     );
     const ordered = isCadenaMode ? sortCadenaHand(base) : base;
-    if (roomState.phase === 'ROUND_INTRO' || dealtCardCount < targetInitialDealCount) {
+    if (
+      !isSpectatingOther &&
+      (roomState.phase === 'ROUND_INTRO' || dealtCardCount < targetInitialDealCount)
+    ) {
       return ordered.slice(0, dealtCardCount);
     }
     return ordered;
   }, [
-    localPlayer?.hand,
+    perspectivePlayer?.hand,
     inFlightCardIds,
     inFlightDrawnCardIds,
     isCadenaMode,
+    isSpectatingOther,
     roomState.phase,
     dealtCardCount,
     targetInitialDealCount,
   ]);
+
+  // Effective hand interaction state (local player when alive, or watched player's live interaction when spectating)
+  const watchedInteraction =
+    isSpectatingOther && watchedPlayer
+      ? remoteInteractions[watchedPlayer.id]
+      : undefined;
+
+  const effectiveSelectedCardIds = useMemo(() => {
+    if (!isSpectatingOther) return selectedCardIds;
+    return watchedInteraction?.selectedCardIds || [];
+  }, [isSpectatingOther, selectedCardIds, watchedInteraction?.selectedCardIds]);
+
+  const effectiveHoveredCardIndex = useMemo(() => {
+    if (!isSpectatingOther) return hoveredCardIndex;
+    if (!watchedInteraction || watchedInteraction.interaction !== 'CARD_HOVER') {
+      return null;
+    }
+    if (watchedInteraction.hoveredCardId) {
+      const idx = visibleHandCards.findIndex(
+        (c) => c.id === watchedInteraction.hoveredCardId
+      );
+      if (idx >= 0) return idx;
+    }
+    if (typeof watchedInteraction.hoveredIndex === 'number') {
+      return Math.min(
+        Math.max(0, watchedInteraction.hoveredIndex),
+        Math.max(0, visibleHandCards.length - 1)
+      );
+    }
+    return null;
+  }, [
+    isSpectatingOther,
+    hoveredCardIndex,
+    watchedInteraction,
+    visibleHandCards,
+  ]);
+
+  const effectiveIsHandHovered = useMemo(() => {
+    if (!isSpectatingOther) return isHandHovered;
+    return Boolean(
+      watchedInteraction &&
+        (watchedInteraction.interaction === 'HAND_HOVER' ||
+          watchedInteraction.interaction === 'CARD_HOVER' ||
+          watchedInteraction.interaction === 'CARD_SELECTED')
+    );
+  }, [isSpectatingOther, isHandHovered, watchedInteraction]);
 
   // Connected players for synchronized rematch
   const connectedPlayers = useMemo(
@@ -1928,7 +2117,7 @@ export const CantinaTable = ({
 
       {/* 4. OPPONENTS AROUND THE TABLE (CHAIR-ALIGNED, SEAT PERSPECTIVE, ACTIVE SEAT GLOW) */}
       <div className="absolute inset-0 pointer-events-none z-10">
-        {opponents.map((opp, oppIndex) => {
+        {opponents.map((opp) => {
           const isOppTurn =
             roomState.activePlayerId === opp.id &&
             (roomState.phase === 'PLAYING' || roomState.phase === 'ROUND_INTRO');
@@ -1938,9 +2127,8 @@ export const CantinaTable = ({
             oppInteraction?.interaction === 'CARD_HOVER' ||
             oppInteraction?.interaction === 'CARD_SELECTED';
 
-          const { seatLayout, seatRole } = getOpponentSeatInfo(
-            oppIndex,
-            opponents.length
+          const { seatLayout, seatRole } = getOpponentSeatInfoForPlayer(
+            opp.seatIndex
           );
           const oppCardSize =
             seatRole === 'far' ? 'opponent-far' : 'opponent-side';
@@ -2592,20 +2780,93 @@ export const CantinaTable = ({
                 )}
               </>
             )}
+            {/* TRUE SPECTATOR POV MODE CONTROLS (WHEN LOCAL PLAYER IS ELIMINATED) */}
+            {isSpectatingOther && watchedPlayer && (
+              <div className="px-3.5 py-2 sm:px-4 sm:py-2 rounded-2xl bg-stone-950/92 border border-amber-500/55 shadow-[0_12px_35px_rgba(0,0,0,0.92)] backdrop-blur-md flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-black uppercase tracking-wider text-amber-300">
+                  <Eye className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>ESPECTADOR • PERSPECTIVA DE:</span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {survivingPlayers.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => cycleSpectatedPlayer(-1)}
+                      title="Jugador superviviente anterior (←)"
+                      className="p-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-amber-500/40 text-amber-200 hover:text-white transition-all active:scale-95"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  <div className="flex items-center gap-1.5">
+                    {survivingPlayers.map((surv) => {
+                      const isWatchingThis = surv.id === watchedPlayer.id;
+                      const isSurvTurn = roomState.activePlayerId === surv.id;
+                      return (
+                        <button
+                          key={surv.id}
+                          type="button"
+                          onClick={() => {
+                            audio.playClick();
+                            setSpectatedPlayerId(surv.id);
+                          }}
+                          className={`px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                            isWatchingThis
+                              ? 'bg-amber-500 text-stone-950 border-amber-200 shadow-[0_0_16px_rgba(245,158,11,0.5)]'
+                              : 'bg-stone-900/90 text-stone-300 border-stone-700 hover:border-amber-500/50 hover:text-amber-100'
+                          }`}
+                        >
+                          {isSurvTurn && (
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                isWatchingThis
+                                  ? 'bg-stone-950 animate-ping'
+                                  : 'bg-amber-400 animate-pulse'
+                              }`}
+                            />
+                          )}
+                          <span>{surv.avatar}</span>
+                          <span>{surv.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {survivingPlayers.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => cycleSpectatedPlayer(1)}
+                      title="Siguiente jugador superviviente (→)"
+                      className="p-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-amber-500/40 text-amber-200 hover:text-white transition-all active:scale-95"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 hidden sm:inline">
+                  • Solo lectura
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Physical Hand Fan Region — sized for larger cards + top lift headroom + bottom clearance above status row */}
-        {isLocalAlive ? (
+        {/* Physical Hand Fan Region — Renders Local Player's Hand OR Watched Surviving Player's Live Hand in Spectator Mode */}
+        {isLocalAlive || (isSpectatingOther && watchedPlayer) ? (
           <div
-            onMouseEnter={handleHandMouseEnter}
-            onMouseLeave={handleHandMouseLeave}
+            onMouseEnter={isSpectatingOther ? undefined : handleHandMouseEnter}
+            onMouseLeave={isSpectatingOther ? undefined : handleHandMouseLeave}
             style={{
               height: 'calc(clamp(156px, 20.8vh, 212px) + 64px)',
             }}
-            className="relative flex items-end justify-center pointer-events-auto w-full max-w-[920px] px-6"
+            className={`relative flex items-end justify-center w-full max-w-[920px] px-6 ${
+              isSpectatingOther ? 'pointer-events-none' : 'pointer-events-auto'
+            }`}
           >
-            {isMyTurn && (
+            {isPerspectivePlayerTurn && (
               <div className="absolute inset-x-16 bottom-6 h-28 rounded-full bg-amber-500/15 blur-2xl pointer-events-none" />
             )}
 
@@ -2613,12 +2874,16 @@ export const CantinaTable = ({
               const totalCards = visibleHandCards.length;
               const mid = (totalCards - 1) / 2;
               const offsetFromMid = i - mid;
-              const selectedIdx = selectedCardIds.indexOf(card.id);
+              const selectedIdx = effectiveSelectedCardIds.indexOf(card.id);
               const isSelected = selectedIdx >= 0;
-              const isCardHovered = hoveredCardIndex === i;
+              const isCardHovered = effectiveHoveredCardIndex === i;
 
-              const isCardFlippedFaceUp = flippedCardIndices.has(i);
-              const isCurrentlyFlipping = flippingCardIndex === i;
+              const isCardFlippedFaceUp = isSpectatingOther
+                ? true
+                : flippedCardIndices.has(i);
+              const isCurrentlyFlipping = isSpectatingOther
+                ? false
+                : flippingCardIndex === i;
 
               const maxAllowedHoverSpacing = Math.min(
                 layout.localHand.hoverFanSpacing,
@@ -2629,18 +2894,21 @@ export const CantinaTable = ({
                 Math.max(20, (viewportWidth - 160) / Math.max(totalCards, 1))
               );
 
-              const spacingPx = isHandHovered
+              const spacingPx = effectiveIsHandHovered
                 ? maxAllowedHoverSpacing
                 : maxAllowedIdleSpacing;
               const spreadDeg =
-                (isHandHovered
+                (effectiveIsHandHovered
                   ? layout.localHand.hoverFanRotation
                   : layout.localHand.idleFanRotation) *
                 (totalCards > 7 ? 0.72 : 1);
 
               let neighborPushX = 0;
-              if (hoveredCardIndex !== null && hoveredCardIndex !== i) {
-                const diff = i - hoveredCardIndex;
+              if (
+                effectiveHoveredCardIndex !== null &&
+                effectiveHoveredCardIndex !== i
+              ) {
+                const diff = i - effectiveHoveredCardIndex;
                 const distanceAttenuation = 1 / Math.abs(diff);
                 neighborPushX =
                   Math.sign(diff) *
@@ -2703,7 +2971,11 @@ export const CantinaTable = ({
                   ref={(el) => {
                     cardElementRefs.current[card.id] = el;
                   }}
-                  onMouseEnter={() => handleCardMouseEnter(i)}
+                  onMouseEnter={
+                    isSpectatingOther
+                      ? undefined
+                      : () => handleCardMouseEnter(i, card.id)
+                  }
                   style={{
                     position: 'absolute',
                     bottom: `${layout.localHand.bottomPx}px`,
@@ -2725,8 +2997,10 @@ export const CantinaTable = ({
                     isFaceDown={!isCardFlippedFaceUp}
                     mapId={selectedMapId}
                     selected={isSelected}
-                    disabled={isMandatoryChallenge}
-                    onClick={() => handleCardClick(card.id)}
+                    disabled={isSpectatingOther ? false : isMandatoryChallenge}
+                    onClick={
+                      isSpectatingOther ? undefined : () => handleCardClick(card.id)
+                    }
                     size="hand"
                   />
                 </div>
@@ -2744,38 +3018,43 @@ export const CantinaTable = ({
         <div className="w-full h-11 sm:h-12 flex items-center justify-center pb-2 sm:pb-2.5 pointer-events-none shrink-0">
           <div
             className={`flex items-center gap-2 px-3.5 py-1 rounded-full pointer-events-auto text-[11px] sm:text-xs font-medium border backdrop-blur-md transition-all ${
-              isMyTurn
+              isPerspectivePlayerTurn
                 ? 'bg-amber-950/90 border-amber-400 text-amber-100 shadow-[0_0_16px_rgba(245,158,11,0.4)]'
                 : 'bg-black/75 border-stone-800 text-stone-200 shadow-lg'
             }`}
           >
-            {isMyTurn && (
+            {isPerspectivePlayerTurn && (
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
             )}
+            {isSpectatingOther && (
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 flex items-center gap-1">
+                <Skull className="w-3 h-3" /> Eliminado &middot; Viendo a:
+              </span>
+            )}
             <span className="font-bold text-stone-100">
-              {localPlayer?.avatar} {localPlayer?.name}
+              {perspectivePlayer?.avatar} {perspectivePlayer?.name}
             </span>
             <span className="text-stone-500">&middot;</span>
             {isCadenaMode ? (
               <>
                 <span className="font-mono tabular-nums text-amber-400 font-bold">
-                  Cartas: {localPlayer?.cardsCount ?? 0}
+                  Cartas: {perspectivePlayer?.cardsCount ?? 0}
                 </span>
-                {localPlayer?.lastReflectableEffectReceived && (
+                {perspectivePlayer?.lastReflectableEffectReceived && (
                   <>
                     <span className="text-stone-500">&middot;</span>
                     <span className="text-cyan-300 font-bold">
-                      🪞 Espejo listo ({localPlayer.lastReflectableEffectReceived.type} de{' '}
-                      {localPlayer.lastReflectableEffectReceived.sourcePlayerName})
+                      🪞 Espejo listo ({perspectivePlayer.lastReflectableEffectReceived.type} de{' '}
+                      {perspectivePlayer.lastReflectableEffectReceived.sourcePlayerName})
                     </span>
                   </>
                 )}
               </>
             ) : (
               <span className="font-mono tabular-nums text-amber-400 font-bold">
-                Tu Revólver:{' '}
-                {localPlayer?.revolver?.shotsTaken ??
-                  localPlayer?.chamberPulls ??
+                {isSpectatingOther ? 'Su Revólver:' : 'Tu Revólver:'}{' '}
+                {perspectivePlayer?.revolver?.shotsTaken ??
+                  perspectivePlayer?.chamberPulls ??
                   0}
                 /6
               </span>
@@ -2817,6 +3096,11 @@ export const CantinaTable = ({
             <div className="mt-7 sm:mt-9 mb-6 sm:mb-8 pt-2 pb-1 flex items-center justify-center gap-4 sm:gap-5">
               {roomState.challengeResult.revealedCards.map((card, idx) => {
                 const isDiabloCard = card.rank === 'DIABLO';
+                const claimedRank = roomState.challengeResult!.claimedRank;
+                const isCardInvalid =
+                  card.rank !== claimedRank &&
+                  card.rank !== 'JOKER' &&
+                  !(roomState.config.mode === 'DIABLO' && card.rank === 'DIABLO');
                 return (
                   <div
                     key={card.id || idx}
@@ -2831,7 +3115,7 @@ export const CantinaTable = ({
                     className={`relative transition-all duration-500 ${
                       isDiabloCard
                         ? 'z-20 drop-shadow-[0_0_30px_rgba(239,68,68,0.9)]'
-                        : 'scale-90 opacity-85'
+                        : 'scale-90 opacity-90'
                     }`}
                   >
                     {isDiabloCard && (
@@ -2840,6 +3124,7 @@ export const CantinaTable = ({
                     <CantinaCard
                       rank={card.rank}
                       mapId={selectedMapId}
+                      isInvalidReveal={isCardInvalid}
                       size="lg"
                       className={
                         isDiabloCard
@@ -2873,7 +3158,13 @@ export const CantinaTable = ({
       {/* 7B. CARD REVELATION SUSPENSE MODAL (Clásico / Diablo) */}
       {roomState.phase === 'REVELACION' && roomState.challengeResult && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-stone-950 border-2 border-amber-500/60 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center gap-5">
+          <div
+            className={`w-full max-w-lg bg-stone-950 border-2 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center gap-5 ${
+              roomState.challengeResult.isBluff
+                ? 'border-red-500/80 shadow-[0_0_75px_rgba(239,68,68,0.45)]'
+                : 'border-emerald-500/70 shadow-[0_0_65px_rgba(16,185,129,0.3)]'
+            }`}
+          >
             <span className="text-xs font-black uppercase tracking-widest text-amber-400">
               {roomState.challengeResult.isFinalHandChallenge
                 ? 'VERIFICACIÓN DE ÚLTIMAS CARTAS'
@@ -2882,9 +3173,13 @@ export const CantinaTable = ({
 
             <h2 className="text-2xl sm:text-3xl font-black font-serif text-white">
               {roomState.challengeResult.isBluff ? (
-                <span className="text-rose-500">¡FAROL DETECTADO!</span>
+                <span className="text-red-500 drop-shadow-[0_0_16px_rgba(239,68,68,0.6)]">
+                  ¡FAROL DETECTADO!
+                </span>
               ) : (
-                <span className="text-emerald-400">¡JUGADA VÁLIDA!</span>
+                <span className="text-emerald-400 drop-shadow-[0_0_14px_rgba(16,185,129,0.5)]">
+                  ¡JUGADA VÁLIDA!
+                </span>
               )}
             </h2>
 
@@ -2894,16 +3189,53 @@ export const CantinaTable = ({
               </div>
             )}
 
-            <div className="flex items-center justify-center gap-3 my-2">
-              {roomState.challengeResult.revealedCards.map((card) => (
-                <CantinaCard
-                  key={card.id}
-                  rank={card.rank}
-                  mapId={selectedMapId}
-                  size="lg"
-                  className="shadow-2xl"
-                />
-              ))}
+            <div className="flex flex-wrap items-center justify-center gap-4 my-2">
+              {roomState.challengeResult.revealedCards.map((card, idx) => {
+                const claimedRank = roomState.challengeResult!.claimedRank;
+                const isCardInvalid =
+                  card.rank !== claimedRank &&
+                  card.rank !== 'JOKER' &&
+                  !(roomState.config.mode === 'DIABLO' && card.rank === 'DIABLO');
+
+                return (
+                  <div
+                    key={card.id || idx}
+                    className="flex flex-col items-center gap-2"
+                  >
+                    <div
+                      className={`relative rounded-2xl transition-transform ${
+                        isCardInvalid ? 'scale-105' : ''
+                      }`}
+                    >
+                      {isCardInvalid && (
+                        <div className="absolute -inset-2 rounded-3xl bg-red-600/35 blur-md pointer-events-none animate-pulse" />
+                      )}
+                      <CantinaCard
+                        rank={card.rank}
+                        mapId={selectedMapId}
+                        isInvalidReveal={isCardInvalid}
+                        size="lg"
+                        className={
+                          isCardInvalid
+                            ? 'shadow-[0_0_35px_rgba(239,68,68,0.9)]'
+                            : 'ring-2 ring-emerald-400/70 shadow-2xl'
+                        }
+                      />
+                    </div>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                        isCardInvalid
+                          ? 'bg-red-950/95 border-red-400 text-red-200 shadow-[0_0_14px_rgba(239,68,68,0.55)]'
+                          : 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                      }`}
+                    >
+                      {isCardInvalid
+                        ? `✕ MENTIRA (${card.rank} ≠ ${claimedRank})`
+                        : `✓ VÁLIDA (${card.rank})`}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
             <p className="text-sm text-stone-200 leading-relaxed font-semibold">
