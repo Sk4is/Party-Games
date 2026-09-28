@@ -30,7 +30,7 @@ interface CantinaCardProps {
 
 const RESPONSIVE_SIZE_STYLES: Partial<Record<CantinaCardSize, React.CSSProperties>> = {
   hand: {
-    height: 'clamp(138px, 17.6vh, 178px)',
+    height: 'clamp(156px, 20.8vh, 212px)',
     aspectRatio: '2 / 3',
   },
   table: {

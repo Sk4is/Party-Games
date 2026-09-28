@@ -1088,10 +1088,10 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
         })}
       </div>
 
-      {/* 6. LOCAL PLAYER ZONE (CLEAR PHYSICAL VERTICAL SEPARATION: TURN MESSAGE -> ACTION CONTROLS -> HAND FAN) */}
-      <div className="absolute bottom-0 inset-x-0 z-20 flex flex-col items-center pointer-events-none pb-2 sm:pb-3">
-        {/* Action Controls & Turn Prompt Bar */}
-        <div className="relative z-40 flex flex-col items-center justify-center gap-2 px-4 mb-2 sm:mb-3 min-h-[44px] pointer-events-auto">
+      {/* 6. LOCAL PLAYER ZONE (INDEPENDENT REGIONS: ACTION CONTROLS -> HAND VISUAL REGION -> DEDICATED STATUS SAFE AREA) */}
+      <div className="absolute bottom-0 inset-x-0 z-20 flex flex-col items-center pointer-events-none">
+        {/* Action Controls & Turn Prompt Bar — strictly above the hand visual region */}
+        <div className="relative z-40 flex flex-col items-center justify-center gap-2 px-4 mb-2 min-h-[44px] pointer-events-auto">
           {/* Mandatory Final-Hand Accusation Alert */}
           {isMyTurn && isMandatoryChallenge && isLocalAlive && (
             <div className="px-4 py-1.5 rounded-xl bg-red-950/95 border border-red-400/80 text-red-200 text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-[0_0_25px_rgba(239,68,68,0.45)] animate-bounce">
@@ -1145,19 +1145,19 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
           </div>
         </div>
 
-        {/* Physical Hand Fan Container — cards deal face-down and flip face-up at round start */}
+        {/* Physical Hand Fan Region — sized for larger cards + top lift headroom + bottom clearance above status row */}
         {isLocalAlive ? (
           <div
             onMouseEnter={handleHandMouseEnter}
             onMouseLeave={handleHandMouseLeave}
             style={{
-              height: 'calc(clamp(138px, 17.6vh, 178px) + 42px)',
+              height: 'calc(clamp(156px, 20.8vh, 212px) + 64px)',
             }}
-            className="relative flex items-end justify-center pointer-events-auto w-full max-w-[640px] px-6 pb-1"
+            className="relative flex items-end justify-center pointer-events-auto w-full max-w-[720px] px-6"
           >
             {/* Subtle warm golden glow behind local hand when it's local player's turn */}
             {isMyTurn && (
-              <div className="absolute inset-x-16 bottom-2 h-24 rounded-full bg-amber-500/15 blur-2xl pointer-events-none" />
+              <div className="absolute inset-x-16 bottom-6 h-28 rounded-full bg-amber-500/15 blur-2xl pointer-events-none" />
             )}
 
             {visibleHandCards.map((card, i) => {
@@ -1172,11 +1172,11 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
 
               const maxAllowedHoverSpacing = Math.min(
                 layout.localHand.hoverFanSpacing,
-                Math.max(40, (viewportWidth - 130) / Math.max(totalCards, 1))
+                Math.max(42, (viewportWidth - 150) / Math.max(totalCards, 1))
               );
               const maxAllowedIdleSpacing = Math.min(
                 layout.localHand.idleFanSpacing,
-                Math.max(24, (viewportWidth - 150) / Math.max(totalCards, 1))
+                Math.max(24, (viewportWidth - 165) / Math.max(totalCards, 1))
               );
 
               const spacingPx = isHandHovered
@@ -1237,7 +1237,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                   onMouseEnter={() => handleCardMouseEnter(i)}
                   style={{
                     position: 'absolute',
-                    bottom: '6px',
+                    bottom: `${layout.localHand.bottomPx}px`,
                     transform: `translate3d(${fanX}px, ${finalY}px, 0) rotate(${finalRot}deg) scale(${finalScale}) scaleX(${flipScaleX})`,
                     transformOrigin: '50% 88%',
                     zIndex,
@@ -1260,71 +1260,91 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
             })}
           </div>
         ) : (
-          <div className="py-3 px-5 rounded-2xl bg-black/80 border border-stone-800 text-stone-400 text-xs font-semibold backdrop-blur-sm pointer-events-auto flex items-center gap-2 mb-2">
+          <div className="py-3 px-5 rounded-2xl bg-black/80 border border-stone-800 text-stone-400 text-xs font-semibold backdrop-blur-sm pointer-events-auto flex items-center gap-2 mb-3">
             <Skull className="w-4 h-4 text-rose-500" /> Has sido eliminado.
             Observando la cantina...
           </div>
         )}
 
-        {/* Local player status badge */}
-        <div
-          className={`flex items-center gap-2 mt-1 px-3 py-1 rounded-full pointer-events-auto text-[11px] font-medium border transition-all ${
-            isMyTurn
-              ? 'bg-amber-950/90 border-amber-400 text-amber-100 shadow-[0_0_16px_rgba(245,158,11,0.4)]'
-              : 'bg-black/65 border-stone-800 text-stone-300'
-          }`}
-        >
-          {isMyTurn && (
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-          )}
-          <span className="font-bold text-stone-100">
-            {localPlayer?.avatar} {localPlayer?.name}
-          </span>
-          <span className="text-stone-600">&bull;</span>
-          <span className="font-mono tabular-nums text-amber-400 font-bold">
-            Tambor: {localPlayer?.chamberPulls ?? 0}/6
-          </span>
+        {/* DEDICATED BOTTOM STATUS SAFE AREA (24–30px below lowest card edge, never overlapped) */}
+        <div className="w-full h-11 sm:h-12 flex items-center justify-center pb-2 sm:pb-2.5 pointer-events-none shrink-0">
+          <div
+            className={`flex items-center gap-2 px-3.5 py-1 rounded-full pointer-events-auto text-[11px] sm:text-xs font-medium border backdrop-blur-md transition-all ${
+              isMyTurn
+                ? 'bg-amber-950/90 border-amber-400 text-amber-100 shadow-[0_0_16px_rgba(245,158,11,0.4)]'
+                : 'bg-black/75 border-stone-800 text-stone-200 shadow-lg'
+            }`}
+          >
+            {isMyTurn && (
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            )}
+            <span className="font-bold text-stone-100">
+              {localPlayer?.avatar} {localPlayer?.name}
+            </span>
+            <span className="text-stone-500">&middot;</span>
+            <span className="font-mono tabular-nums text-amber-400 font-bold">
+              Tambor: {localPlayer?.chamberPulls ?? 0}/6
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* 7A. 5-SECOND DEVIL CARD REVEAL PRESENTATION (Requirements 20-23: DEVIL_REVEAL phase) */}
+      {/* 7A. 5-SECOND DEVIL CARD REVEAL PRESENTATION (Explicit vertical separation & bounded 6px float) */}
       {roomState.phase === 'DEVIL_REVEAL' && roomState.challengeResult && (
         <div className="fixed inset-0 z-50 bg-gradient-to-b from-red-950/90 via-black/92 to-stone-950/95 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
+          <style>{`
+            @keyframes cantinaDevilFloat {
+              0%, 100% { transform: translateY(2px); }
+              50% { transform: translateY(-6px); }
+            }
+          `}</style>
+
           {/* Infernal radial glow */}
           <div
             className="fixed inset-0 pointer-events-none"
             style={{
               background:
-                'radial-gradient(circle at 50% 48%, rgba(239, 68, 68, 0.35) 0%, rgba(180, 83, 9, 0.2) 40%, transparent 72%)',
+                'radial-gradient(circle at 50% 48%, rgba(239, 68, 68, 0.32) 0%, rgba(147, 51, 234, 0.14) 38%, transparent 72%)',
             }}
           />
 
-          <div className="relative z-10 w-full max-w-xl rounded-3xl bg-gradient-to-b from-[#2b0909] via-[#170606] to-[#0c0505] border-2 border-red-500/80 p-6 sm:p-8 shadow-[0_0_90px_rgba(220,38,38,0.65)] flex flex-col items-center text-center gap-5">
+          <div className="relative z-10 w-full max-w-xl rounded-3xl bg-gradient-to-b from-[#2b0909] via-[#170606] to-[#0c0505] border-2 border-red-500/80 px-6 py-6 sm:px-8 sm:py-8 shadow-[0_0_90px_rgba(220,38,38,0.65)] flex flex-col items-center text-center">
+            {/* 1. Top Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-950 border border-red-400/70 text-red-200 text-xs font-black uppercase tracking-[0.22em] shadow-lg">
               <Flame className="w-4 h-4 text-amber-400 animate-bounce" />
               ¡CARTA DEL DIABLO REVELADA!
               <Flame className="w-4 h-4 text-amber-400 animate-bounce" />
             </div>
 
-            <h2 className="text-2xl sm:text-4xl font-black font-serif text-amber-100 tracking-wide drop-shadow-[0_4px_14px_rgba(220,38,38,0.9)]">
-              ¡EL DIABLO DESPIERTA EN LA MESA!
+            {/* 2. Main Heading — explicit vertical spacing below badge */}
+            <h2 className="mt-3.5 sm:mt-4 text-2xl sm:text-4xl font-black font-serif text-amber-100 leading-tight tracking-wide drop-shadow-[0_4px_14px_rgba(220,38,38,0.9)]">
+              ¡EL DIABLO DESPIERTA
+              <span className="block mt-0.5">EN LA MESA!</span>
             </h2>
 
-            {/* Revealed cards rising from the central pile, spotlighting DIABLO */}
-            <div className="flex items-center justify-center gap-4 my-3">
+            {/* 3. Revealed Cards Stage — EXPLICIT 28px–36px CLEAR GAP below heading, bounded 6px float */}
+            <div className="mt-7 sm:mt-9 mb-6 sm:mb-8 pt-2 pb-1 flex items-center justify-center gap-4 sm:gap-5">
               {roomState.challengeResult.revealedCards.map((card, idx) => {
                 const isDiabloCard = card.rank === 'DIABLO';
                 return (
                   <div
                     key={card.id || idx}
+                    style={
+                      isDiabloCard
+                        ? {
+                            animation:
+                              'cantinaDevilFloat 2.6s ease-in-out infinite',
+                          }
+                        : undefined
+                    }
                     className={`relative transition-all duration-500 ${
                       isDiabloCard
-                        ? 'scale-125 -translate-y-3 z-20 drop-shadow-[0_0_35px_rgba(239,68,68,0.95)]'
-                        : 'scale-95 opacity-85'
+                        ? 'z-20 drop-shadow-[0_0_30px_rgba(239,68,68,0.9)]'
+                        : 'scale-90 opacity-85'
                     }`}
                   >
                     {isDiabloCard && (
-                      <div className="absolute -inset-3 rounded-2xl bg-gradient-to-t from-red-600/60 via-amber-500/50 to-red-500/60 blur-lg animate-pulse pointer-events-none" />
+                      <div className="absolute -inset-3 rounded-2xl bg-gradient-to-t from-purple-700/25 via-red-600/40 to-amber-500/35 blur-lg animate-pulse pointer-events-none" />
                     )}
                     <CantinaCard
                       rank={card.rank}
@@ -1341,6 +1361,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
               })}
             </div>
 
+            {/* 4. Safe Status Box — explicit clear gap below Devil card */}
             <div className="w-full p-4 rounded-2xl bg-black/60 border border-red-500/40 flex flex-col gap-1.5">
               <p className="text-base sm:text-lg font-black text-emerald-300 uppercase tracking-wider">
                 🛡️ {roomState.challengeResult.accusedName} QUEDA A SALVO
@@ -1351,7 +1372,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
               </p>
             </div>
 
-            <div className="w-full flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-amber-300 animate-pulse">
+            <div className="mt-4 w-full flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-amber-300 animate-pulse">
               <Crosshair className="w-4 h-4 text-red-400 animate-spin" />
               Preparando los tambores para todos los rivales...
             </div>

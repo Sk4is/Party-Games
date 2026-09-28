@@ -57,15 +57,15 @@ export const MAX_VISIBLE_PILE_CARDS = 15;
 // Base layouts for standard Cantina table scene
 const BASE_LAYOUT: CantinaLayoutConfig = {
   localHand: {
-    bottomPx: 8,
-    idleFanSpacing: 34,
-    hoverFanSpacing: 68,
-    neighborHoverPushPx: 12,
+    bottomPx: 28,
+    idleFanSpacing: 38,
+    hoverFanSpacing: 78,
+    neighborHoverPushPx: 15,
     idleFanRotation: 4.2,
     hoverFanRotation: 5.2,
-    arcDropPx: 5.5,
-    cardHoverLiftPx: 28,
-    cardSelectedLiftPx: 20,
+    arcDropPx: 5.0,
+    cardHoverLiftPx: 30,
+    cardSelectedLiftPx: 22,
     cardSelectedHoverBonusPx: 8,
     scale: 1.0,
   },
