@@ -19,7 +19,8 @@ export interface PileVisualLayout {
   centerTopPercent: number; // percentage from top of table scene
   centerLeftPercent: number;
   perspectivePx: number; // perspective container
-  rotateX: number; // table surface tilt in degrees (e.g. 46deg)
+  rotateX: number; // table surface tilt in degrees (e.g. 52deg)
+  scaleY: number; // subtle foreshortening on the wooden surface
   scale: number;
   maxScatterX: number; // px
   maxScatterY: number; // px
@@ -31,10 +32,13 @@ export interface CantinaLayoutConfig {
     bottomPx: number;
     idleFanSpacing: number;
     hoverFanSpacing: number;
+    neighborHoverPushPx: number;
     idleFanRotation: number;
     hoverFanRotation: number;
+    arcDropPx: number;
     cardHoverLiftPx: number;
     cardSelectedLiftPx: number;
+    cardSelectedHoverBonusPx: number;
     scale: number;
   };
   farOpponent: SeatVisualLayout;
@@ -42,77 +46,83 @@ export interface CantinaLayoutConfig {
   rightOpponent: SeatVisualLayout;
   tablePile: PileVisualLayout;
   throwAnimation: {
-    durationMs: number; // ~550ms
-    staggerDelayMs: number; // ~60ms
-    settlingMs: number; // ~120ms
+    durationMs: number; // ~470ms flight
+    staggerDelayMs: number; // ~52ms stagger
+    settlingMs: number; // ~75ms micro-settle on wood
   };
 }
+
+export const MAX_VISIBLE_PILE_CARDS = 15;
 
 // Base layouts for standard Cantina table scene
 const BASE_LAYOUT: CantinaLayoutConfig = {
   localHand: {
-    bottomPx: 12,
-    idleFanSpacing: 28,
-    hoverFanSpacing: 50,
-    idleFanRotation: 3.5,
-    hoverFanRotation: 4.8,
-    cardHoverLiftPx: 26,
-    cardSelectedLiftPx: 42,
+    bottomPx: 8,
+    idleFanSpacing: 34,
+    hoverFanSpacing: 68,
+    neighborHoverPushPx: 12,
+    idleFanRotation: 4.2,
+    hoverFanRotation: 5.2,
+    arcDropPx: 5.5,
+    cardHoverLiftPx: 28,
+    cardSelectedLiftPx: 20,
+    cardSelectedHoverBonusPx: 8,
     scale: 1.0,
   },
 
   // Far opponent seated in chair directly across table (moved DOWN to sit in chair, not floating near ceiling)
   farOpponent: {
-    topPercent: 24, // Was previously 12% (way too high). 24% sits directly in chair above table edge.
+    topPercent: 32.5,
     leftPercent: 50,
-    scale: 0.65,
+    scale: 0.9,
     rotationZ: 0,
     perspectiveTiltX: 18,
-    fanSpacing: 18,
-    fanRotationStep: 3.5,
+    fanSpacing: 19,
+    fanRotationStep: 3.8,
     cardLiftOnHover: 10,
   },
 
   // 3-4 player game: Left opponent seat
   leftOpponent: {
-    topPercent: 36,
-    leftPercent: 12,
-    scale: 0.68,
-    rotationZ: 14,
+    topPercent: 41.5,
+    leftPercent: 13.5,
+    scale: 0.94,
+    rotationZ: 16,
     perspectiveTiltX: 20,
-    fanSpacing: 16,
-    fanRotationStep: 4.0,
+    fanSpacing: 19,
+    fanRotationStep: 4.2,
     cardLiftOnHover: 10,
   },
 
   // 3-4 player game: Right opponent seat
   rightOpponent: {
-    topPercent: 36,
-    leftPercent: 88,
-    scale: 0.68,
-    rotationZ: -14,
+    topPercent: 41.5,
+    leftPercent: 86.5,
+    scale: 0.94,
+    rotationZ: -16,
     perspectiveTiltX: 20,
-    fanSpacing: 16,
-    fanRotationStep: 4.0,
+    fanSpacing: 19,
+    fanRotationStep: 4.2,
     cardLiftOnHover: 10,
   },
 
   // Tabletop pile viewed lying flat on the wooden table surface in 3D perspective
   tablePile: {
-    centerTopPercent: 48,
+    centerTopPercent: 54.5,
     centerLeftPercent: 50,
-    perspectivePx: 900,
-    rotateX: 44, // Flat angle matching table perspective
-    scale: 0.82,
-    maxScatterX: 18, // deterministic scatter offsets
-    maxScatterY: 14,
-    maxScatterRotZ: 16,
+    perspectivePx: 760,
+    rotateX: 52, // Flat angle matching seated table perspective
+    scaleY: 0.88,
+    scale: 0.92,
+    maxScatterX: 22, // deterministic scatter offsets
+    maxScatterY: 13,
+    maxScatterRotZ: 12,
   },
 
   throwAnimation: {
-    durationMs: 560,
-    staggerDelayMs: 65,
-    settlingMs: 140,
+    durationMs: 470,
+    staggerDelayMs: 52,
+    settlingMs: 75,
   },
 };
 
@@ -120,18 +130,18 @@ const BASE_LAYOUT: CantinaLayoutConfig = {
 export const CANTINA_TABLE_LAYOUTS: Record<CantinaMapId, CantinaLayoutConfig> = {
   mapa1: {
     ...BASE_LAYOUT,
-    farOpponent: { ...BASE_LAYOUT.farOpponent, topPercent: 25 },
-    tablePile: { ...BASE_LAYOUT.tablePile, centerTopPercent: 49 },
+    farOpponent: { ...BASE_LAYOUT.farOpponent, topPercent: 33 },
+    tablePile: { ...BASE_LAYOUT.tablePile, centerTopPercent: 55 },
   },
   mapa2: {
     ...BASE_LAYOUT,
-    farOpponent: { ...BASE_LAYOUT.farOpponent, topPercent: 24 },
-    tablePile: { ...BASE_LAYOUT.tablePile, centerTopPercent: 48 },
+    farOpponent: { ...BASE_LAYOUT.farOpponent, topPercent: 32.5 },
+    tablePile: { ...BASE_LAYOUT.tablePile, centerTopPercent: 54.5 },
   },
   mapa3: {
     ...BASE_LAYOUT,
-    farOpponent: { ...BASE_LAYOUT.farOpponent, topPercent: 24 },
-    tablePile: { ...BASE_LAYOUT.tablePile, centerTopPercent: 48 },
+    farOpponent: { ...BASE_LAYOUT.farOpponent, topPercent: 32.5 },
+    tablePile: { ...BASE_LAYOUT.tablePile, centerTopPercent: 54.5 },
   },
 };
 
@@ -140,14 +150,20 @@ export const CANTINA_TABLE_LAYOUTS: Record<CantinaMapId, CantinaLayoutConfig> = 
  * Never calls Math.random() inside render. Cards remain completely stable across rerenders.
  */
 export function getStableCardScatter(seedKey: string, cardIndex: number) {
-  let hash = 0;
-  for (let i = 0; i < seedKey.length; i++) {
-    hash = (hash << 5) - hash + seedKey.charCodeAt(i);
-    hash |= 0;
+  let hash = 2166136261;
+  const combined = `${seedKey}#${cardIndex}`;
+  for (let i = 0; i < combined.length; i++) {
+    hash ^= combined.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
   }
-  const factor = hash + cardIndex * 937;
-  const rotZ = Math.sin(factor) * 14; // -14 to +14 deg
-  const x = Math.cos(factor * 1.3) * 16; // -16 to +16 px
-  const y = Math.sin(factor * 1.7) * 12; // -12 to +12 px
-  return { rotZ, x, y };
+  const f1 = ((hash & 0xffff) / 0xffff) * 2 - 1; // -1 to +1
+  const f2 = (((hash >>> 8) & 0xffff) / 0xffff) * 2 - 1; // -1 to +1
+  const f3 = (((hash >>> 16) & 0xffff) / 0xffff) * 2 - 1; // -1 to +1
+  const f4 = (((hash >>> 4) & 0xffff) / 0xffff) * 2 - 1; // -1 to +1
+
+  const rotZ = Number((f1 * 12).toFixed(2)); // -12 to +12 deg
+  const x = Number((f2 * 22).toFixed(2)); // -22 to +22 px
+  const y = Number((f3 * 13).toFixed(2)); // -13 to +13 px
+  const rotXDelta = Number((f4 * 2).toFixed(2)); // -2 to +2 deg subtle perspective variation
+  return { rotZ, x, y, rotXDelta };
 }

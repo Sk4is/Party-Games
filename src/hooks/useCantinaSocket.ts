@@ -351,8 +351,8 @@ export function useCantinaSocket({
   }, [sendMessage]);
 
   const playCards = useCallback(
-    (cardIds: string[]) => {
-      sendMessage({ type: 'PLAY_CARDS', cardIds });
+    (cardIds: string[], playId?: string) => {
+      sendMessage({ type: 'PLAY_CARDS', cardIds, playId });
     },
     [sendMessage]
   );

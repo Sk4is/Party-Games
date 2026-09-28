@@ -1652,12 +1652,61 @@ class AudioManager {
     this.playCardDealt();
   }
 
-  public playCardThrow() {
-    this.playCardFlip();
+  public playCardThrow(cardIndex: number = 0) {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const volScale = cardIndex === 0 ? 1.0 : cardIndex === 1 ? 0.72 : 0.56;
+    const pitchScale = 1 + Math.min(cardIndex, 3) * 0.045;
+
+    const osc1 = this.ctx.createOscillator();
+    const gain1 = this.ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(440 * pitchScale, now);
+    osc1.frequency.exponentialRampToValueAtTime(920 * pitchScale, now + 0.045);
+    gain1.gain.setValueAtTime(0.14 * volScale, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+    osc1.connect(gain1);
+    gain1.connect(this.ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.055);
+
+    const osc2 = this.ctx.createOscillator();
+    const gain2 = this.ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(210 * pitchScale, now + 0.02);
+    osc2.frequency.exponentialRampToValueAtTime(105 * pitchScale, now + 0.11);
+    gain2.gain.setValueAtTime(0.11 * volScale, now + 0.02);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc2.connect(gain2);
+    gain2.connect(this.ctx.destination);
+    osc2.start(now + 0.02);
+    osc2.stop(now + 0.12);
   }
 
-  public playCardLand() {
-    this.playStampImpact();
+  public playCardLand(cardIndex: number = 0) {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const volScale = cardIndex === 0 ? 1.0 : cardIndex === 1 ? 0.74 : 0.58;
+    const pitchScale = 1 + Math.min(cardIndex, 3) * 0.05;
+
+    // Warm cardboard-on-wood thump + slight wood friction
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(155 * pitchScale, now);
+    osc.frequency.exponentialRampToValueAtTime(52 * pitchScale, now + 0.065);
+    gain.gain.setValueAtTime(0.19 * volScale, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.075);
   }
 
   public playChallenge() {

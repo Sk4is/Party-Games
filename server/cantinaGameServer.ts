@@ -245,6 +245,9 @@ export class CantinaServer {
 
       case 'PLAY_CARDS': {
         if (room.phase !== 'PLAYING') return;
+        if (msg.playId && room.centerPileHistory.some((h) => h.playId === msg.playId)) {
+          return;
+        }
         const activePlayer = room.players[room.activePlayerIndex];
         if (!activePlayer || activePlayer.id !== conn.playerId) {
           this.sendError(ws, 'NO ES TU TURNO');
@@ -276,7 +279,17 @@ export class CantinaServer {
         room.centerPileCards.push(...playedCards);
         room.centerPileCount = room.centerPileCards.length;
 
-        const playId = `play_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const clientPlayId =
+          typeof msg.playId === 'string' &&
+          msg.playId.trim().length > 0 &&
+          msg.playId.length <= 80 &&
+          !room.centerPileHistory.some((h) => h.playId === msg.playId)
+            ? msg.playId.trim()
+            : null;
+
+        const playId =
+          clientPlayId ||
+          `play_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const turnRecord = {
           playerId: activePlayer.id,
           playerName: activePlayer.name,

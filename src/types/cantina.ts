@@ -144,7 +144,7 @@ export type CantinaClientMessage =
   | { type: 'JOIN_ROOM'; code: string; player: { id: string; name: string; avatar: string; color: string } }
   | { type: 'UPDATE_CONFIG'; config: Partial<CantinaConfig> }
   | { type: 'START_GAME' }
-  | { type: 'PLAY_CARDS'; cardIds: string[] }
+  | { type: 'PLAY_CARDS'; cardIds: string[]; playId?: string }
   | { type: 'CHALLENGE_BLUFF' }
   | { type: 'TRIGGER_ROULETTE' }
   | { type: 'NEXT_ROUND' }
