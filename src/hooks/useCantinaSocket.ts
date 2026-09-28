@@ -475,6 +475,40 @@ export function useCantinaSocket({
     [sendMessage]
   );
 
+  const cadenaSelectRevolverTarget = useCallback(
+    (targetPlayerId: string) => {
+      sendMessage({ type: 'CADENA_SELECT_REVOLVER_TARGET', targetPlayerId });
+    },
+    [sendMessage]
+  );
+
+  const cadenaSpinRevolver = useCallback(
+    (
+      eventId: string,
+      velocity: number,
+      angle: number,
+      spinId: string,
+      settled?: boolean
+    ) => {
+      sendMessage({
+        type: 'CADENA_SPIN_REVOLVER',
+        eventId,
+        velocity,
+        angle,
+        spinId,
+        settled,
+      });
+    },
+    [sendMessage]
+  );
+
+  const cadenaPullRevolver = useCallback(
+    (eventId?: string) => {
+      sendMessage({ type: 'CADENA_PULL_REVOLVER', eventId });
+    },
+    [sendMessage]
+  );
+
   const cadenaDeclareUltima = useCallback(() => {
     sendMessage({ type: 'CADENA_DECLARE_ULTIMA' });
   }, [sendMessage]);
@@ -552,6 +586,9 @@ export function useCantinaSocket({
     cadenaEndTurn,
     cadenaStealCard,
     cadenaSelectBombTarget,
+    cadenaSelectRevolverTarget,
+    cadenaSpinRevolver,
+    cadenaPullRevolver,
     cadenaDeclareUltima,
     cadenaCatchUltima,
   };

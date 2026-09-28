@@ -59,6 +59,9 @@ interface ServerRoom {
   cadenaActiveBombCard: Card | null;
   cadenaIsMirrorSteal: boolean;
   cadenaSkippedPlayerId: string | null;
+  cadenaStealPermutation: number[];
+  cadenaRevolverLoadedChambers: number[];
+  cadenaRevolverTimeout: NodeJS.Timeout | null;
   winnerPlayerId: string | null;
   winnerName: string | null;
   rematchReadyPlayerIds: string[];
@@ -251,6 +254,9 @@ export class CantinaServer {
       cadenaActiveBombCard: null,
       cadenaIsMirrorSteal: false,
       cadenaSkippedPlayerId: null,
+      cadenaStealPermutation: [],
+      cadenaRevolverLoadedChambers: [],
+      cadenaRevolverTimeout: null,
       winnerPlayerId: null,
       winnerName: null,
       rematchReadyPlayerIds: [],
@@ -493,6 +499,35 @@ export class CantinaServer {
         break;
       }
 
+      case 'CADENA_SELECT_REVOLVER_TARGET': {
+        this.handleCadenaSelectRevolverTarget(
+          ws,
+          room,
+          conn.playerId,
+          msg.targetPlayerId
+        );
+        break;
+      }
+
+      case 'CADENA_SPIN_REVOLVER': {
+        this.handleCadenaSpinRevolver(
+          ws,
+          room,
+          conn.playerId,
+          msg.eventId,
+          msg.velocity,
+          msg.angle,
+          msg.spinId,
+          msg.settled
+        );
+        break;
+      }
+
+      case 'CADENA_PULL_REVOLVER': {
+        this.handleCadenaPullRevolver(ws, room, conn.playerId, msg.eventId);
+        break;
+      }
+
       case 'CADENA_DECLARE_ULTIMA': {
         this.handleCadenaDeclareUltima(ws, room, conn.playerId);
         break;
@@ -634,11 +669,25 @@ export class CantinaServer {
       }
 
       case 'HAND_INTERACTION': {
+        let broadcastedHoverIndex = msg.hoveredIndex;
+        if (
+          room.config.mode === 'CADENA' &&
+          typeof msg.hoveredIndex === 'number'
+        ) {
+          const sender = room.players.find((p) => p.id === conn.playerId);
+          const count = Math.max(1, sender?.cardsCount || 1);
+          // Scramble hovered slot index for remote spectators in Cadena mode so sorted local hands never leak card rank positions
+          broadcastedHoverIndex =
+            ((msg.hoveredIndex * 3 + (sender?.seatIndex || 1) + room.currentRound) %
+              count +
+              count) %
+            count;
+        }
         this.broadcastHandInteraction(
           room.code,
           conn.playerId,
           msg.interaction,
-          msg.hoveredIndex
+          broadcastedHoverIndex
         );
         break;
       }
@@ -654,6 +703,10 @@ export class CantinaServer {
     if (room.roundTransitionTimeout) {
       clearTimeout(room.roundTransitionTimeout);
       room.roundTransitionTimeout = null;
+    }
+    if (room.cadenaRevolverTimeout) {
+      clearTimeout(room.cadenaRevolverTimeout);
+      room.cadenaRevolverTimeout = null;
     }
 
     room.currentRound = 0;
@@ -672,6 +725,8 @@ export class CantinaServer {
     room.cadenaActiveBombCard = null;
     room.cadenaIsMirrorSteal = false;
     room.cadenaSkippedPlayerId = null;
+    room.cadenaStealPermutation = [];
+    room.cadenaRevolverLoadedChambers = [];
     room.centerPileCards = [];
     room.centerPileCount = 0;
     room.centerPileHistory = [];
@@ -705,6 +760,10 @@ export class CantinaServer {
       clearTimeout(room.roundTransitionTimeout);
       room.roundTransitionTimeout = null;
     }
+    if (room.cadenaRevolverTimeout) {
+      clearTimeout(room.cadenaRevolverTimeout);
+      room.cadenaRevolverTimeout = null;
+    }
 
     room.currentRound = 1;
     room.phase = 'ROUND_INTRO';
@@ -718,6 +777,8 @@ export class CantinaServer {
     room.cadenaActiveBombCard = null;
     room.cadenaIsMirrorSteal = false;
     room.cadenaSkippedPlayerId = null;
+    room.cadenaStealPermutation = [];
+    room.cadenaRevolverLoadedChambers = [];
 
     // 1. Build and shuffle the authoritative 68-card Cadena deck
     const fullDeck = shuffle(buildCadenaDeck(room.currentRound));
@@ -795,11 +856,13 @@ export class CantinaServer {
       turnSubPhase: 'NORMAL',
       drawnCardId: null,
       stealTargetPlayerId: null,
+      stealShuffleSeed: null,
       stolenCardId: null,
       stolenCard: null,
       bombHolderPlayerId: null,
       bombHolderPlayerName: null,
       bombTurnsRemaining: 0,
+      revolverState: null,
       ultimaWindow: null,
       lastEvent: null,
       lastDrawEvent: null,
@@ -888,6 +951,7 @@ export class CantinaServer {
           reshuffledCount,
           drawPileCountBefore,
           drawPileCountAfter: room.cadenaDrawPile.length,
+          drawnCardIds: drawn.map((c) => c.id),
           drawnCards: drawn.map((c) => ({ ...c })),
           timestamp: Date.now(),
         };
@@ -986,9 +1050,17 @@ export class CantinaServer {
     cs.turnSubPhase = 'NORMAL';
     cs.drawnCardId = null;
     cs.stealTargetPlayerId = null;
+    cs.stealShuffleSeed = null;
     cs.stolenCardId = null;
     cs.stolenCard = null;
+    cs.revolverState = null;
     room.cadenaIsMirrorSteal = false;
+    room.cadenaStealPermutation = [];
+    room.cadenaRevolverLoadedChambers = [];
+    if (room.cadenaRevolverTimeout) {
+      clearTimeout(room.cadenaRevolverTimeout);
+      room.cadenaRevolverTimeout = null;
+    }
 
     // Bomb countdown check (only decrements when the bomb holder finishes a turn without defusing/reflecting)
     if (
@@ -1419,7 +1491,7 @@ export class CantinaServer {
       }
 
       case 'K': {
-        // K — ROBO: steal 1 random card from a chosen rival
+        // K — ROBO: steal 1 random card from a chosen rival (cards privately shuffled so position never leaks)
         const validRivals = room.players.filter(
           (p) => p.isAlive && p.id !== activePlayer.id && (p.hand || []).length > 0
         );
@@ -1437,8 +1509,15 @@ export class CantinaServer {
           (targetPlayerId && validRivals.find((r) => r.id === targetPlayerId)) ||
           validRivals[0];
 
+        const rivalHandLen = (chosenRival.hand || []).length;
+        room.cadenaStealPermutation = shuffle(
+          Array.from({ length: rivalHandLen }, (_, idx) => idx)
+        );
         cs.turnSubPhase = 'K_STEAL_PICK';
         cs.stealTargetPlayerId = chosenRival.id;
+        cs.stealShuffleSeed = `kshuf_${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 7)}`;
         room.cadenaIsMirrorSteal = false;
         this.broadcastRoom(room);
         break;
@@ -1456,7 +1535,11 @@ export class CantinaServer {
         }
 
         const chosenRival =
-          targetPlayerId ? validRivals.find((r) => r.id === targetPlayerId) : null;
+          targetPlayerId
+            ? validRivals.find((r) => r.id === targetPlayerId)
+            : validRivals.length === 1
+            ? validRivals[0]
+            : null;
 
         if (chosenRival) {
           this.assignBombToTarget(room, activePlayer, chosenRival, false);
@@ -1464,6 +1547,34 @@ export class CantinaServer {
           this.broadcastRoom(room);
         } else {
           cs.turnSubPhase = 'BOMB_SELECT_TARGET';
+          this.broadcastRoom(room);
+        }
+        break;
+      }
+
+      case 'REVOLVER': {
+        // REVÓLVER: isolated Cadena revolver special-card minigame targeting a rival
+        const validRivals = room.players.filter(
+          (p) => p.isAlive && p.id !== activePlayer.id
+        );
+        if (validRivals.length === 0) {
+          this.finishCadenaPlayerTurn(room, activePlayer, false, 1);
+          this.broadcastRoom(room);
+          return;
+        }
+
+        const chosenRival =
+          targetPlayerId
+            ? validRivals.find((r) => r.id === targetPlayerId)
+            : validRivals.length === 1
+            ? validRivals[0]
+            : null;
+
+        if (chosenRival) {
+          this.startCadenaRevolverDuel(room, activePlayer, chosenRival, false);
+          this.broadcastRoom(room);
+        } else {
+          cs.turnSubPhase = 'REVOLVER_SELECT_TARGET';
           this.broadcastRoom(room);
         }
         break;
@@ -1530,9 +1641,31 @@ export class CantinaServer {
       case 'K': {
         // Mirror player steals a card back from sourcePlayer!
         if (sourcePlayer && (sourcePlayer.hand || []).length > 0) {
+          room.cadenaStealPermutation = shuffle(
+            Array.from({ length: sourcePlayer.hand.length }, (_, idx) => idx)
+          );
           cs.turnSubPhase = 'K_STEAL_PICK';
           cs.stealTargetPlayerId = sourcePlayer.id;
+          cs.stealShuffleSeed = `kshuf_m_${Date.now()}_${Math.random()
+            .toString(36)
+            .substring(2, 7)}`;
           room.cadenaIsMirrorSteal = true;
+          this.broadcastRoom(room);
+        } else {
+          this.finishCadenaPlayerTurn(room, mirrorPlayer, false, 1);
+          this.broadcastRoom(room);
+        }
+        break;
+      }
+
+      case 'REVOLVER': {
+        // Mirror reflects the Cadena Revolver back at sourcePlayer!
+        const target =
+          sourcePlayer ||
+          room.players.find((p) => p.isAlive && p.id !== mirrorPlayer.id) ||
+          null;
+        if (target) {
+          this.startCadenaRevolverDuel(room, mirrorPlayer, target, true);
           this.broadcastRoom(room);
         } else {
           this.finishCadenaPlayerTurn(room, mirrorPlayer, false, 1);
@@ -1646,6 +1779,259 @@ export class CantinaServer {
     this.broadcastRoom(room);
   }
 
+  private startCadenaRevolverDuel(
+    room: ServerRoom,
+    actor: CantinaPlayer,
+    target: CantinaPlayer,
+    isReflected: boolean
+  ) {
+    if (!room.cadenaState) return;
+    const cs = room.cadenaState;
+
+    if (room.cadenaRevolverTimeout) {
+      clearTimeout(room.cadenaRevolverTimeout);
+      room.cadenaRevolverTimeout = null;
+    }
+
+    // Isolated 6-chamber Cadena Revolver (3 loaded chambers, 3 empty chambers, completely separate from Clásico/Diablo personal revolvers)
+    room.cadenaRevolverLoadedChambers = shuffle([0, 1, 2, 3, 4, 5]).slice(0, 3);
+
+    const startChamber = Math.floor(Math.random() * 6);
+    const startAngle = -startChamber * 60;
+    const eventId = `crev_${room.code}_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 6)}`;
+
+    cs.turnSubPhase = 'REVOLVER_DUEL';
+    cs.revolverState = {
+      eventId,
+      actorPlayerId: actor.id,
+      actorPlayerName: actor.name,
+      shooterPlayerId: target.id,
+      shooterPlayerName: target.name,
+      chambers: 6,
+      cylinderAngle: startAngle,
+      firedChamberIndex: getTopChamberIndexFromAngle(startAngle),
+      shotResolved: false,
+      fired: false,
+      penaltyCardsCount: 0,
+      isReflected,
+    };
+
+    if (!isReflected) {
+      target.lastReflectableEffectReceived = {
+        type: 'REVOLVER',
+        sourcePlayerId: actor.id,
+        sourcePlayerName: actor.name,
+        timestamp: Date.now(),
+      };
+    }
+
+    this.emitCadenaEvent(room, {
+      kind: 'REVOLVER_TARGETED',
+      actorPlayerId: actor.id,
+      actorPlayerName: actor.name,
+      targetPlayerId: target.id,
+      targetPlayerName: target.name,
+      text: isReflected
+        ? `🪞🔫 ${actor.name} reflejó el REVÓLVER contra ${target.name}`
+        : `🔫 ${actor.name} apuntó el REVÓLVER a ${target.name}`,
+    });
+
+    if (!target.isConnected) {
+      room.cadenaRevolverTimeout = setTimeout(() => {
+        this.executeCadenaRevolverPull(room, eventId);
+      }, 2500);
+    }
+  }
+
+  private handleCadenaSelectRevolverTarget(
+    ws: WebSocket,
+    room: ServerRoom,
+    playerId: string,
+    targetPlayerId: string
+  ) {
+    if (room.config.mode !== 'CADENA' || room.phase !== 'PLAYING' || !room.cadenaState) {
+      return;
+    }
+    const cs = room.cadenaState;
+    const activePlayer = room.players[room.activePlayerIndex];
+    if (!activePlayer || activePlayer.id !== playerId) {
+      this.sendError(ws, 'NO ES TU TURNO');
+      return;
+    }
+    if (cs.turnSubPhase !== 'REVOLVER_SELECT_TARGET') {
+      return;
+    }
+
+    const target = room.players.find(
+      (p) => p.id === targetPlayerId && p.isAlive && p.id !== activePlayer.id
+    );
+    if (!target) {
+      this.sendError(ws, 'SELECCIONA UN RIVAL VÁLIDO');
+      return;
+    }
+
+    this.startCadenaRevolverDuel(room, activePlayer, target, false);
+    this.broadcastRoom(room);
+  }
+
+  private handleCadenaSpinRevolver(
+    ws: WebSocket,
+    room: ServerRoom,
+    playerId: string,
+    eventId: string,
+    velocity: number,
+    angle: number,
+    spinId: string,
+    settled?: boolean
+  ) {
+    if (room.config.mode !== 'CADENA' || room.phase !== 'PLAYING' || !room.cadenaState) {
+      return;
+    }
+    const cs = room.cadenaState;
+    if (cs.turnSubPhase !== 'REVOLVER_DUEL' || !cs.revolverState) return;
+    if (cs.revolverState.shotResolved) return;
+    if (cs.revolverState.shooterPlayerId !== playerId) return;
+    if (eventId && eventId !== cs.revolverState.eventId) return;
+
+    const safeVel = Math.max(-75, Math.min(75, Number(velocity) || 0));
+    const rawAngle = Number(angle) || 0;
+    const isSettled = Boolean(settled) || Math.abs(safeVel) < 0.08;
+    const effectiveAngle = isSettled ? snapAngleToChamber(rawAngle) : rawAngle;
+    const topIdx = getTopChamberIndexFromAngle(effectiveAngle);
+
+    cs.revolverState.cylinderAngle = effectiveAngle;
+    cs.revolverState.firedChamberIndex = topIdx;
+
+    this.broadcastEventExcept(room.code, playerId, {
+      type: 'ROULETTE_SPIN_EVENT',
+      rouletteEventId: cs.revolverState.eventId,
+      playerId,
+      velocity: isSettled ? 0 : safeVel,
+      angle: effectiveAngle,
+      spinId: String(spinId || `cspin_${Date.now()}`),
+      settled: isSettled,
+    });
+  }
+
+  private handleCadenaPullRevolver(
+    ws: WebSocket,
+    room: ServerRoom,
+    playerId: string,
+    eventId?: string
+  ) {
+    if (room.config.mode !== 'CADENA' || room.phase !== 'PLAYING' || !room.cadenaState) {
+      return;
+    }
+    const cs = room.cadenaState;
+    if (cs.turnSubPhase !== 'REVOLVER_DUEL' || !cs.revolverState) return;
+    if (cs.revolverState.shotResolved) return;
+    if (eventId && eventId !== cs.revolverState.eventId) return;
+
+    const shooter = room.players.find(
+      (p) => p.id === cs.revolverState?.shooterPlayerId
+    );
+    const activePlayer = room.players[room.activePlayerIndex];
+
+    // Allow the targeted shooter (or the active turn owner if shooter is offline) to pull the trigger
+    if (
+      playerId !== cs.revolverState.shooterPlayerId &&
+      !(shooter && !shooter.isConnected && activePlayer?.id === playerId)
+    ) {
+      this.sendError(ws, 'NO ERES EL JUGADOR APUNTADO POR EL REVÓLVER');
+      return;
+    }
+
+    this.executeCadenaRevolverPull(room, cs.revolverState.eventId);
+  }
+
+  private executeCadenaRevolverPull(room: ServerRoom, eventId: string) {
+    if (!room.cadenaState || !room.cadenaState.revolverState) return;
+    const cs = room.cadenaState;
+    const revState = cs.revolverState;
+    if (revState.shotResolved || revState.eventId !== eventId) return;
+
+    if (room.cadenaRevolverTimeout) {
+      clearTimeout(room.cadenaRevolverTimeout);
+      room.cadenaRevolverTimeout = null;
+    }
+
+    const shooter = room.players.find((p) => p.id === revState.shooterPlayerId);
+    const activePlayer = room.players[room.activePlayerIndex];
+
+    const restingAngle = snapAngleToChamber(revState.cylinderAngle);
+    const firedChamberIndex = getTopChamberIndexFromAngle(restingAngle);
+    const fired = room.cadenaRevolverLoadedChambers.includes(firedChamberIndex);
+
+    revState.cylinderAngle = restingAngle;
+    revState.firedChamberIndex = firedChamberIndex;
+    revState.shotResolved = true;
+    revState.fired = fired;
+
+    if (fired && shooter && shooter.isAlive) {
+      // ¡BANG! Penalty in Cadena mode: shooter draws 5 cards from the deck (NEVER mutates personal Clásico/Diablo revolver or life state)
+      const penaltyCards = this.drawCardsFromCadenaDeck(
+        room,
+        5,
+        shooter,
+        'REVOLVER_PENALTY'
+      );
+      shooter.hand = [...(shooter.hand || []), ...penaltyCards];
+      shooter.cardsCount = shooter.hand.length;
+      revState.penaltyCardsCount = penaltyCards.length;
+
+      if (
+        cs.ultimaWindow &&
+        cs.ultimaWindow.targetPlayerId === shooter.id &&
+        shooter.cardsCount > 1
+      ) {
+        cs.ultimaWindow = null;
+      }
+
+      this.emitCadenaEvent(room, {
+        kind: 'REVOLVER_BANG',
+        actorPlayerId: revState.actorPlayerId,
+        actorPlayerName: revState.actorPlayerName,
+        targetPlayerId: shooter.id,
+        targetPlayerName: shooter.name,
+        text: `💥 ¡BANG! El Revólver alcanzó a ${shooter.name} (+${penaltyCards.length} cartas)`,
+      });
+    } else {
+      revState.penaltyCardsCount = 0;
+      this.emitCadenaEvent(room, {
+        kind: 'REVOLVER_CLICK',
+        actorPlayerId: revState.actorPlayerId,
+        actorPlayerName: revState.actorPlayerName,
+        targetPlayerId: shooter?.id,
+        targetPlayerName: shooter?.name || revState.shooterPlayerName,
+        text: `💨 ¡CLICK! ${
+          shooter?.name || revState.shooterPlayerName
+        } se salvó del Revólver (0 cartas)`,
+      });
+    }
+
+    this.broadcastRoom(room);
+
+    // After showing the impact result, finish the turn and advance to the next player
+    room.cadenaRevolverTimeout = setTimeout(() => {
+      room.cadenaRevolverTimeout = null;
+      if (
+        room.phase === 'PLAYING' &&
+        room.cadenaState &&
+        room.cadenaState.turnSubPhase === 'REVOLVER_DUEL' &&
+        room.cadenaState.revolverState?.eventId === eventId
+      ) {
+        const turnOwner =
+          room.players[room.activePlayerIndex] || activePlayer;
+        if (turnOwner) {
+          this.finishCadenaPlayerTurn(room, turnOwner, false, 1);
+          this.broadcastRoom(room);
+        }
+      }
+    }, 2100);
+  }
+
   private handleCadenaStealCard(
     ws: WebSocket,
     room: ServerRoom,
@@ -1685,14 +2071,21 @@ export class CantinaServer {
       return;
     }
 
-    // Server-authoritative random card selection from victim's hand (slotIndex used as entropy offset)
+    // Server-authoritative random card selection using a private shuffled permutation of victim's hand
+    // so card positions NEVER leak information even though local hands are sorted on screen.
     const victimHand = victim.hand;
-    const randomIdx =
-      (Math.floor(Math.random() * victimHand.length) +
-        Math.max(0, Number(slotIndex) || 0)) %
+    const permutation =
+      room.cadenaStealPermutation.length === victimHand.length
+        ? room.cadenaStealPermutation
+        : shuffle(Array.from({ length: victimHand.length }, (_, idx) => idx));
+    const safeSlot =
+      ((Math.floor(Number(slotIndex) || 0) % victimHand.length) +
+        victimHand.length) %
       victimHand.length;
+    const randomIdx = permutation[safeSlot] ?? Math.floor(Math.random() * victimHand.length);
     const [stolenCard] = victimHand.splice(randomIdx, 1);
     victim.cardsCount = victimHand.length;
+    room.cadenaStealPermutation = [];
 
     // Transfer stolen card privately to activePlayer's hand
     activePlayer.hand = [...(activePlayer.hand || []), stolenCard];
@@ -2421,6 +2814,10 @@ export class CantinaServer {
       clearTimeout(room.roundTransitionTimeout);
       room.roundTransitionTimeout = null;
     }
+    if (room.cadenaRevolverTimeout) {
+      clearTimeout(room.cadenaRevolverTimeout);
+      room.cadenaRevolverTimeout = null;
+    }
     room.phase = 'GAME_OVER';
     room.mandatoryChallenge = false;
     room.rematchReadyPlayerIds = [];
@@ -2428,6 +2825,7 @@ export class CantinaServer {
     room.winnerName = winner ? winner.name : 'Nadie (todos eliminados)';
     if (room.cadenaState) {
       room.cadenaState.turnSubPhase = 'NORMAL';
+      room.cadenaState.revolverState = null;
       room.cadenaState.ultimaWindow = null;
     }
     this.broadcastRoom(room);
@@ -2437,6 +2835,10 @@ export class CantinaServer {
     if (room.roundTransitionTimeout) {
       clearTimeout(room.roundTransitionTimeout);
       room.roundTransitionTimeout = null;
+    }
+    if (room.cadenaRevolverTimeout) {
+      clearTimeout(room.cadenaRevolverTimeout);
+      room.cadenaRevolverTimeout = null;
     }
     room.phase = 'LOBBY';
     room.currentRound = 0;
@@ -2456,6 +2858,8 @@ export class CantinaServer {
     room.cadenaActiveBombCard = null;
     room.cadenaIsMirrorSteal = false;
     room.cadenaSkippedPlayerId = null;
+    room.cadenaStealPermutation = [];
+    room.cadenaRevolverLoadedChambers = [];
     room.centerPileCards = [];
     room.centerPileCount = 0;
     room.centerPileHistory = [];
@@ -2537,13 +2941,24 @@ export class CantinaServer {
             cs.ultimaWindow = null;
           }
 
-          // If the leaving player was the active player, advance turn cleanly
-          if (room.players[room.activePlayerIndex]?.id === player.id) {
+          // If the leaving player was the active player or the Cadena Revolver shooter, advance turn cleanly
+          if (
+            room.players[room.activePlayerIndex]?.id === player.id ||
+            cs.revolverState?.shooterPlayerId === player.id
+          ) {
+            if (room.cadenaRevolverTimeout) {
+              clearTimeout(room.cadenaRevolverTimeout);
+              room.cadenaRevolverTimeout = null;
+            }
             cs.turnSubPhase = 'NORMAL';
             cs.drawnCardId = null;
             cs.stealTargetPlayerId = null;
+            cs.stealShuffleSeed = null;
             cs.stolenCardId = null;
             cs.stolenCard = null;
+            cs.revolverState = null;
+            room.cadenaStealPermutation = [];
+            room.cadenaRevolverLoadedChambers = [];
             room.activePlayerIndex = this.getNextCadenaPlayerIndex(
               room,
               room.activePlayerIndex,
@@ -2691,6 +3106,10 @@ export class CantinaServer {
         lastDrawEvent: rawDrawEvent
           ? {
               ...rawDrawEvent,
+              drawnCardIds:
+                rawDrawEvent.playerId === playerId
+                  ? rawDrawEvent.drawnCardIds
+                  : undefined,
               drawnCards:
                 rawDrawEvent.playerId === playerId
                   ? rawDrawEvent.drawnCards

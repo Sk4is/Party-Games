@@ -18,7 +18,7 @@ export type NumericCardRank =
   | '9'
   | '10';
 
-// Cards can be 1..10, J, Q, K, JOKER, BOMBA, ESPEJO, or DIABLO
+// Cards can be 1..10, J, Q, K, JOKER, BOMBA, ESPEJO, REVOLVER, or DIABLO
 export type CardRank =
   | NumericCardRank
   | 'J'
@@ -27,6 +27,7 @@ export type CardRank =
   | 'JOKER'
   | 'BOMBA'
   | 'ESPEJO'
+  | 'REVOLVER'
   | 'DIABLO';
 
 export interface Card {
@@ -54,7 +55,7 @@ export interface CantinaPlayerRevolverState {
   firedChambers: number[]; // Chamber indices (0..5) already tested by this player
 }
 
-export type ReflectableSpecialType = 'J' | 'Q' | 'K' | 'BOMBA';
+export type ReflectableSpecialType = 'J' | 'Q' | 'K' | 'BOMBA' | 'REVOLVER';
 
 export interface ReflectableEffect {
   type: ReflectableSpecialType;
@@ -157,7 +158,9 @@ export type CadenaTurnSubPhase =
   | 'K_STEAL_PICK'
   | 'K_FOLLOWUP_CHAIN'
   | 'BOMB_SELECT_TARGET'
-  | 'BOMB_PASS_TARGET';
+  | 'BOMB_PASS_TARGET'
+  | 'REVOLVER_SELECT_TARGET'
+  | 'REVOLVER_DUEL';
 
 export interface CadenaUltimaWindow {
   eventId: string;
@@ -168,6 +171,21 @@ export interface CadenaUltimaWindow {
   caughtByPlayerName: string | null;
   resolved: boolean;
   deadlineMs: number;
+}
+
+export interface CadenaRevolverState {
+  eventId: string;
+  actorPlayerId: string;
+  actorPlayerName: string;
+  shooterPlayerId: string;
+  shooterPlayerName: string;
+  chambers: 6;
+  cylinderAngle: number;
+  firedChamberIndex: number;
+  shotResolved: boolean;
+  fired: boolean;
+  penaltyCardsCount: number;
+  isReflected?: boolean;
 }
 
 export interface CadenaVisualEvent {
@@ -182,6 +200,9 @@ export interface CadenaVisualEvent {
     | 'BOMB_TICK'
     | 'BOMB_EXPLODED'
     | 'MIRROR_REFLECTED'
+    | 'REVOLVER_TARGETED'
+    | 'REVOLVER_BANG'
+    | 'REVOLVER_CLICK'
     | 'ULTIMA_DECLARED'
     | 'ULTIMA_CAUGHT'
     | 'ULTIMA_FALSE_ACCUSATION';
@@ -200,7 +221,8 @@ export type CadenaDrawReason =
   | 'NORMAL_DRAW'
   | 'ULTIMA_PENALTY'
   | 'FALSE_ULTIMA_PENALTY'
-  | 'BOMB_EXPLOSION';
+  | 'BOMB_EXPLOSION'
+  | 'REVOLVER_PENALTY';
 
 export interface CadenaDrawEventData {
   eventId: string;
@@ -212,6 +234,7 @@ export interface CadenaDrawEventData {
   reshuffledCount: number;
   drawPileCountBefore: number;
   drawPileCountAfter: number;
+  drawnCardIds?: string[];
   drawnCards?: Card[]; // Strictly provided ONLY to the player who drew the cards; undefined for opponents
   timestamp: number;
 }
@@ -227,6 +250,7 @@ export interface CadenaRoomState {
   drawnCardId: string | null;
   // When activePlayer plays K (or reflects K) and is picking a rival's face-down card:
   stealTargetPlayerId: string | null;
+  stealShuffleSeed?: string | null;
   // When activePlayer just stole a card with K:
   stolenCardId: string | null;
   stolenCard?: Card | null; // Only populated for the thief!
@@ -234,6 +258,8 @@ export interface CadenaRoomState {
   bombHolderPlayerId: string | null;
   bombHolderPlayerName: string | null;
   bombTurnsRemaining: number; // 3, 2, 1, or 0 when inactive
+  // Isolated Cadena Revolver special-card minigame state (never mutates Clásico/Diablo personal revolvers):
+  revolverState?: CadenaRevolverState | null;
   // ¡ÚLTIMA! declaration / catch window:
   ultimaWindow: CadenaUltimaWindow | null;
   // Latest visual event for table animations (Bomb flight, Mirror flash, K steal, etc.)
@@ -334,6 +360,9 @@ export type CantinaClientMessage =
   | { type: 'CADENA_END_TURN' }
   | { type: 'CADENA_STEAL_CARD'; targetPlayerId: string; slotIndex: number }
   | { type: 'CADENA_SELECT_BOMB_TARGET'; targetPlayerId: string }
+  | { type: 'CADENA_SELECT_REVOLVER_TARGET'; targetPlayerId: string }
+  | { type: 'CADENA_SPIN_REVOLVER'; eventId: string; velocity: number; angle: number; spinId: string; settled?: boolean }
+  | { type: 'CADENA_PULL_REVOLVER'; eventId?: string }
   | { type: 'CADENA_DECLARE_ULTIMA' }
   | { type: 'CADENA_CATCH_ULTIMA' };
 

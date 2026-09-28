@@ -416,23 +416,23 @@ export const CantinaLobby: React.FC<CantinaLobbyProps> = ({
                 </div>
               </button>
 
-              {/* Option 3: CADENA */}
+              {/* Option 3: CADENA (BLUE VISUAL IDENTITY) */}
               <button
                 type="button"
                 disabled={!isHost}
                 onClick={() => onUpdateConfig({ mode: 'CADENA' })}
                 className={`relative p-4 rounded-xl border text-left transition-all flex flex-col justify-between gap-2 ${
                   currentMode === 'CADENA'
-                    ? 'bg-gradient-to-br from-amber-950/65 via-stone-900/95 to-stone-950 border-amber-400 shadow-[0_8px_25px_rgba(245,158,11,0.24)] ring-1 ring-amber-400/60'
-                    : 'bg-stone-950/65 border-stone-800 hover:border-stone-700'
+                    ? 'bg-gradient-to-br from-sky-950/70 via-blue-950/45 to-stone-950 border-sky-400 shadow-[0_8px_25px_rgba(56,189,248,0.28)] ring-1 ring-sky-400/65'
+                    : 'bg-stone-950/65 border-stone-800 hover:border-sky-800/70'
                 } ${isHost ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm sm:text-base font-black text-amber-200 tracking-wider font-serif">
+                  <span className="text-sm sm:text-base font-black text-sky-300 tracking-wider font-serif flex items-center gap-1.5">
                     CADENA
                   </span>
                   {currentMode === 'CADENA' && (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-400 text-stone-950 text-[10px] font-black uppercase tracking-wider">
+                    <span className="px-2 py-0.5 rounded-full bg-sky-400 text-stone-950 text-[10px] font-black uppercase tracking-wider shadow-sm">
                       Activo
                     </span>
                   )}
@@ -440,7 +440,7 @@ export const CantinaLobby: React.FC<CantinaLobbyProps> = ({
                 <p className="text-xs text-stone-300 leading-relaxed">
                   Conecta números, crea cadenas y usa poderes para dejar a tus rivales sin respuesta.
                 </p>
-                <div className="pt-1 border-t border-stone-800/80 text-[10px] font-bold text-amber-400/90 uppercase tracking-wider">
+                <div className="pt-1 border-t border-stone-800/80 text-[10px] font-bold text-sky-400/95 uppercase tracking-wider">
                   NÚMEROS &middot; COMBOS &middot; PODERES
                 </div>
               </button>

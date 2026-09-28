@@ -30,10 +30,12 @@ import {
   getCardNumericValue,
   isCircularlyAdjacent,
   isSpecialActionCard,
-   nextCircularNumber,
+  nextCircularNumber,
   prevCircularNumber,
   validateCadenaChain,
   findInvalidCardsInSelection,
+  sortCadenaHand,
+  createShuffledStealSlots,
 } from '../../utils/cadenaRules';
 import { CardPlayedEventData } from '../../hooks/useCantinaSocket';
 import { CantinaCard } from './CantinaCard';
@@ -42,6 +44,7 @@ import {
   TransientCard,
 } from './CantinaCardAnimationLayer';
 import { CantinaRouletteOverlay } from './CantinaRouletteOverlay';
+import { CantinaCadenaRevolverOverlay } from './CantinaCadenaRevolverOverlay';
 import { CantinaExitModal } from './CantinaExitModal';
 import { CantinaCadenaGuideModal } from './CantinaCadenaGuideModal';
 import { CantinaCadenaDrawPile } from './CantinaCadenaDrawPile';
@@ -65,6 +68,7 @@ import {
   Zap,
   Hand,
   Megaphone,
+  Shuffle,
 } from 'lucide-react';
 
 interface CantinaTableProps {
@@ -104,6 +108,15 @@ interface CantinaTableProps {
   onCadenaEndTurn?: () => void;
   onCadenaStealCard?: (targetPlayerId: string, slotIndex: number) => void;
   onCadenaSelectBombTarget?: (targetPlayerId: string) => void;
+  onCadenaSelectRevolverTarget?: (targetPlayerId: string) => void;
+  onCadenaSpinRevolver: (
+    eventId: string,
+    velocity: number,
+    angle: number,
+    spinId: string,
+    settled?: boolean
+  ) => void;
+  onCadenaPullRevolver: (eventId: string) => void;
   onCadenaDeclareUltima?: () => void;
   onCadenaCatchUltima?: () => void;
 }
@@ -120,9 +133,10 @@ const SPECIAL_CARD_NAMES: Record<string, string> = {
   K: 'ROBO (K)',
   BOMBA: 'BOMBA',
   ESPEJO: 'ESPEJO',
+  REVOLVER: 'REVÓLVER',
 };
 
-export const CantinaTable: React.FC<CantinaTableProps> = ({
+export const CantinaTable = ({
   roomState,
   localPlayerId,
   remoteInteractions,
@@ -143,9 +157,12 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   onCadenaEndTurn,
   onCadenaStealCard,
   onCadenaSelectBombTarget,
+  onCadenaSelectRevolverTarget,
+  onCadenaSpinRevolver,
+  onCadenaPullRevolver,
   onCadenaDeclareUltima,
   onCadenaCatchUltima,
-}) => {
+}: CantinaTableProps) => {
   const isCadenaMode = roomState.config.mode === 'CADENA';
   const cadenaState = roomState.cadenaState || null;
   const targetInitialDealCount = isCadenaMode ? 7 : 5;
@@ -153,6 +170,9 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   const [inFlightCardIds, setInFlightCardIds] = useState<string[]>([]);
   const [inFlightDrawnCardIds, setInFlightDrawnCardIds] = useState<string[]>([]);
+  const [settlingIntoSortCardIds, setSettlingIntoSortCardIds] = useState<
+    Set<string>
+  >(() => new Set());
   const [invalidShakeKeysByCardId, setInvalidShakeKeysByCardId] = useState<
     Record<string, number>
   >({});
@@ -278,6 +298,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   useEffect(() => {
     if (!isCadenaMode || !cadenaState) return;
     if (cadenaState.turnSubPhase === 'K_STEAL_PICK') {
+      audio.playCardFlip();
       if (
         cadenaState.stealTargetPlayerId &&
         opponentsWithCards.some((o) => o.id === cadenaState.stealTargetPlayerId)
@@ -313,7 +334,9 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     } else if (
       cadenaState.turnSubPhase === 'K_STEAL_PICK' ||
       cadenaState.turnSubPhase === 'BOMB_SELECT_TARGET' ||
-      cadenaState.turnSubPhase === 'BOMB_PASS_TARGET'
+      cadenaState.turnSubPhase === 'BOMB_PASS_TARGET' ||
+      cadenaState.turnSubPhase === 'REVOLVER_SELECT_TARGET' ||
+      cadenaState.turnSubPhase === 'REVOLVER_DUEL'
     ) {
       setSelectedCardIds([]);
     }
@@ -340,6 +363,8 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
       audio.playBombDefuse();
     } else if (ev.kind === 'BOMB_EXPLODED') {
       audio.playExplosion();
+    } else if (ev.kind === 'REVOLVER_TARGETED') {
+      audio.playHammerCock();
     } else if (
       ev.kind === 'ULTIMA_DECLARED' ||
       ev.kind === 'ULTIMA_CAUGHT' ||
@@ -723,8 +748,12 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     const midIdx = (totalDrawn - 1) / 2;
 
     for (let i = 0; i < totalDrawn; i++) {
-      const drawnCardObj = drawEv.drawnCards?.[i];
-      const drawnCardId = drawnCardObj?.id || drawEv.drawnCardIds?.[i];
+      const drawnCardId = drawEv.drawnCards?.[i]?.id || drawEv.drawnCardIds?.[i];
+      const drawnCardObj =
+        drawEv.drawnCards?.[i] ||
+        (isLocalDraw && drawnCardId
+          ? (localPlayer?.hand || []).find((c) => c.id === drawnCardId)
+          : undefined);
       const visualId = drawnCardId
         ? `draw_${drawEv.eventId}_${drawnCardId}`
         : `draw_${drawEv.eventId}_${i}`;
@@ -1024,7 +1053,9 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     if (
       subPhase === 'K_STEAL_PICK' ||
       subPhase === 'BOMB_SELECT_TARGET' ||
-      subPhase === 'BOMB_PASS_TARGET'
+      subPhase === 'BOMB_PASS_TARGET' ||
+      subPhase === 'REVOLVER_SELECT_TARGET' ||
+      subPhase === 'REVOLVER_DUEL'
     ) {
       return;
     }
@@ -1050,11 +1081,14 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
       audio.playCardSelect();
       const next = selectedCardIds.slice(0, existingIdx);
       setSelectedCardIds(next);
-      onSendHandInteraction('CARD_SELECTED', hoveredCardIndex ?? undefined);
+      onSendHandInteraction(
+        'CARD_SELECTED',
+        isCadenaMode ? undefined : hoveredCardIndex ?? undefined
+      );
       return;
     }
 
-    // If clicking a special action card (J, Q, K, BOMBA, ESPEJO)
+    // If clicking a special action card (J, Q, K, BOMBA, ESPEJO, REVOLVER)
     if (isSpecialActionCard(clickedCard)) {
       if (subPhase === 'K_FOLLOWUP_CHAIN') {
         triggerInvalidCardsShake([cardId]);
@@ -1072,9 +1106,16 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
         triggerInvalidCardsShake([cardId]);
         return;
       }
+      if (clickedCard.rank === 'REVOLVER' && aliveOpponents.length === 0) {
+        triggerInvalidCardsShake([cardId]);
+        return;
+      }
       audio.playCardSelect();
       setSelectedCardIds([cardId]);
-      onSendHandInteraction('CARD_SELECTED', hoveredCardIndex ?? undefined);
+      onSendHandInteraction(
+        'CARD_SELECTED',
+        isCadenaMode ? undefined : hoveredCardIndex ?? undefined
+      );
       return;
     }
 
@@ -1094,7 +1135,10 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     ) {
       audio.playCardSelect();
       setSelectedCardIds([...selectedCardIds, cardId]);
-      onSendHandInteraction('CARD_SELECTED', hoveredCardIndex ?? undefined);
+      onSendHandInteraction(
+        'CARD_SELECTED',
+        isCadenaMode ? undefined : hoveredCardIndex ?? undefined
+      );
       return;
     }
 
@@ -1105,7 +1149,10 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     ) {
       audio.playCardSelect();
       setSelectedCardIds([cardId]);
-      onSendHandInteraction('CARD_SELECTED', hoveredCardIndex ?? undefined);
+      onSendHandInteraction(
+        'CARD_SELECTED',
+        isCadenaMode ? undefined : hoveredCardIndex ?? undefined
+      );
       return;
     }
 
@@ -1318,13 +1365,56 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     }
   }, []);
 
+  const handleSpinCadenaRevolver = useCallback(
+    (
+      eventId: string,
+      velocity: number,
+      angle: number,
+      spinId: string,
+      settled?: boolean
+    ) => {
+      onCadenaSpinRevolver(eventId, velocity, angle, spinId, settled);
+    },
+    [onCadenaSpinRevolver]
+  );
+
+  const handlePullCadenaRevolver = useCallback(
+    (eventId: string) => {
+      onCadenaPullRevolver(eventId);
+    },
+    [onCadenaPullRevolver]
+  );
+
   const handleCardAnimationFinished = useCallback((cardVisualKey: string) => {
     if (cardVisualKey.startsWith('draw_')) {
       // Extract drawnCardId if present: `draw_${eventId}_${cardId}`
-      setInFlightDrawnCardIds((prev) =>
-        prev.filter((cid) => !cardVisualKey.endsWith(`_${cid}`))
-      );
+      let landedId: string | null = null;
+      setInFlightDrawnCardIds((prev) => {
+        const matched = prev.find((cid) => cardVisualKey.endsWith(`_${cid}`));
+        if (matched) landedId = matched;
+        return prev.filter((cid) => !cardVisualKey.endsWith(`_${cid}`));
+      });
       setAnimatingCards((prev) => prev.filter((c) => c.id !== cardVisualKey));
+      if (landedId) {
+        const cid = landedId;
+        setSettlingIntoSortCardIds((prev) => {
+          const next = new Set(prev);
+          next.add(cid);
+          return next;
+        });
+        if (typeof window !== 'undefined') {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              setSettlingIntoSortCardIds((prev) => {
+                if (!prev.has(cid)) return prev;
+                const next = new Set(prev);
+                next.delete(cid);
+                return next;
+              });
+            });
+          });
+        }
+      }
       return;
     }
     if (cardVisualKey.startsWith('reshuffle_')) {
@@ -1342,7 +1432,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   const handleCardMouseEnter = (index: number) => {
     setHoveredCardIndex(index);
     audio.playCardHover();
-    onSendHandInteraction('CARD_HOVER', index);
+    onSendHandInteraction('CARD_HOVER', isCadenaMode ? undefined : index);
   };
 
   const handleHandMouseEnter = () => {
@@ -1437,19 +1527,22 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   }, [animatingCards]);
 
   // Filter visible hand cards (subtract in-flight cards during throw or draw, and respect dealing count during ROUND_INTRO)
+  // Requirement 1 & 2: In CADENA mode, derive a sorted visual hand (1..10 ascending, then J, Q, K, JOKER, ESPEJO, BOMBA, REVOLVER)
   const visibleHandCards = useMemo(() => {
     const base = (localPlayer?.hand || []).filter(
       (c) =>
         !inFlightCardIds.includes(c.id) && !inFlightDrawnCardIds.includes(c.id)
     );
+    const ordered = isCadenaMode ? sortCadenaHand(base) : base;
     if (roomState.phase === 'ROUND_INTRO' || dealtCardCount < targetInitialDealCount) {
-      return base.slice(0, dealtCardCount);
+      return ordered.slice(0, dealtCardCount);
     }
-    return base;
+    return ordered;
   }, [
     localPlayer?.hand,
     inFlightCardIds,
     inFlightDrawnCardIds,
+    isCadenaMode,
     roomState.phase,
     dealtCardCount,
     targetInitialDealCount,
@@ -1548,7 +1641,13 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
               {isCadenaMode ? 'Partida' : `Ronda ${roomState.currentRound}`}
             </span>
             <span className="text-stone-600">&bull;</span>
-            <span className="font-semibold text-amber-300">
+            <span
+              className={`font-semibold ${
+                roomState.config.mode === 'CADENA'
+                  ? 'text-sky-300'
+                  : 'text-amber-300'
+              }`}
+            >
               {roomState.config.mode === 'CADENA'
                 ? 'Modo Cadena ⛓️'
                 : roomState.config.mode === 'DIABLO'
@@ -1578,9 +1677,9 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
             <button
               type="button"
               onClick={() => setShowCadenaGuideModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/60 text-amber-200 text-xs font-black uppercase tracking-wider transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/60 text-sky-200 text-xs font-black uppercase tracking-wider transition-all shadow-sm"
             >
-              <BookOpen className="w-3.5 h-3.5 text-amber-300" />
+              <BookOpen className="w-3.5 h-3.5 text-sky-300" />
               <span>📖 Guía</span>
             </button>
           )}
@@ -1790,6 +1889,15 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 className="w-6 h-8 object-contain rounded"
               />
             )}
+            {(activeVisualEffect.kind === 'REVOLVER_TARGETED' ||
+              activeVisualEffect.kind === 'REVOLVER_CLICK' ||
+              activeVisualEffect.kind === 'REVOLVER_BANG') && (
+              <img
+                src={CANTINA_CARD_ASSETS.REVOLVER}
+                alt="Revólver"
+                className="w-6 h-8 object-contain rounded"
+              />
+            )}
             <span>{activeVisualEffect.text}</span>
           </div>
         )}
@@ -1859,6 +1967,11 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
             opp.isAlive &&
             (cadenaState?.turnSubPhase === 'BOMB_SELECT_TARGET' ||
               cadenaState?.turnSubPhase === 'BOMB_PASS_TARGET');
+          const isRevolverSelectableRival =
+            isCadenaMode &&
+            isMyTurn &&
+            opp.isAlive &&
+            cadenaState?.turnSubPhase === 'REVOLVER_SELECT_TARGET';
 
           return (
             <div
@@ -1866,6 +1979,8 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
               onClick={() => {
                 if (isBombSelectableRival) {
                   onCadenaSelectBombTarget?.(opp.id);
+                } else if (isRevolverSelectableRival) {
+                  onCadenaSelectRevolverTarget?.(opp.id);
                 }
               }}
               style={{
@@ -1876,7 +1991,9 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 perspective: '900px',
               }}
               className={`flex flex-col items-center gap-1.5 transition-all duration-300 pointer-events-auto ${
-                isBombSelectableRival ? 'cursor-pointer hover:scale-105' : ''
+                isBombSelectableRival || isRevolverSelectableRival
+                  ? 'cursor-pointer hover:scale-105'
+                  : ''
               }`}
             >
               {/* Floating Active Turn Marker on Opponent's Seat */}
@@ -1992,7 +2109,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs backdrop-blur-md border transition-all duration-300 ${
                   !opp.isAlive
                     ? 'bg-rose-950/50 border-rose-900/50 text-stone-400'
-                    : isBombSelectableRival
+                    : isBombSelectableRival || isRevolverSelectableRival
                     ? 'bg-red-950/95 border-2 border-red-400 text-amber-100 shadow-[0_0_24px_rgba(239,68,68,0.65)] scale-105'
                     : isOppTurn
                     ? 'bg-amber-950/95 border-2 border-amber-400 text-amber-100 shadow-[0_0_24px_rgba(245,158,11,0.55)] scale-105'
@@ -2202,15 +2319,56 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
               </div>
             )}
 
-          {/* CADENA MODE SUBPHASE: K STEAL PICK FACE-DOWN CARD */}
+          {/* CADENA MODE SUBPHASE: REVOLVER TARGET SELECTION */}
+          {isCadenaMode &&
+            cadenaState &&
+            isMyTurn &&
+            cadenaState.turnSubPhase === 'REVOLVER_SELECT_TARGET' && (
+              <div className="p-3 sm:p-4 rounded-2xl bg-stone-950/95 border-2 border-sky-400/85 shadow-[0_0_40px_rgba(56,189,248,0.45)] flex flex-col items-center gap-2.5">
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-black uppercase tracking-wider text-sky-100">
+                  <img
+                    src={CANTINA_CARD_ASSETS.REVOLVER}
+                    alt="Revólver"
+                    className="w-6 h-8 object-contain rounded"
+                  />
+                  <span>
+                    🔫 ELIGE A QUÉ RIVAL RETAS AL REVÓLVER (GIRA Y DISPARA):
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {aliveOpponents.map((opp) => (
+                    <button
+                      key={opp.id}
+                      type="button"
+                      onClick={() => onCadenaSelectRevolverTarget?.(opp.id)}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-2 border border-sky-300/60 active:scale-95 transition-all"
+                    >
+                      <span>{opp.avatar}</span>
+                      <span>{opp.name}</span>
+                      <span className="text-[10px] opacity-85">
+                        ({opp.cardsCount} 🃏)
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {/* CADENA MODE SUBPHASE: K STEAL PICK FACE-DOWN CARD (PRIVATELY SHUFFLED) */}
           {isCadenaMode &&
             cadenaState &&
             isMyTurn &&
             cadenaState.turnSubPhase === 'K_STEAL_PICK' && (
-              <div className="p-3.5 sm:p-4 rounded-2xl bg-stone-950/95 border-2 border-amber-400/85 shadow-[0_0_40px_rgba(245,158,11,0.45)] flex flex-col items-center gap-3 max-w-lg">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-stone-950/95 border-2 border-amber-400/85 shadow-[0_0_40px_rgba(245,158,11,0.45)] flex flex-col items-center gap-3 max-w-lg animate-in zoom-in-95 duration-200">
                 <div className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-200 flex items-center gap-2">
                   <Hand className="w-4 h-4 text-amber-400" />
                   <span>ROBO (K): ELIGE UNA CARTA BOCA ABAJO DE TU RIVAL</span>
+                </div>
+
+                {/* Private shuffle indicator so players know sorted positions cannot leak */}
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-950/90 border border-sky-400/50 text-[10px] font-black uppercase tracking-wider text-sky-200">
+                  <Shuffle className="w-3 h-3 text-sky-400" />
+                  <span>Cartas barajadas en privado • Posiciones aleatorias</span>
                 </div>
 
                 {/* Rival selector tabs if multiple rivals have cards and not locked by Mirror */}
@@ -2233,7 +2391,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                   </div>
                 )}
 
-                {/* Face-down cards of the target rival to pick from */}
+                {/* Face-down cards of the target rival to pick from (shuffled slots) */}
                 {(() => {
                   const targetRival =
                     opponentsWithCards.find(
@@ -2243,6 +2401,12 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                     ) || opponentsWithCards[0];
 
                   if (!targetRival) return null;
+
+                  const displayCount = Math.min(targetRival.cardsCount, 8);
+                  const shuffledSlots = createShuffledStealSlots(
+                    displayCount,
+                    `${cadenaState.stealShuffleSeed || 'kshuf'}_${targetRival.id}`
+                  );
 
                   return (
                     <div className="flex flex-col items-center gap-2">
@@ -2254,16 +2418,17 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                         para robarla al azar:
                       </span>
                       <div className="flex flex-wrap items-center justify-center gap-2 py-1">
-                        {Array.from({
-                          length: Math.min(targetRival.cardsCount, 8),
-                        }).map((_, slotIdx) => (
+                        {shuffledSlots.map((slotPermIdx, visualPos) => (
                           <button
-                            key={slotIdx}
+                            key={`steal_${cadenaState.stealShuffleSeed || 0}_${slotPermIdx}`}
                             type="button"
+                            style={{
+                              animationDelay: `${visualPos * 35}ms`,
+                            }}
                             onClick={() =>
-                              onCadenaStealCard?.(targetRival.id, slotIdx)
+                              onCadenaStealCard?.(targetRival.id, slotPermIdx)
                             }
-                            className="group relative transition-transform hover:-translate-y-2 hover:scale-105 active:scale-95"
+                            className="group relative transition-transform hover:-translate-y-2 hover:scale-105 active:scale-95 animate-in fade-in zoom-in-90 duration-200"
                           >
                             <CantinaCard
                               isFaceDown
@@ -2512,8 +2677,25 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 ? 1.03
                 : 1.0;
 
+              const isSettlingIntoSortedSlot =
+                isCadenaMode && settlingIntoSortCardIds.has(card.id);
+              const effectiveFanX = isSettlingIntoSortedSlot ? 0 : fanX;
+              const effectiveFinalY = isSettlingIntoSortedSlot
+                ? finalY - 34
+                : finalY;
+              const effectiveRot = isSettlingIntoSortedSlot ? 0 : finalRot;
+              const effectiveScale = isSettlingIntoSortedSlot
+                ? 1.08
+                : finalScale;
+
               const flipScaleX = isCurrentlyFlipping ? 0.08 : 1;
-              const zIndex = isCardHovered ? 45 : isSelected ? 25 + i : 10 + i;
+              const zIndex = isSettlingIntoSortedSlot
+                ? 50
+                : isCardHovered
+                ? 45
+                : isSelected
+                ? 25 + i
+                : 10 + i;
 
               return (
                 <div
@@ -2525,11 +2707,11 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                   style={{
                     position: 'absolute',
                     bottom: `${layout.localHand.bottomPx}px`,
-                    transform: `translate3d(${fanX}px, ${finalY}px, 0) rotate(${finalRot}deg) scale(${finalScale}) scaleX(${flipScaleX})`,
+                    transform: `translate3d(${effectiveFanX}px, ${effectiveFinalY}px, 0) rotate(${effectiveRot}deg) scale(${effectiveScale}) scaleX(${flipScaleX})`,
                     transformOrigin: '50% 88%',
                     zIndex,
                     transition:
-                      'transform 200ms cubic-bezier(0.22, 1, 0.36, 1), z-index 0ms',
+                      'transform 310ms cubic-bezier(0.22, 1, 0.36, 1), z-index 0ms',
                     willChange: 'transform',
                   }}
                 >
@@ -2744,6 +2926,22 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
           rouletteSpinEvent={rouletteSpinEvent}
           onPullTrigger={onPullTrigger}
           onSpinCylinder={onSpinCylinder}
+        />
+      )}
+
+      {/* 8B. CADENA SPECIAL CARD REVOLVER OVERLAY (Isolated Cadena Minigame — penalty cards, no death) */}
+      {isCadenaMode && cadenaState?.revolverState && (
+        <CantinaCadenaRevolverOverlay
+          key={cadenaState.revolverState.eventId}
+          revolverState={cadenaState.revolverState}
+          localPlayerId={localPlayerId}
+          interactive={Boolean(
+            isLocalAlive &&
+              cadenaState.revolverState.shooterPlayerId === localPlayerId
+          )}
+          rouletteSpinEvent={rouletteSpinEvent}
+          onSpinRevolver={handleSpinCadenaRevolver}
+          onPullRevolver={handlePullCadenaRevolver}
         />
       )}
 

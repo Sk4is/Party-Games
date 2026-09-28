@@ -80,6 +80,13 @@ const SPECIAL_CARDS_GUIDE: {
     description:
       'Refleja el último poder compatible que otro jugador haya usado contra ti.',
   },
+  {
+    rank: 'REVOLVER',
+    title: 'REVÓLVER',
+    subtitle: 'Ruleta de Cartas (2 en el mazo)',
+    description:
+      'Apunta a un rival (3 de 6 recámaras cargadas). ¡BANG! roba 5 cartas de penalización; ¡CLICK! se salva sin robar.',
+  },
 ];
 
 export const CantinaCadenaGuideModal: React.FC<CantinaCadenaGuideModalProps> = ({

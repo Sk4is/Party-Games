@@ -28,6 +28,7 @@ export const CANTINA_CARD_ASSETS: Record<string | number, string> = {
   JOKER: `${CANTINA_ASSET_BASE}/joker.png`,
   BOMBA: `${CANTINA_ASSET_BASE}/bomba.png`,
   ESPEJO: `${CANTINA_ASSET_BASE}/espejo.png`,
+  REVOLVER: `${CANTINA_ASSET_BASE}/revolver.png`,
   DEVIL: `${CANTINA_ASSET_BASE}/diablo.png`,
   DIABLO: `${CANTINA_ASSET_BASE}/diablo.png`,
 };

@@ -19,7 +19,86 @@ export const SPECIAL_ACTION_RANKS: CardRank[] = [
   'K',
   'BOMBA',
   'ESPEJO',
+  'REVOLVER',
 ];
+
+/**
+ * Explicit presentation sort order for CADENA hands:
+ * Numeric cards 1..10 ascending first, then special cards in stable order:
+ * J -> Q -> K -> JOKER -> ESPEJO -> BOMBA -> REVOLVER
+ */
+export const CADENA_HAND_SORT_WEIGHT: Record<CardRank, number> = {
+  '1': 1,
+  '2': 2,
+  '3': 3,
+  '4': 4,
+  '5': 5,
+  '6': 6,
+  '7': 7,
+  '8': 8,
+  '9': 9,
+  '10': 10,
+  J: 11,
+  Q: 12,
+  K: 13,
+  JOKER: 14,
+  ESPEJO: 15,
+  BOMBA: 16,
+  REVOLVER: 17,
+  DIABLO: 99,
+};
+
+/**
+ * Pure presentation helper that sorts a player's hand for CADENA mode without mutating
+ * the authoritative hand array or altering card IDs.
+ * Identical ranks stay grouped together and preserve a deterministic order by stable card ID.
+ */
+export function sortCadenaHand(cards: readonly Card[] | undefined | null): Card[] {
+  if (!cards || cards.length === 0) return [];
+  return [...cards].sort((a, b) => {
+    const weightA = CADENA_HAND_SORT_WEIGHT[a.rank] ?? 50;
+    const weightB = CADENA_HAND_SORT_WEIGHT[b.rank] ?? 50;
+    if (weightA !== weightB) {
+      return weightA - weightB;
+    }
+    return a.id.localeCompare(b.id, undefined, { numeric: true });
+  });
+}
+
+/**
+ * Generates a freshly shuffled permutation of slot indices [0 .. count - 1]
+ * so K's steal-selection cards never leak sorted hand positions.
+ */
+export function createShuffledStealSlots(
+  count: number,
+  seed?: number | string | null
+): number[] {
+  const slots = Array.from({ length: Math.max(0, count) }, (_, i) => i);
+  let numericSeed = 0;
+  if (typeof seed === 'number' && Number.isFinite(seed)) {
+    numericSeed = Math.abs(Math.floor(seed)) || 1;
+  } else if (typeof seed === 'string' && seed.length > 0) {
+    let hash = 2166136261;
+    for (let i = 0; i < seed.length; i++) {
+      hash ^= seed.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    numericSeed = Math.abs(hash) || 1;
+  }
+  let s = numericSeed;
+  const nextRand = () => {
+    if (seed === undefined || seed === null) {
+      return Math.random();
+    }
+    s = (s * 1664525 + 1013904223) % 4294967296;
+    return s / 4294967296;
+  };
+  for (let i = slots.length - 1; i > 0; i--) {
+    const j = Math.floor(nextRand() * (i + 1));
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+  }
+  return slots;
+}
 
 /**
  * Returns the numeric value (1..10) if the card rank is '1'..'10', otherwise null.
@@ -71,7 +150,7 @@ export function isCircularlyAdjacent(currentNumber: number, candidate: number): 
 }
 
 /**
- * Builds the authoritative 68-card CADENA deck:
+ * Builds the authoritative 70-card CADENA deck:
  * - Numeric 1..10: 5 copies each = 50 cards
  * - 4 x J (SALTO)
  * - 4 x Q (REVERSA)
@@ -79,7 +158,8 @@ export function isCircularlyAdjacent(currentNumber: number, candidate: number): 
  * - 3 x JOKER (COMODÍN)
  * - 2 x ESPEJO (REFLEJO)
  * - 1 x BOMBA
- * Total = 68 cards. Zero DIABLO cards.
+ * - 2 x REVOLVER (RULETA DE CARTAS)
+ * Total = 70 cards. Zero DIABLO cards.
  */
 export function buildCadenaDeck(roundTag: string | number = 1): Card[] {
   const deck: Card[] = [];
@@ -122,6 +202,11 @@ export function buildCadenaDeck(roundTag: string | number = 1): Card[] {
 
   // 1 x BOMBA
   deck.push({ id: `cad_BOMBA_r${roundTag}_${seq++}`, rank: 'BOMBA' });
+
+  // 2 x REVOLVER
+  for (let i = 0; i < 2; i++) {
+    deck.push({ id: `cad_REVOLVER_r${roundTag}_${seq++}`, rank: 'REVOLVER' });
+  }
 
   return deck;
 }

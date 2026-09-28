@@ -82,6 +82,9 @@ export const CantinaGame: React.FC<CantinaGameProps> = ({
     cadenaEndTurn,
     cadenaStealCard,
     cadenaSelectBombTarget,
+    cadenaSelectRevolverTarget,
+    cadenaSpinRevolver,
+    cadenaPullRevolver,
     cadenaDeclareUltima,
     cadenaCatchUltima,
   } = useCantinaSocket({
@@ -195,6 +198,9 @@ export const CantinaGame: React.FC<CantinaGameProps> = ({
           onCadenaEndTurn={cadenaEndTurn}
           onCadenaStealCard={cadenaStealCard}
           onCadenaSelectBombTarget={cadenaSelectBombTarget}
+          onCadenaSelectRevolverTarget={cadenaSelectRevolverTarget}
+          onCadenaSpinRevolver={cadenaSpinRevolver}
+          onCadenaPullRevolver={cadenaPullRevolver}
           onCadenaDeclareUltima={cadenaDeclareUltima}
           onCadenaCatchUltima={cadenaCatchUltima}
         />
