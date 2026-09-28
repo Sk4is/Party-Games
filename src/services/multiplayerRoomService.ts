@@ -13,11 +13,21 @@ export interface PlayerProfile {
   color: string;
 }
 
+export type MultiplayerGameType =
+  | 'la-bomba'
+  | 'la-peor-respuesta'
+  | 'pinturillo'
+  | 'palabra-secreta'
+  | 'codigo-rojo'
+  | 'coartada'
+  | 'entre-topos'
+  | 'la_cantina_del_farol';
+
 export interface SharedRoomSummary {
   roomId: string;
   roomCode: string;
   code: string;
-  gameType: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos' | 'la_cantina_del_farol' | 'la-cantina-del-farol';
+  gameType: MultiplayerGameType;
   hostId: string;
   phase: string;
   createdAt: number;
@@ -33,7 +43,7 @@ export interface ValidateJoinResult {
   valid: boolean;
   room?: SharedRoomSummary;
   wrongGame?: boolean;
-  actualGameType?: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos' | 'la_cantina_del_farol' | 'la-cantina-del-farol';
+  actualGameType?: MultiplayerGameType;
   message?: string;
 }
 
@@ -42,7 +52,7 @@ export interface ValidateJoinResult {
  * Ensures backend is awake first if sleeping, without duplicating requests.
  */
 export async function createOnlineRoom(
-  gameType: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos' | 'la_cantina_del_farol' | 'la-cantina-del-farol',
+  gameType: MultiplayerGameType,
   hostPlayer: PlayerProfile,
   config?: any
 ): Promise<SharedRoomSummary> {
@@ -101,7 +111,7 @@ export async function findOnlineRoom(code: string): Promise<SharedRoomSummary> {
  */
 export async function validateJoinOnlineRoom(
   code: string,
-  gameType?: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos' | 'la_cantina_del_farol' | 'la-cantina-del-farol',
+  gameType?: MultiplayerGameType,
   player?: PlayerProfile
 ): Promise<ValidateJoinResult> {
   const cleanCode = code.trim().toUpperCase();

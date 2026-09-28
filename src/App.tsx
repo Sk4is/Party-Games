@@ -30,7 +30,7 @@ type AppView =
   | 'CODIGO_ROJO'
   | 'COARTADA'
   | 'ENTRE_TOPOS'
-  | 'CANTINA_ONLINE'
+  | 'CANTINA'
   | 'BOMBA_LOCAL_SETUP'
   | 'BOMBA_LOCAL_GAME'
   | 'LPR_LOCAL_SETUP'
@@ -60,8 +60,9 @@ export default function App() {
       if (
         (activeSession.gameType as string) === 'la_cantina_del_farol' ||
         (activeSession.gameType as string) === 'la-cantina-del-farol'
-      )
-        return 'CANTINA_ONLINE';
+      ) {
+        return 'CANTINA';
+      }
     }
 
     if (typeof window !== 'undefined') {
@@ -76,8 +77,7 @@ export default function App() {
       if (game === 'codigo-rojo') return 'CODIGO_ROJO';
       if (game === 'coartada') return 'COARTADA';
       if (game === 'entre-topos') return 'ENTRE_TOPOS';
-      if (game === 'la_cantina_del_farol' || game === 'la-cantina-del-farol' || game === 'cantina')
-        return 'CANTINA_ONLINE';
+      if (game === 'la_cantina_del_farol' || game === 'la-cantina-del-farol') return 'CANTINA';
       if (room) {
         return 'PINTURILLO';
       }
@@ -112,8 +112,8 @@ export default function App() {
       setCurrentView('COARTADA');
     } else if (gameId === 'entre-topos') {
       setCurrentView('ENTRE_TOPOS');
-    } else if (gameId === 'la_cantina_del_farol' || gameId === 'la-cantina-del-farol' || gameId === 'cantina') {
-      setCurrentView('CANTINA_ONLINE');
+    } else if (gameId === 'la_cantina_del_farol' || gameId === 'la-cantina-del-farol') {
+      setCurrentView('CANTINA');
     }
   };
 
@@ -124,7 +124,15 @@ export default function App() {
   };
 
   const handleSwitchGame = (
-    game: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos' | 'la_cantina_del_farol' | 'la-cantina-del-farol',
+    game:
+      | 'la-bomba'
+      | 'la-peor-respuesta'
+      | 'pinturillo'
+      | 'palabra-secreta'
+      | 'codigo-rojo'
+      | 'coartada'
+      | 'entre-topos'
+      | 'la_cantina_del_farol',
     code: string
   ) => {
     setUrlRoomCode(code);
@@ -135,7 +143,7 @@ export default function App() {
     else if (game === 'codigo-rojo') setCurrentView('CODIGO_ROJO');
     else if (game === 'coartada') setCurrentView('COARTADA');
     else if (game === 'entre-topos') setCurrentView('ENTRE_TOPOS');
-    else if (game === 'la_cantina_del_farol' || game === 'la-cantina-del-farol') setCurrentView('CANTINA_ONLINE');
+    else if (game === 'la_cantina_del_farol') setCurrentView('CANTINA');
   };
 
   return (
@@ -210,8 +218,8 @@ export default function App() {
         />
       )}
 
-      {/* 8. LA CANTINA DEL FAROL (ONLINE MULTIPLAYER 2-4 PLAYERS) */}
-      {currentView === 'CANTINA_ONLINE' && (
+      {/* 8. LA CANTINA DEL FAROL (ONLINE MULTIPLAYER BLUFF & ROULETTE 2-4 PLAYERS) */}
+      {currentView === 'CANTINA' && (
         <CantinaGame
           onBackToMenu={handleBackToMenu}
           initialRoomCode={urlRoomCode}

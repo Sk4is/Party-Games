@@ -341,7 +341,7 @@ app.post('/api/rooms/create', (req, res) => {
     } else if (gameType === 'entre-topos') {
       const room = entreToposServer.createRoomDirect(normalizedPlayer as any, config);
       return res.json({ success: true, room });
-    } else if (gameType === 'la_cantina_del_farol' || gameType === 'la-cantina-del-farol') {
+    } else if (gameType === 'la_cantina_del_farol') {
       const room = cantinaServer.createRoomDirect(normalizedPlayer as any, config);
       return res.json({ success: true, room });
     }
@@ -369,7 +369,14 @@ app.post('/api/rooms/validate-join', (req, res) => {
     const coartadaInfo = coartadaServer?.getRoomInfo(code);
     const entreToposInfo = entreToposServer?.getRoomInfo(code);
     const cantinaInfo = cantinaServer?.getRoomInfo(code);
-    const roomInfo = partyInfo || pinturilloInfo || palabraInfo || codigoRojoInfo || coartadaInfo || entreToposInfo || cantinaInfo;
+    const roomInfo =
+      partyInfo ||
+      pinturilloInfo ||
+      palabraInfo ||
+      codigoRojoInfo ||
+      coartadaInfo ||
+      entreToposInfo ||
+      cantinaInfo;
 
     if (!roomInfo) {
       return res.status(404).json({ valid: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
@@ -389,9 +396,9 @@ app.post('/api/rooms/validate-join', (req, res) => {
           ? 'CÓDIGO ROJO'
           : roomInfo.gameType === 'coartada'
           ? 'COARTADA'
-          : roomInfo.gameType === 'entre-topos'
-          ? 'ENTRE TOPOS'
-          : 'LA CANTINA DEL FAROL';
+          : roomInfo.gameType === 'la_cantina_del_farol'
+          ? 'LA CANTINA DEL FAROL'
+          : 'ENTRE TOPOS';
       return res.status(400).json({
         valid: false,
         wrongGame: true,
@@ -439,13 +446,13 @@ async function startServer() {
   cantinaServer = new CantinaServer();
 
   let vite: any = null;
-  app.use('/assets/fonts', (req, res, next) => {
-    if (req.url.includes('?import')) {
+  app.use('/assets', (req, res, next) => {
+    if (req.url.includes('?import') || req.url.includes('?url')) {
       return next();
     }
     const cleanRelative = req.path.replace(/^\/+/, '');
-    const candidateRoot = path.join(process.cwd(), 'assets', 'fonts', cleanRelative);
-    const candidatePublic = path.join(process.cwd(), 'public', 'assets', 'fonts', cleanRelative);
+    const candidateRoot = path.join(process.cwd(), 'assets', cleanRelative);
+    const candidatePublic = path.join(process.cwd(), 'public', 'assets', cleanRelative);
     if (fs.existsSync(candidateRoot) && fs.statSync(candidateRoot).isFile()) {
       return res.sendFile(candidateRoot);
     }
@@ -506,7 +513,7 @@ async function startServer() {
       entreToposServer.wss.handleUpgrade(request, socket, head, (ws) => {
         entreToposServer.wss.emit('connection', ws, request);
       });
-    } else if (pathname === '/ws/cantina' || pathname === '/ws/la-cantina-del-farol' || pathname === '/ws/la_cantina_del_farol') {
+    } else if (pathname === '/ws/cantina') {
       cantinaServer.wss.handleUpgrade(request, socket, head, (ws) => {
         cantinaServer.wss.emit('connection', ws, request);
       });

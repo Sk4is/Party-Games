@@ -4,7 +4,15 @@
  * for all 3 multiplayer games: La Bomba, La Peor Respuesta, and Pinturillo.
  */
 
-export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos' | 'la_cantina_del_farol' | 'la-cantina-del-farol';
+export type SupportedGameType =
+  | 'la-bomba'
+  | 'la-peor-respuesta'
+  | 'pinturillo'
+  | 'palabra-secreta'
+  | 'codigo-rojo'
+  | 'coartada'
+  | 'entre-topos'
+  | 'la_cantina_del_farol';
 
 export interface ActiveSessionData {
   gameType: SupportedGameType;
@@ -91,9 +99,11 @@ export const sessionRecovery = {
           'codigo-rojo',
           'coartada',
           'entre-topos',
+          'la_cantina_del_farol',
         ].includes(urlGame)
       ) {
         const playerId =
+          localStorage.getItem('fam2play_cantina_player_id') ||
           localStorage.getItem('fam2play_player_id') ||
           localStorage.getItem('fiesta_playerId') ||
           localStorage.getItem('pinturillo_playerId') ||
