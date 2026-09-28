@@ -2,7 +2,7 @@
 // Centralized configuration for player positions, perspectives, table pile geometry, and card animations.
 // We will tune these values later.
 
-import { CantinaMapId } from './maps';
+import { CantinaMapId } from './cantinaAssets';
 
 export interface SeatVisualLayout {
   topPercent: number; // percentage from top (0-100)

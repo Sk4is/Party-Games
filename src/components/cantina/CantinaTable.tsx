@@ -6,11 +6,12 @@ import {
   HandInteractionType,
 } from '../../types/cantina';
 import {
-  CANTINA_MAPS,
+  CANTINA_MAP_ASSETS,
   getSeatPovKey,
+  resolveCantinaSeatBackground,
   logCantinaMapAssetError,
   CantinaMapId,
-} from '../../data/cantina/maps';
+} from '../../data/cantina/cantinaAssets';
 import {
   CANTINA_TABLE_LAYOUTS,
   getStableCardScatter,
@@ -82,16 +83,17 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   const isLocalAlive = localPlayer?.isAlive ?? false;
 
   // 1. Authoritative Map & Independent Seat POV
-  const selectedMapId: CantinaMapId = roomState.config?.mapId || 'mapa1';
-  const mapDef = CANTINA_MAPS[selectedMapId] || CANTINA_MAPS.mapa1;
+  const selectedMapId: CantinaMapId = roomState.config.mapId;
+  const mapDef = CANTINA_MAP_ASSETS[selectedMapId];
 
   // Strict specification for POV mapping:
   // PLAYER 1 / HOST -> POV1
   // PLAYER 2        -> POV3
   // PLAYER 3        -> POV2
   // PLAYER 4        -> POV4
-  const povKey = getSeatPovKey(localPlayer?.seatIndex ?? 0);
-  const povImageSrc = mapDef[povKey];
+  const seatIndex = localPlayer?.seatIndex ?? 0;
+  const povKey = getSeatPovKey(seatIndex);
+  const povImageSrc = resolveCantinaSeatBackground(selectedMapId, seatIndex);
 
   // Visual layout tuning values for current map
   const layout =
@@ -348,20 +350,27 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   }, [localPlayer?.hand, inFlightCardIds]);
 
   return (
-    <div className="fixed inset-0 w-screen h-screen overflow-hidden select-none bg-[#0c0a09] text-stone-100 font-sans z-0">
+    <div
+      style={{
+        backgroundImage: `url("${povImageSrc}")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+      className="fixed inset-0 w-screen h-screen overflow-hidden select-none bg-[#0c0a09] text-stone-100 font-sans z-0"
+    >
       {/* 1. IMMERSIVE MAP POV BACKGROUND — strictly resolves selectedMap + seat POV */}
       <img
         src={povImageSrc}
-        alt={`Cantina POV - ${mapDef.name} (${povKey})`}
+        alt=""
         onError={() => {
           logCantinaMapAssetError(selectedMapId, povKey, povImageSrc);
         }}
         className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
       />
 
-      {/* Atmospheric noir shading overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/60 pointer-events-none z-0" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,rgba(0,0,0,0.75)_100%)] pointer-events-none z-0" />
+      {/* Subtle atmospheric shading overlay (never opaque black) */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/30 pointer-events-none z-0" />
 
       {/* 2. TRANSIENT CARD ANIMATION LAYER (Curved Bézier throw & progressive table tilt) */}
       <CantinaCardAnimationLayer

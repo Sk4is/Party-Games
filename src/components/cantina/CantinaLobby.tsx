@@ -5,7 +5,10 @@ import {
   CantinaGameMode,
   CantinaMapId,
 } from '../../types/cantina';
-import { CANTINA_MAPS, logCantinaMapAssetError } from '../../data/cantina/maps';
+import {
+  CANTINA_MAP_ASSETS,
+  logCantinaMapAssetError,
+} from '../../data/cantina/cantinaAssets';
 import { Copy, Check, Users, Play, Crown, ShieldAlert, Sparkles, Flame, LogOut } from 'lucide-react';
 
 interface CantinaLobbyProps {
@@ -276,8 +279,8 @@ export const CantinaLobby: React.FC<CantinaLobbyProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {(Object.keys(CANTINA_MAPS) as CantinaMapId[]).map((mapId) => {
-                const mapDef = CANTINA_MAPS[mapId];
+              {(Object.keys(CANTINA_MAP_ASSETS) as CantinaMapId[]).map((mapId) => {
+                const mapDef = CANTINA_MAP_ASSETS[mapId];
                 const isSelected = currentMapId === mapId;
 
                 return (
@@ -301,7 +304,7 @@ export const CantinaLobby: React.FC<CantinaLobbyProps> = ({
 
 const MapCardOption: React.FC<{
   mapId: CantinaMapId;
-  mapDef: typeof CANTINA_MAPS[CantinaMapId];
+  mapDef: typeof CANTINA_MAP_ASSETS[CantinaMapId];
   isSelected: boolean;
   isHost: boolean;
   onSelect: () => void;
@@ -318,10 +321,18 @@ const MapCardOption: React.FC<{
       } ${isHost ? 'cursor-pointer hover:-translate-y-1' : 'cursor-default'}`}
     >
       {/* Map Thumbnail Image */}
-      <div className="relative w-full h-28 overflow-hidden bg-stone-950">
+      <div
+        style={{
+          backgroundImage: `url("${mapDef.thumbnail}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+        className="relative w-full h-28 overflow-hidden bg-stone-950"
+      >
         <img
           src={mapDef.thumbnail}
-          alt={mapDef.name}
+          alt=""
           onError={() => {
             logCantinaMapAssetError(mapId, 'thumbnail', mapDef.thumbnail);
           }}

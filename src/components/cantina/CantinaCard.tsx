@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { CardRank, CantinaMapId } from '../../types/cantina';
 import {
   CANTINA_CARD_ASSETS,
-  CANTINA_CARD_CANDIDATES,
+  CANTINA_MAP_ASSETS,
   logCantinaCardAssetError,
-} from '../../data/cantina/cards';
-import { CANTINA_MAPS, logCantinaMapAssetError } from '../../data/cantina/maps';
+  logCantinaMapAssetError,
+} from '../../data/cantina/cantinaAssets';
 
 interface CantinaCardProps {
   rank?: CardRank;
@@ -21,15 +21,13 @@ interface CantinaCardProps {
 export const CantinaCard: React.FC<CantinaCardProps> = ({
   rank,
   isFaceDown = false,
-  mapId = 'mapa3',
+  mapId = 'mapa1',
   selected = false,
   onClick,
   size = 'md',
   className = '',
   style,
 }) => {
-  const [candidateIndex, setCandidateIndex] = useState(0);
-
   // Card dimensions with natural 2:3 aspect ratio
   const sizeClasses = {
     xs: 'w-10 h-15 rounded-md',
@@ -38,9 +36,9 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
     lg: 'w-32 h-48 sm:w-36 sm:h-54 rounded-2xl',
   }[size];
 
-  // Card back is strictly determined by mapId (NOT player POV, NO silent fallback)
-  const mapDef = CANTINA_MAPS[mapId];
-  const backCardSrc = mapDef?.back || CANTINA_MAPS.mapa3.back;
+  // Card back is strictly determined by mapId from canonical registry (no map3 fallback)
+  const mapAssets = CANTINA_MAP_ASSETS[mapId];
+  const backCardSrc = mapAssets.back;
 
   if (isFaceDown) {
     return (
@@ -57,7 +55,7 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
       >
         <img
           src={backCardSrc}
-          alt="Reverso de carta"
+          alt=""
           onError={() => {
             logCantinaMapAssetError(mapId, 'back', backCardSrc);
           }}
@@ -72,8 +70,7 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
   }
 
   // Card front: resolved strictly from single source of truth CANTINA_CARD_ASSETS
-  const candidates = rank ? CANTINA_CARD_CANDIDATES[rank] || [CANTINA_CARD_ASSETS[rank]] : [];
-  const currentSrc = candidates[candidateIndex] || (rank ? CANTINA_CARD_ASSETS[rank] : '');
+  const frontCardSrc = rank ? CANTINA_CARD_ASSETS[rank] : '';
 
   return (
     <div
@@ -87,16 +84,13 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
           : 'shadow-black/90 hover:brightness-110'
       } ${className}`}
     >
-      {currentSrc ? (
+      {frontCardSrc ? (
         <img
-          src={currentSrc}
-          alt={rank || 'Carta'}
+          src={frontCardSrc}
+          alt=""
           onError={() => {
             if (rank) {
-              logCantinaCardAssetError(rank, currentSrc);
-            }
-            if (candidateIndex + 1 < candidates.length) {
-              setCandidateIndex(candidateIndex + 1);
+              logCantinaCardAssetError(rank, frontCardSrc);
             }
           }}
           draggable={false}

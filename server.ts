@@ -451,15 +451,15 @@ async function startServer() {
       return next();
     }
     const cleanRelative = req.path.replace(/^\/+/, '');
-    const candidateRoot = path.join(process.cwd(), 'assets', cleanRelative);
     const candidatePublic = path.join(process.cwd(), 'public', 'assets', cleanRelative);
-    if (fs.existsSync(candidateRoot) && fs.statSync(candidateRoot).isFile()) {
-      return res.sendFile(candidateRoot);
-    }
+    const candidateRoot = path.join(process.cwd(), 'assets', cleanRelative);
     if (fs.existsSync(candidatePublic) && fs.statSync(candidatePublic).isFile()) {
       return res.sendFile(candidatePublic);
     }
-    return res.status(404).end();
+    if (fs.existsSync(candidateRoot) && fs.statSync(candidateRoot).isFile()) {
+      return res.sendFile(candidateRoot);
+    }
+    return next();
   });
 
   if (process.env.NODE_ENV !== 'production') {
