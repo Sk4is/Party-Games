@@ -46,7 +46,7 @@ interface ServerRoom {
 
 const DEFAULT_CONFIG: CantinaConfig = {
   mode: 'CLASICO',
-  mapId: 'mapa3',
+  mapId: 'mapa1',
 };
 
 const TABLE_RANKS: TableRank[] = ['J', 'Q', 'K'];

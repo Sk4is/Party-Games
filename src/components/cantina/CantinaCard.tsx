@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { CardRank, CantinaMapId } from '../../types/cantina';
-import { CANTINA_MAPS } from '../../data/cantina/maps';
+import {
+  CANTINA_CARD_ASSETS,
+  CANTINA_CARD_CANDIDATES,
+  logCantinaCardAssetError,
+} from '../../data/cantina/cards';
+import { CANTINA_MAPS, logCantinaMapAssetError } from '../../data/cantina/maps';
 
 interface CantinaCardProps {
   rank?: CardRank;
@@ -13,15 +18,6 @@ interface CantinaCardProps {
   style?: React.CSSProperties;
 }
 
-// User-provided card artwork mapping
-const CARD_FRONT_ASSETS: Record<CardRank, string[]> = {
-  J: ['/assets/cartas/cartaj.png'],
-  Q: ['/assets/cartas/cartoq.png', '/assets/cartas/cartaq.png'],
-  K: ['/assets/cartas/cartak.png'],
-  JOKER: ['/assets/cartas/joker.png'],
-  DIABLO: ['/assets/cartas/diablo.png'],
-};
-
 export const CantinaCard: React.FC<CantinaCardProps> = ({
   rank,
   isFaceDown = false,
@@ -33,17 +29,18 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
   style,
 }) => {
   const [candidateIndex, setCandidateIndex] = useState(0);
-  const [backCardError, setBackCardError] = useState(false);
 
+  // Card dimensions with natural 2:3 aspect ratio
   const sizeClasses = {
-    xs: 'w-10 h-14 rounded-md',
-    sm: 'w-14 h-20 rounded-lg',
-    md: 'w-20 h-28 sm:w-24 sm:h-34 rounded-xl',
-    lg: 'w-28 h-40 sm:w-32 sm:h-46 rounded-2xl',
+    xs: 'w-10 h-15 rounded-md',
+    sm: 'w-14 h-21 rounded-lg',
+    md: 'w-22 h-33 sm:w-26 sm:h-39 rounded-xl',
+    lg: 'w-32 h-48 sm:w-36 sm:h-54 rounded-2xl',
   }[size];
 
-  const mapDef = CANTINA_MAPS[mapId] || CANTINA_MAPS.mapa3;
-  const backCardSrc = backCardError ? '/assets/mapas/mapa3/map3backcard.png' : mapDef.backCard;
+  // Card back is strictly determined by mapId (NOT player POV, NO silent fallback)
+  const mapDef = CANTINA_MAPS[mapId];
+  const backCardSrc = mapDef?.back || CANTINA_MAPS.mapa3.back;
 
   if (isFaceDown) {
     return (
@@ -62,20 +59,21 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
           src={backCardSrc}
           alt="Reverso de carta"
           onError={() => {
-            if (!backCardError) setBackCardError(true);
+            logCantinaMapAssetError(mapId, 'back', backCardSrc);
           }}
           draggable={false}
-          className="w-full h-full object-cover object-center pointer-events-none rounded-inherit"
+          className="w-full h-full object-contain object-center pointer-events-none rounded-inherit"
         />
         {selected && (
-          <div className="absolute inset-0 bg-amber-400/15 pointer-events-none rounded-inherit ring-2 ring-amber-300" />
+          <div className="absolute inset-0 bg-amber-400/10 pointer-events-none rounded-inherit ring-2 ring-amber-300" />
         )}
       </div>
     );
   }
 
-  const candidates = rank ? CARD_FRONT_ASSETS[rank] || [] : [];
-  const currentSrc = candidates[candidateIndex] || candidates[0];
+  // Card front: resolved strictly from single source of truth CANTINA_CARD_ASSETS
+  const candidates = rank ? CANTINA_CARD_CANDIDATES[rank] || [CANTINA_CARD_ASSETS[rank]] : [];
+  const currentSrc = candidates[candidateIndex] || (rank ? CANTINA_CARD_ASSETS[rank] : '');
 
   return (
     <div
@@ -94,19 +92,22 @@ export const CantinaCard: React.FC<CantinaCardProps> = ({
           src={currentSrc}
           alt={rank || 'Carta'}
           onError={() => {
+            if (rank) {
+              logCantinaCardAssetError(rank, currentSrc);
+            }
             if (candidateIndex + 1 < candidates.length) {
               setCandidateIndex(candidateIndex + 1);
             }
           }}
           draggable={false}
-          className="w-full h-full object-cover object-center pointer-events-none rounded-inherit"
+          className="w-full h-full object-contain object-center pointer-events-none rounded-inherit"
         />
       ) : (
         <div className="w-full h-full bg-stone-900 border border-stone-800 rounded-inherit" />
       )}
 
       {selected && (
-        <div className="absolute inset-0 bg-amber-400/15 pointer-events-none rounded-inherit ring-2 ring-amber-300" />
+        <div className="absolute inset-0 bg-amber-400/10 pointer-events-none rounded-inherit ring-2 ring-amber-300" />
       )}
     </div>
   );

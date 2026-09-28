@@ -58,6 +58,7 @@ export const CantinaGame: React.FC<CantinaGameProps> = ({
     errorMessage,
     notification,
     remoteInteractions,
+    cardPlayedEvent,
     createRoom,
     joinRoom,
     updateConfig,
@@ -161,6 +162,7 @@ export const CantinaGame: React.FC<CantinaGameProps> = ({
           roomState={roomState}
           localPlayerId={player.id}
           remoteInteractions={remoteInteractions}
+          cardPlayedEvent={cardPlayedEvent}
           onPlayCards={playCards}
           onChallengeBluff={challengeBluff}
           onTriggerRoulette={triggerRoulette}

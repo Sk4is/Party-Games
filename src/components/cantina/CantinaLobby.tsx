@@ -5,7 +5,7 @@ import {
   CantinaGameMode,
   CantinaMapId,
 } from '../../types/cantina';
-import { CANTINA_MAPS } from '../../data/cantina/maps';
+import { CANTINA_MAPS, logCantinaMapAssetError } from '../../data/cantina/maps';
 import { Copy, Check, Users, Play, Crown, ShieldAlert, Sparkles, Flame, LogOut } from 'lucide-react';
 
 interface CantinaLobbyProps {
@@ -306,17 +306,6 @@ const MapCardOption: React.FC<{
   isHost: boolean;
   onSelect: () => void;
 }> = ({ mapId, mapDef, isSelected, isHost, onSelect }) => {
-  const [loadError, setLoadError] = useState(false);
-
-  // If map1 or map2 image file is not on disk, gracefully use working map3 with thematic atmospheric filter
-  const imgSrc = loadError ? '/assets/mapas/mapa3/map3pov1.png' : mapDef.thumbnail;
-  const filterStyle =
-    loadError && mapId === 'mapa1'
-      ? { filter: 'hue-rotate(240deg) saturate(1.5) brightness(0.95)' }
-      : loadError && mapId === 'mapa2'
-      ? { filter: 'sepia(0.85) hue-rotate(320deg) contrast(1.15)' }
-      : undefined;
-
   return (
     <button
       type="button"
@@ -331,10 +320,11 @@ const MapCardOption: React.FC<{
       {/* Map Thumbnail Image */}
       <div className="relative w-full h-28 overflow-hidden bg-stone-950">
         <img
-          src={imgSrc}
+          src={mapDef.thumbnail}
           alt={mapDef.name}
-          onError={() => setLoadError(true)}
-          style={filterStyle}
+          onError={() => {
+            logCantinaMapAssetError(mapId, 'thumbnail', mapDef.thumbnail);
+          }}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/20 to-transparent" />

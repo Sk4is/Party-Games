@@ -72,6 +72,7 @@ export function useCantinaSocket({
   const [remoteInteractions, setRemoteInteractions] = useState<
     Record<string, { interaction: HandInteractionType; hoveredIndex?: number }>
   >({});
+  const [cardPlayedEvent, setCardPlayedEvent] = useState<CardPlayedEventData | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const messageQueueRef = useRef<CantinaClientMessage[]>([]);
@@ -213,6 +214,7 @@ export function useCantinaSocket({
             },
           }));
         } else if (msg.type === 'CARD_PLAYED_EVENT') {
+          setCardPlayedEvent(msg);
           if (onCardPlayedEventRef.current) {
             onCardPlayedEventRef.current(msg);
           }
@@ -420,6 +422,7 @@ export function useCantinaSocket({
     errorMessage,
     notification,
     remoteInteractions,
+    cardPlayedEvent,
     createRoom,
     joinRoom,
     updateConfig,
