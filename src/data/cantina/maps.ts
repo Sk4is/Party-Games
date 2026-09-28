@@ -156,11 +156,11 @@ export function getSeatPovKey(seatIndex: number): CantinaPovKey {
  * Never silently substitutes another map.
  */
 export function logCantinaMapAssetError(
-  mapId: CantinaMapId,
+  mapId: CantinaMapId | string,
   povKey: CantinaPovKey | 'back' | 'thumbnail',
   resolvedSrc: string
 ) {
-  const mapDef = CANTINA_MAPS[mapId];
+  const mapDef = CANTINA_MAPS[mapId as CantinaMapId];
   const expectedFile = mapDef?.expectedFiles[povKey] || `assets/mapas/${mapId}/${povKey}.png`;
   console.error(
     `[CANTINA ASSET ERROR]\ntype: map\nmap: ${mapId}\npov: ${povKey}\nresolvedSrc: ${resolvedSrc}\nexpectedFile: ${expectedFile}`

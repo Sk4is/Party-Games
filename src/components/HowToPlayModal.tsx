@@ -423,20 +423,20 @@ const GAMES: GameGuide[] = [
   {
     id: 'la_cantina_del_farol',
     name: 'La Cantina del Farol',
-    icon: '🥃',
-    tagline: 'Faroles, acusaciones y ruleta rusa',
+    icon: '🏮',
+    tagline: 'Miente, acusa y juega tus cartas con sangre fría',
     playersBadge: '2–4 Jugadores',
-    typeBadge: 'Multijugador Online',
+    typeBadge: 'Engaño y Supervivencia',
     accent: {
-      primary: '#D97706',
-      contrastText: '#0a0f1d',
-      borderClass: 'border-[#D97706]/40',
-      glowColor: 'rgba(217, 119, 6, 0.18)',
+      primary: '#F59E0B',
+      contrastText: '#1c1917',
+      borderClass: 'border-[#F59E0B]/40',
+      glowColor: 'rgba(245, 158, 11, 0.18)',
       titleColor: 'text-[#FBBF24]',
-      iconBg: 'bg-[#D97706]/15',
-      iconBorder: 'border-[#D97706]/30',
-      numberBg: 'rgba(217, 119, 6, 0.18)',
-      numberColor: '#F59E0B',
+      iconBg: 'bg-[#F59E0B]/15',
+      iconBorder: 'border-[#F59E0B]/30',
+      numberBg: 'rgba(245, 158, 11, 0.18)',
+      numberColor: '#FBBF24',
       tagBg: 'bg-amber-500/10',
       tagBorder: 'border-amber-500/30',
       tagText: 'text-amber-300',
@@ -444,28 +444,28 @@ const GAMES: GameGuide[] = [
     rules: [
       {
         num: '01',
-        title: 'La Mesa y las Cartas Requeridas',
+        title: 'La Ley de la Mesa (Jotas, Reinas o Reyes)',
         content: (
           <p>
-            Al comenzar la ronda se determina la <strong className="text-white">carta requerida</strong> (Jotas, Reinas o Reyes) y cada tahonero recibe 5 cartas de una baraja de 20 cartas (6 J, 6 Q, 6 K y 2 Jokers comodín). En tu turno juegas de 1 a 3 cartas boca abajo en el montón central, afirmando que todas corresponden al rango de la mesa. Puedes decir la verdad o tirar un <strong>farol</strong>.
+            Al inicio de cada ronda se fija el rango de la mesa (<strong className="text-amber-300">J</strong>, <strong className="text-amber-300">Q</strong> o <strong className="text-amber-300">K</strong>) y cada jugador recibe <strong>5 cartas</strong>. En tu turno debes lanzar de <strong>1 a 3 cartas boca abajo</strong> asegurando que coinciden con la mesa (los Jokers actúan como comodín).
           </p>
         ),
       },
       {
         num: '02',
-        title: 'Llamar al Farol (Acusación)',
+        title: '¡Farol! Acusaciones a sangre fría',
         content: (
           <p>
-            El jugador activo puede pulsar <strong className="text-rose-400">¡FAROL!</strong> para desafiar la jugada inmediatamente anterior. Las cartas se voltean ante toda la cantina: si el acusado mintió, es pillado; si decía la verdad, el acusador habrá errado su acusación.
+            En lugar de jugar cartas, el siguiente jugador puede gritar <strong className="text-rose-400">«¡FAROL!»</strong> para destapar la última jugada. Si el jugador anterior mintió en alguna carta, él se enfrenta al tambor; si dijo la verdad, ¡quien acusó asume las consecuencias!
           </p>
         ),
       },
       {
         num: '03',
-        title: 'El Tambor del Revólver y el Modo Diablo',
+        title: 'La Ruleta Rusa y Modo Diablo',
         content: (
           <p>
-            El perdedor del duelo debe <strong className="text-white">apretar el gatillo</strong> del revólver (tambor de 6 recámaras con 1 bala). Si la recámara está vacía (¡clic!), sobrevive pero el riesgo aumenta. Si suena el disparo (¡bang!), queda <strong>eliminado</strong>. En <strong className="text-rose-400">Modo Diablo</strong>, la Carta del Diablo sirve como comodín, pero si se desvela condena a toda la cantina a apretar el gatillo.
+            Cada jugador tiene su propio tambor de <strong>6 recámaras con 1 bala</strong>. Cada fallo avanza tu tambor (1/6, 2/6...). En el <strong className="text-rose-400">Modo Diablo</strong> se añade una Carta del Diablo que obliga a todos los demás rivales vivos a apretar el gatillo si es revelada al acusar.
           </p>
         ),
       },
