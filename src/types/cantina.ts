@@ -1,16 +1,38 @@
-export type CantinaGameMode = 'CLASICO' | 'DIABLO';
+export type CantinaGameMode = 'CLASICO' | 'DIABLO' | 'CADENA';
 
 export type CantinaMapId = 'mapa1' | 'mapa2' | 'mapa3';
 
-// Only J, Q, K are table ranks (NO 'A'!)
+// Only J, Q, K are table ranks in Clásico / Diablo (NO 'A'!)
 export type TableRank = 'J' | 'Q' | 'K';
 
-// Cards can be J, Q, K, JOKER, or DIABLO
-export type CardRank = 'J' | 'Q' | 'K' | 'JOKER' | 'DIABLO';
+// Numeric ranks for Cadena mode (1 through 10)
+export type NumericCardRank =
+  | '1'
+  | '2'
+  | '3'
+  | '4'
+  | '5'
+  | '6'
+  | '7'
+  | '8'
+  | '9'
+  | '10';
+
+// Cards can be 1..10, J, Q, K, JOKER, BOMBA, ESPEJO, or DIABLO
+export type CardRank =
+  | NumericCardRank
+  | 'J'
+  | 'Q'
+  | 'K'
+  | 'JOKER'
+  | 'BOMBA'
+  | 'ESPEJO'
+  | 'DIABLO';
 
 export interface Card {
   id: string;
   rank: CardRank;
+  substitutedNumber?: number; // 1..10 when a JOKER bridges a number in CADENA mode
 }
 
 export type CantinaPhase =
@@ -32,6 +54,15 @@ export interface CantinaPlayerRevolverState {
   firedChambers: number[]; // Chamber indices (0..5) already tested by this player
 }
 
+export type ReflectableSpecialType = 'J' | 'Q' | 'K' | 'BOMBA';
+
+export interface ReflectableEffect {
+  type: ReflectableSpecialType;
+  sourcePlayerId: string;
+  sourcePlayerName: string;
+  timestamp: number;
+}
+
 export interface CantinaPlayer {
   id: string;
   name: string;
@@ -48,6 +79,8 @@ export interface CantinaPlayer {
   revolver?: CantinaPlayerRevolverState;
   isEliminated: boolean;
   eliminatedRound?: number;
+  // Cadena mode per-player state
+  lastReflectableEffectReceived?: ReflectableEffect | null;
 }
 
 export interface PlayedTurn {
@@ -55,7 +88,7 @@ export interface PlayedTurn {
   playerName: string;
   cardsCount: number;
   claimedRank: TableRank;
-  cards?: Card[]; // Only revealed during REVELACION
+  cards?: Card[]; // Revealed in Cadena mode or during REVELACION in Clásico/Diablo
   timestamp: number;
   playId: string;
 }
@@ -66,6 +99,7 @@ export interface CenterPileItem {
   playerName: string;
   cardsCount: number;
   claimedRank: TableRank;
+  cards?: Card[]; // In CADENA mode, center pile cards are face-up!
   timestamp: number;
 }
 
@@ -117,6 +151,97 @@ export interface RouletteResult {
   shots: SingleShotResult[];
 }
 
+export type CadenaTurnSubPhase =
+  | 'NORMAL'
+  | 'DRAWN_DECISION'
+  | 'K_STEAL_PICK'
+  | 'K_FOLLOWUP_CHAIN'
+  | 'BOMB_SELECT_TARGET'
+  | 'BOMB_PASS_TARGET';
+
+export interface CadenaUltimaWindow {
+  eventId: string;
+  targetPlayerId: string;
+  targetPlayerName: string;
+  declared: boolean;
+  caughtByPlayerId: string | null;
+  caughtByPlayerName: string | null;
+  resolved: boolean;
+  deadlineMs: number;
+}
+
+export interface CadenaVisualEvent {
+  eventId: string;
+  kind:
+    | 'CHAIN_PLAYED'
+    | 'J_SKIP'
+    | 'Q_REVERSE'
+    | 'K_STEAL'
+    | 'BOMB_PLACED'
+    | 'BOMB_DEFUSED'
+    | 'BOMB_TICK'
+    | 'BOMB_EXPLODED'
+    | 'MIRROR_REFLECTED'
+    | 'ULTIMA_DECLARED'
+    | 'ULTIMA_CAUGHT'
+    | 'ULTIMA_FALSE_ACCUSATION';
+  actorPlayerId: string;
+  actorPlayerName: string;
+  targetPlayerId?: string;
+  targetPlayerName?: string;
+  reflectedType?: ReflectableSpecialType;
+  chainNumbers?: number[];
+  turnsRemaining?: number;
+  text: string;
+  timestamp: number;
+}
+
+export type CadenaDrawReason =
+  | 'NORMAL_DRAW'
+  | 'ULTIMA_PENALTY'
+  | 'FALSE_ULTIMA_PENALTY'
+  | 'BOMB_EXPLOSION';
+
+export interface CadenaDrawEventData {
+  eventId: string;
+  playerId: string;
+  playerName: string;
+  count: number;
+  reason: CadenaDrawReason;
+  reshuffled: boolean;
+  reshuffledCount: number;
+  drawPileCountBefore: number;
+  drawPileCountAfter: number;
+  drawnCards?: Card[]; // Strictly provided ONLY to the player who drew the cards; undefined for opponents
+  timestamp: number;
+}
+
+export interface CadenaRoomState {
+  currentNumber: number; // 1..10
+  turnDirection: 1 | -1; // 1 = normal/clockwise, -1 = reversed/counter-clockwise
+  drawPileCount: number;
+  discardPileCount: number;
+  topCard: Card | null;
+  turnSubPhase: CadenaTurnSubPhase;
+  // When activePlayer draws 1 card and it is playable:
+  drawnCardId: string | null;
+  // When activePlayer plays K (or reflects K) and is picking a rival's face-down card:
+  stealTargetPlayerId: string | null;
+  // When activePlayer just stole a card with K:
+  stolenCardId: string | null;
+  stolenCard?: Card | null; // Only populated for the thief!
+  // Bomb state:
+  bombHolderPlayerId: string | null;
+  bombHolderPlayerName: string | null;
+  bombTurnsRemaining: number; // 3, 2, 1, or 0 when inactive
+  // ¡ÚLTIMA! declaration / catch window:
+  ultimaWindow: CadenaUltimaWindow | null;
+  // Latest visual event for table animations (Bomb flight, Mirror flash, K steal, etc.)
+  lastEvent: CadenaVisualEvent | null;
+  // Latest authoritative draw event for physical deck-to-player draw & reshuffle animations
+  lastDrawEvent?: CadenaDrawEventData | null;
+}
+
 export interface CantinaConfig {
   mode: CantinaGameMode;
   mapId: CantinaMapId;
@@ -138,7 +263,7 @@ export interface CantinaRoomState {
   phase: CantinaPhase;
   config: CantinaConfig;
   currentRound: number;
-  tableRank: TableRank; // Current round required rank (J, Q, K)
+  tableRank: TableRank; // Current round required rank in Clásico/Diablo (J, Q, K)
   roundStartEventId?: string;
   roundStartingPlayerId?: string | null;
   roundStartingPlayerName?: string | null;
@@ -151,6 +276,7 @@ export interface CantinaRoomState {
   lastPlay: PlayedTurn | null;
   challengeResult: ChallengeResult | null;
   rouletteResult: RouletteResult | null;
+  cadenaState?: CadenaRoomState | null;
   winnerPlayerId: string | null;
   winnerName: string | null;
   rematchReadyPlayerIds?: string[];
@@ -182,6 +308,7 @@ export interface DealCardsEventData {
   startingPlayerId: string;
   startingPlayerName: string;
   tableRank: TableRank;
+  cardsPerPlayer?: number;
 }
 
 // Client to Server Messages
@@ -199,7 +326,16 @@ export type CantinaClientMessage =
   | { type: 'RESTART_MATCH' }
   | { type: 'RETURN_TO_LOBBY' }
   | { type: 'LEAVE_ROOM' }
-  | { type: 'HAND_INTERACTION'; interaction: HandInteractionType; hoveredIndex?: number };
+  | { type: 'HAND_INTERACTION'; interaction: HandInteractionType; hoveredIndex?: number }
+  // Cadena Mode Actions:
+  | { type: 'CADENA_PLAY_CHAIN'; cardIds: string[]; playId?: string }
+  | { type: 'CADENA_PLAY_SPECIAL'; cardId: string; targetPlayerId?: string; playId?: string }
+  | { type: 'CADENA_DRAW_CARD' }
+  | { type: 'CADENA_END_TURN' }
+  | { type: 'CADENA_STEAL_CARD'; targetPlayerId: string; slotIndex: number }
+  | { type: 'CADENA_SELECT_BOMB_TARGET'; targetPlayerId: string }
+  | { type: 'CADENA_DECLARE_ULTIMA' }
+  | { type: 'CADENA_CATCH_ULTIMA' };
 
 // Server to Client Messages
 export type CantinaServerMessage =
@@ -207,6 +343,6 @@ export type CantinaServerMessage =
   | { type: 'ERROR'; message: string }
   | { type: 'NOTIFICATION'; text: string; variant?: 'info' | 'warning' | 'danger' | 'success' }
   | { type: 'PLAYER_HAND_INTERACTION'; playerId: string; interaction: HandInteractionType; hoveredIndex?: number }
-  | { type: 'CARD_PLAYED_EVENT'; playerId: string; playerName: string; cardsCount: number; playId: string; claimedRank: TableRank }
-  | { type: 'DEAL_CARDS_EVENT'; round: number; roundStartEventId: string; startingPlayerId: string; startingPlayerName: string; tableRank: TableRank }
+  | { type: 'CARD_PLAYED_EVENT'; playerId: string; playerName: string; cardsCount: number; playId: string; claimedRank: TableRank; cards?: Card[] }
+  | { type: 'DEAL_CARDS_EVENT'; round: number; roundStartEventId: string; startingPlayerId: string; startingPlayerName: string; tableRank: TableRank; cardsPerPlayer?: number }
   | { type: 'ROULETTE_SPIN_EVENT'; rouletteEventId: string; playerId: string; velocity: number; angle: number; spinId: string; settled?: boolean };

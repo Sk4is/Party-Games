@@ -10,6 +10,7 @@ class AudioManager {
   private volume: number = 0.85;
   private fuseOsc: OscillatorNode | null = null;
   private fuseGain: GainNode | null = null;
+  private lastInvalidCardSfxMs: number = 0;
 
   constructor() {
     // Load local UI audio preferences from localStorage if available
@@ -1896,6 +1897,219 @@ class AudioManager {
 
   public playRevolverClick() {
     this.playRelayLatch();
+  }
+
+  public playMirrorReflect() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    [880, 1318.51, 1760, 2093].forEach((freq, i) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + i * 0.035;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.12, start + 0.14);
+      gain.gain.setValueAtTime(0.14, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.16);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.17);
+    });
+  }
+
+  public playBombTick() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(740, now);
+    osc.frequency.exponentialRampToValueAtTime(320, now + 0.06);
+    gain.gain.setValueAtTime(0.16, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.075);
+  }
+
+  public playBombDefuse() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    [523.25, 659.25, 783.99].forEach((freq, idx) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + idx * 0.06;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.16, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.18);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.19);
+    });
+  }
+
+  public playUltimaDeclare() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    [587.33, 880, 1174.66].forEach((freq, idx) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + idx * 0.05;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.22, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.24);
+    });
+  }
+
+  /**
+   * Short, non-annoying muted "nope / thunk" error SFX for invalid card clicks in Cadena mode.
+   * Includes a 190ms cooldown (150-250ms) so rapid clicking never creates overlapping audio.
+   */
+  public playInvalidCardFeedback() {
+    if (this.isMuted) return;
+    const nowWall = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (nowWall - this.lastInvalidCardSfxMs < 190) {
+      return;
+    }
+    this.lastInvalidCardSfxMs = nowWall;
+
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+
+    // First muted wooden thunk
+    const osc1 = this.ctx.createOscillator();
+    const gain1 = this.ctx.createGain();
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(210, now);
+    osc1.frequency.exponentialRampToValueAtTime(118, now + 0.055);
+    gain1.gain.setValueAtTime(0.15, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    osc1.connect(gain1);
+    gain1.connect(this.ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.065);
+
+    // Second slightly lower muted "nope" tap
+    const osc2 = this.ctx.createOscillator();
+    const gain2 = this.ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(158, now + 0.048);
+    osc2.frequency.exponentialRampToValueAtTime(92, now + 0.115);
+    gain2.gain.setValueAtTime(0.14, now + 0.048);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc2.connect(gain2);
+    gain2.connect(this.ctx.destination);
+    osc2.start(now + 0.048);
+    osc2.stop(now + 0.125);
+  }
+
+  /**
+   * Short physical card riffle/gather sound when the discard pile reshuffles into the draw deck.
+   */
+  public playDeckReshuffle() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    for (let i = 0; i < 6; i++) {
+      setTimeout(() => {
+        this.playCardDealt();
+      }, i * 68);
+    }
+  }
+
+  /**
+   * Celebratory warm Cantina victory sting for the local winner in Cadena mode.
+   */
+  public playCadenaVictory() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const notes = [
+      { f: 523.25, t: 0.0, d: 0.14 }, // C5
+      { f: 659.25, t: 0.09, d: 0.14 }, // E5
+      { f: 783.99, t: 0.18, d: 0.16 }, // G5
+      { f: 987.77, t: 0.28, d: 0.18 }, // B5
+      { f: 1046.5, t: 0.38, d: 0.55 }, // C6
+    ];
+
+    notes.forEach((n) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + n.t;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(n.f, start);
+      gain.gain.setValueAtTime(0.2, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + n.d);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(start);
+      osc.stop(start + n.d + 0.02);
+    });
+  }
+
+  /**
+   * Playful saloon defeat sting for a local player who lost in Cadena mode.
+   */
+  public playCadenaDefeat() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const notes = [
+      { f: 392.0, t: 0.0, d: 0.15 }, // G4
+      { f: 369.99, t: 0.14, d: 0.15 }, // F#4
+      { f: 349.23, t: 0.28, d: 0.16 }, // F4
+      { f: 293.66, t: 0.44, d: 0.42 }, // D4
+    ];
+
+    notes.forEach((n, idx) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + n.t;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(n.f, start);
+      if (idx === notes.length - 1) {
+        osc.frequency.exponentialRampToValueAtTime(n.f * 0.92, start + n.d);
+      }
+      gain.gain.setValueAtTime(0.16, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + n.d);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(start);
+      osc.stop(start + n.d + 0.02);
+    });
   }
 }
 

@@ -76,6 +76,14 @@ export const CantinaGame: React.FC<CantinaGameProps> = ({
     returnToLobby,
     leaveRoom,
     sendHandInteraction,
+    cadenaPlayChain,
+    cadenaPlaySpecial,
+    cadenaDrawCard,
+    cadenaEndTurn,
+    cadenaStealCard,
+    cadenaSelectBombTarget,
+    cadenaDeclareUltima,
+    cadenaCatchUltima,
   } = useCantinaSocket({
     player,
     initialRoomCode,
@@ -181,6 +189,14 @@ export const CantinaGame: React.FC<CantinaGameProps> = ({
           onReturnToLobby={returnToLobby}
           onLeaveRoom={handleLeaveAndBack}
           onSendHandInteraction={sendHandInteraction}
+          onCadenaPlayChain={cadenaPlayChain}
+          onCadenaPlaySpecial={cadenaPlaySpecial}
+          onCadenaDrawCard={cadenaDrawCard}
+          onCadenaEndTurn={cadenaEndTurn}
+          onCadenaStealCard={cadenaStealCard}
+          onCadenaSelectBombTarget={cadenaSelectBombTarget}
+          onCadenaDeclareUltima={cadenaDeclareUltima}
+          onCadenaCatchUltima={cadenaCatchUltima}
         />
       </div>
     );

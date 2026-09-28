@@ -9,7 +9,7 @@ export type CantinaPovKey = 'pov1' | 'pov2' | 'pov3' | 'pov4';
 
 export const CANTINA_ASSET_BASE = '/assets/cantina';
 
-export const CANTINA_CARD_ASSETS = {
+export const CANTINA_CARD_ASSETS: Record<string | number, string> = {
   1: `${CANTINA_ASSET_BASE}/carta1.png`,
   2: `${CANTINA_ASSET_BASE}/carta2.png`,
   3: `${CANTINA_ASSET_BASE}/carta3.png`,
@@ -26,9 +26,11 @@ export const CANTINA_CARD_ASSETS = {
   K: `${CANTINA_ASSET_BASE}/cartak.png`,
 
   JOKER: `${CANTINA_ASSET_BASE}/joker.png`,
+  BOMBA: `${CANTINA_ASSET_BASE}/bomba.png`,
+  ESPEJO: `${CANTINA_ASSET_BASE}/espejo.png`,
   DEVIL: `${CANTINA_ASSET_BASE}/diablo.png`,
   DIABLO: `${CANTINA_ASSET_BASE}/diablo.png`,
-} as const;
+};
 
 export interface CantinaMapDefinition {
   id: CantinaMapId;

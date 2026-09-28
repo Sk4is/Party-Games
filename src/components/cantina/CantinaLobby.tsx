@@ -357,21 +357,21 @@ export const CantinaLobby: React.FC<CantinaLobbyProps> = ({
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               {/* Option 1: CLÁSICO */}
               <button
                 type="button"
                 disabled={!isHost}
                 onClick={() => onUpdateConfig({ mode: 'CLASICO' })}
-                className={`relative p-4 sm:p-5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2.5 ${
+                className={`relative p-4 rounded-xl border text-left transition-all flex flex-col justify-between gap-2 ${
                   currentMode === 'CLASICO'
                     ? 'bg-gradient-to-br from-amber-950/55 via-stone-900/95 to-stone-950 border-amber-400 shadow-[0_8px_25px_rgba(245,158,11,0.18)] ring-1 ring-amber-400/50'
                     : 'bg-stone-950/65 border-stone-800 hover:border-stone-700'
                 } ${isHost ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-black text-amber-200 tracking-wider font-serif">
-                    MODO CLÁSICO
+                  <span className="text-sm sm:text-base font-black text-amber-200 tracking-wider font-serif">
+                    CLÁSICO
                   </span>
                   {currentMode === 'CLASICO' && (
                     <span className="px-2 py-0.5 rounded-full bg-amber-400 text-stone-950 text-[10px] font-black uppercase tracking-wider">
@@ -392,15 +392,15 @@ export const CantinaLobby: React.FC<CantinaLobbyProps> = ({
                 type="button"
                 disabled={!isHost}
                 onClick={() => onUpdateConfig({ mode: 'DIABLO' })}
-                className={`relative p-4 sm:p-5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2.5 ${
+                className={`relative p-4 rounded-xl border text-left transition-all flex flex-col justify-between gap-2 ${
                   currentMode === 'DIABLO'
                     ? 'bg-gradient-to-br from-rose-950/60 via-stone-900/95 to-stone-950 border-rose-500 shadow-[0_8px_25px_rgba(244,63,94,0.22)] ring-1 ring-rose-500/50'
                     : 'bg-stone-950/65 border-stone-800 hover:border-stone-700'
                 } ${isHost ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-black text-rose-300 tracking-wider font-serif flex items-center gap-1.5">
-                    MODO DIABLO <Sparkles className="w-3.5 h-3.5 text-rose-400" />
+                  <span className="text-sm sm:text-base font-black text-rose-300 tracking-wider font-serif flex items-center gap-1.5">
+                    DIABLO <Sparkles className="w-3.5 h-3.5 text-rose-400" />
                   </span>
                   {currentMode === 'DIABLO' && (
                     <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black uppercase tracking-wider">
@@ -413,6 +413,35 @@ export const CantinaLobby: React.FC<CantinaLobbyProps> = ({
                 </p>
                 <div className="pt-1 border-t border-stone-800/80 text-[10px] font-bold text-rose-400/90 uppercase tracking-wider">
                   20 cartas (1 carta real pasa a ser El Diablo)
+                </div>
+              </button>
+
+              {/* Option 3: CADENA */}
+              <button
+                type="button"
+                disabled={!isHost}
+                onClick={() => onUpdateConfig({ mode: 'CADENA' })}
+                className={`relative p-4 rounded-xl border text-left transition-all flex flex-col justify-between gap-2 ${
+                  currentMode === 'CADENA'
+                    ? 'bg-gradient-to-br from-amber-950/65 via-stone-900/95 to-stone-950 border-amber-400 shadow-[0_8px_25px_rgba(245,158,11,0.24)] ring-1 ring-amber-400/60'
+                    : 'bg-stone-950/65 border-stone-800 hover:border-stone-700'
+                } ${isHost ? 'cursor-pointer' : 'cursor-default'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm sm:text-base font-black text-amber-200 tracking-wider font-serif">
+                    CADENA
+                  </span>
+                  {currentMode === 'CADENA' && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-400 text-stone-950 text-[10px] font-black uppercase tracking-wider">
+                      Activo
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-stone-300 leading-relaxed">
+                  Conecta números, crea cadenas y usa poderes para dejar a tus rivales sin respuesta.
+                </p>
+                <div className="pt-1 border-t border-stone-800/80 text-[10px] font-bold text-amber-400/90 uppercase tracking-wider">
+                  NÚMEROS &middot; COMBOS &middot; PODERES
                 </div>
               </button>
             </div>

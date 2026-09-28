@@ -6,6 +6,7 @@ import {
   CantinaClientMessage,
   HandInteractionType,
   TableRank,
+  Card,
   DealCardsEventData,
   RouletteSpinEventData,
 } from '../types/cantina';
@@ -32,6 +33,7 @@ export interface CardPlayedEventData {
   cardsCount: number;
   playId: string;
   claimedRank: TableRank;
+  cards?: Card[];
 }
 
 interface UseCantinaSocketOptions {
@@ -229,6 +231,7 @@ export function useCantinaSocket({
             startingPlayerId: msg.startingPlayerId,
             startingPlayerName: msg.startingPlayerName,
             tableRank: msg.tableRank,
+            cardsPerPlayer: msg.cardsPerPlayer,
           });
           if (onDealCardsEventRef.current) {
             onDealCardsEventRef.current(msg.round, {
@@ -237,6 +240,7 @@ export function useCantinaSocket({
               startingPlayerId: msg.startingPlayerId,
               startingPlayerName: msg.startingPlayerName,
               tableRank: msg.tableRank,
+              cardsPerPlayer: msg.cardsPerPlayer,
             });
           }
         } else if (msg.type === 'ROULETTE_SPIN_EVENT') {
@@ -434,6 +438,51 @@ export function useCantinaSocket({
     sendMessage({ type: 'RETURN_TO_LOBBY' });
   }, [sendMessage]);
 
+  // Cadena Mode Actions:
+  const cadenaPlayChain = useCallback(
+    (cardIds: string[], playId?: string) => {
+      sendMessage({ type: 'CADENA_PLAY_CHAIN', cardIds, playId });
+    },
+    [sendMessage]
+  );
+
+  const cadenaPlaySpecial = useCallback(
+    (cardId: string, targetPlayerId?: string, playId?: string) => {
+      sendMessage({ type: 'CADENA_PLAY_SPECIAL', cardId, targetPlayerId, playId });
+    },
+    [sendMessage]
+  );
+
+  const cadenaDrawCard = useCallback(() => {
+    sendMessage({ type: 'CADENA_DRAW_CARD' });
+  }, [sendMessage]);
+
+  const cadenaEndTurn = useCallback(() => {
+    sendMessage({ type: 'CADENA_END_TURN' });
+  }, [sendMessage]);
+
+  const cadenaStealCard = useCallback(
+    (targetPlayerId: string, slotIndex: number) => {
+      sendMessage({ type: 'CADENA_STEAL_CARD', targetPlayerId, slotIndex });
+    },
+    [sendMessage]
+  );
+
+  const cadenaSelectBombTarget = useCallback(
+    (targetPlayerId: string) => {
+      sendMessage({ type: 'CADENA_SELECT_BOMB_TARGET', targetPlayerId });
+    },
+    [sendMessage]
+  );
+
+  const cadenaDeclareUltima = useCallback(() => {
+    sendMessage({ type: 'CADENA_DECLARE_ULTIMA' });
+  }, [sendMessage]);
+
+  const cadenaCatchUltima = useCallback(() => {
+    sendMessage({ type: 'CADENA_CATCH_ULTIMA' });
+  }, [sendMessage]);
+
   const leaveRoom = useCallback(() => {
     isManuallyClosedRef.current = true;
     clearReconnectTimer();
@@ -497,5 +546,13 @@ export function useCantinaSocket({
     returnToLobby,
     leaveRoom,
     sendHandInteraction,
+    cadenaPlayChain,
+    cadenaPlaySpecial,
+    cadenaDrawCard,
+    cadenaEndTurn,
+    cadenaStealCard,
+    cadenaSelectBombTarget,
+    cadenaDeclareUltima,
+    cadenaCatchUltima,
   };
 }
