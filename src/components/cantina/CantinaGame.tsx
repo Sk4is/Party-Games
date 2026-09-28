@@ -203,9 +203,12 @@ export const CantinaGame: React.FC<CantinaGameProps> = ({
       </div>
 
       <div className="relative z-10 w-full max-w-md bg-stone-900/90 border border-amber-800/40 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-md flex flex-col items-center gap-6">
-        {/* Cantina Logo / Icon */}
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-600 via-amber-700 to-stone-900 border border-amber-500/50 flex items-center justify-center text-4xl shadow-2xl shadow-amber-600/30">
-          🥃
+        {/* Cantina Lantern Logo / Icon */}
+        <div className="relative">
+          <div className="absolute -inset-3 rounded-full bg-amber-500/25 blur-xl pointer-events-none" />
+          <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-500/30 via-amber-800/40 to-stone-950 border border-amber-400/60 flex items-center justify-center text-4xl shadow-[0_0_35px_rgba(245,158,11,0.35)]">
+            🏮
+          </div>
         </div>
 
         <div className="text-center">

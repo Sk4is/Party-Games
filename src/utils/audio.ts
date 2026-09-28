@@ -1,24 +1,80 @@
 // Sound synthesizer using standard Web Audio API for 100% reliable zero-dependency sound effects
 
+const CANTINA_VOLUME_STORAGE_KEY = 'fam2play_cantina_volume';
+const CANTINA_MUTED_STORAGE_KEY = 'fam2play_cantina_muted';
+
 class AudioManager {
   private ctx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
   private isMuted: boolean = false;
+  private volume: number = 0.85;
   private fuseOsc: OscillatorNode | null = null;
   private fuseGain: GainNode | null = null;
 
   constructor() {
-    // AudioContext will be initialized on first user interaction
+    // Load local UI audio preferences from localStorage if available
+    if (typeof window !== 'undefined') {
+      try {
+        const savedVolume = localStorage.getItem(CANTINA_VOLUME_STORAGE_KEY);
+        if (savedVolume !== null) {
+          const parsed = parseFloat(savedVolume);
+          if (Number.isFinite(parsed)) {
+            this.volume = Math.max(0, Math.min(1, parsed));
+          }
+        }
+        const savedMuted = localStorage.getItem(CANTINA_MUTED_STORAGE_KEY);
+        if (savedMuted !== null) {
+          this.isMuted = savedMuted === 'true';
+        }
+      } catch {}
+    }
   }
 
   private initContext() {
     if (!this.ctx && typeof window !== 'undefined') {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
       if (AudioCtx) {
-        this.ctx = new AudioCtx();
+        const rawCtx = new AudioCtx();
+        const realDestination = rawCtx.destination;
+        const master = rawCtx.createGain();
+        master.gain.value = this.isMuted ? 0 : this.volume;
+        master.connect(realDestination);
+
+        try {
+          Object.defineProperty(rawCtx, 'destination', {
+            get: () => master,
+            configurable: true,
+          });
+        } catch {}
+
+        this.ctx = rawCtx;
+        this.masterGain = master;
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
+    }
+    this.syncMasterGain();
+  }
+
+  private syncMasterGain() {
+    if (this.masterGain && this.ctx) {
+      try {
+        const effectiveGain = this.isMuted ? 0 : this.volume;
+        this.masterGain.gain.setValueAtTime(effectiveGain, this.ctx.currentTime);
+      } catch {}
+    }
+  }
+
+  private persistPreferences() {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(CANTINA_VOLUME_STORAGE_KEY, String(this.volume));
+        localStorage.setItem(CANTINA_MUTED_STORAGE_KEY, String(this.isMuted));
+      } catch {}
     }
   }
 
@@ -27,7 +83,9 @@ class AudioManager {
     if (this.isMuted) {
       this.stopFuseLoop();
     }
+    this.syncMasterGain();
     this.updateRainGain();
+    this.persistPreferences();
     return !this.isMuted;
   }
 
@@ -36,11 +94,31 @@ class AudioManager {
     if (this.isMuted) {
       this.stopFuseLoop();
     }
+    this.syncMasterGain();
     this.updateRainGain();
+    this.persistPreferences();
   }
 
   public getIsMuted(): boolean {
     return this.isMuted;
+  }
+
+  public setVolume(newVolume: number) {
+    const clamped = Math.max(0, Math.min(1, Number.isFinite(newVolume) ? newVolume : 0.85));
+    this.volume = clamped;
+    if (clamped > 0 && this.isMuted) {
+      this.isMuted = false;
+    } else if (clamped === 0) {
+      this.isMuted = true;
+    }
+    this.initContext();
+    this.syncMasterGain();
+    this.updateRainGain();
+    this.persistPreferences();
+  }
+
+  public getVolume(): number {
+    return this.volume;
   }
 
   // Sizzling / ticking fuse sound effect

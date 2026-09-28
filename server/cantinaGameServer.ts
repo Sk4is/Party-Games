@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import {
   CantinaRoomState,
   CantinaPlayer,
+  CantinaPlayerRevolverState,
   CantinaConfig,
   CantinaClientMessage,
   CantinaServerMessage,
@@ -64,6 +65,68 @@ function shuffle<T>(array: T[]): T[] {
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
+}
+
+/**
+ * Snaps any cylinder angle in degrees to the nearest 60° chamber detent.
+ */
+function snapAngleToChamber(angle: number): number {
+  const finite = Number.isFinite(angle) ? angle : 0;
+  return Math.round(finite / 60) * 60;
+}
+
+/**
+ * Returns which chamber index (0..5) is physically located at 12 o'clock (-90°)
+ * for a given cylinder rotation angle in degrees:
+ *   chamber 0 = -90° (at 12 o'clock when angle = 0°)
+ *   chamber idx sits at -90° + idx * 60° + angle
+ *   => at 12 o'clock when idx ≡ -Math.round(angle / 60) (mod 6)
+ */
+function getTopChamberIndexFromAngle(angle: number): number {
+  const steps = -Math.round((Number.isFinite(angle) ? angle : 0) / 60);
+  return ((steps % 6) + 6) % 6;
+}
+
+function createInitialRevolverState(): CantinaPlayerRevolverState {
+  return {
+    chambers: 6,
+    currentRotation: 0,
+    topChamberIndex: 0,
+    shotsTaken: 0,
+    firedChambers: [],
+  };
+}
+
+function ensurePlayerRevolver(player: CantinaPlayer): CantinaPlayerRevolverState {
+  if (!player.revolver) {
+    player.revolver = {
+      chambers: 6,
+      currentRotation: -player.chamberPulls * 60,
+      topChamberIndex: ((player.chamberPulls % 6) + 6) % 6,
+      shotsTaken: player.chamberPulls,
+      firedChambers: Array.from({ length: Math.min(6, player.chamberPulls) }, (_, i) => i),
+    };
+  }
+  return player.revolver;
+}
+
+/**
+ * Advances a player's personal revolver rotation by -60° steps until the chamber at 12 o'clock
+ * is an untested chamber (used between rounds/turns, NEVER after pressing DISPARAR).
+ */
+function advanceRevolverToNextUntestedChamber(player: CantinaPlayer) {
+  const rev = ensurePlayerRevolver(player);
+  if (rev.firedChambers.length >= 6) return;
+  let angle = snapAngleToChamber(rev.currentRotation);
+  for (let i = 0; i < 6; i++) {
+    const candidateIdx = getTopChamberIndexFromAngle(angle);
+    if (!rev.firedChambers.includes(candidateIdx)) {
+      rev.currentRotation = angle;
+      rev.topChamberIndex = candidateIdx;
+      return;
+    }
+    angle -= 60;
+  }
 }
 
 export class CantinaServer {
@@ -142,6 +205,7 @@ export class CantinaServer {
       hand: [],
       chamberPulls: 0,
       bulletChamber: Math.floor(Math.random() * 6),
+      revolver: createInitialRevolverState(),
       isEliminated: false,
     };
 
@@ -220,6 +284,7 @@ export class CantinaServer {
           hand: [],
           chamberPulls: 0,
           bulletChamber: Math.floor(Math.random() * 6),
+          revolver: createInitialRevolverState(),
           isEliminated: false,
         };
         room.players.push(player);
@@ -375,17 +440,31 @@ export class CantinaServer {
           return;
         }
 
+        const shooter = room.players.find((p) => p.id === conn.playerId);
+        if (!shooter) return;
+        const rev = ensurePlayerRevolver(shooter);
+
         const safeVel = Math.max(-75, Math.min(75, Number(msg.velocity) || 0));
-        const safeAngle = Number(msg.angle) || 0;
+        const rawAngle = Number(msg.angle) || 0;
+        const settled = Boolean(msg.settled) || Math.abs(safeVel) < 0.08;
+        const effectiveAngle = settled ? snapAngleToChamber(rawAngle) : rawAngle;
+        const topIdx = getTopChamberIndexFromAngle(effectiveAngle);
         const spinId = String(msg.spinId || `spin_${Date.now()}`);
+
+        // Authoritatively update this player's personal revolver orientation
+        rev.currentRotation = snapAngleToChamber(effectiveAngle);
+        rev.topChamberIndex = topIdx;
+        room.rouletteResult.cylinderAngle = effectiveAngle;
+        room.rouletteResult.firedChamberIndex = topIdx;
 
         this.broadcastEventExcept(room.code, conn.playerId, {
           type: 'ROULETTE_SPIN_EVENT',
           rouletteEventId: room.rouletteResult.rouletteEventId,
           playerId: conn.playerId,
-          velocity: safeVel,
-          angle: safeAngle,
+          velocity: settled ? 0 : safeVel,
+          angle: effectiveAngle,
           spinId,
+          settled,
         });
         break;
       }
@@ -521,7 +600,7 @@ export class CantinaServer {
     room.centerPileCount = 0;
     room.centerPileHistory = [];
 
-    // Reset all players
+    // Reset all players for the new match (each player gets their own personal 6-chamber revolver)
     room.players.forEach((p, idx) => {
       p.seatIndex = idx;
       p.isAlive = true;
@@ -529,6 +608,7 @@ export class CantinaServer {
       p.eliminatedRound = undefined;
       p.chamberPulls = 0;
       p.bulletChamber = Math.floor(Math.random() * 6);
+      p.revolver = createInitialRevolverState();
       p.cardsCount = 0;
       p.hand = [];
     });
@@ -877,6 +957,10 @@ export class CantinaServer {
     room.phase = 'RULETA';
     const rouletteEventId = `roul_${room.code}_r${room.currentRound}_s${stepIndex}_${Date.now()}`;
 
+    // Load THIS shooter's personal 6-chamber revolver (never shared with other players)
+    advanceRevolverToNextUntestedChamber(shooter);
+    const shooterRevolver = ensurePlayerRevolver(shooter);
+
     room.rouletteResult = {
       rouletteEventId,
       shotEventId: null,
@@ -884,8 +968,11 @@ export class CantinaServer {
       totalSteps: queuePlayerIds.length,
       targetPlayerId: shooter.id,
       targetPlayerName: shooter.name,
-      chamberPullsBefore: shooter.chamberPulls,
-      chamberNumber: shooter.chamberPulls + 1,
+      chamberPullsBefore: shooterRevolver.shotsTaken,
+      chamberNumber: Math.min(6, shooterRevolver.shotsTaken + 1),
+      cylinderAngle: shooterRevolver.currentRotation,
+      firedChamberIndex: shooterRevolver.topChamberIndex,
+      firedChambersBefore: [...shooterRevolver.firedChambers],
       shotResolved: false,
       fired: false,
       isFatal: false,
@@ -928,10 +1015,23 @@ export class CantinaServer {
     const shooter = room.players.find((p) => p.id === playerId);
     if (!shooter) return;
 
-    // Server-authoritative bullet evaluation
-    const pull = shooter.chamberPulls;
-    const fired = pull === shooter.bulletChamber;
-    shooter.chamberPulls += 1;
+    const shooterRevolver = ensurePlayerRevolver(shooter);
+
+    // CRITICAL: Pressing DISPARAR performs ZERO additional cylinder rotation.
+    // Evaluate the exact chamber currently physically aligned at 12 o'clock on shooter's personal revolver.
+    const restingAngle = snapAngleToChamber(shooterRevolver.currentRotation);
+    const firedChamberIndex = getTopChamberIndexFromAngle(restingAngle);
+    shooterRevolver.currentRotation = restingAngle;
+    shooterRevolver.topChamberIndex = firedChamberIndex;
+
+    const pullsBefore = shooterRevolver.shotsTaken;
+    const fired = firedChamberIndex === shooter.bulletChamber;
+
+    if (!shooterRevolver.firedChambers.includes(firedChamberIndex)) {
+      shooterRevolver.firedChambers.push(firedChamberIndex);
+    }
+    shooterRevolver.shotsTaken = Math.min(6, shooterRevolver.firedChambers.length);
+    shooter.chamberPulls = shooterRevolver.shotsTaken;
 
     if (fired) {
       shooter.isAlive = false;
@@ -945,7 +1045,7 @@ export class CantinaServer {
       playerId: shooter.id,
       playerName: shooter.name,
       fired,
-      chamberNumber: pull + 1,
+      chamberNumber: Math.min(6, pullsBefore + 1),
       survived: !fired,
     };
 
@@ -957,7 +1057,9 @@ export class CantinaServer {
     room.rouletteResult = {
       ...room.rouletteResult,
       shotEventId: `shot_${rouletteEventId}_${Date.now()}`,
-      chamberNumber: pull + 1,
+      chamberNumber: Math.min(6, pullsBefore + 1),
+      cylinderAngle: restingAngle,
+      firedChamberIndex,
       shotResolved: true,
       fired,
       isFatal: fired,
@@ -967,8 +1069,13 @@ export class CantinaServer {
 
     this.broadcastRoom(room);
 
-    // Allow 3.5 seconds for trigger tension + gunshot/click + elimination/relief presentation
+    // Allow 3.5 seconds for trigger strike + gunshot/click + elimination/relief presentation
     room.roundTransitionTimeout = setTimeout(() => {
+      if (!fired && shooter.isAlive) {
+        // Prepare shooter's personal revolver for future rounds AFTER the roulette overlay finishes
+        advanceRevolverToNextUntestedChamber(shooter);
+      }
+
       const survivors = room.players.filter((p) => p.isAlive);
       if (survivors.length <= 1) {
         this.endGame(room, survivors[0] || null);
@@ -1041,6 +1148,7 @@ export class CantinaServer {
       p.hand = [];
       p.chamberPulls = 0;
       p.bulletChamber = Math.floor(Math.random() * 6);
+      p.revolver = createInitialRevolverState();
     });
 
     if (notificationMsg) {
@@ -1137,6 +1245,7 @@ export class CantinaServer {
   private sanitizeRoomForPlayer(room: ServerRoom, playerId: string): CantinaRoomState {
     const sanitizedPlayers: CantinaPlayer[] = room.players.map((p) => {
       const isSelf = p.id === playerId;
+      const rev = ensurePlayerRevolver(p);
       return {
         id: p.id,
         name: p.name,
@@ -1149,8 +1258,16 @@ export class CantinaServer {
         cardsCount: p.hand ? p.hand.length : p.cardsCount,
         // Hand is ONLY visible to the player themselves!
         hand: isSelf ? p.hand || [] : undefined,
-        chamberPulls: p.chamberPulls,
-        bulletChamber: p.isEliminated || isSelf ? p.bulletChamber : 0,
+        chamberPulls: rev.shotsTaken,
+        // Bullet chamber is NEVER exposed to any client while the player is alive!
+        bulletChamber: p.isEliminated ? p.bulletChamber : -1,
+        revolver: {
+          chambers: 6,
+          currentRotation: rev.currentRotation,
+          topChamberIndex: rev.topChamberIndex,
+          shotsTaken: rev.shotsTaken,
+          firedChambers: [...rev.firedChambers],
+        },
         isEliminated: p.isEliminated,
         eliminatedRound: p.eliminatedRound,
       };

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { RouletteResult, RouletteSpinEventData } from '../../types/cantina';
 import { audio } from '../../utils/audio';
 import { Skull, ShieldCheck, Flame, Crosshair, RotateCw } from 'lucide-react';
@@ -12,7 +12,8 @@ interface CantinaRouletteOverlayProps {
     rouletteEventId: string,
     velocity: number,
     angle: number,
-    spinId: string
+    spinId: string,
+    settled?: boolean
   ) => void;
 }
 
@@ -25,12 +26,20 @@ interface CantinaRouletteOverlayProps {
  * chamber 4 = 150° (lower-left)
  * chamber 5 = 210° (upper-left)
  *
- * When the cylinder rotates by `cylinderAngle` degrees, chamber `idx` sits at:
+ * When the cylinder is at `cylinderAngle` degrees, chamber `idx` sits at:
  *   worldAngle = -90° + idx * 60° + cylinderAngle
- * Therefore, chamber `idx` is aligned at 12 o'clock (-90°) when:
- *   cylinderAngle ≡ -idx * 60° (mod 360°)
+ * Therefore, the chamber physically located at 12 o'clock (-90°) is:
+ *   topChamberIdx = (((-Math.round(cylinderAngle / 60)) % 6) + 6) % 6
  */
 const CHAMBER_BASE_ANGLES_DEG = [-90, -30, 30, 90, 150, 210] as const;
+
+function snapAngleToChamber(angle: number): number {
+  return Math.round(angle / 60) * 60;
+}
+
+function getTopChamberIndex(angle: number): number {
+  return (((-Math.round(angle / 60)) % 6) + 6) % 6;
+}
 
 export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
   rouletteResult,
@@ -44,48 +53,77 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
     5,
     Math.max(0, rouletteResult.chamberPullsBefore || 0)
   );
-  const activeChamberIdx = chambersTestedBefore;
+
+  // Set of chamber indices (0..5) already tested on THIS player's personal revolver before this shot
+  const firedChambersBeforeSet = useMemo(() => {
+    if (Array.isArray(rouletteResult.firedChambersBefore)) {
+      return new Set<number>(rouletteResult.firedChambersBefore);
+    }
+    return new Set<number>(
+      Array.from({ length: chambersTestedBefore }, (_, idx) => idx)
+    );
+  }, [rouletteResult.firedChambersBefore, chambersTestedBefore]);
+
+  const initialCylinderAngle = Number.isFinite(rouletteResult.cylinderAngle)
+    ? snapAngleToChamber(rouletteResult.cylinderAngle)
+    : -chambersTestedBefore * 60;
 
   // Cylinder physics & shot sequence state
-  const [cylinderAngle, setCylinderAngle] = useState<number>(
-    () => -activeChamberIdx * 60
-  );
+  // CRITICAL INVARIANT: Pressing DISPARAR NEVER changes cylinderAngle.
+  const [cylinderAngle, setCylinderAngle] = useState<number>(initialCylinderAngle);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [ratchetTick, setRatchetTick] = useState<boolean>(false);
   const [hasRequestedPull, setHasRequestedPull] = useState<boolean>(false);
-  const [resolveStage, setResolveStage] = useState<
-    'WAITING' | 'ALIGNING' | 'TENSION' | 'IMPACT'
-  >('WAITING');
+  const [resolveStage, setResolveStage] = useState<'WAITING' | 'TENSION' | 'IMPACT'>(
+    'WAITING'
+  );
 
   const cylinderRef = useRef<HTMLDivElement | null>(null);
-  const angleRef = useRef<number>(-activeChamberIdx * 60);
+  const angleRef = useRef<number>(initialCylinderAngle);
   const velocityRef = useRef<number>(0);
   const isDraggingRef = useRef<boolean>(false);
   const isLockedForShotRef = useRef<boolean>(false);
   const lastPointerAngleRef = useRef<number>(0);
   const lastPointerTimeRef = useRef<number>(0);
-  const lastDetentIndexRef = useRef<number>(
-    Math.floor((-activeChamberIdx * 60) / 30)
-  );
+  const lastDetentIndexRef = useRef<number>(Math.floor(initialCylinderAngle / 30));
   const lastBroadcastTimeRef = useRef<number>(0);
   const lastProcessedSpinIdRef = useRef<string>('');
   const rafRef = useRef<number | null>(null);
 
-  // Reset state when a new roulette step begins: align current firing chamber at 12 o'clock
+  const firedChambersRef = useRef<Set<number>>(firedChambersBeforeSet);
+  firedChambersRef.current = firedChambersBeforeSet;
+
+  const rouletteEventIdRef = useRef<string>(rouletteResult.rouletteEventId);
+  rouletteEventIdRef.current = rouletteResult.rouletteEventId;
+
+  const isTargetPlayerRef = useRef<boolean>(isTargetPlayer);
+  isTargetPlayerRef.current = isTargetPlayer;
+
+  const onSpinCylinderRef = useRef(onSpinCylinder);
+  onSpinCylinderRef.current = onSpinCylinder;
+
+  // Reset state ONLY when a new roulette step (rouletteEventId) begins
   useEffect(() => {
     setHasRequestedPull(false);
     setResolveStage('WAITING');
     isLockedForShotRef.current = false;
+    isDraggingRef.current = false;
+    setIsDragging(false);
+    setIsSpinning(false);
 
-    const initialTopAngle = -activeChamberIdx * 60;
-    angleRef.current = initialTopAngle;
+    const startAngle = Number.isFinite(rouletteResult.cylinderAngle)
+      ? snapAngleToChamber(rouletteResult.cylinderAngle)
+      : -chambersTestedBefore * 60;
+
+    angleRef.current = startAngle;
     velocityRef.current = 0;
-    lastDetentIndexRef.current = Math.floor(initialTopAngle / 30);
-    setCylinderAngle(initialTopAngle);
-  }, [rouletteResult.rouletteEventId, activeChamberIdx]);
+    lastDetentIndexRef.current = Math.floor(startAngle / 30);
+    setCylinderAngle(startAngle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rouletteResult.rouletteEventId]);
 
-  // Listen for remote cylinder spins from the active shooter
+  // Listen for remote cylinder spins from the active shooter (spectator sync)
   useEffect(() => {
     if (!rouletteSpinEvent) return;
     if (rouletteSpinEvent.rouletteEventId !== rouletteResult.rouletteEventId) return;
@@ -95,8 +133,9 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
 
     lastProcessedSpinIdRef.current = rouletteSpinEvent.spinId;
     angleRef.current = rouletteSpinEvent.angle;
-    velocityRef.current = rouletteSpinEvent.velocity;
+    velocityRef.current = rouletteSpinEvent.settled ? 0 : rouletteSpinEvent.velocity;
     setCylinderAngle(rouletteSpinEvent.angle);
+    setIsSpinning(!rouletteSpinEvent.settled && Math.abs(rouletteSpinEvent.velocity) > 0.15);
   }, [
     rouletteSpinEvent,
     rouletteResult.rouletteEventId,
@@ -104,11 +143,9 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
     localPlayerId,
   ]);
 
-  // Authoritative Shot Sequence:
-  // 1. Lock cylinder interaction
-  // 2. Smoothly rotate/settle cylinder so `activeChamberIdx` aligns at 12 o'clock (-activeChamberIdx * 60 mod 360)
-  // 3. Short tension pause under fixed top firing marker
-  // 4. Trigger strike & impact reveal at 12 o'clock
+  // Authoritative Shot Resolution:
+  // CRITICAL: ZERO rotation when DISPARAR is pressed or when shotResolved arrives!
+  // The chamber already sitting at 12 o'clock is fired in place.
   useEffect(() => {
     if (!rouletteResult.shotResolved) {
       setResolveStage('WAITING');
@@ -122,22 +159,8 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
     velocityRef.current = 0;
     setIsSpinning(false);
 
-    // Calculate smooth rotational settle angle so `activeChamberIdx` lands at exact 12 o'clock
-    const currentAngle = angleRef.current;
-    const desiredAngleMod = -activeChamberIdx * 60;
-    const shortestDelta =
-      ((((desiredAngleMod - currentAngle) % 360) + 540) % 360) - 180;
-    const targetTopAngle = currentAngle + shortestDelta;
-
-    angleRef.current = targetTopAngle;
-    setCylinderAngle(targetTopAngle);
-    setResolveStage('ALIGNING');
-    audio.playRevolverRatchetClick(1.0);
-
-    const tensionTimer = setTimeout(() => {
-      setResolveStage('TENSION');
-      audio.playHammerCock();
-    }, 360);
+    setResolveStage('TENSION');
+    audio.playHammerCock();
 
     const impactTimer = setTimeout(() => {
       setResolveStage('IMPACT');
@@ -146,20 +169,18 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
       } else {
         audio.playRevolverClick();
       }
-    }, 740);
+    }, 440);
 
     return () => {
-      clearTimeout(tensionTimer);
       clearTimeout(impactTimer);
     };
   }, [
     rouletteResult.shotResolved,
     rouletteResult.shotEventId,
     rouletteResult.fired,
-    activeChamberIdx,
   ]);
 
-  // Continuous 60fps cylinder inertia & ratchet click loop while in WAITING state
+  // Continuous 60fps cylinder inertia & chamber snapping loop BEFORE pressing DISPARAR
   useEffect(() => {
     let active = true;
     let tickTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -170,16 +191,36 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
       if (
         !isLockedForShotRef.current &&
         !isDraggingRef.current &&
-        Math.abs(velocityRef.current) > 0.08
+        Math.abs(velocityRef.current) > 0.05
       ) {
         angleRef.current += velocityRef.current;
-        velocityRef.current *= 0.962;
+        velocityRef.current *= 0.964;
 
-        // Soft magnetic detent alignment to 60° chamber slots when slowing down
-        if (Math.abs(velocityRef.current) < 1.2) {
-          const nearestDetent = Math.round(angleRef.current / 60) * 60;
+        // If slowing down and approaching a chamber that was already tested on this revolver,
+        // maintain gentle momentum so it glides into the next untested chamber BEFORE stopping.
+        const spentSet = firedChambersRef.current;
+        if (
+          spentSet.size > 0 &&
+          spentSet.size < 6 &&
+          Math.abs(velocityRef.current) < 2.2
+        ) {
+          const nearestSlotAngle = snapAngleToChamber(angleRef.current);
+          const candidateTopIdx = getTopChamberIndex(nearestSlotAngle);
+          if (spentSet.has(candidateTopIdx)) {
+            const dir = velocityRef.current >= 0 ? 1 : -1;
+            velocityRef.current = dir * 2.35;
+          }
+        }
+
+        // Gentle magnetic snap to the nearest 60° chamber detent as part of manual spin deceleration
+        if (Math.abs(velocityRef.current) < 1.15) {
+          const nearestDetent = snapAngleToChamber(angleRef.current);
           const diff = nearestDetent - angleRef.current;
-          angleRef.current += diff * 0.14;
+          angleRef.current += diff * 0.22;
+          if (Math.abs(diff) < 0.35 && Math.abs(velocityRef.current) < 0.35) {
+            angleRef.current = nearestDetent;
+            velocityRef.current = 0;
+          }
         }
 
         const currentDetent = Math.floor(angleRef.current / 30);
@@ -196,18 +237,48 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
         }
 
         setCylinderAngle(angleRef.current);
-        setIsSpinning(Math.abs(velocityRef.current) > 0.35);
+
+        if (velocityRef.current === 0) {
+          setIsSpinning(false);
+          if (isTargetPlayerRef.current) {
+            onSpinCylinderRef.current(
+              rouletteEventIdRef.current,
+              0,
+              angleRef.current,
+              `settle_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              true
+            );
+          }
+        } else {
+          setIsSpinning(true);
+        }
       } else if (
         !isLockedForShotRef.current &&
         !isDraggingRef.current &&
-        Math.abs(velocityRef.current) <= 0.08
+        Math.abs(velocityRef.current) <= 0.05 &&
+        velocityRef.current !== 0
       ) {
-        if (velocityRef.current !== 0) {
-          velocityRef.current = 0;
-          const snapped = Math.round(angleRef.current / 60) * 60;
-          angleRef.current = snapped;
-          setCylinderAngle(snapped);
-          setIsSpinning(false);
+        velocityRef.current = 0;
+        let snapped = snapAngleToChamber(angleRef.current);
+        const spentSet = firedChambersRef.current;
+        if (spentSet.size > 0 && spentSet.size < 6) {
+          for (let i = 0; i < 6; i++) {
+            if (!spentSet.has(getTopChamberIndex(snapped))) break;
+            snapped -= 60;
+          }
+        }
+        angleRef.current = snapped;
+        setCylinderAngle(snapped);
+        setIsSpinning(false);
+
+        if (isTargetPlayerRef.current) {
+          onSpinCylinderRef.current(
+            rouletteEventIdRef.current,
+            0,
+            snapped,
+            `settle_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            true
+          );
         }
       }
 
@@ -243,6 +314,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
     e.currentTarget.setPointerCapture(e.pointerId);
     isDraggingRef.current = true;
     setIsDragging(true);
+    setIsSpinning(true);
     velocityRef.current = 0;
     lastPointerAngleRef.current = computePointerAngle(e.clientX, e.clientY);
     lastPointerTimeRef.current = performance.now();
@@ -283,14 +355,15 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
 
     if (
       now - lastBroadcastTimeRef.current > 90 &&
-      Math.abs(velocityRef.current) > 1.5
+      Math.abs(velocityRef.current) > 1.2
     ) {
       lastBroadcastTimeRef.current = now;
       onSpinCylinder(
         rouletteResult.rouletteEventId,
         velocityRef.current,
         angleRef.current,
-        `spin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+        `spin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        false
       );
     }
   };
@@ -303,20 +376,24 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {}
 
-    if (Math.abs(velocityRef.current) < 2.2) {
-      velocityRef.current = 24 + Math.random() * 14;
+    // Proportional flick physics:
+    // If quick tap without drag, impart a moderate spin; if dragged, preserve proportional flick velocity
+    if (Math.abs(velocityRef.current) < 0.8) {
+      velocityRef.current = 12 + Math.random() * 8;
     } else {
       velocityRef.current = Math.max(
-        -55,
-        Math.min(55, velocityRef.current * 1.35)
+        -56,
+        Math.min(56, velocityRef.current * 1.28)
       );
     }
+    setIsSpinning(true);
 
     onSpinCylinder(
       rouletteResult.rouletteEventId,
       velocityRef.current,
       angleRef.current,
-      `spin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+      `spin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      false
     );
   };
 
@@ -329,14 +406,16 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
     ) {
       return;
     }
-    const impulse = (Math.random() > 0.2 ? 1 : -1) * (28 + Math.random() * 18);
+    const impulse = (Math.random() > 0.2 ? 1 : -1) * (24 + Math.random() * 16);
     velocityRef.current = impulse;
+    setIsSpinning(true);
     audio.playRevolverRatchetClick(1.1);
     onSpinCylinder(
       rouletteResult.rouletteEventId,
       impulse,
       angleRef.current,
-      `spin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+      `spin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      false
     );
   };
 
@@ -345,36 +424,25 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
       !isTargetPlayer ||
       rouletteResult.shotResolved ||
       hasRequestedPull ||
-      isLockedForShotRef.current
+      isLockedForShotRef.current ||
+      isDragging ||
+      isSpinning
     ) {
       return;
     }
+    // CRITICAL INVARIANT: Do NOT modify angleRef.current or cylinderAngle when DISPARAR is pressed!
+    isLockedForShotRef.current = true;
     setHasRequestedPull(true);
-    // Stop manual spin immediately and begin aligning to 12 o'clock while awaiting server confirmation
-    velocityRef.current = 0;
-    const currentAngle = angleRef.current;
-    const desiredAngleMod = -activeChamberIdx * 60;
-    const shortestDelta =
-      ((((desiredAngleMod - currentAngle) % 360) + 540) % 360) - 180;
-    const targetTopAngle = currentAngle + shortestDelta;
-    angleRef.current = targetTopAngle;
-    setCylinderAngle(targetTopAngle);
-
     audio.playHammerCock();
     onPullTrigger(rouletteResult.rouletteEventId);
   };
 
   const isImpactBang = resolveStage === 'IMPACT' && rouletteResult.fired;
   const isImpactClick = resolveStage === 'IMPACT' && !rouletteResult.fired;
-  const isSettlingToTop =
-    resolveStage === 'ALIGNING' ||
-    resolveStage === 'TENSION' ||
-    resolveStage === 'IMPACT' ||
-    hasRequestedPull;
+  const isCylinderMoving = isDragging || isSpinning;
 
-  // Which chamber index is currently closest to the 12 o'clock top marker
-  const currentTopChamberIdx =
-    (((-Math.round(cylinderAngle / 60)) % 6) + 6) % 6;
+  // The chamber currently physically located at 12 o'clock (-90°)
+  const currentTopChamberIdx = getTopChamberIndex(cylinderAngle);
 
   return (
     <div
@@ -410,7 +478,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
             : 'bg-gradient-to-b from-[#231914] via-[#16100d] to-[#0c0907] border-amber-500/60'
         }`}
       >
-        {/* Top Tag: Devil Sequence or Ruleta Rusa */}
+        {/* Top Tag: Devil Sequence or Personal Revolver */}
         <div className="flex flex-col items-center gap-1.5 mb-4">
           {rouletteResult.isDevilSequence ? (
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-red-950/90 border border-red-500/60 text-red-300 text-xs font-black uppercase tracking-[0.2em]">
@@ -421,19 +489,19 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
           ) : (
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-950/70 border border-amber-500/40 text-amber-300 text-xs font-black uppercase tracking-[0.2em]">
               <Crosshair className="w-3.5 h-3.5 text-amber-400" />
-              RULETA RUSA EN LA CANTINA
+              REVÓLVER DE {rouletteResult.targetPlayerName}
             </div>
           )}
 
           <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wide text-amber-100 drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]">
             {isTargetPlayer
-              ? '¡TE TOCA EL REVÓLVER!'
+              ? '¡TU REVÓLVER EN JUEGO!'
               : `TURNO DE ${rouletteResult.targetPlayerName}`}
           </h2>
 
           <p className="text-xs sm:text-sm font-bold text-amber-200/75 uppercase tracking-widest">
-            CÁMARA {rouletteResult.chamberNumber} DE 6 • ({chambersTestedBefore}
-            /6 PROBADAS ANTES)
+            TAMBOR PERSONAL: {chambersTestedBefore}/6 PROBADAS • TIRO{' '}
+            {rouletteResult.chamberNumber}/6
           </p>
         </div>
 
@@ -463,11 +531,11 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
           {/* FIXED TOP FIRING MARKER (12 O'CLOCK — NEVER ROTATES WITH CYLINDER) */}
           <div className="z-20 flex flex-col items-center pointer-events-none -mb-1.5">
             <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400/90 mb-0.5">
-              CAÑÓN / PERCUTOR
+              CAÑÓN / 12 EN PUNTO
             </span>
             <div
               className={`w-9 h-7 rounded-t-xl rounded-b-md border-2 flex flex-col items-center justify-center transition-transform duration-150 ${
-                resolveStage === 'TENSION' || resolveStage === 'ALIGNING' || hasRequestedPull
+                resolveStage === 'TENSION' || hasRequestedPull
                   ? '-translate-y-1.5 scale-110 bg-amber-500 border-amber-200 shadow-[0_0_18px_rgba(245,158,11,0.9)]'
                   : isImpactBang
                   ? 'translate-y-2 bg-red-500 border-yellow-200 shadow-[0_0_28px_rgba(239,68,68,1)]'
@@ -490,7 +558,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                   ? 'bg-red-500/60 opacity-100'
                   : isImpactClick
                   ? 'bg-emerald-500/35 opacity-100'
-                  : isDragging || isSpinning
+                  : isCylinderMoving
                   ? 'bg-amber-500/35 opacity-100'
                   : 'bg-amber-500/15 opacity-75'
               }`}
@@ -506,13 +574,13 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                   ? 'border-red-400 shadow-[0_0_28px_rgba(239,68,68,0.95)] scale-110'
                   : isImpactClick
                   ? 'border-emerald-400 shadow-[0_0_22px_rgba(16,185,129,0.8)] scale-105'
-                  : resolveStage === 'TENSION' || resolveStage === 'ALIGNING'
+                  : resolveStage === 'TENSION'
                   ? 'border-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.75)] scale-105'
-                  : 'border-amber-400/45 border-dashed'
+                  : 'border-amber-400/50 border-dashed'
               }`}
             />
 
-            {/* Rotating Cylinder Body */}
+            {/* Rotating Cylinder Body — ZERO rotation transition after pressing DISPARAR */}
             <div
               ref={cylinderRef}
               onPointerDown={handlePointerDown}
@@ -521,9 +589,6 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
               onPointerCancel={handlePointerUp}
               style={{
                 transform: `rotate(${cylinderAngle}deg) scale(${ratchetTick ? 1.02 : 1})`,
-                transition: isSettlingToTop
-                  ? 'transform 340ms cubic-bezier(0.22, 1, 0.36, 1)'
-                  : 'none',
                 touchAction: 'none',
               }}
               className={`relative w-52 h-52 sm:w-56 sm:h-56 rounded-full border-[5px] flex items-center justify-center shadow-[inset_0_0_30px_rgba(0,0,0,0.9),0_14px_35px_rgba(0,0,0,0.85)] transition-colors ${
@@ -564,18 +629,17 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                 const x = Math.cos(rad) * radius;
                 const y = Math.sin(rad) * radius;
 
-                const isSpentBefore = idx < chambersTestedBefore;
-                // The chamber being fired on this pull is `activeChamberIdx`, which settles at 12 o'clock (-activeChamberIdx * 60)
-                const isFiringChamber = idx === activeChamberIdx;
+                const isSpentBefore = firedChambersBeforeSet.has(idx);
+                // The chamber physically at 12 o'clock is the ONLY chamber fired when DISPARAR is pressed
                 const isCurrentlyAtTop = idx === currentTopChamberIdx;
 
                 let chamberStyle =
                   'bg-stone-950 border-amber-600/50 text-amber-200/70 shadow-[inset_0_3px_8px_rgba(0,0,0,0.9)]';
 
-                if (isFiringChamber && isImpactBang) {
+                if (isCurrentlyAtTop && isImpactBang) {
                   chamberStyle =
                     'bg-gradient-to-br from-yellow-300 via-amber-500 to-red-600 border-white text-black shadow-[0_0_24px_rgba(239,68,68,1)] scale-110';
-                } else if (isFiringChamber && isImpactClick) {
+                } else if (isCurrentlyAtTop && isImpactClick) {
                   chamberStyle =
                     'bg-emerald-950/90 border-emerald-400 text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.6)]';
                 } else if (isSpentBefore) {
@@ -594,15 +658,12 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                     key={idx}
                     style={{
                       transform: `translate(${x}px, ${y}px) rotate(${-cylinderAngle}deg)`,
-                      transition: isSettlingToTop
-                        ? 'transform 340ms cubic-bezier(0.22, 1, 0.36, 1)'
-                        : 'none',
                     }}
                     className={`absolute w-12 h-12 sm:w-13 sm:h-13 rounded-full border-2 flex items-center justify-center font-black text-xs pointer-events-none ${chamberStyle}`}
                   >
-                    {isFiringChamber && isImpactBang ? (
+                    {isCurrentlyAtTop && isImpactBang ? (
                       <Skull className="w-6 h-6 text-red-950 animate-pulse" />
-                    ) : isFiringChamber && isImpactClick ? (
+                    ) : isCurrentlyAtTop && isImpactClick ? (
                       <span className="text-[10px] font-black text-emerald-300">
                         VACÍA
                       </span>
@@ -632,7 +693,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
               {isTargetPlayer ? (
                 <>
                   <span className="text-xs font-bold text-amber-200/80">
-                    Arrastra el tambor para girarlo
+                    Arrastra el tambor las veces que quieras
                   </span>
                   <button
                     type="button"
@@ -648,7 +709,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
               ) : (
                 <span className="text-xs font-bold text-amber-200/75 uppercase tracking-wider">
                   {isSpinning
-                    ? `¡${rouletteResult.targetPlayerName} ESTÁ GIRANDO EL TAMBOR!`
+                    ? `¡${rouletteResult.targetPlayerName} ESTÁ GIRANDO SU TAMBOR!`
                     : `EL REVÓLVER APUNTA A ${rouletteResult.targetPlayerName}`}
                 </span>
               )}
@@ -664,44 +725,43 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
                 <div className="w-full flex flex-col items-center gap-2.5">
                   <button
                     type="button"
-                    disabled={hasRequestedPull}
+                    disabled={hasRequestedPull || isCylinderMoving}
                     onClick={handleTriggerClick}
-                    className="w-full max-w-xs py-4 px-6 rounded-2xl font-black text-base sm:text-lg uppercase tracking-wider text-white bg-gradient-to-b from-red-600 via-red-700 to-red-900 hover:from-red-500 hover:to-red-800 border-2 border-amber-400/80 shadow-[0_10px_30px_rgba(220,38,38,0.5)] active:scale-95 transition-all disabled:opacity-50"
+                    className="w-full max-w-xs py-4 px-6 rounded-2xl font-black text-base sm:text-lg uppercase tracking-wider text-white bg-gradient-to-b from-red-600 via-red-700 to-red-900 hover:from-red-500 hover:to-red-800 border-2 border-amber-400/80 shadow-[0_10px_30px_rgba(220,38,38,0.5)] active:scale-95 transition-all disabled:opacity-45 disabled:cursor-not-allowed"
                   >
-                    {hasRequestedPull
-                      ? 'ALINEANDO TAMBOR...'
-                      : 'APRETAR EL GATILLO'}
+                    {isCylinderMoving
+                      ? 'GIRANDO EL TAMBOR...'
+                      : hasRequestedPull
+                      ? 'DISPARANDO...'
+                      : 'DISPARAR'}
                   </button>
-                  <p className="text-[11px] font-bold text-amber-200/60 uppercase tracking-widest">
-                    La cámara superior (12 en punto) será la que se dispare
+                  <p className="text-[11px] font-bold text-amber-200/65 uppercase tracking-widest">
+                    Se disparará la cámara situada a las 12 en punto sin rotar más
                   </p>
                 </div>
               ) : (
                 <div className="w-full py-4 px-5 rounded-2xl bg-black/55 border border-amber-500/30 flex flex-col items-center gap-1.5">
                   <div className="flex items-center gap-2 text-amber-300 font-black text-sm sm:text-base uppercase tracking-wider animate-pulse">
                     <Crosshair className="w-4 h-4 text-red-400" />
-                    ESPERANDO A QUE {rouletteResult.targetPlayerName} APRIETE EL
-                    GATILLO...
+                    ESPERANDO A QUE {rouletteResult.targetPlayerName} PULSE
+                    DISPARAR...
                   </div>
                   <p className="text-xs text-stone-400 font-medium">
-                    Solo {rouletteResult.targetPlayerName} puede accionar el
-                    revólver
+                    Revólver personal de {rouletteResult.targetPlayerName} (
+                    {chambersTestedBefore}/6 cámaras probadas)
                   </p>
                 </div>
               )}
             </>
           )}
 
-          {(resolveStage === 'ALIGNING' || resolveStage === 'TENSION') && (
+          {resolveStage === 'TENSION' && (
             <div className="w-full py-4 px-5 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col items-center gap-1">
               <div className="text-lg sm:text-xl font-black text-amber-300 uppercase tracking-[0.2em] animate-pulse">
-                {resolveStage === 'ALIGNING'
-                  ? 'FIJANDO CÁMARA SUPERIOR...'
-                  : '¡APRETANDO EL GATILLO...!'}
+                ¡MARTILLO CAYENDO...!
               </div>
               <p className="text-xs text-amber-200/70 uppercase tracking-widest">
-                El percutor cae sobre la cámara superior (
-                {rouletteResult.chamberNumber}/6)
+                Percutor sobre la cámara superior (12 en punto)
               </p>
             </div>
           )}
@@ -745,7 +805,7 @@ export const CantinaRouletteOverlay: React.FC<CantinaRouletteOverlayProps> = ({
               >
                 {rouletteResult.fired
                   ? `La bala estaba en la cámara superior (${rouletteResult.chamberNumber}/6) — Eliminado`
-                  : `Cámara superior (${rouletteResult.chamberNumber}/6) vacía — Sigue con vida`}
+                  : `Cámara superior vacía (${rouletteResult.chamberNumber}/6 probadas) — Sigue con vida`}
               </p>
             </div>
           )}

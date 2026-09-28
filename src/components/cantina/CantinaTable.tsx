@@ -40,6 +40,8 @@ import {
   RotateCcw,
   Sparkles,
   AlertTriangle,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 
 interface CantinaTableProps {
@@ -59,7 +61,8 @@ interface CantinaTableProps {
     rouletteEventId: string,
     velocity: number,
     angle: number,
-    spinId: string
+    spinId: string,
+    settled?: boolean
   ) => void;
   onTriggerRoulette: () => void;
   onNextRound: () => void;
@@ -100,6 +103,10 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   const [isHandHovered, setIsHandHovered] = useState(false);
   const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [isAudioMuted, setIsAudioMuted] = useState<boolean>(() => audio.getIsMuted());
+  const [audioVolume, setAudioVolume] = useState<number>(() => audio.getVolume());
+  const [showVolumePopover, setShowVolumePopover] = useState<boolean>(false);
+  const volumeControlRef = useRef<HTMLDivElement | null>(null);
   const [animatingCards, setAnimatingCards] = useState<TransientCard[]>([]);
   const [optimisticPlays, setOptimisticPlays] = useState<CenterPileItem[]>([]);
   const [topPlayEventBanner, setTopPlayEventBanner] = useState<string | null>(null);
@@ -687,6 +694,32 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     }
   };
 
+  const handleToggleMute = () => {
+    const unmuted = audio.toggleMute();
+    setIsAudioMuted(!unmuted);
+    setAudioVolume(audio.getVolume());
+  };
+
+  const handleVolumeChange = (newVal: number) => {
+    audio.setVolume(newVal);
+    setAudioVolume(audio.getVolume());
+    setIsAudioMuted(audio.getIsMuted());
+  };
+
+  useEffect(() => {
+    if (!showVolumePopover) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        volumeControlRef.current &&
+        !volumeControlRef.current.contains(e.target as Node)
+      ) {
+        setShowVolumePopover(false);
+      }
+    };
+    window.addEventListener('pointerdown', handleOutsideClick);
+    return () => window.removeEventListener('pointerdown', handleOutsideClick);
+  }, [showVolumePopover]);
+
   // Merge authoritative centerPileHistory with any pending local optimistic play (deduplicated by playId)
   const effectivePileHistory = useMemo(() => {
     const serverHistory = roomState.centerPileHistory || [];
@@ -780,10 +813,10 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
         onCardFinished={handleCardAnimationFinished}
       />
 
-      {/* 3. TOP BAR HEADER (SALA / RONDA / MODO on left, SALIR on right — NO centered table rule pill) */}
-      <header className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 py-2 bg-black/45 backdrop-blur-sm border-b border-amber-900/30">
-        <div className="flex items-center gap-2.5 sm:gap-3">
-          <div className="flex items-center gap-2 px-3 py-1 bg-stone-950/85 border border-amber-700/40 rounded-xl shadow-md">
+      {/* 3. TOP BAR HEADER (SALA / RONDA / MODO on left, centered LA CANTINA DEL FAROL title, SALIR to the left of Volume Control on right) */}
+      <header className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-3 sm:px-4 py-2 bg-black/50 backdrop-blur-sm border-b border-amber-900/35">
+        <div className="flex items-center gap-2 sm:gap-3 z-10">
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 bg-stone-950/85 border border-amber-700/40 rounded-xl shadow-md">
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">
               SALA:
             </span>
@@ -792,7 +825,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1 bg-stone-950/70 border border-stone-800 rounded-xl text-xs text-stone-300">
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 bg-stone-950/75 border border-stone-800 rounded-xl text-xs text-stone-300">
             <span className="font-bold text-amber-100">
               Ronda {roomState.currentRound}
             </span>
@@ -802,20 +835,83 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 ? 'Modo Diablo 😈'
                 : 'Modo Clásico'}
             </span>
-            <span className="hidden md:inline text-stone-600">&bull;</span>
-            <span className="hidden md:inline text-stone-400 text-[11px]">
+            <span className="hidden lg:inline text-stone-600">&bull;</span>
+            <span className="hidden lg:inline text-stone-400 text-[11px]">
               {mapDef.name}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Centered Cantina Title */}
+        <div className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2 pointer-events-none select-none">
+          <span className="text-base drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]">
+            🏮
+          </span>
+          <span className="text-xs sm:text-sm font-black font-serif tracking-[0.18em] text-amber-200/95 uppercase drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+            LA CANTINA DEL FAROL
+          </span>
+        </div>
+
+        {/* Right Header Controls: SALIR immediately to the LEFT of Volume/Mute control */}
+        <div className="flex items-center gap-2 z-10">
           <button
             onClick={() => setShowExitModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900/85 hover:bg-stone-800 border border-stone-700/60 text-stone-200 text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900/85 hover:bg-stone-800 border border-stone-700/60 text-stone-200 hover:text-amber-200 text-xs font-semibold transition-colors shadow-sm"
           >
             <LogOut className="w-3.5 h-3.5" /> Salir
           </button>
+
+          {/* Sound / Volume Control */}
+          <div
+            ref={volumeControlRef}
+            className="relative flex items-center"
+            onMouseEnter={() => setShowVolumePopover(true)}
+          >
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-stone-900/85 hover:bg-stone-800 border border-amber-700/40 text-amber-200 transition-colors shadow-sm">
+              <button
+                type="button"
+                onClick={handleToggleMute}
+                title={isAudioMuted ? 'Activar sonido' : 'Silenciar sonido'}
+                className="flex items-center justify-center text-amber-300 hover:text-amber-100 transition-colors"
+              >
+                {isAudioMuted || audioVolume === 0 ? (
+                  <VolumeX className="w-4 h-4 text-rose-400" />
+                ) : (
+                  <Volume2 className="w-4 h-4 text-amber-400" />
+                )}
+              </button>
+
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={isAudioMuted ? 0 : audioVolume}
+                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                aria-label="Volumen de la cantina"
+                className="hidden sm:block w-16 h-1.5 accent-amber-400 bg-stone-700 rounded-lg cursor-pointer"
+              />
+            </div>
+
+            {/* Mobile / compact popover slider when tapped */}
+            {showVolumePopover && (
+              <div className="sm:hidden absolute right-0 top-full mt-2 px-3 py-2.5 rounded-xl bg-stone-950/95 border border-amber-600/50 shadow-2xl flex items-center gap-2 z-50 backdrop-blur-md">
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={isAudioMuted ? 0 : audioVolume}
+                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                  aria-label="Volumen"
+                  className="w-24 h-1.5 accent-amber-400 bg-stone-700 rounded-lg cursor-pointer"
+                />
+                <span className="text-[10px] font-mono font-bold text-amber-300 w-8 text-right">
+                  {Math.round((isAudioMuted ? 0 : audioVolume) * 100)}%
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -1033,8 +1129,11 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                   {opp.isHost && <Crown className="w-3 h-3 text-amber-400" />}
                 </span>
                 {opp.isAlive && (
-                  <span className="text-[10px] font-mono tabular-nums text-amber-400/90 font-bold px-1.5 py-0.2 rounded bg-stone-900/90 border border-stone-700/80">
-                    {opp.chamberPulls}/6
+                  <span
+                    title="Recámaras probadas en su revólver personal"
+                    className="text-[10px] font-mono tabular-nums text-amber-400/90 font-bold px-1.5 py-0.2 rounded bg-stone-900/90 border border-stone-700/80"
+                  >
+                    {opp.revolver?.shotsTaken ?? opp.chamberPulls}/6
                   </span>
                 )}
               </div>
@@ -1283,7 +1382,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
             </span>
             <span className="text-stone-500">&middot;</span>
             <span className="font-mono tabular-nums text-amber-400 font-bold">
-              Tambor: {localPlayer?.chamberPulls ?? 0}/6
+              Tu Revólver: {localPlayer?.revolver?.shotsTaken ?? localPlayer?.chamberPulls ?? 0}/6
             </span>
           </div>
         </div>

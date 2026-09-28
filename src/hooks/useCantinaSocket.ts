@@ -246,6 +246,7 @@ export function useCantinaSocket({
             velocity: msg.velocity,
             angle: msg.angle,
             spinId: msg.spinId,
+            settled: msg.settled,
           });
         } else if (msg.type === 'NOTIFICATION') {
           setNotification({ text: msg.text, variant: msg.variant });
@@ -394,13 +395,20 @@ export function useCantinaSocket({
   );
 
   const sendRouletteSpin = useCallback(
-    (rouletteEventId: string, velocity: number, angle: number, spinId: string) => {
+    (
+      rouletteEventId: string,
+      velocity: number,
+      angle: number,
+      spinId: string,
+      settled?: boolean
+    ) => {
       sendMessage({
         type: 'ROULETTE_SPIN',
         rouletteEventId,
         velocity,
         angle,
         spinId,
+        settled,
       });
     },
     [sendMessage]

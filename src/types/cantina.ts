@@ -24,6 +24,14 @@ export type CantinaPhase =
   | 'GAME_OVER'
   | 'MATCH_ABORTED';
 
+export interface CantinaPlayerRevolverState {
+  chambers: 6;
+  currentRotation: number; // Authoritative cylinder angle in degrees (multiple of 60° at rest)
+  topChamberIndex: number; // 0..5 chamber currently at 12 o'clock
+  shotsTaken: number; // 0..6 shots taken on this player's personal revolver
+  firedChambers: number[]; // Chamber indices (0..5) already tested by this player
+}
+
 export interface CantinaPlayer {
   id: string;
   name: string;
@@ -36,7 +44,8 @@ export interface CantinaPlayer {
   cardsCount: number;
   hand?: Card[]; // Only provided to the local player by server
   chamberPulls: number; // How many times they have pulled trigger (0 to 6)
-  bulletChamber: number; // 0 to 5 (secret on server, revealed upon death)
+  bulletChamber: number; // 0 to 5 (secret on server, -1 on clients while alive, revealed only upon death)
+  revolver?: CantinaPlayerRevolverState;
   isEliminated: boolean;
   eliminatedRound?: number;
 }
@@ -96,6 +105,9 @@ export interface RouletteResult {
   targetPlayerName: string;
   chamberPullsBefore: number;
   chamberNumber: number; // 1 to 6
+  cylinderAngle: number; // Authoritative cylinder angle in degrees for targetPlayer's revolver
+  firedChamberIndex: number; // 0 to 5 (the chamber at 12 o'clock)
+  firedChambersBefore: number[]; // Chamber indices (0..5) already tested on targetPlayer's personal revolver before this shot
   shotResolved: boolean;
   fired: boolean;
   isFatal: boolean;
@@ -161,6 +173,7 @@ export interface RouletteSpinEventData {
   velocity: number;
   angle: number;
   spinId: string;
+  settled?: boolean;
 }
 
 export interface DealCardsEventData {
@@ -179,7 +192,7 @@ export type CantinaClientMessage =
   | { type: 'PLAY_CARDS'; cardIds: string[]; playId?: string }
   | { type: 'CHALLENGE_BLUFF' }
   | { type: 'PULL_TRIGGER'; rouletteEventId: string }
-  | { type: 'ROULETTE_SPIN'; rouletteEventId: string; velocity: number; angle: number; spinId: string }
+  | { type: 'ROULETTE_SPIN'; rouletteEventId: string; velocity: number; angle: number; spinId: string; settled?: boolean }
   | { type: 'TRIGGER_ROULETTE' }
   | { type: 'NEXT_ROUND' }
   | { type: 'REQUEST_REMATCH' }
@@ -196,4 +209,4 @@ export type CantinaServerMessage =
   | { type: 'PLAYER_HAND_INTERACTION'; playerId: string; interaction: HandInteractionType; hoveredIndex?: number }
   | { type: 'CARD_PLAYED_EVENT'; playerId: string; playerName: string; cardsCount: number; playId: string; claimedRank: TableRank }
   | { type: 'DEAL_CARDS_EVENT'; round: number; roundStartEventId: string; startingPlayerId: string; startingPlayerName: string; tableRank: TableRank }
-  | { type: 'ROULETTE_SPIN_EVENT'; rouletteEventId: string; playerId: string; velocity: number; angle: number; spinId: string };
+  | { type: 'ROULETTE_SPIN_EVENT'; rouletteEventId: string; playerId: string; velocity: number; angle: number; spinId: string; settled?: boolean };
