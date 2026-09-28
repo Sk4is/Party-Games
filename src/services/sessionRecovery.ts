@@ -12,7 +12,8 @@ export type SupportedGameType =
   | 'codigo-rojo'
   | 'coartada'
   | 'entre-topos'
-  | 'la_cantina_del_farol';
+  | 'la_cantina_del_farol'
+  | 'fortunarium';
 
 export interface ActiveSessionData {
   gameType: SupportedGameType;
@@ -100,9 +101,11 @@ export const sessionRecovery = {
           'coartada',
           'entre-topos',
           'la_cantina_del_farol',
+          'fortunarium',
         ].includes(urlGame)
       ) {
         const playerId =
+          localStorage.getItem('fam2play_fortunarium_player_id') ||
           localStorage.getItem('fam2play_cantina_player_id') ||
           localStorage.getItem('fam2play_player_id') ||
           localStorage.getItem('fiesta_playerId') ||

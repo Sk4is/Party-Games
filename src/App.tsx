@@ -17,6 +17,7 @@ import { CodigoRojoGame } from './components/codigo-rojo/CodigoRojoGame';
 import { CoartadaGame } from './components/coartada/CoartadaGame';
 import { EntreToposGame } from './components/entre-topos/EntreToposGame';
 import { CantinaGame } from './components/cantina/CantinaGame';
+import { FortunariumGame } from './components/fortunarium/FortunariumGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 import { sessionRecovery } from './services/sessionRecovery';
 import { BackendConnectingModal } from './components/common/BackendConnectingModal';
@@ -31,6 +32,7 @@ type AppView =
   | 'COARTADA'
   | 'ENTRE_TOPOS'
   | 'CANTINA'
+  | 'FORTUNARIUM'
   | 'BOMBA_LOCAL_SETUP'
   | 'BOMBA_LOCAL_GAME'
   | 'LPR_LOCAL_SETUP'
@@ -63,6 +65,9 @@ export default function App() {
       ) {
         return 'CANTINA';
       }
+      if ((activeSession.gameType as string) === 'fortunarium') {
+        return 'FORTUNARIUM';
+      }
     }
 
     if (typeof window !== 'undefined') {
@@ -78,6 +83,7 @@ export default function App() {
       if (game === 'coartada') return 'COARTADA';
       if (game === 'entre-topos') return 'ENTRE_TOPOS';
       if (game === 'la_cantina_del_farol' || game === 'la-cantina-del-farol') return 'CANTINA';
+      if (game === 'fortunarium') return 'FORTUNARIUM';
       if (room) {
         return 'PINTURILLO';
       }
@@ -114,6 +120,8 @@ export default function App() {
       setCurrentView('ENTRE_TOPOS');
     } else if (gameId === 'la_cantina_del_farol' || gameId === 'la-cantina-del-farol') {
       setCurrentView('CANTINA');
+    } else if (gameId === 'fortunarium') {
+      setCurrentView('FORTUNARIUM');
     }
   };
 
@@ -132,7 +140,8 @@ export default function App() {
       | 'codigo-rojo'
       | 'coartada'
       | 'entre-topos'
-      | 'la_cantina_del_farol',
+      | 'la_cantina_del_farol'
+      | 'fortunarium',
     code: string
   ) => {
     setUrlRoomCode(code);
@@ -144,6 +153,7 @@ export default function App() {
     else if (game === 'coartada') setCurrentView('COARTADA');
     else if (game === 'entre-topos') setCurrentView('ENTRE_TOPOS');
     else if (game === 'la_cantina_del_farol') setCurrentView('CANTINA');
+    else if (game === 'fortunarium') setCurrentView('FORTUNARIUM');
   };
 
   return (
@@ -221,6 +231,15 @@ export default function App() {
       {/* 8. LA CANTINA DEL FAROL (ONLINE MULTIPLAYER BLUFF & ROULETTE 2-4 PLAYERS) */}
       {currentView === 'CANTINA' && (
         <CantinaGame
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
+      )}
+
+      {/* 9. FORTUNARIUM (ONLINE COOPERATIVE SLOT MACHINE 2-4 PLAYERS) */}
+      {currentView === 'FORTUNARIUM' && (
+        <FortunariumGame
           onBackToMenu={handleBackToMenu}
           initialRoomCode={urlRoomCode}
           onSwitchGame={handleSwitchGame}

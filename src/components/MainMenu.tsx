@@ -494,6 +494,54 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
               </div>
             </div>
           </div>
+
+          {/* CARD 9: FORTUNARIUM */}
+          <div
+            id="card-fortunarium"
+            role="button"
+            tabIndex={0}
+            onClick={() => handleSelectGame('fortunarium')}
+            onKeyDown={(e) => handleKeyDown(e, 'fortunarium')}
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#FBBF24]/40 hover:border-[#FBBF24] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(251,191,36,0.32)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
+            style={{ animationDelay: '0.32s' }}
+          >
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.15),transparent_65%)] pointer-events-none opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-15 bg-[#FBBF24] blur-2xl transition-opacity duration-500" />
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#FBBF24] via-[#D97706] to-[#78350F] border border-[#FDE68A]/45 flex items-center justify-center text-3xl shadow-lg shadow-[#F59E0B]/25 group-hover:scale-105 group-hover:-translate-y-1 group-hover:rotate-2 transition-all duration-300">
+                  🎰
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
+                  ONLINE
+                </span>
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#FBBF24] transition-colors duration-200">
+                FORTUNARIUM
+              </h2>
+              <p className="text-slate-300/90 text-sm sm:text-base font-normal leading-snug">
+                &ldquo;Una misma tragaperras para todo el grupo. Superad la cuota, mejorad la máquina y comparad quién amasa o arruina la fortuna.&rdquo;
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold">2–4 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300">Cooperativo</span>
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-950/50 border border-emerald-500/30 text-emerald-300 font-bold">Tragaperras Compartida</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
+              <span className="text-sm font-bold text-[#FBBF24] group-hover:text-[#FDE047] group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
+                Entrar a la sala <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </span>
+              <div className="w-10 h-10 rounded-full bg-[#FBBF24] group-hover:bg-[#F59E0B] text-slate-950 flex items-center justify-center font-black shadow-md shadow-[#FBBF24]/25 group-hover:scale-110 transition-all duration-300">
+                <Play className="w-4 h-4 fill-current ml-0.5" />
+              </div>
+            </div>
+          </div>
         </div>
       </main>
 

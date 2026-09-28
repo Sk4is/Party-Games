@@ -16,6 +16,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "FortunariumBouncy";
+  src: url("/assets/fonts/Bouncy-Thin-PERSONAL_USE_ONLY.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 html,
 body,
 #root {
@@ -52,6 +60,10 @@ body,
   }
   .font-blackboard {
     font-family: 'BLAZE', 'Chalkboard SE', 'Comic Sans MS', 'Caveat', cursive, sans-serif;
+  }
+  .font-fortunarium {
+    font-family: "FortunariumBouncy", "Titan One", "Fredoka", cursive, sans-serif;
+    letter-spacing: 0.04em;
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;

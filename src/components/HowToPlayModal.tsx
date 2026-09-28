@@ -471,6 +471,57 @@ const GAMES: GameGuide[] = [
       },
     ],
   },
+  {
+    id: 'fortunarium',
+    name: 'Fortunarium',
+    icon: '🎰',
+    tagline: 'Una sola máquina tragaperras cooperativa para todo el grupo',
+    playersBadge: '2–4 Jugadores',
+    typeBadge: 'Cooperativo y Estadísticas',
+    accent: {
+      primary: '#FBBF24',
+      contrastText: '#1c1917',
+      borderClass: 'border-[#FBBF24]/40',
+      glowColor: 'rgba(251, 191, 36, 0.18)',
+      titleColor: 'text-[#FBBF24]',
+      iconBg: 'bg-[#FBBF24]/15',
+      iconBorder: 'border-[#FBBF24]/30',
+      numberBg: 'rgba(251, 191, 36, 0.18)',
+      numberColor: '#FBBF24',
+      tagBg: 'bg-amber-500/10',
+      tagBorder: 'border-amber-500/30',
+      tagText: 'text-amber-300',
+    },
+    rules: [
+      {
+        num: '01',
+        title: 'Una máquina compartida y cuotas por ciclo',
+        content: (
+          <p>
+            De 2 a 4 jugadores comparten <strong className="text-white">una única tragaperras física de 5x3 rodillos</strong>. El dinero, la cuota, la integridad y las mejoras son de todo el grupo. Antes de agotar las tiradas de cada ciclo debéis reunir el dinero exigido por la cuota.
+          </p>
+        ),
+      },
+      {
+        num: '02',
+        title: 'Símbolos especiales, integridad y voltaje',
+        content: (
+          <p>
+            Además de los 12 símbolos clásicos de premio, aparecen <strong className="text-amber-300">Monedas, Rayos, Llaves, Comodines, Interrogaciones, Bombas y Calaveras</strong>. Cuidado con la integridad mecánica: si llega al 0% por explosiones o sobrecargas, la máquina revienta.
+          </p>
+        ),
+      },
+      {
+        num: '03',
+        title: 'Taller de mejoras y balance económico individual',
+        content: (
+          <p>
+            Invertid el fondo común o las Llaves en el <strong className="text-white">Taller del Fortunarium</strong> para potenciar rodillos y blindar el chasis. Aunque la partida es cooperativa, el marcador registra en vivo <strong className="text-emerald-300">quién ha generado más fortuna y quién ha perdido más dinero</strong>.
+          </p>
+        ),
+      },
+    ],
+  },
 ];
 
 export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose, initialGame }) => {

@@ -21,7 +21,8 @@ export type MultiplayerGameType =
   | 'codigo-rojo'
   | 'coartada'
   | 'entre-topos'
-  | 'la_cantina_del_farol';
+  | 'la_cantina_del_farol'
+  | 'fortunarium';
 
 export interface SharedRoomSummary {
   roomId: string;

@@ -6,19 +6,24 @@ export type SupportedGameType =
   | 'codigo-rojo'
   | 'coartada'
   | 'entre-topos'
-  | 'la_cantina_del_farol';
+  | 'la_cantina_del_farol'
+  | 'fortunarium';
 
 interface RoomMeta {
   code: string;
   gameType: SupportedGameType;
-  serverType: 'party' | 'pinturillo' | 'cantina';
+  serverType: 'party' | 'pinturillo' | 'cantina' | 'fortunarium';
   createdAt: number;
 }
 
 class RoomRegistry {
   private rooms = new Map<string, RoomMeta>();
 
-  register(code: string, gameType: SupportedGameType, serverType: 'party' | 'pinturillo' | 'cantina') {
+  register(
+    code: string,
+    gameType: SupportedGameType,
+    serverType: 'party' | 'pinturillo' | 'cantina' | 'fortunarium'
+  ) {
     const cleanCode = code.toUpperCase().trim();
     this.rooms.set(cleanCode, {
       code: cleanCode,
