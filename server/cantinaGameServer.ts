@@ -30,7 +30,12 @@ interface ServerRoom {
   config: CantinaConfig;
   currentRound: number;
   tableRank: TableRank;
+  roundStartEventId: string;
+  lastRoundStarterSeatIndex: number;
+  roundStartingPlayerId: string | null;
+  roundStartingPlayerName: string | null;
   activePlayerIndex: number;
+  mandatoryChallenge: boolean;
   players: CantinaPlayer[];
   centerPileCount: number;
   centerPileCards: Card[]; // Server-only, hidden from clients
@@ -40,6 +45,7 @@ interface ServerRoom {
   rouletteResult: RouletteResult | null;
   winnerPlayerId: string | null;
   winnerName: string | null;
+  rematchReadyPlayerIds: string[];
   roundTransitionTimeout: NodeJS.Timeout | null;
   abortReason?: string;
 }
@@ -150,7 +156,12 @@ export class CantinaServer {
       },
       currentRound: 0,
       tableRank: 'K',
+      roundStartEventId: '',
+      lastRoundStarterSeatIndex: -1,
+      roundStartingPlayerId: null,
+      roundStartingPlayerName: null,
       activePlayerIndex: 0,
+      mandatoryChallenge: false,
       players: [initialPlayer],
       centerPileCount: 0,
       centerPileCards: [],
@@ -160,6 +171,7 @@ export class CantinaServer {
       rouletteResult: null,
       winnerPlayerId: null,
       winnerName: null,
+      rematchReadyPlayerIds: [],
       roundTransitionTimeout: null,
     };
 
@@ -254,6 +266,14 @@ export class CantinaServer {
           return;
         }
 
+        if (room.mandatoryChallenge) {
+          this.sendError(
+            ws,
+            '¡EL JUGADOR ANTERIOR SE QUEDÓ SIN CARTAS! DEBES ACUSAR ¡FAROL!'
+          );
+          return;
+        }
+
         const cardIds = msg.cardIds;
         if (!Array.isArray(cardIds) || cardIds.length < 1 || cardIds.length > 3) {
           this.sendError(ws, 'DEBES SELECCIONAR ENTRE 1 Y 3 CARTAS');
@@ -274,6 +294,7 @@ export class CantinaServer {
         // Remove cards from player's hand
         activePlayer.hand = playerHand.filter((c) => !cardIds.includes(c.id));
         activePlayer.cardsCount = activePlayer.hand.length;
+        const emptiedHand = activePlayer.cardsCount === 0;
 
         // Add to center pile
         room.centerPileCards.push(...playedCards);
@@ -320,8 +341,8 @@ export class CantinaServer {
           claimedRank: room.tableRank,
         });
 
-        // Advance to next active alive player with cards
-        this.advanceToNextTurn(room);
+        // Advance to next active alive player (or force mandatory accusation if activePlayer emptied hand)
+        this.advanceToNextTurn(room, emptiedHand, activePlayer.id);
         this.broadcastRoom(room);
         break;
       }
@@ -343,9 +364,67 @@ export class CantinaServer {
         break;
       }
 
+      case 'ROULETTE_SPIN': {
+        if (room.phase !== 'RULETA' || !room.rouletteResult) return;
+        if (room.rouletteResult.shotResolved) return;
+        if (room.rouletteResult.targetPlayerId !== conn.playerId) return;
+        if (
+          msg.rouletteEventId &&
+          msg.rouletteEventId !== room.rouletteResult.rouletteEventId
+        ) {
+          return;
+        }
+
+        const safeVel = Math.max(-75, Math.min(75, Number(msg.velocity) || 0));
+        const safeAngle = Number(msg.angle) || 0;
+        const spinId = String(msg.spinId || `spin_${Date.now()}`);
+
+        this.broadcastEventExcept(room.code, conn.playerId, {
+          type: 'ROULETTE_SPIN_EVENT',
+          rouletteEventId: room.rouletteResult.rouletteEventId,
+          playerId: conn.playerId,
+          velocity: safeVel,
+          angle: safeAngle,
+          spinId,
+        });
+        break;
+      }
+
+      case 'PULL_TRIGGER': {
+        if (room.phase !== 'RULETA' || !room.rouletteResult) return;
+        if (room.rouletteResult.shotResolved) return;
+        if (room.rouletteResult.targetPlayerId !== conn.playerId) {
+          this.sendError(ws, 'NO ES TU TURNO DE DISPARAR');
+          return;
+        }
+        if (
+          msg.rouletteEventId &&
+          msg.rouletteEventId !== room.rouletteResult.rouletteEventId
+        ) {
+          return;
+        }
+        this.executeRouletteTriggerPull(
+          room,
+          conn.playerId,
+          room.rouletteResult.rouletteEventId
+        );
+        break;
+      }
+
       case 'TRIGGER_ROULETTE': {
-        if (room.phase !== 'RULETA') return;
-        this.broadcastRoom(room);
+        if (room.phase !== 'RULETA' || !room.rouletteResult) return;
+        if (
+          !room.rouletteResult.shotResolved &&
+          room.rouletteResult.targetPlayerId === conn.playerId
+        ) {
+          this.executeRouletteTriggerPull(
+            room,
+            conn.playerId,
+            room.rouletteResult.rouletteEventId
+          );
+        } else {
+          this.broadcastRoom(room);
+        }
         break;
       }
 
@@ -357,21 +436,60 @@ export class CantinaServer {
         break;
       }
 
+      case 'REQUEST_REMATCH': {
+        if (room.phase !== 'GAME_OVER') return;
+        if (!room.rematchReadyPlayerIds.includes(conn.playerId)) {
+          room.rematchReadyPlayerIds.push(conn.playerId);
+        }
+        const connectedPlayers = room.players.filter((p) => p.isConnected);
+        const allReady =
+          connectedPlayers.length >= 2 &&
+          connectedPlayers.every((p) => room.rematchReadyPlayerIds.includes(p.id));
+        if (allReady) {
+          this.startMatch(room);
+        } else {
+          this.broadcastRoom(room);
+        }
+        break;
+      }
+
       case 'RESTART_MATCH': {
+        if (room.phase === 'GAME_OVER') {
+          if (!room.rematchReadyPlayerIds.includes(conn.playerId)) {
+            room.rematchReadyPlayerIds.push(conn.playerId);
+          }
+          const connectedPlayers = room.players.filter((p) => p.isConnected);
+          const allReady =
+            connectedPlayers.length >= 2 &&
+            connectedPlayers.every((p) =>
+              room.rematchReadyPlayerIds.includes(p.id)
+            );
+          if (allReady) {
+            this.startMatch(room);
+          } else {
+            this.broadcastRoom(room);
+          }
+          return;
+        }
         if (room.hostId !== conn.playerId) return;
         this.resetMatchToLobby(room);
         break;
       }
 
       case 'RETURN_TO_LOBBY': {
-        // Return to lobby from active match or end state
+        // Return to lobby from active match or end state while preserving the room
         this.resetMatchToLobby(room);
         break;
       }
 
       case 'HAND_INTERACTION': {
         // Ephemeral live interaction: relay to other players in the room
-        this.broadcastHandInteraction(room.code, conn.playerId, msg.interaction, msg.hoveredIndex);
+        this.broadcastHandInteraction(
+          room.code,
+          conn.playerId,
+          msg.interaction,
+          msg.hoveredIndex
+        );
         break;
       }
 
@@ -383,9 +501,22 @@ export class CantinaServer {
   }
 
   private startMatch(room: ServerRoom) {
+    if (room.roundTransitionTimeout) {
+      clearTimeout(room.roundTransitionTimeout);
+      room.roundTransitionTimeout = null;
+    }
+
     room.currentRound = 0;
+    room.lastRoundStarterSeatIndex = -1;
+    room.roundStartingPlayerId = null;
+    room.roundStartingPlayerName = null;
+    room.mandatoryChallenge = false;
+    room.rematchReadyPlayerIds = [];
     room.winnerPlayerId = null;
     room.winnerName = null;
+    room.lastPlay = null;
+    room.challengeResult = null;
+    room.rouletteResult = null;
     room.centerPileCards = [];
     room.centerPileCount = 0;
     room.centerPileHistory = [];
@@ -395,6 +526,7 @@ export class CantinaServer {
       p.seatIndex = idx;
       p.isAlive = true;
       p.isEliminated = false;
+      p.eliminatedRound = undefined;
       p.chamberPulls = 0;
       p.bulletChamber = Math.floor(Math.random() * 6);
       p.cardsCount = 0;
@@ -418,6 +550,7 @@ export class CantinaServer {
 
     room.currentRound += 1;
     room.phase = 'ROUND_INTRO';
+    room.mandatoryChallenge = false;
     room.lastPlay = null;
     room.challengeResult = null;
     room.rouletteResult = null;
@@ -435,57 +568,108 @@ export class CantinaServer {
 
     for (const rank of TABLE_RANKS) {
       for (let i = 0; i < 6; i++) {
-        deck.push({ id: `card_${rank}_${idCounter++}`, rank });
+        deck.push({ id: `card_${rank}_r${room.currentRound}_${idCounter++}`, rank });
       }
     }
 
     // 2 Jokers
-    deck.push({ id: `card_JOKER_${idCounter++}`, rank: 'JOKER' });
-    deck.push({ id: `card_JOKER_${idCounter++}`, rank: 'JOKER' });
+    deck.push({ id: `card_JOKER_r${room.currentRound}_${idCounter++}`, rank: 'JOKER' });
+    deck.push({ id: `card_JOKER_r${room.currentRound}_${idCounter++}`, rank: 'JOKER' });
 
     // In DIABLO mode: exactly ONE card of the matching tableRank is transformed into DIABLO!
-    // Example: if tableRank is Q, deck has 6 J, 5 Q, 6 K, 2 Joker, 1 Devil = 20 total cards!
     if (room.config.mode === 'DIABLO') {
       const matchIndex = deck.findIndex((c) => c.rank === room.tableRank);
       if (matchIndex >= 0) {
-        deck[matchIndex] = { id: `card_DIABLO_${idCounter++}`, rank: 'DIABLO' };
+        deck[matchIndex] = {
+          id: `card_DIABLO_r${room.currentRound}_${idCounter++}`,
+          rank: 'DIABLO',
+        };
       }
     }
 
     const shuffled = shuffle(deck);
 
-    // Deal 5 cards to each alive player
-    alivePlayers.forEach((player) => {
-      const hand = shuffled.splice(0, 5);
-      player.hand = hand;
-      player.cardsCount = hand.length;
+    // Deal 5 cards to each alive player; clear eliminated players' hands
+    room.players.forEach((player) => {
+      if (player.isAlive) {
+        const hand = shuffled.splice(0, 5);
+        player.hand = hand;
+        player.cardsCount = hand.length;
+      } else {
+        player.hand = [];
+        player.cardsCount = 0;
+      }
     });
 
-    // Start with the first alive player
-    const firstAliveIndex = room.players.findIndex((p) => p.isAlive);
-    room.activePlayerIndex = firstAliveIndex >= 0 ? firstAliveIndex : 0;
+    // Server-authoritative round starting player rotation across alive players:
+    // Round 1 -> first alive player (seat 0). Subsequent rounds -> next alive seat clockwise.
+    const total = room.players.length;
+    let startIdx = 0;
+    if (room.lastRoundStarterSeatIndex < 0) {
+      const firstAlive = room.players.findIndex((p) => p.isAlive);
+      startIdx = firstAlive >= 0 ? firstAlive : 0;
+    } else {
+      for (let offset = 1; offset <= total; offset++) {
+        const candidateIdx = (room.lastRoundStarterSeatIndex + offset) % total;
+        if (room.players[candidateIdx]?.isAlive) {
+          startIdx = candidateIdx;
+          break;
+        }
+      }
+    }
+
+    room.lastRoundStarterSeatIndex = startIdx;
+    room.activePlayerIndex = startIdx;
+    const starterPlayer = room.players[startIdx];
+    room.roundStartingPlayerId = starterPlayer ? starterPlayer.id : null;
+    room.roundStartingPlayerName = starterPlayer ? starterPlayer.name : null;
+    room.roundStartEventId = `deal_${room.code}_r${room.currentRound}_${Date.now()}`;
 
     // Broadcast dealing event for clients to trigger physical deal animation
     this.broadcastEvent(room.code, {
       type: 'DEAL_CARDS_EVENT',
       round: room.currentRound,
+      roundStartEventId: room.roundStartEventId,
+      startingPlayerId: room.roundStartingPlayerId || '',
+      startingPlayerName: room.roundStartingPlayerName || '',
+      tableRank: room.tableRank,
     });
 
     this.broadcastRoom(room);
 
-    // After 2.5 seconds, transition to PLAYING
+    // After 2.4 seconds (when dealing & reveal completes), transition to PLAYING
     room.roundTransitionTimeout = setTimeout(() => {
       room.phase = 'PLAYING';
       this.broadcastRoom(room);
-    }, 2500);
+    }, 2400);
   }
 
-  private advanceToNextTurn(room: ServerRoom) {
+  private advanceToNextTurn(
+    room: ServerRoom,
+    emptiedHand: boolean,
+    justPlayedPlayerId: string
+  ) {
     const total = room.players.length;
+
+    // Requirement 8: When a player plays their final card(s), DO NOT immediately declare them winner.
+    // The NEXT alive player is FORCED to accuse: ¡FAROL!
+    if (emptiedHand) {
+      let nextIdx = (room.activePlayerIndex + 1) % total;
+      for (let i = 0; i < total; i++) {
+        const candidate = room.players[nextIdx];
+        if (candidate && candidate.isAlive && candidate.id !== justPlayedPlayerId) {
+          room.activePlayerIndex = nextIdx;
+          room.mandatoryChallenge = true;
+          return;
+        }
+        nextIdx = (nextIdx + 1) % total;
+      }
+    }
+
+    // Normal turn advancement: find next alive player who has cards
     let nextIdx = (room.activePlayerIndex + 1) % total;
     let found = false;
 
-    // Look for next alive player who has cards
     for (let i = 0; i < total; i++) {
       const candidate = room.players[nextIdx];
       if (candidate.isAlive && (candidate.hand || []).length > 0) {
@@ -497,20 +681,38 @@ export class CantinaServer {
 
     if (found) {
       room.activePlayerIndex = nextIdx;
+      room.mandatoryChallenge = false;
     } else {
-      // All alive players are out of cards! Redeal a new round
-      this.startRound(room);
+      // Fallback if no one has cards left: force challenge on next alive player
+      let fallbackIdx = (room.activePlayerIndex + 1) % total;
+      for (let i = 0; i < total; i++) {
+        const candidate = room.players[fallbackIdx];
+        if (candidate && candidate.isAlive && candidate.id !== justPlayedPlayerId) {
+          room.activePlayerIndex = fallbackIdx;
+          room.mandatoryChallenge = true;
+          return;
+        }
+        fallbackIdx = (fallbackIdx + 1) % total;
+      }
     }
   }
 
   private resolveChallenge(room: ServerRoom, accuser: CantinaPlayer) {
     if (!room.lastPlay) return;
 
+    if (room.roundTransitionTimeout) {
+      clearTimeout(room.roundTransitionTimeout);
+      room.roundTransitionTimeout = null;
+    }
+
     const lastPlay = room.lastPlay;
     const accused = room.players.find((p) => p.id === lastPlay.playerId);
     if (!accused) return;
 
-    room.phase = 'REVELACION';
+    const isFinalHandChallenge = Boolean(
+      room.mandatoryChallenge || (accused.hand || []).length === 0
+    );
+    room.mandatoryChallenge = false;
 
     const revealedCards = lastPlay.cards || [];
     const isDiabloMode = room.config.mode === 'DIABLO';
@@ -530,20 +732,46 @@ export class CantinaServer {
       }
     }
 
-    let loser = isBluff ? accused : accuser;
+    const loser = isBluff ? accused : accuser;
     let description = '';
+    let roundWinnerPlayerId: string | null = null;
+    let roundWinnerName: string | null = null;
 
     if (isDiabloMode && hasDiablo) {
       // In Devil Mode: if Devil is challenged:
       // Devil player is SAFE! Every OTHER alive player must shoot!
-      description = `¡CARTA DEL DIABLO EN JUEGO! ${accused.name} se salva por el poder del Diablo. ¡Toda la mesa restante debe probar su suerte en el revólver!`;
+      if (isFinalHandChallenge && !isBluff) {
+        roundWinnerPlayerId = accused.id;
+        roundWinnerName = accused.name;
+      }
+      description = `¡EL DIABLO DESPIERTA! ${accused.name} queda a salvo. ¡Todos los demás rivales vivos deben enfrentarse al revólver!`;
+    } else if (isFinalHandChallenge) {
+      if (!isBluff) {
+        roundWinnerPlayerId = accused.id;
+        roundWinnerName = accused.name;
+        description = `${accused.name} se quedó sin cartas con una jugada válida y gana la ronda. ${accuser.name} falló la acusación y debe disparar.`;
+      } else {
+        roundWinnerPlayerId = null;
+        roundWinnerName = null;
+        description = `¡Farol en la jugada final! ${accused.name} mintió al quedarse sin cartas y NO gana la ronda. ${accused.name} debe disparar.`;
+      }
     } else if (isBluff) {
-      description = `¡FAROL DETECTADO! ${accused.name} ha mentido. No todas las cartas eran ${this.getRankName(room.tableRank)}.`;
+      description = `¡FAROL DETECTADO! ${accused.name} ha mentido. No todas las cartas eran ${this.getRankName(
+        room.tableRank
+      )}.`;
     } else {
-      description = `¡VERDAD PURA! ${accused.name} decía la verdad. ${accuser.name} ha fallado la acusación.`;
+      description = `¡JUGADA VÁLIDA! ${accused.name} decía la verdad. ${accuser.name} ha fallado la acusación.`;
     }
 
+    const challengeId = `chal_${room.code}_r${room.currentRound}_${Date.now()}`;
+    const isDevilEvent = Boolean(hasDiablo && isDiabloMode);
+    const devilRevealEventId = isDevilEvent
+      ? `devil_${room.code}_r${room.currentRound}_${Date.now()}`
+      : undefined;
+
     room.challengeResult = {
+      challengeId,
+      devilRevealEventId,
       accuserPlayerId: accuser.id,
       accuserName: accuser.name,
       accusedPlayerId: accused.id,
@@ -553,16 +781,30 @@ export class CantinaServer {
       isBluff,
       loserPlayerId: loser.id,
       loserName: loser.name,
-      hasDiablo: hasDiablo && isDiabloMode,
+      hasDiablo: isDevilEvent,
+      isFinalHandChallenge,
+      roundWinnerPlayerId,
+      roundWinnerName,
       description,
     };
 
-    this.broadcastRoom(room);
+    if (isDevilEvent) {
+      // Requirement 20-23: Pause normal flow and run 5-second Devil card reveal from central pile
+      room.phase = 'DEVIL_REVEAL';
+      this.broadcastRoom(room);
 
-    // After 3.5 seconds of card flip suspense, go to RULETA
-    room.roundTransitionTimeout = setTimeout(() => {
-      this.prepareRoulette(room, loser, hasDiablo && isDiabloMode, accused);
-    }, 3500);
+      room.roundTransitionTimeout = setTimeout(() => {
+        this.prepareRoulette(room, loser, true, accused);
+      }, 5200);
+    } else {
+      room.phase = 'REVELACION';
+      this.broadcastRoom(room);
+
+      // After 3.4 seconds of card flip & round result presentation, go to interactive RULETA
+      room.roundTransitionTimeout = setTimeout(() => {
+        this.prepareRoulette(room, loser, false, accused);
+      }, 3400);
+    }
   }
 
   private prepareRoulette(
@@ -571,115 +813,180 @@ export class CantinaServer {
     isDevilSequence: boolean,
     accused: CantinaPlayer
   ) {
-    room.phase = 'RULETA';
+    if (room.roundTransitionTimeout) {
+      clearTimeout(room.roundTransitionTimeout);
+      room.roundTransitionTimeout = null;
+    }
 
+    let queuePlayerIds: string[] = [];
     if (isDevilSequence) {
-      // DEVIL SEQUENCE: Devil player is SAFE. Every OTHER alive player must shoot in sequence!
-      const shooters = room.players.filter((p) => p.isAlive && p.id !== accused.id);
-      const shots: SingleShotResult[] = [];
-
-      shooters.forEach((shooter) => {
-        const pull = shooter.chamberPulls;
-        const fired = pull === shooter.bulletChamber;
-        shooter.chamberPulls += 1;
-
-        if (fired) {
-          shooter.isAlive = false;
-          shooter.isEliminated = true;
-          shooter.eliminatedRound = room.currentRound;
-        }
-
-        shots.push({
-          playerId: shooter.id,
-          playerName: shooter.name,
-          fired,
-          chamberNumber: pull + 1,
-          survived: !fired,
-        });
-      });
-
-      // Initialize sequential roulette presentation
-      room.rouletteResult = {
-        stepIndex: 0,
-        totalSteps: shots.length,
-        targetPlayerId: shots[0]?.playerId || primaryLoser.id,
-        targetPlayerName: shots[0]?.playerName || primaryLoser.name,
-        fired: shots[0]?.fired || false,
-        chamberNumber: shots[0]?.chamberNumber || 1,
-        isFatal: shots[0]?.fired || false,
-        survived: shots[0]?.survived ?? true,
-        isDevilSequence: true,
-        shots,
-      };
-
-      this.broadcastRoom(room);
-
-      // Sequence each shot with 3 seconds gap
-      this.runDevilShotSequence(room, 0);
+      // Devil player (accused) is SAFE. All other alive rivals shoot in sequence!
+      queuePlayerIds = room.players
+        .filter((p) => p.isAlive && p.id !== accused.id)
+        .map((p) => p.id);
     } else {
-      // Normal single roulette pull
-      const pull = primaryLoser.chamberPulls;
-      const fired = pull === primaryLoser.bulletChamber;
-      primaryLoser.chamberPulls += 1;
+      queuePlayerIds = [primaryLoser.id];
+    }
 
-      if (fired) {
-        primaryLoser.isAlive = false;
-        primaryLoser.isEliminated = true;
-        primaryLoser.eliminatedRound = room.currentRound;
-      }
+    if (queuePlayerIds.length === 0) {
+      this.evaluatePostRoulette(room);
+      return;
+    }
 
-      room.rouletteResult = {
-        stepIndex: 0,
-        totalSteps: 1,
-        targetPlayerId: primaryLoser.id,
-        targetPlayerName: primaryLoser.name,
-        fired,
-        chamberNumber: pull + 1,
-        isFatal: fired,
-        survived: !fired,
-        isDevilSequence: false,
-        shots: [
-          {
-            playerId: primaryLoser.id,
-            playerName: primaryLoser.name,
-            fired,
-            chamberNumber: pull + 1,
-            survived: !fired,
-          },
-        ],
-      };
+    this.startInteractiveRouletteStep(
+      room,
+      queuePlayerIds,
+      0,
+      isDevilSequence,
+      []
+    );
+  }
 
-      this.broadcastRoom(room);
+  private startInteractiveRouletteStep(
+    room: ServerRoom,
+    queuePlayerIds: string[],
+    stepIndex: number,
+    isDevilSequence: boolean,
+    completedShots: SingleShotResult[]
+  ) {
+    if (room.roundTransitionTimeout) {
+      clearTimeout(room.roundTransitionTimeout);
+      room.roundTransitionTimeout = null;
+    }
 
-      // After 4.2 seconds, evaluate match state
+    // Requirement 28: If only 1 player remains alive, match ends immediately
+    const survivors = room.players.filter((p) => p.isAlive);
+    if (survivors.length <= 1 || stepIndex >= queuePlayerIds.length) {
+      this.evaluatePostRoulette(room);
+      return;
+    }
+
+    const targetId = queuePlayerIds[stepIndex];
+    const shooter = room.players.find((p) => p.id === targetId);
+    if (!shooter || !shooter.isAlive) {
+      this.startInteractiveRouletteStep(
+        room,
+        queuePlayerIds,
+        stepIndex + 1,
+        isDevilSequence,
+        completedShots
+      );
+      return;
+    }
+
+    room.phase = 'RULETA';
+    const rouletteEventId = `roul_${room.code}_r${room.currentRound}_s${stepIndex}_${Date.now()}`;
+
+    room.rouletteResult = {
+      rouletteEventId,
+      shotEventId: null,
+      stepIndex,
+      totalSteps: queuePlayerIds.length,
+      targetPlayerId: shooter.id,
+      targetPlayerName: shooter.name,
+      chamberPullsBefore: shooter.chamberPulls,
+      chamberNumber: shooter.chamberPulls + 1,
+      shotResolved: false,
+      fired: false,
+      isFatal: false,
+      survived: true,
+      isDevilSequence,
+      queuePlayerIds,
+      shots: completedShots,
+    };
+
+    this.broadcastRoom(room);
+
+    // If the target shooter is disconnected, auto-pull after 3.5s so the match never stalls
+    if (!shooter.isConnected) {
       room.roundTransitionTimeout = setTimeout(() => {
-        this.evaluatePostRoulette(room);
-      }, 4200);
+        this.executeRouletteTriggerPull(room, shooter.id, rouletteEventId);
+      }, 3500);
     }
   }
 
-  private runDevilShotSequence(room: ServerRoom, currentStep: number) {
-    if (!room.rouletteResult || !room.rouletteResult.shots) return;
-    const shots = room.rouletteResult.shots;
-
-    if (currentStep < shots.length) {
-      const shot = shots[currentStep];
-      room.rouletteResult.stepIndex = currentStep;
-      room.rouletteResult.targetPlayerId = shot.playerId;
-      room.rouletteResult.targetPlayerName = shot.playerName;
-      room.rouletteResult.fired = shot.fired;
-      room.rouletteResult.chamberNumber = shot.chamberNumber;
-      room.rouletteResult.isFatal = shot.fired;
-      room.rouletteResult.survived = shot.survived;
-
-      this.broadcastRoom(room);
-
-      room.roundTransitionTimeout = setTimeout(() => {
-        this.runDevilShotSequence(room, currentStep + 1);
-      }, 3200);
-    } else {
-      this.evaluatePostRoulette(room);
+  private executeRouletteTriggerPull(
+    room: ServerRoom,
+    playerId: string,
+    rouletteEventId: string
+  ) {
+    if (
+      room.phase !== 'RULETA' ||
+      !room.rouletteResult ||
+      room.rouletteResult.shotResolved ||
+      room.rouletteResult.rouletteEventId !== rouletteEventId ||
+      room.rouletteResult.targetPlayerId !== playerId
+    ) {
+      return;
     }
+
+    if (room.roundTransitionTimeout) {
+      clearTimeout(room.roundTransitionTimeout);
+      room.roundTransitionTimeout = null;
+    }
+
+    const shooter = room.players.find((p) => p.id === playerId);
+    if (!shooter) return;
+
+    // Server-authoritative bullet evaluation
+    const pull = shooter.chamberPulls;
+    const fired = pull === shooter.bulletChamber;
+    shooter.chamberPulls += 1;
+
+    if (fired) {
+      shooter.isAlive = false;
+      shooter.isEliminated = true;
+      shooter.eliminatedRound = room.currentRound;
+      shooter.hand = [];
+      shooter.cardsCount = 0;
+    }
+
+    const shotRecord: SingleShotResult = {
+      playerId: shooter.id,
+      playerName: shooter.name,
+      fired,
+      chamberNumber: pull + 1,
+      survived: !fired,
+    };
+
+    const updatedShots = [...(room.rouletteResult.shots || []), shotRecord];
+    const queuePlayerIds = room.rouletteResult.queuePlayerIds || [shooter.id];
+    const currentStep = room.rouletteResult.stepIndex;
+    const isDevilSequence = room.rouletteResult.isDevilSequence;
+
+    room.rouletteResult = {
+      ...room.rouletteResult,
+      shotEventId: `shot_${rouletteEventId}_${Date.now()}`,
+      chamberNumber: pull + 1,
+      shotResolved: true,
+      fired,
+      isFatal: fired,
+      survived: !fired,
+      shots: updatedShots,
+    };
+
+    this.broadcastRoom(room);
+
+    // Allow 3.5 seconds for trigger tension + gunshot/click + elimination/relief presentation
+    room.roundTransitionTimeout = setTimeout(() => {
+      const survivors = room.players.filter((p) => p.isAlive);
+      if (survivors.length <= 1) {
+        this.endGame(room, survivors[0] || null);
+        return;
+      }
+
+      if (currentStep + 1 < queuePlayerIds.length) {
+        this.startInteractiveRouletteStep(
+          room,
+          queuePlayerIds,
+          currentStep + 1,
+          isDevilSequence,
+          updatedShots
+        );
+      } else {
+        this.evaluatePostRoulette(room);
+      }
+    }, 3500);
   }
 
   private evaluatePostRoulette(room: ServerRoom) {
@@ -692,7 +999,13 @@ export class CantinaServer {
   }
 
   private endGame(room: ServerRoom, winner: CantinaPlayer | null) {
+    if (room.roundTransitionTimeout) {
+      clearTimeout(room.roundTransitionTimeout);
+      room.roundTransitionTimeout = null;
+    }
     room.phase = 'GAME_OVER';
+    room.mandatoryChallenge = false;
+    room.rematchReadyPlayerIds = [];
     room.winnerPlayerId = winner ? winner.id : null;
     room.winnerName = winner ? winner.name : 'Nadie (todos eliminados)';
     this.broadcastRoom(room);
@@ -705,6 +1018,12 @@ export class CantinaServer {
     }
     room.phase = 'LOBBY';
     room.currentRound = 0;
+    room.roundStartEventId = '';
+    room.lastRoundStarterSeatIndex = -1;
+    room.roundStartingPlayerId = null;
+    room.roundStartingPlayerName = null;
+    room.mandatoryChallenge = false;
+    room.rematchReadyPlayerIds = [];
     room.winnerPlayerId = null;
     room.winnerName = null;
     room.lastPlay = null;
@@ -717,6 +1036,7 @@ export class CantinaServer {
     room.players.forEach((p) => {
       p.isAlive = true;
       p.isEliminated = false;
+      p.eliminatedRound = undefined;
       p.cardsCount = 0;
       p.hand = [];
       p.chamberPulls = 0;
@@ -759,6 +1079,33 @@ export class CantinaServer {
           'Los demás jugadores han abandonado la partida. Has vuelto a la sala.'
         );
         return;
+      }
+
+      if (room.phase === 'GAME_OVER') {
+        room.rematchReadyPlayerIds = room.rematchReadyPlayerIds.filter(
+          (id) => id !== conn.playerId
+        );
+        const connectedPlayers = room.players.filter((p) => p.isConnected);
+        if (
+          connectedPlayers.length >= 2 &&
+          connectedPlayers.every((p) => room.rematchReadyPlayerIds.includes(p.id))
+        ) {
+          this.startMatch(room);
+          return;
+        }
+      } else if (
+        room.phase === 'RULETA' &&
+        room.rouletteResult &&
+        !room.rouletteResult.shotResolved &&
+        room.rouletteResult.targetPlayerId === conn.playerId
+      ) {
+        const eventId = room.rouletteResult.rouletteEventId;
+        if (room.roundTransitionTimeout) {
+          clearTimeout(room.roundTransitionTimeout);
+        }
+        room.roundTransitionTimeout = setTimeout(() => {
+          this.executeRouletteTriggerPull(room, conn.playerId, eventId);
+        }, 2000);
       }
     }
 
@@ -814,7 +1161,10 @@ export class CantinaServer {
     let sanitizedLastPlay: PlayedTurn | null = null;
     if (room.lastPlay) {
       const revealCards =
-        room.phase === 'REVELACION' || room.phase === 'RULETA' || room.phase === 'ROUND_END';
+        room.phase === 'REVELACION' ||
+        room.phase === 'DEVIL_REVEAL' ||
+        room.phase === 'RULETA' ||
+        room.phase === 'ROUND_END';
       sanitizedLastPlay = {
         playerId: room.lastPlay.playerId,
         playerName: room.lastPlay.playerName,
@@ -834,8 +1184,12 @@ export class CantinaServer {
       config: room.config,
       currentRound: room.currentRound,
       tableRank: room.tableRank,
+      roundStartEventId: room.roundStartEventId,
+      roundStartingPlayerId: room.roundStartingPlayerId,
+      roundStartingPlayerName: room.roundStartingPlayerName,
       activePlayerIndex: room.activePlayerIndex,
       activePlayerId: activePlayer ? activePlayer.id : null,
+      mandatoryChallenge: room.mandatoryChallenge,
       players: sanitizedPlayers,
       centerPileCount: room.centerPileCount,
       centerPileHistory: room.centerPileHistory,
@@ -844,6 +1198,7 @@ export class CantinaServer {
       rouletteResult: room.rouletteResult,
       winnerPlayerId: room.winnerPlayerId,
       winnerName: room.winnerName,
+      rematchReadyPlayerIds: room.rematchReadyPlayerIds,
       abortReason: room.abortReason,
     };
   }
@@ -881,6 +1236,22 @@ export class CantinaServer {
   private broadcastEvent(roomCode: string, eventPayload: any) {
     for (const [ws, conn] of this.clients.entries()) {
       if (conn.roomCode === roomCode && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(eventPayload));
+      }
+    }
+  }
+
+  private broadcastEventExcept(
+    roomCode: string,
+    excludePlayerId: string,
+    eventPayload: any
+  ) {
+    for (const [ws, conn] of this.clients.entries()) {
+      if (
+        conn.roomCode === roomCode &&
+        conn.playerId !== excludePlayerId &&
+        ws.readyState === WebSocket.OPEN
+      ) {
         ws.send(JSON.stringify(eventPayload));
       }
     }

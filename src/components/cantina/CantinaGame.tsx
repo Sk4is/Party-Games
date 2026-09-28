@@ -59,14 +59,19 @@ export const CantinaGame: React.FC<CantinaGameProps> = ({
     notification,
     remoteInteractions,
     cardPlayedEvent,
+    dealCardsEvent,
+    rouletteSpinEvent,
     createRoom,
     joinRoom,
     updateConfig,
     startGame,
     playCards,
     challengeBluff,
+    pullTrigger,
+    sendRouletteSpin,
     triggerRoulette,
     nextRound,
+    requestRematch,
     restartMatch,
     returnToLobby,
     leaveRoom,
@@ -163,10 +168,15 @@ export const CantinaGame: React.FC<CantinaGameProps> = ({
           localPlayerId={player.id}
           remoteInteractions={remoteInteractions}
           cardPlayedEvent={cardPlayedEvent}
+          dealCardsEvent={dealCardsEvent}
+          rouletteSpinEvent={rouletteSpinEvent}
           onPlayCards={playCards}
           onChallengeBluff={challengeBluff}
+          onPullTrigger={pullTrigger}
+          onSpinCylinder={sendRouletteSpin}
           onTriggerRoulette={triggerRoulette}
           onNextRound={nextRound}
+          onRequestRematch={requestRematch}
           onRestartMatch={restartMatch}
           onReturnToLobby={returnToLobby}
           onLeaveRoom={handleLeaveAndBack}

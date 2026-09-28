@@ -18,6 +18,7 @@ export type CantinaPhase =
   | 'ROUND_INTRO'
   | 'PLAYING'
   | 'REVELACION'
+  | 'DEVIL_REVEAL'
   | 'RULETA'
   | 'ROUND_END'
   | 'GAME_OVER'
@@ -60,6 +61,8 @@ export interface CenterPileItem {
 }
 
 export interface ChallengeResult {
+  challengeId: string;
+  devilRevealEventId?: string;
   accuserPlayerId: string;
   accuserName: string;
   accusedPlayerId: string;
@@ -70,6 +73,9 @@ export interface ChallengeResult {
   loserPlayerId: string;
   loserName: string;
   hasDiablo: boolean;
+  isFinalHandChallenge?: boolean;
+  roundWinnerPlayerId?: string | null;
+  roundWinnerName?: string | null;
   description: string;
 }
 
@@ -82,15 +88,20 @@ export interface SingleShotResult {
 }
 
 export interface RouletteResult {
+  rouletteEventId: string;
+  shotEventId?: string | null;
   stepIndex: number;
   totalSteps: number;
   targetPlayerId: string;
   targetPlayerName: string;
-  fired: boolean;
+  chamberPullsBefore: number;
   chamberNumber: number; // 1 to 6
+  shotResolved: boolean;
+  fired: boolean;
   isFatal: boolean;
   survived: boolean;
   isDevilSequence: boolean;
+  queuePlayerIds?: string[];
   shots: SingleShotResult[];
 }
 
@@ -116,8 +127,12 @@ export interface CantinaRoomState {
   config: CantinaConfig;
   currentRound: number;
   tableRank: TableRank; // Current round required rank (J, Q, K)
+  roundStartEventId?: string;
+  roundStartingPlayerId?: string | null;
+  roundStartingPlayerName?: string | null;
   activePlayerIndex: number;
   activePlayerId: string | null;
+  mandatoryChallenge?: boolean;
   players: CantinaPlayer[];
   centerPileCount: number;
   centerPileHistory: CenterPileItem[];
@@ -126,6 +141,7 @@ export interface CantinaRoomState {
   rouletteResult: RouletteResult | null;
   winnerPlayerId: string | null;
   winnerName: string | null;
+  rematchReadyPlayerIds?: string[];
   abortReason?: string;
   notification?: {
     type: 'info' | 'warning' | 'danger' | 'success';
@@ -139,6 +155,22 @@ export type HandInteractionType =
   | 'CARD_HOVER'
   | 'CARD_SELECTED';
 
+export interface RouletteSpinEventData {
+  rouletteEventId: string;
+  playerId: string;
+  velocity: number;
+  angle: number;
+  spinId: string;
+}
+
+export interface DealCardsEventData {
+  round: number;
+  roundStartEventId: string;
+  startingPlayerId: string;
+  startingPlayerName: string;
+  tableRank: TableRank;
+}
+
 // Client to Server Messages
 export type CantinaClientMessage =
   | { type: 'JOIN_ROOM'; code: string; player: { id: string; name: string; avatar: string; color: string } }
@@ -146,8 +178,11 @@ export type CantinaClientMessage =
   | { type: 'START_GAME' }
   | { type: 'PLAY_CARDS'; cardIds: string[]; playId?: string }
   | { type: 'CHALLENGE_BLUFF' }
+  | { type: 'PULL_TRIGGER'; rouletteEventId: string }
+  | { type: 'ROULETTE_SPIN'; rouletteEventId: string; velocity: number; angle: number; spinId: string }
   | { type: 'TRIGGER_ROULETTE' }
   | { type: 'NEXT_ROUND' }
+  | { type: 'REQUEST_REMATCH' }
   | { type: 'RESTART_MATCH' }
   | { type: 'RETURN_TO_LOBBY' }
   | { type: 'LEAVE_ROOM' }
@@ -160,4 +195,5 @@ export type CantinaServerMessage =
   | { type: 'NOTIFICATION'; text: string; variant?: 'info' | 'warning' | 'danger' | 'success' }
   | { type: 'PLAYER_HAND_INTERACTION'; playerId: string; interaction: HandInteractionType; hoveredIndex?: number }
   | { type: 'CARD_PLAYED_EVENT'; playerId: string; playerName: string; cardsCount: number; playId: string; claimedRank: TableRank }
-  | { type: 'DEAL_CARDS_EVENT'; round: number };
+  | { type: 'DEAL_CARDS_EVENT'; round: number; roundStartEventId: string; startingPlayerId: string; startingPlayerName: string; tableRank: TableRank }
+  | { type: 'ROULETTE_SPIN_EVENT'; rouletteEventId: string; playerId: string; velocity: number; angle: number; spinId: string };

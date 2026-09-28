@@ -5,6 +5,8 @@ import {
   TableRank,
   HandInteractionType,
   CenterPileItem,
+  DealCardsEventData,
+  RouletteSpinEventData,
 } from '../../types/cantina';
 import {
   CANTINA_MAP_ASSETS,
@@ -28,7 +30,17 @@ import {
 import { CantinaRouletteOverlay } from './CantinaRouletteOverlay';
 import { CantinaExitModal } from './CantinaExitModal';
 import { audio } from '../../utils/audio';
-import { Skull, Crosshair, Crown, LogOut, Check } from 'lucide-react';
+import {
+  Skull,
+  Crosshair,
+  Crown,
+  LogOut,
+  Check,
+  Flame,
+  RotateCcw,
+  Sparkles,
+  AlertTriangle,
+} from 'lucide-react';
 
 interface CantinaTableProps {
   roomState: CantinaRoomState;
@@ -38,10 +50,20 @@ interface CantinaTableProps {
     { interaction: HandInteractionType; hoveredIndex?: number }
   >;
   cardPlayedEvent?: CardPlayedEventData | null;
+  dealCardsEvent?: DealCardsEventData | null;
+  rouletteSpinEvent?: RouletteSpinEventData | null;
   onPlayCards: (cardIds: string[], playId?: string) => void;
   onChallengeBluff: () => void;
+  onPullTrigger: (rouletteEventId: string) => void;
+  onSpinCylinder: (
+    rouletteEventId: string,
+    velocity: number,
+    angle: number,
+    spinId: string
+  ) => void;
   onTriggerRoulette: () => void;
   onNextRound: () => void;
+  onRequestRematch: () => void;
   onRestartMatch: () => void;
   onReturnToLobby: () => void;
   onLeaveRoom: () => void;
@@ -62,11 +84,13 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   localPlayerId,
   remoteInteractions,
   cardPlayedEvent,
+  dealCardsEvent,
+  rouletteSpinEvent,
   onPlayCards,
   onChallengeBluff,
-  onTriggerRoulette,
-  onNextRound,
-  onRestartMatch,
+  onPullTrigger,
+  onSpinCylinder,
+  onRequestRematch,
   onReturnToLobby,
   onLeaveRoom,
   onSendHandInteraction,
@@ -78,14 +102,22 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   const [showExitModal, setShowExitModal] = useState(false);
   const [animatingCards, setAnimatingCards] = useState<TransientCard[]>([]);
   const [optimisticPlays, setOptimisticPlays] = useState<CenterPileItem[]>([]);
-  const [temporaryToast, setTemporaryToast] = useState<string | null>(null);
+  const [topPlayEventBanner, setTopPlayEventBanner] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState<number>(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
 
+  // Round-start dealing & face-down -> face-up flip state
+  const [dealtCardCount, setDealtCardCount] = useState<number>(() =>
+    roomState.phase === 'ROUND_INTRO' ? 0 : 5
+  );
+  const [flippedCardIndices, setFlippedCardIndices] = useState<Set<number>>(() =>
+    roomState.phase === 'ROUND_INTRO' ? new Set() : new Set([0, 1, 2, 3, 4])
+  );
+  const [flippingCardIndex, setFlippingCardIndex] = useState<number | null>(null);
+  const lastDealtRoundKeyRef = useRef<string>('');
+
   // Track which visual card keys (`${playId}-${cardIndex}`) have finished flying and landed on the table.
-  // Seeded on mount with any plays already in roomState.centerPileHistory so reconnecting mid-round
-  // displays existing pile cards immediately without replaying old animations.
   const [landedCardKeys, setLandedCardKeys] = useState<Set<string>>(() => {
     const initial = new Set<string>();
     (roomState.centerPileHistory || []).forEach((item) => {
@@ -96,10 +128,11 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     return initial;
   });
 
-  // Authoritative deduplication set of processed playIds so a play NEVER animates more than once
+  // Authoritative deduplication sets so events NEVER animate or play audio more than once
   const animatedPlayIdsRef = useRef<Set<string>>(
     new Set((roomState.centerPileHistory || []).map((item) => item.playId))
   );
+  const lastDevilSoundIdRef = useRef<string>('');
   const isSubmittingPlayRef = useRef<boolean>(false);
   const sequenceCounterRef = useRef<number>(
     (roomState.centerPileHistory || []).reduce((acc, item) => acc + item.cardsCount, 0)
@@ -118,13 +151,15 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   }, []);
 
   const localPlayer = roomState.players.find((p) => p.id === localPlayerId);
-  const isHost = localPlayer?.isHost ?? false;
+  const activePlayer = roomState.players.find(
+    (p) => p.id === roomState.activePlayerId
+  );
   const isMyTurn =
     roomState.activePlayerId === localPlayerId && roomState.phase === 'PLAYING';
   const isLocalAlive = localPlayer?.isAlive ?? false;
+  const isMandatoryChallenge = Boolean(roomState.mandatoryChallenge && roomState.lastPlay);
 
   // 1. Authoritative Map & Independent Seat POV
-  // Strict specification for POV mapping:
   // PLAYER 1 / HOST (seatIndex 0) -> POV1
   // PLAYER 2 (seatIndex 1)        -> POV3
   // PLAYER 3 (seatIndex 2)        -> POV2
@@ -135,7 +170,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   const povKey = getSeatPovKey(seatIndex);
   const povImageSrc = resolveCantinaSeatBackground(selectedMapId, seatIndex);
 
-  // Visual layout tuning values for current map
   const layout =
     CANTINA_TABLE_LAYOUTS[selectedMapId] || CANTINA_TABLE_LAYOUTS.mapa1;
 
@@ -183,6 +217,104 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     isSubmittingPlayRef.current = false;
   }, [roomState.activePlayerId, roomState.currentRound, roomState.phase]);
 
+  // Trigger physical card dealing (face-down -> face-up flip) at the start of each round
+  useEffect(() => {
+    const roundKey =
+      roomState.roundStartEventId ||
+      dealCardsEvent?.roundStartEventId ||
+      `round_${roomState.currentRound}`;
+
+    if (!roundKey || roundKey === lastDealtRoundKeyRef.current) return;
+
+    // If reconnecting mid-round while already PLAYING and cards have been played, skip deal intro
+    if (
+      roomState.phase !== 'ROUND_INTRO' &&
+      (roomState.centerPileCount > 0 || (roomState.centerPileHistory || []).length > 0)
+    ) {
+      lastDealtRoundKeyRef.current = roundKey;
+      setDealtCardCount(5);
+      setFlippedCardIndices(new Set([0, 1, 2, 3, 4]));
+      setFlippingCardIndex(null);
+      return;
+    }
+
+    lastDealtRoundKeyRef.current = roundKey;
+    setDealtCardCount(0);
+    setFlippedCardIndices(new Set());
+    setFlippingCardIndex(null);
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    // Step 1: Deal 5 cards face-down into each player's hand
+    for (let i = 0; i < 5; i++) {
+      timers.push(
+        setTimeout(() => {
+          setDealtCardCount(i + 1);
+          audio.playCardDealt();
+        }, 120 + i * 125)
+      );
+    }
+
+    // Step 2: Flip local player's dealt cards from face-down to face-up one by one
+    for (let i = 0; i < 5; i++) {
+      const flipStartMs = 860 + i * 145;
+      timers.push(
+        setTimeout(() => {
+          setFlippingCardIndex(i);
+          audio.playCardFlip();
+        }, flipStartMs)
+      );
+      timers.push(
+        setTimeout(() => {
+          setFlippedCardIndices((prev) => {
+            const next = new Set(prev);
+            next.add(i);
+            return next;
+          });
+          if (i === 4) {
+            setFlippingCardIndex(null);
+          }
+        }, flipStartMs + 95)
+      );
+    }
+
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+    };
+  }, [
+    roomState.roundStartEventId,
+    roomState.currentRound,
+    roomState.phase,
+    roomState.centerPileCount,
+    roomState.centerPileHistory,
+    dealCardsEvent?.roundStartEventId,
+  ]);
+
+  // Ensure all cards are visible and face-up once in PLAYING phase after deal finishes
+  useEffect(() => {
+    if (roomState.phase === 'PLAYING' && dealtCardCount < 5) {
+      const fallbackTimer = setTimeout(() => {
+        setDealtCardCount(5);
+        setFlippedCardIndices(new Set([0, 1, 2, 3, 4]));
+        setFlippingCardIndex(null);
+      }, 1800);
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [roomState.phase, dealtCardCount]);
+
+  // Play ominous Devil sound once when DEVIL_REVEAL begins
+  useEffect(() => {
+    if (roomState.phase === 'DEVIL_REVEAL' && roomState.challengeResult) {
+      const devilId =
+        roomState.challengeResult.devilRevealEventId ||
+        roomState.challengeResult.challengeId;
+      if (devilId && lastDevilSoundIdRef.current !== devilId) {
+        lastDevilSoundIdRef.current = devilId;
+        audio.playDevilAwakens();
+      }
+    }
+  }, [roomState.phase, roomState.challengeResult]);
+
   // Clean in-flight cards and reset pile when authoritative round changes or centerPileHistory is cleared
   const prevRoundRef = useRef<number>(roomState.currentRound);
   useEffect(() => {
@@ -202,6 +334,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
       sequenceCounterRef.current = 0;
       if (isNewRound) {
         animatedPlayIdsRef.current.clear();
+        setTopPlayEventBanner(null);
       }
     }
   }, [
@@ -265,8 +398,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
       }
       animatedPlayIdsRef.current.add(play.playId);
 
-      // If this play belongs to the local player (e.g. fallback where playId wasn't matched),
-      // mark its cards as landed and do not spawn a duplicate remote animation.
       if (play.playerId === localPlayerId) {
         setLandedCardKeys((prev) => {
           const next = new Set(prev);
@@ -287,7 +418,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
         Math.max(opponents.length, 1)
       );
 
-      // Prefer exact DOM coordinates of the opponent's hand fan on the viewer's screen
       const seatEl = opponentSeatRefs.current[play.playerId];
       const seatRect = seatEl ? seatEl.getBoundingClientRect() : null;
       const baseStartX =
@@ -386,7 +516,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     }
   }, [roomState.centerPileHistory, triggerRemotePlayAnimation]);
 
-  // Temporary toast when a turn is played
+  // Top-center play event message when a turn is played ("TAHONERO JUGÓ 2 CARTAS")
   const prevLastPlayIdRef = useRef<string | undefined>(roomState.lastPlay?.playId);
   useEffect(() => {
     if (
@@ -394,19 +524,26 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
       roomState.lastPlay.playId !== prevLastPlayIdRef.current
     ) {
       prevLastPlayIdRef.current = roomState.lastPlay.playId;
-      setTemporaryToast(
-        `${roomState.lastPlay.playerName} jugó ${roomState.lastPlay.cardsCount} carta${
-          roomState.lastPlay.cardsCount > 1 ? 's' : ''
-        }`
+      setTopPlayEventBanner(
+        `${roomState.lastPlay.playerName.toUpperCase()} JUGÓ ${
+          roomState.lastPlay.cardsCount
+        } CARTA${roomState.lastPlay.cardsCount > 1 ? 'S' : ''}`
       );
-      const timer = setTimeout(() => setTemporaryToast(null), 2400);
+      const timer = setTimeout(() => setTopPlayEventBanner(null), 2900);
       return () => clearTimeout(timer);
     }
   }, [roomState.lastPlay]);
 
-  // Card click selection
+  // Card click selection (disabled when mandatoryChallenge is active)
   const handleCardClick = (cardId: string) => {
-    if (!isMyTurn || !isLocalAlive || isSubmittingPlayRef.current) return;
+    if (
+      !isMyTurn ||
+      !isLocalAlive ||
+      isSubmittingPlayRef.current ||
+      isMandatoryChallenge
+    ) {
+      return;
+    }
     audio.playCardSelect();
 
     setSelectedCardIds((prev) => {
@@ -430,7 +567,8 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
       selectedCardIds.length < 1 ||
       selectedCardIds.length > 3 ||
       !isMyTurn ||
-      !isLocalAlive
+      !isLocalAlive ||
+      isMandatoryChallenge
     ) {
       return;
     }
@@ -441,7 +579,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
       .toString(36)
       .substring(2, 6)}`;
 
-    // 1. Mark this playId as animated so server confirmation / CARD_PLAYED_EVENT never re-triggers it
     animatedPlayIdsRef.current.add(playId);
 
     const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
@@ -449,7 +586,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     const pileCenter = getPileCenterCoords();
     const midIdx = (cardsToPlay.length - 1) / 2;
 
-    // 2. Capture exact DOM center geometry of each selected card in the local player's hand
     const localTransientCards: TransientCard[] = cardsToPlay.map((cid, idx) => {
       const visualKey = `${playId}-${idx}`;
       const found = (localPlayer?.hand || []).find((c) => c.id === cid);
@@ -475,7 +611,7 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
         playId,
         cardIndex: idx,
         rank: found?.rank,
-        isFaceDown: true, // Thrown face down onto the wooden tabletop
+        isFaceDown: true,
         mapId: selectedMapId,
         startX,
         startY,
@@ -498,8 +634,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
       };
     });
 
-    // 3. Optimistically register the play in pile history so the moment each card finishes settling,
-    // its persistent table representation is ready in the exact same frame
     setOptimisticPlays((prev) => [
       ...prev,
       {
@@ -512,18 +646,14 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
       },
     ]);
 
-    // 4. Hide thrown cards from hand and launch their flight
     setInFlightCardIds((prev) => [...prev, ...cardsToPlay]);
     setAnimatingCards((prev) => [...prev, ...localTransientCards]);
 
-    // 5. Send authoritative play with the shared playId
     onPlayCards(cardsToPlay, playId);
     setSelectedCardIds([]);
     onSendHandInteraction('HAND_IDLE');
   };
 
-  // Seamless handoff: in the exact same React render batch, mark the card as landed in the
-  // persistent table pile and remove its flying transient card.
   const handleCardAnimationFinished = useCallback((cardVisualKey: string) => {
     setLandedCardKeys((prev) => {
       const next = new Set(prev);
@@ -568,7 +698,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
   }, [roomState.centerPileHistory, optimisticPlays]);
 
   // Compile all round pile cards with stable visual keys and apply gradual visual culling
-  // (retaining the newest MAX_VISIBLE_PILE_CARDS = 15 cards while culling oldest bottom cards)
   const visiblePileCards = useMemo(() => {
     const allCards: {
       visualKey: string;
@@ -600,12 +729,27 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
     return new Set(animatingCards.map((c) => c.id));
   }, [animatingCards]);
 
-  // Filter visible hand cards (subtract in-flight cards during throw)
+  // Filter visible hand cards (subtract in-flight cards during throw, and respect dealing count during ROUND_INTRO)
   const visibleHandCards = useMemo(() => {
-    return (localPlayer?.hand || []).filter(
+    const base = (localPlayer?.hand || []).filter(
       (c) => !inFlightCardIds.includes(c.id)
     );
-  }, [localPlayer?.hand, inFlightCardIds]);
+    if (roomState.phase === 'ROUND_INTRO' || dealtCardCount < 5) {
+      return base.slice(0, dealtCardCount);
+    }
+    return base;
+  }, [localPlayer?.hand, inFlightCardIds, roomState.phase, dealtCardCount]);
+
+  // Connected players for synchronized rematch
+  const connectedPlayers = useMemo(
+    () => roomState.players.filter((p) => p.isConnected),
+    [roomState.players]
+  );
+  const rematchReadySet = useMemo(
+    () => new Set(roomState.rematchReadyPlayerIds || []),
+    [roomState.rematchReadyPlayerIds]
+  );
+  const isLocalReadyForRematch = rematchReadySet.has(localPlayerId);
 
   return (
     <div
@@ -636,10 +780,10 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
         onCardFinished={handleCardAnimationFinished}
       />
 
-      {/* 3. TOP HUD: TABLE RULE (COMPACT, DOES NOT COVER TABLE) */}
-      <header className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 py-2 bg-black/40 backdrop-blur-sm border-b border-amber-900/30">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1 bg-stone-950/80 border border-amber-700/40 rounded-xl shadow-md">
+      {/* 3. TOP BAR HEADER (SALA / RONDA / MODO on left, SALIR on right — NO centered table rule pill) */}
+      <header className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 py-2 bg-black/45 backdrop-blur-sm border-b border-amber-900/30">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2 px-3 py-1 bg-stone-950/85 border border-amber-700/40 rounded-xl shadow-md">
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">
               SALA:
             </span>
@@ -648,46 +792,100 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
             </span>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-stone-950/60 border border-stone-800 rounded-xl text-xs text-stone-300">
-            <span>Ronda {roomState.currentRound}</span>
+          <div className="flex items-center gap-2 px-3 py-1 bg-stone-950/70 border border-stone-800 rounded-xl text-xs text-stone-300">
+            <span className="font-bold text-amber-100">
+              Ronda {roomState.currentRound}
+            </span>
             <span className="text-stone-600">&bull;</span>
             <span className="font-semibold text-amber-300">
               {roomState.config.mode === 'DIABLO'
                 ? 'Modo Diablo 😈'
                 : 'Modo Clásico'}
             </span>
-            <span className="text-stone-600">&bull;</span>
-            <span className="text-stone-400 text-[11px]">{mapDef.name}</span>
+            <span className="hidden md:inline text-stone-600">&bull;</span>
+            <span className="hidden md:inline text-stone-400 text-[11px]">
+              {mapDef.name}
+            </span>
           </div>
-        </div>
-
-        {/* COMPACT TOP-CENTRE TABLE RULE HUD */}
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-stone-950/85 border border-amber-500/50 shadow-xl shadow-amber-500/10 backdrop-blur-md">
-          <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
-            MESA:
-          </span>
-          <span className="text-xs sm:text-sm font-black font-serif text-amber-300 tracking-wider">
-            {RANK_LABELS[roomState.tableRank]}
-          </span>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowExitModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900/80 hover:bg-stone-800 border border-stone-700/60 text-stone-300 text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900/85 hover:bg-stone-800 border border-stone-700/60 text-stone-200 text-xs font-semibold transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" /> Salir
           </button>
         </div>
       </header>
 
-      {/* 4. OPPONENTS AROUND THE TABLE (CHAIR-ALIGNED, SEAT PERSPECTIVE, HIERARCHICAL SIZING) */}
+      {/* 3B. PROMINENT TOP-LEFT TABLE RULE PLAQUE (Requirement 1: Upper-left immediately below header) */}
+      <div className="absolute top-13 sm:top-14 left-3 sm:left-5 z-30 pointer-events-none">
+        <div className="flex flex-col px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl bg-stone-950/82 backdrop-blur-md border border-amber-500/60 shadow-[0_12px_30px_rgba(0,0,0,0.85),0_0_18px_rgba(245,158,11,0.14)]">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.22em] text-amber-400/90">
+              REGLA DE LA MESA
+            </span>
+          </div>
+          <div className="mt-0.5 text-base sm:text-2xl font-black font-serif text-amber-100 tracking-wider drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+            {RANK_LABELS[roomState.tableRank]}
+          </div>
+        </div>
+      </div>
+
+      {/* 3C. TOP-CENTER PLAY EVENT & ACTIVE TURN BANNER (Requirements 2 & 3: Immediately below header) */}
+      <div className="absolute top-13 sm:top-14 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center gap-1.5 max-w-[90vw]">
+        {roomState.phase === 'ROUND_INTRO' && (
+          <div className="px-4 py-1.5 rounded-2xl bg-stone-950/90 border border-amber-400/70 text-amber-200 text-xs sm:text-sm font-black uppercase tracking-wider shadow-[0_8px_24px_rgba(0,0,0,0.85)] backdrop-blur-md flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+            <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
+            <span>
+              RONDA {roomState.currentRound} • EMPIEZA{' '}
+              {(
+                roomState.roundStartingPlayerName ||
+                activePlayer?.name ||
+                'JUGADOR'
+              ).toUpperCase()}
+            </span>
+          </div>
+        )}
+
+        {topPlayEventBanner && (
+          <div className="px-4 py-1.5 rounded-2xl bg-stone-950/90 border border-amber-500/65 text-amber-200 text-xs sm:text-sm font-black uppercase tracking-wider shadow-[0_10px_28px_rgba(0,0,0,0.9)] backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200 whitespace-nowrap">
+            {topPlayEventBanner}
+          </div>
+        )}
+
+        {roomState.phase === 'PLAYING' && activePlayer && (
+          <div
+            className={`px-3.5 py-1 rounded-full border text-[11px] sm:text-xs font-black uppercase tracking-widest backdrop-blur-md flex items-center gap-2 shadow-lg transition-all duration-300 ${
+              isMyTurn
+                ? 'bg-amber-500/25 border-amber-400 text-amber-200 shadow-[0_0_20px_rgba(245,158,11,0.35)]'
+                : 'bg-stone-950/85 border-amber-500/45 text-amber-100/95'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isMyTurn
+                  ? 'bg-amber-300 animate-ping'
+                  : 'bg-amber-400 animate-pulse'
+              }`}
+            />
+            <span>
+              {isMyTurn
+                ? 'ES TU TURNO'
+                : `TURNO DE ${activePlayer.name.toUpperCase()}`}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* 4. OPPONENTS AROUND THE TABLE (CHAIR-ALIGNED, SEAT PERSPECTIVE, ACTIVE SEAT GLOW) */}
       <div className="absolute inset-0 pointer-events-none z-10">
         {opponents.map((opp, oppIndex) => {
           const isOppTurn =
             roomState.activePlayerId === opp.id &&
-            roomState.phase === 'PLAYING';
+            (roomState.phase === 'PLAYING' || roomState.phase === 'ROUND_INTRO');
           const oppInteraction = remoteInteractions[opp.id];
           const isOppHandHovered =
             oppInteraction?.interaction === 'HAND_HOVER' ||
@@ -701,7 +899,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
           const oppCardSize =
             seatRole === 'far' ? 'opponent-far' : 'opponent-side';
 
-          // Responsive clamp for side opponents on narrow screens
           const effectiveLeftPercent =
             viewportWidth < 640
               ? seatRole === 'left'
@@ -710,6 +907,12 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 ? 83
                 : seatLayout.leftPercent
               : seatLayout.leftPercent;
+
+          // During ROUND_INTRO dealing, stagger opponent card appearance
+          const visibleOppCardsCount =
+            roomState.phase === 'ROUND_INTRO'
+              ? Math.min(opp.cardsCount, dealtCardCount)
+              : opp.cardsCount;
 
           return (
             <div
@@ -721,9 +924,22 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 transform: `translate(-50%, -50%) rotate(${seatLayout.rotationZ}deg)`,
                 perspective: '900px',
               }}
-              className="flex flex-col items-center gap-2 transition-all duration-300 pointer-events-auto"
+              className="flex flex-col items-center gap-1.5 transition-all duration-300 pointer-events-auto"
             >
-              {/* Opponent Card Backs Fan (No HUD rectangle behind the hand) */}
+              {/* Floating Active Turn Marker on Opponent's Seat */}
+              {isOppTurn && opp.isAlive && (
+                <div
+                  style={{
+                    transform: `rotate(${-seatLayout.rotationZ}deg)`,
+                  }}
+                  className="mb-0.5 px-2.5 py-0.5 rounded-full bg-amber-500 text-stone-950 font-black text-[10px] uppercase tracking-wider shadow-[0_0_18px_rgba(245,158,11,0.85)] flex items-center gap-1.5 animate-bounce whitespace-nowrap z-30"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-950 animate-ping" />
+                  <span>TURNO DE {opp.name.toUpperCase()}</span>
+                </div>
+              )}
+
+              {/* Opponent Card Backs Fan */}
               {opp.isAlive ? (
                 <div
                   ref={(el) => {
@@ -735,8 +951,13 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                     transformOrigin: 'center bottom',
                   }}
                 >
-                  {Array.from({ length: opp.cardsCount }).map((_, cIdx) => {
-                    const mid = (opp.cardsCount - 1) / 2;
+                  {/* Warm Ambient Seat Glow when it's this opponent's turn */}
+                  {isOppTurn && (
+                    <div className="absolute -inset-3 rounded-full bg-amber-400/25 blur-xl animate-pulse pointer-events-none" />
+                  )}
+
+                  {Array.from({ length: visibleOppCardsCount }).map((_, cIdx) => {
+                    const mid = (visibleOppCardsCount - 1) / 2;
                     const offsetFromMid = cIdx - mid;
                     const spreadDeg = isOppHandHovered
                       ? seatLayout.fanRotationStep * 1.45
@@ -770,14 +991,18 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                           isFaceDown
                           mapId={selectedMapId}
                           size={oppCardSize}
-                          className="shadow-xl shadow-black/85"
+                          className={
+                            isOppTurn
+                              ? 'shadow-[0_10px_24px_rgba(0,0,0,0.9),0_0_12px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/50'
+                              : 'shadow-xl shadow-black/85'
+                          }
                         />
                       </div>
                     );
                   })}
-                  {opp.cardsCount === 0 && (
-                    <span className="text-[10px] text-stone-400/80 font-bold uppercase tracking-wider">
-                      Sin cartas
+                  {opp.cardsCount === 0 && roomState.phase !== 'ROUND_INTRO' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-500/50 text-[10px] text-amber-300 font-black uppercase tracking-wider shadow">
+                      ¡Sin cartas!
                     </span>
                   )}
                 </div>
@@ -787,22 +1012,28 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 </div>
               )}
 
-              {/* Minimal Opponent Name & Chamber Indicator */}
+              {/* Opponent Name & Chamber Indicator Badge */}
               <div
-                className={`flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs backdrop-blur-md border ${
+                style={{
+                  transform: `rotate(${-seatLayout.rotationZ}deg)`,
+                }}
+                className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs backdrop-blur-md border transition-all duration-300 ${
                   !opp.isAlive
-                    ? 'bg-rose-950/40 border-rose-900/40 text-stone-400'
+                    ? 'bg-rose-950/50 border-rose-900/50 text-stone-400'
                     : isOppTurn
-                    ? 'bg-amber-500/20 border-amber-400 text-amber-200 shadow-md shadow-amber-400/20 animate-pulse'
-                    : 'bg-black/65 border-stone-800/90 text-stone-200'
+                    ? 'bg-amber-950/95 border-2 border-amber-400 text-amber-100 shadow-[0_0_24px_rgba(245,158,11,0.55)] scale-105'
+                    : 'bg-black/75 border-stone-700/80 text-stone-200'
                 }`}
               >
-                <span className="font-bold flex items-center gap-1 text-[11px] whitespace-nowrap">
+                {isOppTurn && opp.isAlive && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+                )}
+                <span className="font-bold flex items-center gap-1 text-[11px] sm:text-xs whitespace-nowrap">
                   {opp.avatar} {opp.name}
                   {opp.isHost && <Crown className="w-3 h-3 text-amber-400" />}
                 </span>
                 {opp.isAlive && (
-                  <span className="text-[10px] font-mono tabular-nums text-amber-400/90 font-bold px-1.5 py-0.2 rounded bg-stone-900/80 border border-stone-800">
+                  <span className="text-[10px] font-mono tabular-nums text-amber-400/90 font-bold px-1.5 py-0.2 rounded bg-stone-900/90 border border-stone-700/80">
                     {opp.chamberPulls}/6
                   </span>
                 )}
@@ -824,7 +1055,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
         className="w-64 h-48 pointer-events-none z-10"
       >
         {visiblePileCards.map((item) => {
-          // Wait to display each card in the persistent pile until its flight/settle completes
           if (
             !landedCardKeys.has(item.visualKey) ||
             animatingCardKeySet.has(item.visualKey)
@@ -856,51 +1086,66 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
             </div>
           );
         })}
-
-        {/* Temporary play notice toast above the table pile */}
-        {temporaryToast && (
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-30 px-3.5 py-1 rounded-full bg-black/85 border border-amber-600/45 text-amber-300 text-xs font-semibold whitespace-nowrap shadow-lg backdrop-blur-sm animate-in fade-in duration-200">
-            {temporaryToast}
-          </div>
-        )}
       </div>
 
       {/* 6. LOCAL PLAYER ZONE (CLEAR PHYSICAL VERTICAL SEPARATION: TURN MESSAGE -> ACTION CONTROLS -> HAND FAN) */}
       <div className="absolute bottom-0 inset-x-0 z-20 flex flex-col items-center pointer-events-none pb-2 sm:pb-3">
-        {/* Action Controls & Turn Prompt Bar — physically above the maximum raised card height */}
-        <div className="relative z-40 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 px-4 mb-2 sm:mb-3 min-h-[42px] pointer-events-auto">
-          {/* CHALLENGE BLUFF BUTTON ("¡FAROL!") */}
-          {isMyTurn && roomState.lastPlay && isLocalAlive && (
-            <button
-              onClick={handleChallenge}
-              className="py-2.5 px-5 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-2xl shadow-rose-600/40 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-rose-400/40 whitespace-nowrap"
-            >
-              <Skull className="w-4 h-4 shrink-0" /> ¡FAROL!
-            </button>
-          )}
-
-          {/* CONFIRM PLAY BUTTON (Appears when 1-3 cards selected, unobstructed by raised cards) */}
-          {isMyTurn && selectedCardIds.length > 0 && isLocalAlive && (
-            <button
-              onClick={handleConfirmPlay}
-              className="py-2.5 px-5 sm:px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-2xl shadow-amber-500/40 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-amber-300 animate-in zoom-in-95 duration-150 whitespace-nowrap"
-            >
-              <Check className="w-4 h-4 stroke-[3] shrink-0" /> CONFIRMAR
-              SELECCIÓN ({selectedCardIds.length}{' '}
-              {RANK_LABELS[roomState.tableRank]})
-            </button>
-          )}
-
-          {/* Compact Turn status reminder when no card selected */}
-          {isMyTurn && selectedCardIds.length === 0 && isLocalAlive && (
-            <div className="px-4 py-1.5 rounded-full bg-stone-950/90 border border-amber-500/45 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-lg backdrop-blur-sm animate-pulse whitespace-nowrap">
-              <Crosshair className="w-3.5 h-3.5 shrink-0" /> Es tu turno: elige
-              de 1 a 3 cartas
+        {/* Action Controls & Turn Prompt Bar */}
+        <div className="relative z-40 flex flex-col items-center justify-center gap-2 px-4 mb-2 sm:mb-3 min-h-[44px] pointer-events-auto">
+          {/* Mandatory Final-Hand Accusation Alert */}
+          {isMyTurn && isMandatoryChallenge && isLocalAlive && (
+            <div className="px-4 py-1.5 rounded-xl bg-red-950/95 border border-red-400/80 text-red-200 text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-[0_0_25px_rgba(239,68,68,0.45)] animate-bounce">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                ¡{roomState.lastPlay?.playerName} SE QUEDÓ SIN CARTAS! DEBES ACUSAR ¡FAROL!
+              </span>
             </div>
           )}
+
+          <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
+            {/* CHALLENGE BLUFF BUTTON ("¡FAROL!") */}
+            {isMyTurn && roomState.lastPlay && isLocalAlive && (
+              <button
+                onClick={handleChallenge}
+                className={`py-2.5 px-5 sm:px-6 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-2xl shadow-rose-600/45 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-rose-400/60 whitespace-nowrap ${
+                  isMandatoryChallenge
+                    ? 'ring-4 ring-amber-400/70 scale-105'
+                    : ''
+                }`}
+              >
+                <Skull className="w-4 h-4 shrink-0" /> ¡FAROL!
+              </button>
+            )}
+
+            {/* CONFIRM PLAY BUTTON */}
+            {isMyTurn &&
+              !isMandatoryChallenge &&
+              selectedCardIds.length > 0 &&
+              isLocalAlive && (
+                <button
+                  onClick={handleConfirmPlay}
+                  className="py-2.5 px-5 sm:px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-2xl shadow-amber-500/40 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-amber-300 animate-in zoom-in-95 duration-150 whitespace-nowrap"
+                >
+                  <Check className="w-4 h-4 stroke-[3] shrink-0" /> CONFIRMAR
+                  SELECCIÓN ({selectedCardIds.length}{' '}
+                  {RANK_LABELS[roomState.tableRank]})
+                </button>
+              )}
+
+            {/* Compact Turn status reminder when no card selected */}
+            {isMyTurn &&
+              !isMandatoryChallenge &&
+              selectedCardIds.length === 0 &&
+              isLocalAlive && (
+                <div className="px-4 py-1.5 rounded-full bg-stone-950/90 border-2 border-amber-400/80 text-amber-200 text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-[0_0_22px_rgba(245,158,11,0.35)] backdrop-blur-sm whitespace-nowrap">
+                  <Crosshair className="w-3.5 h-3.5 text-amber-400 animate-spin shrink-0" />
+                  <span>ES TU TURNO • ELIGE DE 1 A 3 CARTAS</span>
+                </div>
+              )}
+          </div>
         </div>
 
-        {/* Physical Hand Fan Container — sized to include full card height + top lift headroom so cards never overlap buttons above */}
+        {/* Physical Hand Fan Container — cards deal face-down and flip face-up at round start */}
         {isLocalAlive ? (
           <div
             onMouseEnter={handleHandMouseEnter}
@@ -910,6 +1155,11 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
             }}
             className="relative flex items-end justify-center pointer-events-auto w-full max-w-[640px] px-6 pb-1"
           >
+            {/* Subtle warm golden glow behind local hand when it's local player's turn */}
+            {isMyTurn && (
+              <div className="absolute inset-x-16 bottom-2 h-24 rounded-full bg-amber-500/15 blur-2xl pointer-events-none" />
+            )}
+
             {visibleHandCards.map((card, i) => {
               const totalCards = visibleHandCards.length;
               const mid = (totalCards - 1) / 2;
@@ -917,7 +1167,9 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
               const isSelected = selectedCardIds.includes(card.id);
               const isCardHovered = hoveredCardIndex === i;
 
-              // Responsive horizontal spacing so cards spread generously on hover without overflowing narrow viewports
+              const isCardFlippedFaceUp = flippedCardIndices.has(i);
+              const isCurrentlyFlipping = flippingCardIndex === i;
+
               const maxAllowedHoverSpacing = Math.min(
                 layout.localHand.hoverFanSpacing,
                 Math.max(40, (viewportWidth - 130) / Math.max(totalCards, 1))
@@ -934,7 +1186,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 ? layout.localHand.hoverFanRotation
                 : layout.localHand.idleFanRotation;
 
-              // Subtle neighbor separation away from the hovered card to reduce overlap
               let neighborPushX = 0;
               if (hoveredCardIndex !== null && hoveredCardIndex !== i) {
                 const diff = i - hoveredCardIndex;
@@ -945,7 +1196,6 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                   distanceAttenuation;
               }
 
-              // Single composed transform: fan translation + neighbor separation + arc + selection lift + hover lift + rotation + scale
               const fanX = offsetFromMid * spacingPx + neighborPushX;
               const fanArcY =
                 Math.pow(Math.abs(offsetFromMid), 1.45) *
@@ -973,6 +1223,9 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                 ? 1.03
                 : 1.0;
 
+              // 3D horizontal scale pinch during face-down -> face-up flip
+              const flipScaleX = isCurrentlyFlipping ? 0.08 : 1;
+
               const zIndex = isCardHovered ? 35 : isSelected ? 20 + i : 10 + i;
 
               return (
@@ -985,18 +1238,20 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
                   style={{
                     position: 'absolute',
                     bottom: '6px',
-                    transform: `translate3d(${fanX}px, ${finalY}px, 0) rotate(${finalRot}deg) scale(${finalScale})`,
+                    transform: `translate3d(${fanX}px, ${finalY}px, 0) rotate(${finalRot}deg) scale(${finalScale}) scaleX(${flipScaleX})`,
                     transformOrigin: '50% 88%',
                     zIndex,
                     transition:
-                      'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), z-index 0ms',
+                      'transform 200ms cubic-bezier(0.22, 1, 0.36, 1), z-index 0ms',
                     willChange: 'transform',
                   }}
                 >
                   <CantinaCard
                     rank={card.rank}
+                    isFaceDown={!isCardFlippedFaceUp}
                     mapId={selectedMapId}
                     selected={isSelected}
+                    disabled={isMandatoryChallenge}
                     onClick={() => handleCardClick(card.id)}
                     size="hand"
                   />
@@ -1011,35 +1266,124 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
           </div>
         )}
 
-        {/* Local player status line */}
-        <div className="flex items-center gap-2 mt-1 pointer-events-auto text-[11px] text-stone-400 font-medium">
-          <span className="font-bold text-stone-200">
+        {/* Local player status badge */}
+        <div
+          className={`flex items-center gap-2 mt-1 px-3 py-1 rounded-full pointer-events-auto text-[11px] font-medium border transition-all ${
+            isMyTurn
+              ? 'bg-amber-950/90 border-amber-400 text-amber-100 shadow-[0_0_16px_rgba(245,158,11,0.4)]'
+              : 'bg-black/65 border-stone-800 text-stone-300'
+          }`}
+        >
+          {isMyTurn && (
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+          )}
+          <span className="font-bold text-stone-100">
             {localPlayer?.avatar} {localPlayer?.name}
           </span>
           <span className="text-stone-600">&bull;</span>
-          <span className="font-mono tabular-nums text-amber-400/90 font-bold">
+          <span className="font-mono tabular-nums text-amber-400 font-bold">
             Tambor: {localPlayer?.chamberPulls ?? 0}/6
           </span>
         </div>
       </div>
 
-      {/* 7. CARD REVELATION SUSPENSE MODAL */}
+      {/* 7A. 5-SECOND DEVIL CARD REVEAL PRESENTATION (Requirements 20-23: DEVIL_REVEAL phase) */}
+      {roomState.phase === 'DEVIL_REVEAL' && roomState.challengeResult && (
+        <div className="fixed inset-0 z-50 bg-gradient-to-b from-red-950/90 via-black/92 to-stone-950/95 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
+          {/* Infernal radial glow */}
+          <div
+            className="fixed inset-0 pointer-events-none"
+            style={{
+              background:
+                'radial-gradient(circle at 50% 48%, rgba(239, 68, 68, 0.35) 0%, rgba(180, 83, 9, 0.2) 40%, transparent 72%)',
+            }}
+          />
+
+          <div className="relative z-10 w-full max-w-xl rounded-3xl bg-gradient-to-b from-[#2b0909] via-[#170606] to-[#0c0505] border-2 border-red-500/80 p-6 sm:p-8 shadow-[0_0_90px_rgba(220,38,38,0.65)] flex flex-col items-center text-center gap-5">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-950 border border-red-400/70 text-red-200 text-xs font-black uppercase tracking-[0.22em] shadow-lg">
+              <Flame className="w-4 h-4 text-amber-400 animate-bounce" />
+              ¡CARTA DEL DIABLO REVELADA!
+              <Flame className="w-4 h-4 text-amber-400 animate-bounce" />
+            </div>
+
+            <h2 className="text-2xl sm:text-4xl font-black font-serif text-amber-100 tracking-wide drop-shadow-[0_4px_14px_rgba(220,38,38,0.9)]">
+              ¡EL DIABLO DESPIERTA EN LA MESA!
+            </h2>
+
+            {/* Revealed cards rising from the central pile, spotlighting DIABLO */}
+            <div className="flex items-center justify-center gap-4 my-3">
+              {roomState.challengeResult.revealedCards.map((card, idx) => {
+                const isDiabloCard = card.rank === 'DIABLO';
+                return (
+                  <div
+                    key={card.id || idx}
+                    className={`relative transition-all duration-500 ${
+                      isDiabloCard
+                        ? 'scale-125 -translate-y-3 z-20 drop-shadow-[0_0_35px_rgba(239,68,68,0.95)]'
+                        : 'scale-95 opacity-85'
+                    }`}
+                  >
+                    {isDiabloCard && (
+                      <div className="absolute -inset-3 rounded-2xl bg-gradient-to-t from-red-600/60 via-amber-500/50 to-red-500/60 blur-lg animate-pulse pointer-events-none" />
+                    )}
+                    <CantinaCard
+                      rank={card.rank}
+                      mapId={selectedMapId}
+                      size="lg"
+                      className={
+                        isDiabloCard
+                          ? 'ring-2 ring-amber-400 shadow-2xl'
+                          : 'shadow-xl'
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="w-full p-4 rounded-2xl bg-black/60 border border-red-500/40 flex flex-col gap-1.5">
+              <p className="text-base sm:text-lg font-black text-emerald-300 uppercase tracking-wider">
+                🛡️ {roomState.challengeResult.accusedName} QUEDA A SALVO
+              </p>
+              <p className="text-xs sm:text-sm font-bold text-red-200 leading-relaxed">
+                {roomState.challengeResult.accuserName} desafió una jugada con el
+                Diablo. ¡Todos los demás rivales vivos deben enfrentarse al revólver!
+              </p>
+            </div>
+
+            <div className="w-full flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-amber-300 animate-pulse">
+              <Crosshair className="w-4 h-4 text-red-400 animate-spin" />
+              Preparando los tambores para todos los rivales...
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7B. CARD REVELATION SUSPENSE MODAL (Standard accusation & Final-Hand resolution) */}
       {roomState.phase === 'REVELACION' && roomState.challengeResult && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-stone-950 border border-amber-600/50 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center gap-5">
+          <div className="w-full max-w-lg bg-stone-950 border-2 border-amber-500/60 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center gap-5">
             <span className="text-xs font-black uppercase tracking-widest text-amber-400">
-              RESOLUCIÓN DE LA ACUSACIÓN
+              {roomState.challengeResult.isFinalHandChallenge
+                ? 'VERIFICACIÓN DE ÚLTIMAS CARTAS'
+                : 'RESOLUCIÓN DE LA ACUSACIÓN'}
             </span>
 
             <h2 className="text-2xl sm:text-3xl font-black font-serif text-white">
               {roomState.challengeResult.isBluff ? (
                 <span className="text-rose-500">¡FAROL DETECTADO!</span>
               ) : (
-                <span className="text-emerald-400">¡ERA LA VERDAD!</span>
+                <span className="text-emerald-400">¡JUGADA VÁLIDA!</span>
               )}
             </h2>
 
-            {/* Revealed Cards - Pure images, zero fake HTML text */}
+            {roomState.challengeResult.roundWinnerName && (
+              <div className="px-4 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400 text-amber-200 text-xs sm:text-sm font-black uppercase tracking-wider">
+                🏆 ¡{roomState.challengeResult.roundWinnerName} SE QUEDÓ SIN CARTAS VÁLIDAS!
+              </div>
+            )}
+
+            {/* Revealed Cards */}
             <div className="flex items-center justify-center gap-3 my-2">
               {roomState.challengeResult.revealedCards.map((card) => (
                 <CantinaCard
@@ -1052,34 +1396,40 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
               ))}
             </div>
 
-            <p className="text-sm text-stone-300 leading-relaxed font-medium">
+            <p className="text-sm text-stone-200 leading-relaxed font-semibold">
               {roomState.challengeResult.description}
             </p>
 
-            <div className="w-full pt-3 border-t border-stone-800 flex items-center justify-center gap-2 text-xs font-bold text-amber-400">
-              <Crosshair className="w-4 h-4 animate-spin" /> Pasando a la Ruleta
-              Rusa...
+            <div className="w-full pt-3 border-t border-stone-800 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider text-amber-400">
+              <Crosshair className="w-4 h-4 animate-spin" />{' '}
+              {roomState.challengeResult.loserName} debe apretar el gatillo...
             </div>
           </div>
         </div>
       )}
 
-      {/* 8. SYNCHRONIZED ROULETTE EVENT OVERLAY */}
+      {/* 8. INTERACTIVE RUSSIAN ROULETTE OVERLAY */}
       {roomState.phase === 'RULETA' && roomState.rouletteResult && (
-        <CantinaRouletteOverlay rouletteResult={roomState.rouletteResult} />
+        <CantinaRouletteOverlay
+          rouletteResult={roomState.rouletteResult}
+          localPlayerId={localPlayerId}
+          rouletteSpinEvent={rouletteSpinEvent}
+          onPullTrigger={onPullTrigger}
+          onSpinCylinder={onSpinCylinder}
+        />
       )}
 
-      {/* 9. GAME OVER PODIUM */}
+      {/* 9. GAME OVER PODIUM & SYNCHRONIZED REMATCH */}
       {roomState.phase === 'GAME_OVER' && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4">
-          <div className="w-full max-w-md bg-stone-950 border border-amber-500/60 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center gap-6">
+          <div className="w-full max-w-md bg-stone-950 border-2 border-amber-500/70 rounded-3xl p-6 sm:p-8 shadow-[0_25px_80px_rgba(0,0,0,0.95)] flex flex-col items-center text-center gap-5">
             <div className="w-20 h-20 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-4xl shadow-xl shadow-amber-500/20">
               👑
             </div>
 
             <div>
               <span className="text-xs font-black uppercase tracking-widest text-amber-400">
-                FIN DE LA PARTIDA
+                GANADOR DE LA PARTIDA
               </span>
               <h2 className="text-3xl font-black font-serif text-white mt-1">
                 {roomState.winnerName}
@@ -1089,21 +1439,68 @@ export const CantinaTable: React.FC<CantinaTableProps> = ({
               </p>
             </div>
 
-            <div className="w-full flex items-center justify-center gap-3">
-              {isHost && (
-                <button
-                  onClick={onRestartMatch}
-                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-black text-sm uppercase tracking-wider transition-all shadow-lg"
-                >
-                  Nueva Partida
-                </button>
-              )}
+            {/* Rematch readiness list for all connected players */}
+            <div className="w-full p-3.5 rounded-2xl bg-stone-900/80 border border-stone-800 flex flex-col gap-2">
+              <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-stone-400">
+                <span>Jugadores listos para revancha</span>
+                <span className="text-amber-400">
+                  {rematchReadySet.size} / {connectedPlayers.length}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {connectedPlayers.map((p) => {
+                  const isReady = rematchReadySet.has(p.id);
+                  return (
+                    <div
+                      key={p.id}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition-all ${
+                        isReady
+                          ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                          : 'bg-stone-950 border-stone-800 text-stone-400'
+                      }`}
+                    >
+                      <span>{p.avatar}</span>
+                      <span>{p.name}</span>
+                      {isReady && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Primary Rematch Button for ALL players */}
+            <div className="w-full flex flex-col gap-2.5">
               <button
-                onClick={() => setShowExitModal(true)}
-                className="flex-1 py-3 px-4 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold text-sm uppercase tracking-wider transition-colors border border-stone-700"
+                onClick={onRequestRematch}
+                disabled={isLocalReadyForRematch}
+                className={`w-full py-3.5 px-4 rounded-xl font-black text-sm uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 ${
+                  isLocalReadyForRematch
+                    ? 'bg-emerald-900/60 border border-emerald-500/50 text-emerald-200 cursor-default'
+                    : 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-stone-950 shadow-amber-500/25 active:scale-95'
+                }`}
               >
-                Salir
+                <RotateCcw
+                  className={`w-4 h-4 ${isLocalReadyForRematch ? 'animate-spin' : ''}`}
+                />
+                {isLocalReadyForRematch
+                  ? `ESPERANDO JUGADORES (${rematchReadySet.size}/${connectedPlayers.length})...`
+                  : 'VOLVER A JUGAR'}
               </button>
+
+              <div className="w-full flex items-center justify-center gap-2.5">
+                <button
+                  onClick={onReturnToLobby}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 font-bold text-xs uppercase tracking-wider transition-colors border border-stone-700"
+                >
+                  Volver a la Sala
+                </button>
+                <button
+                  onClick={() => setShowExitModal(true)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 font-bold text-xs uppercase tracking-wider transition-colors border border-stone-700"
+                >
+                  Salir
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1717,6 +1717,97 @@ class AudioManager {
     this.playMechanicalDetent();
   }
 
+  public playRevolverRatchetClick(intensity: number = 1) {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const clampedIntensity = Math.max(0.25, Math.min(1.4, intensity));
+
+    // Crisp metallic cylinder ratchet detent
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1120 * (0.9 + clampedIntensity * 0.15), now);
+    osc.frequency.exponentialRampToValueAtTime(280, now + 0.024);
+    gain.gain.setValueAtTime(0.11 * clampedIntensity, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.028);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.03);
+  }
+
+  public playHammerCock() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+
+    // Two-stage heavy metallic revolver hammer cocking
+    const osc1 = this.ctx.createOscillator();
+    const gain1 = this.ctx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(620, now);
+    osc1.frequency.exponentialRampToValueAtTime(180, now + 0.035);
+    gain1.gain.setValueAtTime(0.16, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    osc1.connect(gain1);
+    gain1.connect(this.ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.042);
+
+    const osc2 = this.ctx.createOscillator();
+    const gain2 = this.ctx.createGain();
+    osc2.type = 'square';
+    osc2.frequency.setValueAtTime(980, now + 0.075);
+    osc2.frequency.exponentialRampToValueAtTime(340, now + 0.12);
+    gain2.gain.setValueAtTime(0.22, now + 0.075);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+    osc2.connect(gain2);
+    gain2.connect(this.ctx.destination);
+    osc2.start(now + 0.075);
+    osc2.stop(now + 0.135);
+  }
+
+  public playDevilAwakens() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+
+    // Deep infernal rumble + ominous tritone brass swell
+    const sub = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    sub.type = 'sawtooth';
+    sub.frequency.setValueAtTime(68, now);
+    sub.frequency.exponentialRampToValueAtTime(44, now + 1.4);
+    subGain.gain.setValueAtTime(0.01, now);
+    subGain.gain.linearRampToValueAtTime(0.24, now + 0.22);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 1.6);
+    sub.connect(subGain);
+    subGain.connect(this.ctx.destination);
+    sub.start(now);
+    sub.stop(now + 1.65);
+
+    const tritone = this.ctx.createOscillator();
+    const tritoneGain = this.ctx.createGain();
+    tritone.type = 'triangle';
+    tritone.frequency.setValueAtTime(196, now + 0.08);
+    tritone.frequency.setValueAtTime(138.59, now + 0.42);
+    tritone.frequency.exponentialRampToValueAtTime(98, now + 1.35);
+    tritoneGain.gain.setValueAtTime(0.01, now + 0.08);
+    tritoneGain.gain.linearRampToValueAtTime(0.18, now + 0.28);
+    tritoneGain.gain.exponentialRampToValueAtTime(0.001, now + 1.45);
+    tritone.connect(tritoneGain);
+    tritoneGain.connect(this.ctx.destination);
+    tritone.start(now + 0.08);
+    tritone.stop(now + 1.5);
+  }
+
   public playRevolverTrigger() {
     this.playMechanicalSwitch();
   }

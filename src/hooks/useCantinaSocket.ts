@@ -6,6 +6,8 @@ import {
   CantinaClientMessage,
   HandInteractionType,
   TableRank,
+  DealCardsEventData,
+  RouletteSpinEventData,
 } from '../types/cantina';
 import {
   createOnlineRoom,
@@ -38,7 +40,7 @@ interface UseCantinaSocketOptions {
   enabled?: boolean;
   onWrongGame?: (actualGameType: any, roomCode: string) => void;
   onCardPlayedEvent?: (event: CardPlayedEventData) => void;
-  onDealCardsEvent?: (round: number) => void;
+  onDealCardsEvent?: (round: number, data?: DealCardsEventData) => void;
 }
 
 function getInitialCantinaRoom(initialRoomCode?: string): { code: string } | null {
@@ -73,6 +75,8 @@ export function useCantinaSocket({
     Record<string, { interaction: HandInteractionType; hoveredIndex?: number }>
   >({});
   const [cardPlayedEvent, setCardPlayedEvent] = useState<CardPlayedEventData | null>(null);
+  const [dealCardsEvent, setDealCardsEvent] = useState<DealCardsEventData | null>(null);
+  const [rouletteSpinEvent, setRouletteSpinEvent] = useState<RouletteSpinEventData | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const messageQueueRef = useRef<CantinaClientMessage[]>([]);
@@ -219,9 +223,30 @@ export function useCantinaSocket({
             onCardPlayedEventRef.current(msg);
           }
         } else if (msg.type === 'DEAL_CARDS_EVENT') {
+          setDealCardsEvent({
+            round: msg.round,
+            roundStartEventId: msg.roundStartEventId,
+            startingPlayerId: msg.startingPlayerId,
+            startingPlayerName: msg.startingPlayerName,
+            tableRank: msg.tableRank,
+          });
           if (onDealCardsEventRef.current) {
-            onDealCardsEventRef.current(msg.round);
+            onDealCardsEventRef.current(msg.round, {
+              round: msg.round,
+              roundStartEventId: msg.roundStartEventId,
+              startingPlayerId: msg.startingPlayerId,
+              startingPlayerName: msg.startingPlayerName,
+              tableRank: msg.tableRank,
+            });
           }
+        } else if (msg.type === 'ROULETTE_SPIN_EVENT') {
+          setRouletteSpinEvent({
+            rouletteEventId: msg.rouletteEventId,
+            playerId: msg.playerId,
+            velocity: msg.velocity,
+            angle: msg.angle,
+            spinId: msg.spinId,
+          });
         } else if (msg.type === 'NOTIFICATION') {
           setNotification({ text: msg.text, variant: msg.variant });
         } else if (msg.type === 'ERROR') {
@@ -361,12 +386,36 @@ export function useCantinaSocket({
     sendMessage({ type: 'CHALLENGE_BLUFF' });
   }, [sendMessage]);
 
+  const pullTrigger = useCallback(
+    (rouletteEventId: string) => {
+      sendMessage({ type: 'PULL_TRIGGER', rouletteEventId });
+    },
+    [sendMessage]
+  );
+
+  const sendRouletteSpin = useCallback(
+    (rouletteEventId: string, velocity: number, angle: number, spinId: string) => {
+      sendMessage({
+        type: 'ROULETTE_SPIN',
+        rouletteEventId,
+        velocity,
+        angle,
+        spinId,
+      });
+    },
+    [sendMessage]
+  );
+
   const triggerRoulette = useCallback(() => {
     sendMessage({ type: 'TRIGGER_ROULETTE' });
   }, [sendMessage]);
 
   const nextRound = useCallback(() => {
     sendMessage({ type: 'NEXT_ROUND' });
+  }, [sendMessage]);
+
+  const requestRematch = useCallback(() => {
+    sendMessage({ type: 'REQUEST_REMATCH' });
   }, [sendMessage]);
 
   const restartMatch = useCallback(() => {
@@ -423,14 +472,19 @@ export function useCantinaSocket({
     notification,
     remoteInteractions,
     cardPlayedEvent,
+    dealCardsEvent,
+    rouletteSpinEvent,
     createRoom,
     joinRoom,
     updateConfig,
     startGame,
     playCards,
     challengeBluff,
+    pullTrigger,
+    sendRouletteSpin,
     triggerRoulette,
     nextRound,
+    requestRematch,
     restartMatch,
     returnToLobby,
     leaveRoom,
