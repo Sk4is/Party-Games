@@ -1,16 +1,16 @@
-export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos';
+export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos' | 'la_cantina_del_farol' | 'la-cantina-del-farol';
 
 interface RoomMeta {
   code: string;
   gameType: SupportedGameType;
-  serverType: 'party' | 'pinturillo';
+  serverType: string;
   createdAt: number;
 }
 
 class RoomRegistry {
   private rooms = new Map<string, RoomMeta>();
 
-  register(code: string, gameType: SupportedGameType, serverType: 'party' | 'pinturillo') {
+  register(code: string, gameType: SupportedGameType, serverType: string) {
     const cleanCode = code.toUpperCase().trim();
     this.rooms.set(cleanCode, {
       code: cleanCode,

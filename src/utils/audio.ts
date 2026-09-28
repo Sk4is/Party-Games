@@ -1642,6 +1642,273 @@ class AudioManager {
     osc.start(now);
     osc.stop(now + 0.06);
   }
+
+  // ==========================================
+  // LA CANTINA DEL FAROL — PHYSICAL CARD & REVOLVER SFX
+  // ==========================================
+
+  public playCardHover() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(1400, now + 0.04);
+
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1200, now);
+    filter.Q.setValueAtTime(2, now);
+
+    gain.gain.setValueAtTime(0.02, now);
+    gain.gain.exponentialRampToValueAtTime(0.0005, now + 0.04);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }
+
+  public playCardSelect() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.06);
+
+    gain.gain.setValueAtTime(0.06, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.06);
+  }
+
+  public playCardDeal() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(500, now);
+    osc.frequency.linearRampToValueAtTime(1100, now + 0.08);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1500, now);
+
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.09);
+  }
+
+  public playCardThrow() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(640, now + 0.12);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(900, now);
+
+    gain.gain.setValueAtTime(0.07, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.12);
+  }
+
+  public playCardLand() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    // Wood card tap
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.06);
+
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.06);
+  }
+
+  public playChallenge() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    // Dramatic brass/bell low chord
+    const freqs = [110, 164.81, 220]; // A2, E3, A3
+    freqs.forEach((f) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(f, now);
+      osc.frequency.exponentialRampToValueAtTime(f * 0.96, now + 0.4);
+
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+      osc.connect(gain);
+      gain.connect(this.ctx!.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.45);
+    });
+  }
+
+  public playRevolverSpin() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    // Series of mechanical ratchet clicks
+    for (let i = 0; i < 6; i++) {
+      const clickTime = now + i * 0.07;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(1400 + (i % 2) * 200, clickTime);
+      osc.frequency.exponentialRampToValueAtTime(400, clickTime + 0.02);
+
+      gain.gain.setValueAtTime(0.08, clickTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.02);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(clickTime);
+      osc.stop(clickTime + 0.02);
+    }
+  }
+
+  public playRevolverTrigger() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    // Metallic cocking click
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1800, now);
+    osc.frequency.exponentialRampToValueAtTime(700, now + 0.035);
+
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.035);
+  }
+
+  public playRevolverClick() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    // Dry hollow mechanical click of empty chamber
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(280, now + 0.05);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.05);
+  }
+
+  public playRevolverShot() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    // 1. Sharp high-frequency transient blast
+    const blast = this.ctx.createOscillator();
+    const blastGain = this.ctx.createGain();
+    blast.type = 'sawtooth';
+    blast.frequency.setValueAtTime(600, now);
+    blast.frequency.exponentialRampToValueAtTime(80, now + 0.15);
+
+    blastGain.gain.setValueAtTime(0.35, now);
+    blastGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+    blast.connect(blastGain);
+    blastGain.connect(this.ctx.destination);
+    blast.start(now);
+    blast.stop(now + 0.2);
+
+    // 2. Heavy low-frequency subwoofer rumble
+    const sub = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(140, now);
+    sub.frequency.exponentialRampToValueAtTime(35, now + 0.45);
+
+    subGain.gain.setValueAtTime(0.45, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+    sub.connect(subGain);
+    subGain.connect(this.ctx.destination);
+    sub.start(now);
+    sub.stop(now + 0.5);
+  }
 }
 
 export const audio = new AudioManager();

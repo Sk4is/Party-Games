@@ -420,6 +420,57 @@ const GAMES: GameGuide[] = [
       },
     ],
   },
+  {
+    id: 'la_cantina_del_farol',
+    name: 'La Cantina del Farol',
+    icon: '🥃',
+    tagline: 'Faroles, acusaciones y ruleta rusa',
+    playersBadge: '2–4 Jugadores',
+    typeBadge: 'Multijugador Online',
+    accent: {
+      primary: '#D97706',
+      contrastText: '#0a0f1d',
+      borderClass: 'border-[#D97706]/40',
+      glowColor: 'rgba(217, 119, 6, 0.18)',
+      titleColor: 'text-[#FBBF24]',
+      iconBg: 'bg-[#D97706]/15',
+      iconBorder: 'border-[#D97706]/30',
+      numberBg: 'rgba(217, 119, 6, 0.18)',
+      numberColor: '#F59E0B',
+      tagBg: 'bg-amber-500/10',
+      tagBorder: 'border-amber-500/30',
+      tagText: 'text-amber-300',
+    },
+    rules: [
+      {
+        num: '01',
+        title: 'La Mesa y las Cartas Requeridas',
+        content: (
+          <p>
+            Al comenzar la ronda se determina la <strong className="text-white">carta requerida</strong> (Jotas, Reinas o Reyes) y cada tahonero recibe 5 cartas de una baraja de 20 cartas (6 J, 6 Q, 6 K y 2 Jokers comodín). En tu turno juegas de 1 a 3 cartas boca abajo en el montón central, afirmando que todas corresponden al rango de la mesa. Puedes decir la verdad o tirar un <strong>farol</strong>.
+          </p>
+        ),
+      },
+      {
+        num: '02',
+        title: 'Llamar al Farol (Acusación)',
+        content: (
+          <p>
+            El jugador activo puede pulsar <strong className="text-rose-400">¡FAROL!</strong> para desafiar la jugada inmediatamente anterior. Las cartas se voltean ante toda la cantina: si el acusado mintió, es pillado; si decía la verdad, el acusador habrá errado su acusación.
+          </p>
+        ),
+      },
+      {
+        num: '03',
+        title: 'El Tambor del Revólver y el Modo Diablo',
+        content: (
+          <p>
+            El perdedor del duelo debe <strong className="text-white">apretar el gatillo</strong> del revólver (tambor de 6 recámaras con 1 bala). Si la recámara está vacía (¡clic!), sobrevive pero el riesgo aumenta. Si suena el disparo (¡bang!), queda <strong>eliminado</strong>. En <strong className="text-rose-400">Modo Diablo</strong>, la Carta del Diablo sirve como comodín, pero si se desvela condena a toda la cantina a apretar el gatillo.
+          </p>
+        ),
+      },
+    ],
+  },
 ];
 
 export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose, initialGame }) => {

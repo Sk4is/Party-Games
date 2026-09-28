@@ -4,7 +4,7 @@
  * for all 3 multiplayer games: La Bomba, La Peor Respuesta, and Pinturillo.
  */
 
-export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos';
+export type SupportedGameType = 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos' | 'la_cantina_del_farol' | 'la-cantina-del-farol';
 
 export interface ActiveSessionData {
   gameType: SupportedGameType;

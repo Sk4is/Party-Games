@@ -12,6 +12,7 @@ import { PalabraSecretaServer } from './server/palabraSecretaGameServer';
 import { CodigoRojoServer } from './server/codigoRojoGameServer';
 import { CoartadaServer } from './server/coartadaGameServer';
 import { EntreToposServer } from './server/entreToposGameServer';
+import { CantinaServer } from './server/cantinaGameServer';
 import { roomRegistry } from './server/roomRegistry';
 
 dotenv.config();
@@ -269,6 +270,7 @@ let palabraSecretaServer: PalabraSecretaServer;
 let codigoRojoServer: CodigoRojoServer;
 let coartadaServer: CoartadaServer;
 let entreToposServer: EntreToposServer;
+let cantinaServer: CantinaServer;
 
 // Check room info by code
 app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
@@ -296,6 +298,10 @@ app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
   const entreToposInfo = entreToposServer?.getRoomInfo(code);
   if (entreToposInfo) {
     return res.json({ exists: true, room: entreToposInfo, code: entreToposInfo.code, gameType: entreToposInfo.gameType });
+  }
+  const cantinaInfo = cantinaServer?.getRoomInfo(code);
+  if (cantinaInfo) {
+    return res.json({ exists: true, room: cantinaInfo, code: cantinaInfo.code, gameType: cantinaInfo.gameType });
   }
   return res.status(404).json({ exists: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
 });
@@ -335,6 +341,9 @@ app.post('/api/rooms/create', (req, res) => {
     } else if (gameType === 'entre-topos') {
       const room = entreToposServer.createRoomDirect(normalizedPlayer as any, config);
       return res.json({ success: true, room });
+    } else if (gameType === 'la_cantina_del_farol' || gameType === 'la-cantina-del-farol') {
+      const room = cantinaServer.createRoomDirect(normalizedPlayer as any, config);
+      return res.json({ success: true, room });
     }
 
     return res.status(400).json({ success: false, message: 'Tipo de juego no soportado' });
@@ -359,7 +368,8 @@ app.post('/api/rooms/validate-join', (req, res) => {
     const codigoRojoInfo = codigoRojoServer?.getRoomInfo(code);
     const coartadaInfo = coartadaServer?.getRoomInfo(code);
     const entreToposInfo = entreToposServer?.getRoomInfo(code);
-    const roomInfo = partyInfo || pinturilloInfo || palabraInfo || codigoRojoInfo || coartadaInfo || entreToposInfo;
+    const cantinaInfo = cantinaServer?.getRoomInfo(code);
+    const roomInfo = partyInfo || pinturilloInfo || palabraInfo || codigoRojoInfo || coartadaInfo || entreToposInfo || cantinaInfo;
 
     if (!roomInfo) {
       return res.status(404).json({ valid: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
@@ -379,7 +389,9 @@ app.post('/api/rooms/validate-join', (req, res) => {
           ? 'CÓDIGO ROJO'
           : roomInfo.gameType === 'coartada'
           ? 'COARTADA'
-          : 'ENTRE TOPOS';
+          : roomInfo.gameType === 'entre-topos'
+          ? 'ENTRE TOPOS'
+          : 'LA CANTINA DEL FAROL';
       return res.status(400).json({
         valid: false,
         wrongGame: true,
@@ -424,6 +436,7 @@ async function startServer() {
   codigoRojoServer = new CodigoRojoServer();
   coartadaServer = new CoartadaServer();
   entreToposServer = new EntreToposServer();
+  cantinaServer = new CantinaServer();
 
   let vite: any = null;
   app.use('/assets/fonts', (req, res, next) => {
@@ -492,6 +505,10 @@ async function startServer() {
     } else if (pathname === '/ws/entre-topos') {
       entreToposServer.wss.handleUpgrade(request, socket, head, (ws) => {
         entreToposServer.wss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/ws/cantina' || pathname === '/ws/la-cantina-del-farol' || pathname === '/ws/la_cantina_del_farol') {
+      cantinaServer.wss.handleUpgrade(request, socket, head, (ws) => {
+        cantinaServer.wss.emit('connection', ws, request);
       });
     } else if (pathname === '/ws/party' || pathname === '/ws') {
       partyGameServer.wss.handleUpgrade(request, socket, head, (ws) => {

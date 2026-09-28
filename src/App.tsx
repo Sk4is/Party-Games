@@ -16,6 +16,7 @@ import { PalabraSecretaGame } from './components/palabra-secreta/PalabraSecretaG
 import { CodigoRojoGame } from './components/codigo-rojo/CodigoRojoGame';
 import { CoartadaGame } from './components/coartada/CoartadaGame';
 import { EntreToposGame } from './components/entre-topos/EntreToposGame';
+import { CantinaGame } from './components/cantina/CantinaGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 import { sessionRecovery } from './services/sessionRecovery';
 import { BackendConnectingModal } from './components/common/BackendConnectingModal';
@@ -29,6 +30,7 @@ type AppView =
   | 'CODIGO_ROJO'
   | 'COARTADA'
   | 'ENTRE_TOPOS'
+  | 'CANTINA_ONLINE'
   | 'BOMBA_LOCAL_SETUP'
   | 'BOMBA_LOCAL_GAME'
   | 'LPR_LOCAL_SETUP'
@@ -55,6 +57,11 @@ export default function App() {
       if ((activeSession.gameType as string) === 'codigo-rojo') return 'CODIGO_ROJO';
       if ((activeSession.gameType as string) === 'coartada') return 'COARTADA';
       if ((activeSession.gameType as string) === 'entre-topos') return 'ENTRE_TOPOS';
+      if (
+        (activeSession.gameType as string) === 'la_cantina_del_farol' ||
+        (activeSession.gameType as string) === 'la-cantina-del-farol'
+      )
+        return 'CANTINA_ONLINE';
     }
 
     if (typeof window !== 'undefined') {
@@ -69,6 +76,8 @@ export default function App() {
       if (game === 'codigo-rojo') return 'CODIGO_ROJO';
       if (game === 'coartada') return 'COARTADA';
       if (game === 'entre-topos') return 'ENTRE_TOPOS';
+      if (game === 'la_cantina_del_farol' || game === 'la-cantina-del-farol' || game === 'cantina')
+        return 'CANTINA_ONLINE';
       if (room) {
         return 'PINTURILLO';
       }
@@ -103,6 +112,8 @@ export default function App() {
       setCurrentView('COARTADA');
     } else if (gameId === 'entre-topos') {
       setCurrentView('ENTRE_TOPOS');
+    } else if (gameId === 'la_cantina_del_farol' || gameId === 'la-cantina-del-farol' || gameId === 'cantina') {
+      setCurrentView('CANTINA_ONLINE');
     }
   };
 
@@ -113,7 +124,7 @@ export default function App() {
   };
 
   const handleSwitchGame = (
-    game: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos',
+    game: 'la-bomba' | 'la-peor-respuesta' | 'pinturillo' | 'palabra-secreta' | 'codigo-rojo' | 'coartada' | 'entre-topos' | 'la_cantina_del_farol' | 'la-cantina-del-farol',
     code: string
   ) => {
     setUrlRoomCode(code);
@@ -124,6 +135,7 @@ export default function App() {
     else if (game === 'codigo-rojo') setCurrentView('CODIGO_ROJO');
     else if (game === 'coartada') setCurrentView('COARTADA');
     else if (game === 'entre-topos') setCurrentView('ENTRE_TOPOS');
+    else if (game === 'la_cantina_del_farol' || game === 'la-cantina-del-farol') setCurrentView('CANTINA_ONLINE');
   };
 
   return (
@@ -192,6 +204,15 @@ export default function App() {
       {/* 7. ENTRE TOPOS (ONLINE MULTIPLAYER SOCIAL DEDUCTION 3-10 PLAYERS) */}
       {currentView === 'ENTRE_TOPOS' && (
         <EntreToposGame
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
+      )}
+
+      {/* 8. LA CANTINA DEL FAROL (ONLINE MULTIPLAYER 2-4 PLAYERS) */}
+      {currentView === 'CANTINA_ONLINE' && (
+        <CantinaGame
           onBackToMenu={handleBackToMenu}
           initialRoomCode={urlRoomCode}
           onSwitchGame={handleSwitchGame}

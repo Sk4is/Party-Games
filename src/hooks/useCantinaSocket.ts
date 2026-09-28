@@ -1,0 +1,436 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  CantinaRoomState,
+  CantinaConfig,
+  CantinaServerMessage,
+  CantinaClientMessage,
+  HandInteractionType,
+  TableRank,
+} from '../types/cantina';
+import {
+  createOnlineRoom,
+  validateJoinOnlineRoom,
+  PlayerProfile,
+} from '../services/multiplayerRoomService';
+import { sessionRecovery } from '../services/sessionRecovery';
+import { getGameWsUrl } from '../config/network';
+import { backendHealth } from '../services/backendHealth';
+
+export type CantinaConnectionStatus =
+  | 'idle'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
+  | 'failed';
+
+export interface CardPlayedEventData {
+  playerId: string;
+  playerName: string;
+  cardsCount: number;
+  playId: string;
+  claimedRank: TableRank;
+}
+
+interface UseCantinaSocketOptions {
+  player: PlayerProfile;
+  initialRoomCode?: string;
+  enabled?: boolean;
+  onWrongGame?: (actualGameType: any, roomCode: string) => void;
+  onCardPlayedEvent?: (event: CardPlayedEventData) => void;
+  onDealCardsEvent?: (round: number) => void;
+}
+
+function getInitialCantinaRoom(initialRoomCode?: string): { code: string } | null {
+  if (initialRoomCode && initialRoomCode.trim()) {
+    return { code: initialRoomCode.trim().toUpperCase() };
+  }
+  const saved = sessionRecovery.getActiveSession();
+  if (
+    saved &&
+    ((saved.gameType as string) === 'la_cantina_del_farol' ||
+      (saved.gameType as string) === 'la-cantina-del-farol') &&
+    saved.roomCode
+  ) {
+    return { code: saved.roomCode.trim().toUpperCase() };
+  }
+  return null;
+}
+
+export function useCantinaSocket({
+  player,
+  initialRoomCode,
+  enabled = true,
+  onWrongGame,
+  onCardPlayedEvent,
+  onDealCardsEvent,
+}: UseCantinaSocketOptions) {
+  const [connectionStatus, setConnectionStatus] = useState<CantinaConnectionStatus>('idle');
+  const [roomState, setRoomState] = useState<CantinaRoomState | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ text: string; variant?: string } | null>(null);
+  const [remoteInteractions, setRemoteInteractions] = useState<
+    Record<string, { interaction: HandInteractionType; hoveredIndex?: number }>
+  >({});
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const messageQueueRef = useRef<CantinaClientMessage[]>([]);
+  const reconnectAttemptsRef = useRef<number>(0);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isManuallyClosedRef = useRef<boolean>(false);
+  const isCreatingOrJoiningRef = useRef<boolean>(false);
+  const lastActiveRoomRef = useRef<{ code: string } | null>(getInitialCantinaRoom(initialRoomCode));
+
+  const playerRef = useRef(player);
+  playerRef.current = player;
+
+  const onWrongGameRef = useRef(onWrongGame);
+  onWrongGameRef.current = onWrongGame;
+
+  const onCardPlayedEventRef = useRef(onCardPlayedEvent);
+  onCardPlayedEventRef.current = onCardPlayedEvent;
+
+  const onDealCardsEventRef = useRef(onDealCardsEvent);
+  onDealCardsEventRef.current = onDealCardsEvent;
+
+  const lastSentInteractionRef = useRef<{ interaction: string; hoveredIndex?: number }>({
+    interaction: '',
+  });
+
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearPingTimer = useCallback(() => {
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+  }, []);
+
+  const sendMessage = useCallback((msg: CantinaClientMessage) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(msg));
+    } else {
+      messageQueueRef.current.push(msg);
+    }
+  }, []);
+
+  const sendHandInteraction = useCallback(
+    (interaction: HandInteractionType, hoveredIndex?: number) => {
+      // Throttle: only send when state or index changes
+      if (
+        lastSentInteractionRef.current.interaction === interaction &&
+        lastSentInteractionRef.current.hoveredIndex === hoveredIndex
+      ) {
+        return;
+      }
+      lastSentInteractionRef.current = { interaction, hoveredIndex };
+      sendMessage({
+        type: 'HAND_INTERACTION',
+        interaction,
+        hoveredIndex,
+      });
+    },
+    [sendMessage]
+  );
+
+  const connectToRoom = useCallback((roomCode: string) => {
+    if (!roomCode) return;
+    clearReconnectTimer();
+    clearPingTimer();
+
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    setConnectionStatus('connecting');
+    setErrorMessage(null);
+    isManuallyClosedRef.current = false;
+
+    const wsUrl = getGameWsUrl('/ws/cantina');
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setConnectionStatus('connected');
+      reconnectAttemptsRef.current = 0;
+
+      // Join room message
+      const joinMsg: CantinaClientMessage = {
+        type: 'JOIN_ROOM',
+        code: roomCode.toUpperCase().trim(),
+        player: {
+          id: playerRef.current.id,
+          name: playerRef.current.name,
+          avatar: playerRef.current.avatar,
+          color: playerRef.current.color,
+        },
+      };
+      ws.send(JSON.stringify(joinMsg));
+
+      // Flush queue
+      while (messageQueueRef.current.length > 0) {
+        const pending = messageQueueRef.current.shift();
+        if (pending) {
+          ws.send(JSON.stringify(pending));
+        }
+      }
+
+      // Ping keepalive every 15 seconds
+      pingIntervalRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'PING' }));
+        }
+      }, 15000);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data) as CantinaServerMessage;
+        if (msg.type === 'ROOM_STATE') {
+          setRoomState(msg.state);
+          lastActiveRoomRef.current = { code: msg.state.code };
+
+          sessionRecovery.saveActiveSession({
+            gameType: 'la_cantina_del_farol',
+            roomCode: msg.state.code,
+            playerId: playerRef.current.id,
+          });
+        } else if (msg.type === 'PLAYER_HAND_INTERACTION') {
+          setRemoteInteractions((prev) => ({
+            ...prev,
+            [msg.playerId]: {
+              interaction: msg.interaction,
+              hoveredIndex: msg.hoveredIndex,
+            },
+          }));
+        } else if (msg.type === 'CARD_PLAYED_EVENT') {
+          if (onCardPlayedEventRef.current) {
+            onCardPlayedEventRef.current(msg);
+          }
+        } else if (msg.type === 'DEAL_CARDS_EVENT') {
+          if (onDealCardsEventRef.current) {
+            onDealCardsEventRef.current(msg.round);
+          }
+        } else if (msg.type === 'NOTIFICATION') {
+          setNotification({ text: msg.text, variant: msg.variant });
+        } else if (msg.type === 'ERROR') {
+          setErrorMessage(msg.message);
+        }
+      } catch (err) {
+        console.error('[useCantinaSocket] Error handling message:', err);
+      }
+    };
+
+    ws.onerror = (err) => {
+      console.warn('[useCantinaSocket] WebSocket error:', err);
+    };
+
+    ws.onclose = (event) => {
+      clearPingTimer();
+      if (isManuallyClosedRef.current) {
+        setConnectionStatus('disconnected');
+        return;
+      }
+
+      if (event.code === 4001 || event.code === 4004) {
+        setConnectionStatus('failed');
+        setErrorMessage('SALA NO ENCONTRADA O COMPLETA');
+        return;
+      }
+
+      const attempts = reconnectAttemptsRef.current;
+      if (attempts < 8 && lastActiveRoomRef.current?.code) {
+        setConnectionStatus('reconnecting');
+        const delay = Math.min(1000 * Math.pow(1.5, attempts), 8000);
+        reconnectAttemptsRef.current += 1;
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (lastActiveRoomRef.current?.code) {
+            connectToRoom(lastActiveRoomRef.current.code);
+          }
+        }, delay);
+      } else {
+        setConnectionStatus('disconnected');
+      }
+    };
+  }, [clearReconnectTimer, clearPingTimer]);
+
+  const createRoom = useCallback(
+    async (config?: Partial<CantinaConfig>) => {
+      try {
+        isCreatingOrJoiningRef.current = true;
+        setConnectionStatus('connecting');
+        setErrorMessage(null);
+
+        const summary = await createOnlineRoom(
+          'la_cantina_del_farol',
+          {
+            id: playerRef.current.id,
+            name: playerRef.current.name,
+            avatar: playerRef.current.avatar,
+            color: playerRef.current.color,
+          },
+          config
+        );
+
+        lastActiveRoomRef.current = { code: summary.code };
+        connectToRoom(summary.code);
+        return summary;
+      } catch (err: any) {
+        console.error('[useCantinaSocket] Error creating room:', err);
+        setConnectionStatus('failed');
+        setErrorMessage(err.message || 'Error al crear la sala');
+        throw err;
+      } finally {
+        isCreatingOrJoiningRef.current = false;
+      }
+    },
+    [connectToRoom]
+  );
+
+  const joinRoom = useCallback(
+    async (codeToJoin: string) => {
+      try {
+        isCreatingOrJoiningRef.current = true;
+        setConnectionStatus('connecting');
+        setErrorMessage(null);
+
+        await backendHealth.ensureBackendAvailable();
+
+        const validation = await validateJoinOnlineRoom(
+          codeToJoin,
+          'la_cantina_del_farol',
+          playerRef.current
+        );
+
+        if (!validation.valid) {
+          if (validation.wrongGame && validation.actualGameType && onWrongGameRef.current) {
+            onWrongGameRef.current(validation.actualGameType, codeToJoin);
+            return null;
+          }
+          setErrorMessage(validation.message || 'Código de sala no válido');
+          setConnectionStatus('failed');
+          return null;
+        }
+
+        const roomCode = validation.room?.code || codeToJoin.toUpperCase().trim();
+        lastActiveRoomRef.current = { code: roomCode };
+        connectToRoom(roomCode);
+        return validation.room;
+      } catch (err: any) {
+        console.error('[useCantinaSocket] Error joining room:', err);
+        setConnectionStatus('failed');
+        setErrorMessage(err.message || 'Error al unirse a la sala');
+        throw err;
+      } finally {
+        isCreatingOrJoiningRef.current = false;
+      }
+    },
+    [connectToRoom]
+  );
+
+  const updateConfig = useCallback(
+    (config: Partial<CantinaConfig>) => {
+      sendMessage({ type: 'UPDATE_CONFIG', config });
+    },
+    [sendMessage]
+  );
+
+  const startGame = useCallback(() => {
+    sendMessage({ type: 'START_GAME' });
+  }, [sendMessage]);
+
+  const playCards = useCallback(
+    (cardIds: string[]) => {
+      sendMessage({ type: 'PLAY_CARDS', cardIds });
+    },
+    [sendMessage]
+  );
+
+  const challengeBluff = useCallback(() => {
+    sendMessage({ type: 'CHALLENGE_BLUFF' });
+  }, [sendMessage]);
+
+  const triggerRoulette = useCallback(() => {
+    sendMessage({ type: 'TRIGGER_ROULETTE' });
+  }, [sendMessage]);
+
+  const nextRound = useCallback(() => {
+    sendMessage({ type: 'NEXT_ROUND' });
+  }, [sendMessage]);
+
+  const restartMatch = useCallback(() => {
+    sendMessage({ type: 'RESTART_MATCH' });
+  }, [sendMessage]);
+
+  const returnToLobby = useCallback(() => {
+    sendMessage({ type: 'RETURN_TO_LOBBY' });
+  }, [sendMessage]);
+
+  const leaveRoom = useCallback(() => {
+    isManuallyClosedRef.current = true;
+    clearReconnectTimer();
+    clearPingTimer();
+    sessionRecovery.clearActiveSession();
+
+    if (wsRef.current) {
+      try {
+        wsRef.current.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
+        wsRef.current.close();
+      } catch {}
+      wsRef.current = null;
+    }
+
+    setRoomState(null);
+    setConnectionStatus('disconnected');
+    lastActiveRoomRef.current = null;
+  }, [clearReconnectTimer, clearPingTimer]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const initial = getInitialCantinaRoom(initialRoomCode);
+    if (initial && initial.code && !wsRef.current && !isCreatingOrJoiningRef.current) {
+      connectToRoom(initial.code);
+    }
+
+    return () => {
+      clearReconnectTimer();
+      clearPingTimer();
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.onerror = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [enabled, initialRoomCode, connectToRoom, clearReconnectTimer, clearPingTimer]);
+
+  return {
+    connectionStatus,
+    roomState,
+    errorMessage,
+    notification,
+    remoteInteractions,
+    createRoom,
+    joinRoom,
+    updateConfig,
+    startGame,
+    playCards,
+    challengeBluff,
+    triggerRoulette,
+    nextRound,
+    restartMatch,
+    returnToLobby,
+    leaveRoom,
+    sendHandInteraction,
+  };
+}
