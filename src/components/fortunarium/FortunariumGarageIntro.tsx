@@ -274,7 +274,9 @@ export const FortunariumGarageIntro: React.FC<FortunariumGarageIntroProps> = ({
                 <div className="flex justify-between items-baseline px-1 py-0.5">
                   <span className="text-[#231910] font-bold">Coste de reparación:</span>
                   <span className="font-extrabold text-[#120d08] text-sm sm:text-[15px] tabular-nums">
-                    {quotaInfo.repairCost} CR
+                    {Number.isFinite(quotaInfo.repairCost) && quotaInfo.repairCost > 0
+                      ? `${quotaInfo.repairCost} CR`
+                      : '— CR'}
                   </span>
                 </div>
               </div>

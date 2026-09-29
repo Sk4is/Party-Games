@@ -132,15 +132,19 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
 
   return (
     <div
-      className="fortunarium-root font-fortunarium fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto select-none"
+      className="fortunarium-root font-fortunarium fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 overflow-hidden select-none"
       onClick={onClose}
     >
       <div
-        className="fort-cyber-modal w-full max-w-5xl rounded-2xl flex flex-col max-h-[90dvh] my-auto text-cyan-50 overflow-hidden"
+        style={{
+          width: 'min(1024px, calc(100vw - 32px))',
+          height: 'min(820px, calc(100dvh - 32px))',
+        }}
+        className="fort-cyber-modal rounded-2xl flex flex-col text-cyan-50 overflow-hidden shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Book Header */}
-        <div className="px-4 sm:px-6 py-3.5 bg-gradient-to-r from-[#130714] via-[#091322] to-[#081524] border-b border-[#FF2A6D]/45 flex items-center justify-between gap-3">
+        {/* Top Book Header (Fixed) */}
+        <div className="shrink-0 px-4 sm:px-6 py-3.5 bg-gradient-to-r from-[#130714] via-[#091322] to-[#081524] border-b border-[#FF2A6D]/45 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#1f0815] border border-[#FF2A6D]/75 flex items-center justify-center text-[#FF2A6D] shadow-[0_0_14px_rgba(255,42,109,0.3)] shrink-0">
               <BookOpen className="w-5 h-5" />
@@ -167,10 +171,10 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
           </button>
         </div>
 
-        {/* Body: Sidebar Chapters + Illustrated Page */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 min-h-0 overflow-hidden">
-          {/* Left Index (3 cols on desktop, horizontal scroll on mobile) */}
-          <nav className="md:col-span-4 lg:col-span-3 bg-[#050b14] border-b md:border-b-0 md:border-r border-[#FF2A6D]/35 p-2.5 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar">
+        {/* Body: Fixed Sidebar + Independently Scrollable Chapter Content + Fixed Footer */}
+        <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
+          {/* Left Index (Fixed width on desktop, horizontal scroll on mobile) */}
+          <nav className="shrink-0 md:w-[255px] lg:w-[275px] md:h-full bg-[#050b14] border-b md:border-b-0 md:border-r border-[#FF2A6D]/35 p-2.5 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar">
             {SECTIONS.map((sec) => {
               const Icon = sec.icon;
               const isSelected = sec.id === activeId;
@@ -186,7 +190,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                   }`}
                 >
                   <span
-                    className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                    className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded tabular-nums ${
                       isSelected
                         ? 'bg-black/30 text-white'
                         : 'bg-[#081320] text-[#FF2A6D] border border-[#FF2A6D]/40'
@@ -203,17 +207,18 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
             })}
           </nav>
 
-          {/* Right Page Content */}
-          <div className="md:col-span-8 lg:col-span-9 p-4 sm:p-6 overflow-y-auto flex flex-col justify-between gap-6 font-sans">
-            <div className="flex flex-col gap-4">
-              <div className="border-b border-[#FF2A6D]/35 pb-2.5 flex items-center justify-between">
-                <h3 className="text-2xl sm:text-3xl font-fortunarium text-[#FF2A6D] tracking-wide">
-                  {currentSection.num}. {currentSection.label}
-                </h3>
-                <span className="text-xs font-mono text-cyan-300/80">
-                  Capítulo {currentIndex + 1} de {SECTIONS.length}
-                </span>
-              </div>
+          {/* Right Column: Fixed Chapter Title + Scrollable Body + Fixed Navigation Footer */}
+          <div className="flex-1 min-w-0 min-h-0 h-full flex flex-col overflow-hidden font-sans">
+            <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-[#FF2A6D]/35 flex items-center justify-between gap-2 bg-[#060d18]/60">
+              <h3 className="text-2xl sm:text-3xl font-fortunarium text-[#FF2A6D] tracking-wide truncate">
+                {currentSection.num}. {currentSection.label}
+              </h3>
+              <span className="text-xs font-mono text-cyan-300/80 tabular-nums shrink-0">
+                Capítulo {currentIndex + 1} de {SECTIONS.length}
+              </span>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-col gap-4">
 
               {/* 1. OBJETIVO */}
               {activeId === 'objetivo' && (
@@ -311,7 +316,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {activeId === 'simbolos' && (
                 <div className="flex flex-col gap-3">
                   <p className="text-xs sm:text-sm text-cyan-100">
-                    Existen <strong className="text-[#FF2A6D]">7 símbolos normales canónicos</strong> ordenados de mayor a menor Valor Base. Cada patrón multiplica el <strong className="text-amber-300">Valor Base</strong> del símbolo:
+                    Existen <strong className="text-[#FF2A6D]">{NORMAL_SYMBOLS_BY_VALUE_DESC.length} símbolos normales canónicos</strong> ordenados de mayor a menor Valor Base. Cada patrón multiplica el <strong className="text-amber-300">Valor Base</strong> del símbolo:
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                     {NORMAL_SYMBOLS_BY_VALUE_DESC.map((id) => {
@@ -330,11 +335,8 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                             <div className="text-sm font-fortunarium text-white tracking-wide truncate">
                               {s.name.toUpperCase()}
                             </div>
-                            <div className="text-[11px] font-mono font-bold text-[#FF2A6D] tabular-nums">
-                              Valor Base: {s.baseMultiplier} CR
-                            </div>
-                            <div className="text-[10px] font-mono text-amber-300 tabular-nums">
-                              ×3: {s.basePayout3} · ×4: {s.basePayout4} · ×5: {s.basePayout5} CR
+                            <div className="text-xs font-mono font-black text-amber-300 tabular-nums mt-0.5">
+                              Valor Base: {s.baseSymbolValue} CR
                             </div>
                           </div>
                         </div>
@@ -638,8 +640,8 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               )}
             </div>
 
-            {/* Bottom Page Navigation */}
-            <div className="pt-3 border-t border-[#FF2A6D]/35 flex items-center justify-between">
+            {/* Bottom Page Navigation (Fixed) */}
+            <div className="shrink-0 px-4 sm:px-6 py-3.5 border-t border-[#FF2A6D]/35 bg-[#050b14]/90 flex items-center justify-between">
               <button
                 type="button"
                 disabled={currentIndex === 0}

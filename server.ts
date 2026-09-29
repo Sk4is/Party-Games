@@ -476,9 +476,16 @@ async function startServer() {
     return next();
   });
 
+  const httpServer = http.createServer(app);
+
   if (process.env.NODE_ENV !== 'production') {
     vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
+      server: {
+        middlewareMode: true,
+        hmr: {
+          server: httpServer,
+        },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -492,10 +499,18 @@ async function startServer() {
     });
   }
 
-  const httpServer = http.createServer(app);
-
   // Explicit WebSocket upgrade routing with Origin verification
   httpServer.on('upgrade', (request, socket, head) => {
+    const protocolHeader = request.headers['sec-websocket-protocol'];
+    const protocols = Array.isArray(protocolHeader)
+      ? protocolHeader.join(',')
+      : String(protocolHeader || '');
+
+    // Allow Vite's internal HMR / ping WebSocket listener (attached to httpServer) to handle its own upgrades
+    if (vite && (protocols.includes('vite-hmr') || protocols.includes('vite-ping'))) {
+      return;
+    }
+
     const origin = request.headers.origin;
     if (origin && !isOriginAllowed(origin)) {
       console.warn(`[WebSocket Upgrade] Rejected forbidden origin: ${origin}`);
@@ -539,8 +554,6 @@ async function startServer() {
       partyGameServer.wss.handleUpgrade(request, socket, head, (ws) => {
         partyGameServer.wss.emit('connection', ws, request);
       });
-    } else if (vite && (request.headers['sec-websocket-protocol'] === 'vite-hmr' || pathname.includes('vite'))) {
-      vite.ws?.handleUpgrade(request, socket, head);
     } else {
       socket.destroy();
     }

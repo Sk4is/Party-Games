@@ -16,6 +16,7 @@ import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
 import { getGameWsUrl } from '../config/network';
 import { backendHealth } from '../services/backendHealth';
+import { safeCloseWebSocket } from '../utils/safeWebSocket';
 
 export type PinturilloConnectionStatus =
   | 'idle'
@@ -90,18 +91,7 @@ export function usePinturilloSocket({
     const sock = wsRef.current;
     if (!sock) return;
     wsRef.current = null;
-    sock.onopen = null;
-    sock.onmessage = null;
-    sock.onerror = null;
-    sock.onclose = null;
-
-    try {
-      if (sock.readyState === WebSocket.OPEN || sock.readyState === WebSocket.CONNECTING) {
-        sock.close(1000, reason);
-      }
-    } catch {
-      // Ignore close errors
-    }
+    safeCloseWebSocket(sock, reason);
   }, []);
 
   // Resolve sanitized WebSocket URL

@@ -16,6 +16,7 @@ import { audio } from '../utils/audio';
 import { createConnectionResilience } from '../utils/connectionResilience';
 import { getGameWsUrl } from '../config/network';
 import { backendHealth } from '../services/backendHealth';
+import { safeCloseWebSocket } from '../utils/safeWebSocket';
 
 export type PalabraSecretaConnectionStatus =
   | 'idle'
@@ -119,7 +120,7 @@ export function usePalabraSecretaSocket({
         // Flush any queued messages
         while (messageQueueRef.current.length > 0) {
           const queued = messageQueueRef.current.shift();
-          if (queued) {
+          if (queued && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(queued));
           }
         }
@@ -454,15 +455,16 @@ export function usePalabraSecretaSocket({
     if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     if (wsRef.current) {
-      if (wsRef.current.readyState === WebSocket.OPEN) {
+      const prev = wsRef.current;
+      wsRef.current = null;
+      if (prev.readyState === WebSocket.OPEN) {
         try {
-          wsRef.current.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
-        } catch (e) {
+          prev.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
+        } catch {
           // Ignore
         }
       }
-      wsRef.current.close(1000, 'User left room');
-      wsRef.current = null;
+      safeCloseWebSocket(prev, 'User left room');
     }
     lastActiveRoomRef.current = null;
     sessionRecovery.clearActiveSession();
@@ -508,7 +510,9 @@ export function usePalabraSecretaSocket({
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (wsRef.current) {
-        wsRef.current.close();
+        const prev = wsRef.current;
+        wsRef.current = null;
+        safeCloseWebSocket(prev, 'Component unmounted');
       }
     };
   }, [initialRoomCode, connect]);

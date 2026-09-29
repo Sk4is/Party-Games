@@ -12,6 +12,8 @@
  * detects stale sockets, and forces immediate reconnection within the server grace period.
  */
 
+import { safeCloseWebSocket } from './safeWebSocket';
+
 export interface ResilienceManagerOptions {
   getSocket: () => WebSocket | null;
   onReconnect: () => void;
@@ -49,13 +51,13 @@ export function createConnectionResilience({
     const elapsedSinceHidden = lastHiddenTimestamp > 0 ? now - lastHiddenTimestamp : 0;
     const elapsedSinceLastActivity = now - getLastActivityTime();
 
-    console.log(
-      `${logTag} Foreground event detected. Elapsed hidden: ${elapsedSinceHidden}ms, last activity: ${elapsedSinceLastActivity}ms, socket readyState: ${ws?.readyState}`
-    );
+    // 0. If a connection attempt is already in flight (CONNECTING), allow it to finish
+    if (ws && ws.readyState === WebSocket.CONNECTING) {
+      return;
+    }
 
     // 1. If socket is closed or closing, reconnect immediately
     if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-      console.log(`${logTag} Socket is closed/closing. Triggering immediate reconnection.`);
       onReconnect();
       return;
     }
@@ -63,12 +65,7 @@ export function createConnectionResilience({
     // 2. If app was suspended/backgrounded for > 3.5 seconds, mobile OS socket is almost always dead.
     // Force immediate reconnection to beat the server grace period (15s) and re-sync state in <200ms.
     if (elapsedSinceHidden > 3500 || elapsedSinceLastActivity > 10000) {
-      console.log(`${logTag} Extended background/inactivity detected (>3.5s). Closing stale socket and reconnecting.`);
-      try {
-        ws.close(1000, 'Background wakeup reset');
-      } catch (e) {
-        // Ignore
-      }
+      safeCloseWebSocket(ws, 'Background wakeup reset');
       onReconnect();
       return;
     }
@@ -78,7 +75,7 @@ export function createConnectionResilience({
       const pingSentAt = Date.now();
       try {
         sendPing();
-      } catch (e) {
+      } catch {
         onReconnect();
         return;
       }
@@ -86,12 +83,7 @@ export function createConnectionResilience({
       watchdogTimeout = setTimeout(() => {
         const currentLastActivity = getLastActivityTime();
         if (currentLastActivity < pingSentAt) {
-          console.warn(`${logTag} Heartbeat watchdog expired without response. Socket is zombie. Reconnecting.`);
-          try {
-            ws.close(1000, 'Zombie socket detected');
-          } catch (e) {
-            // Ignore
-          }
+          safeCloseWebSocket(ws, 'Zombie socket detected');
           onReconnect();
         }
       }, 1500);

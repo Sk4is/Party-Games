@@ -14,6 +14,9 @@ function sanitizeBaseUrl(url?: string): string {
   return url.trim().replace(/\/+$/, '');
 }
 
+export const PRODUCTION_RENDER_API_BASE = 'https://fam2play.onrender.com';
+export const PRODUCTION_RENDER_WS_BASE = 'wss://fam2play.onrender.com';
+
 /**
  * Returns the configured base API URL (e.g. "https://fam2play.onrender.com").
  * When running in the same origin (local monolithic dev or unified deployment)
@@ -30,6 +33,13 @@ export function getApiBaseUrl(): string {
   const envWsUrl = sanitizeBaseUrl((import.meta as any).env?.VITE_WS_BASE_URL);
   if (envWsUrl) {
     return envWsUrl.replace(/^wss:\/\//i, 'https://').replace(/^ws:\/\//i, 'http://');
+  }
+
+  if (typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname.toLowerCase();
+    if (hostname === 'fam2play-web.onrender.com') {
+      return PRODUCTION_RENDER_API_BASE;
+    }
   }
 
   // Same-origin fallback
@@ -63,8 +73,12 @@ export function getWsBaseUrl(): string {
     return envApiUrl.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://');
   }
 
-  // Browser fallback: infer from current window location
+  // Browser fallback: infer from current window location (or production Render backend if on static frontend)
   if (typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname.toLowerCase();
+    if (hostname === 'fam2play-web.onrender.com' || hostname === 'fam2play.onrender.com') {
+      return PRODUCTION_RENDER_WS_BASE;
+    }
     const isHttps = window.location.protocol === 'https:';
     const protocol = isHttps ? 'wss:' : 'ws:';
     const host = window.location.host;

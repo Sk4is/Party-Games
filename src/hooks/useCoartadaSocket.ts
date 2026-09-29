@@ -17,6 +17,7 @@ import { sessionRecovery } from '../services/sessionRecovery';
 import { audio } from '../utils/audio';
 import { getGameWsUrl } from '../config/network';
 import { backendHealth } from '../services/backendHealth';
+import { safeCloseWebSocket } from '../utils/safeWebSocket';
 
 export type CoartadaConnectionStatus =
   | 'idle'
@@ -342,8 +343,9 @@ export function useCoartadaSocket({
     if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
     sendClientMessage({ type: 'LEAVE_ROOM' });
     if (wsRef.current) {
-      wsRef.current.close();
+      const prev = wsRef.current;
       wsRef.current = null;
+      safeCloseWebSocket(prev, 'User left room');
     }
     sessionRecovery.clearActiveSession();
     lastActiveRoomRef.current = null;
@@ -369,8 +371,9 @@ export function useCoartadaSocket({
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (wsRef.current) {
-        wsRef.current.close();
+        const prev = wsRef.current;
         wsRef.current = null;
+        safeCloseWebSocket(prev, 'Component unmounted');
       }
     };
   }, []);

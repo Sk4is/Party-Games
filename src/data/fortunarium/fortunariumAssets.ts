@@ -1135,50 +1135,78 @@ export function getUpgradeCostMoney(
 // 2. Repairs used in current quota (`repairsUsedInQuota`): 1 + repairsUsed * 0.35
 // 3. Missing integrity severity & Mecánico Jefe discount (-6% per level, max -60%)
 // ============================================================================
-export function getRepairCostMoney(params: {
-  round: number;
+export interface RepairCostInput {
+  round?: number;
   repairsUsedInQuota?: number;
   integrity?: number;
   maxIntegrity?: number;
-  upgrades?: Record<FortunariumUpgradeId, number>;
+  upgrades?: Partial<Record<FortunariumUpgradeId, number>>;
   activeModifiers?: Pick<FortunariumActiveModifier, 'modifierId'>[];
-}): number {
-  const {
-    round,
-    repairsUsedInQuota = 0,
-    integrity = 70,
-    maxIntegrity = 100,
-    upgrades,
-    activeModifiers = [],
-  } = params;
+}
+
+export function getRepairCostMoney(
+  paramsOrRound?: RepairCostInput | number,
+  legacyRepairsUsedInQuota?: number
+): number {
+  const normalizedParams: RepairCostInput =
+    typeof paramsOrRound === 'number'
+      ? {
+          round: paramsOrRound,
+          repairsUsedInQuota: legacyRepairsUsedInQuota,
+        }
+      : paramsOrRound && typeof paramsOrRound === 'object'
+      ? paramsOrRound
+      : {};
+
+  const rawRound = Number(normalizedParams.round);
+  const safeRound = Number.isFinite(rawRound) && rawRound >= 1 ? Math.floor(rawRound) : 1;
+
+  const rawRepairsUsed = Number(normalizedParams.repairsUsedInQuota);
+  const safeRepairsUsed =
+    Number.isFinite(rawRepairsUsed) && rawRepairsUsed >= 0
+      ? Math.floor(rawRepairsUsed)
+      : 0;
+
+  const rawMaxIntegrity = Number(normalizedParams.maxIntegrity);
+  const safeMaxIntegrity =
+    Number.isFinite(rawMaxIntegrity) && rawMaxIntegrity > 0 ? rawMaxIntegrity : 100;
+
+  const rawIntegrity = Number(normalizedParams.integrity);
+  const safeIntegrity = Number.isFinite(rawIntegrity)
+    ? Math.max(0, Math.min(safeMaxIntegrity, rawIntegrity))
+    : Math.min(70, safeMaxIntegrity);
 
   const baseRepairCost = 28;
-  const quotaScale = 1 + Math.max(0, round - 1) * 0.25;
-  const repeatScale = 1 + Math.max(0, repairsUsedInQuota) * 0.35;
+  const quotaScale = 1 + Math.max(0, safeRound - 1) * 0.25;
+  const repeatScale = 1 + Math.max(0, safeRepairsUsed) * 0.35;
 
   const missingRatio = Math.max(
     0,
-    Math.min(1, (maxIntegrity - integrity) / Math.max(1, maxIntegrity))
+    Math.min(1, (safeMaxIntegrity - safeIntegrity) / Math.max(1, safeMaxIntegrity))
   );
+  // Monotonic damage curve: more damaged chassis is strictly more expensive to repair
   const damageScale =
     missingRatio <= 0.25
-      ? 0.9
-      : missingRatio >= 0.65
-      ? 1.25
+      ? 0.9 + (missingRatio / 0.25) * 0.1
       : 1.0 + (missingRatio - 0.25) * 0.5;
 
-  const mecanicoLv = upgrades?.mecanico_jefe || 0;
+  const rawMecanicoLv = Number(normalizedParams.upgrades?.mecanico_jefe);
+  const mecanicoLv =
+    Number.isFinite(rawMecanicoLv) && rawMecanicoLv > 0 ? Math.floor(rawMecanicoLv) : 0;
   const discountMult = Math.max(0.4, 1 - mecanicoLv * 0.06);
 
+  const activeModifiers = Array.isArray(normalizedParams.activeModifiers)
+    ? normalizedParams.activeModifiers
+    : [];
   const hasRecalentamiento = activeModifiers.some(
-    (m) => m.modifierId === 'recalentamiento'
+    (m) => m && m.modifierId === 'recalentamiento'
   );
   const debuffMult = hasRecalentamiento ? 1.3 : 1.0;
 
-  return Math.max(
-    15,
-    Math.round(baseRepairCost * quotaScale * repeatScale * damageScale * discountMult * debuffMult)
+  const computed = Math.round(
+    baseRepairCost * quotaScale * repeatScale * damageScale * discountMult * debuffMult
   );
+  return Number.isFinite(computed) ? Math.max(15, computed) : 28;
 }
 
 export function calculateEffectiveSpinCost(
@@ -1615,6 +1643,7 @@ export interface FortunariumLiveSymbolStat {
   probabilityDeltaPct: number;
   baseSymbolValue: number;
   liveBaseSymbolValue: number;
+  liveSymbolBaseValue: number;
   basePayout3: number;
   basePayout4: number;
   basePayout5: number;
@@ -1761,6 +1790,7 @@ export function computeLiveSymbolStats(
       probabilityDeltaPct,
       baseSymbolValue: meta.baseSymbolValue,
       liveBaseSymbolValue,
+      liveSymbolBaseValue: liveBaseSymbolValue,
       basePayout3: meta.basePayout3,
       basePayout4: meta.basePayout4,
       basePayout5: meta.basePayout5,

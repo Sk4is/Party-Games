@@ -18,6 +18,7 @@ import {
 import { sessionRecovery } from '../services/sessionRecovery';
 import { getGameWsUrl } from '../config/network';
 import { backendHealth } from '../services/backendHealth';
+import { safeCloseWebSocket, safeSendWebSocket } from '../utils/safeWebSocket';
 
 export type CantinaConnectionStatus =
   | 'idle'
@@ -182,10 +183,9 @@ export function useCantinaSocket({
     clearPingTimer();
 
     if (wsRef.current) {
-      wsRef.current.onclose = null;
-      wsRef.current.onerror = null;
-      wsRef.current.close();
+      const prev = wsRef.current;
       wsRef.current = null;
+      safeCloseWebSocket(prev, 'Reconnecting to Cantina room');
     }
 
     setConnectionStatus('connecting');
@@ -216,8 +216,8 @@ export function useCantinaSocket({
       // Flush queue
       while (messageQueueRef.current.length > 0) {
         const pending = messageQueueRef.current.shift();
-        if (pending) {
-          ws.send(JSON.stringify(pending));
+        if (pending && ws.readyState === WebSocket.OPEN) {
+          safeSendWebSocket(ws, pending as unknown as Record<string, unknown>);
         }
       }
 
@@ -559,11 +559,12 @@ export function useCantinaSocket({
     sessionRecovery.clearActiveSession();
 
     if (wsRef.current) {
-      try {
-        wsRef.current.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
-        wsRef.current.close();
-      } catch {}
+      const prev = wsRef.current;
       wsRef.current = null;
+      if (prev.readyState === WebSocket.OPEN) {
+        safeSendWebSocket(prev, { type: 'LEAVE_ROOM' });
+      }
+      safeCloseWebSocket(prev, 'User left room');
     }
 
     setRoomState(null);
@@ -583,10 +584,9 @@ export function useCantinaSocket({
       clearReconnectTimer();
       clearPingTimer();
       if (wsRef.current) {
-        wsRef.current.onclose = null;
-        wsRef.current.onerror = null;
-        wsRef.current.close();
+        const prev = wsRef.current;
         wsRef.current = null;
+        safeCloseWebSocket(prev, 'Component unmounted');
       }
     };
   }, [enabled, initialRoomCode, connectToRoom, clearReconnectTimer, clearPingTimer]);

@@ -18,7 +18,16 @@ import {
   PlayerProfile,
 } from '../services/multiplayerRoomService';
 import { sessionRecovery } from '../services/sessionRecovery';
+import { backendHealth } from '../services/backendHealth';
 import { getGameWsUrl } from '../config/network';
+import { createConnectionResilience } from '../utils/connectionResilience';
+import {
+  ExplicitSocketLifecycleState,
+  connectWebSocketSafely,
+  safeCloseWebSocket,
+  safeSendWebSocket,
+  getBoundedBackoffDelay,
+} from '../utils/safeWebSocket';
 
 export type FortunariumConnectionStatus =
   | 'idle'
@@ -27,6 +36,8 @@ export type FortunariumConnectionStatus =
   | 'reconnecting'
   | 'disconnected'
   | 'failed';
+
+const MAX_RECONNECT_ATTEMPTS = 8;
 
 interface UseFortunariumSocketOptions {
   player: PlayerProfile;
@@ -62,6 +73,12 @@ export function useFortunariumSocket({
   const [spinEvent, setSpinEvent] = useState<FortunariumSpinResult | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const lifecycleStateRef = useRef<ExplicitSocketLifecycleState>('IDLE');
+  const connectAbortRef = useRef<AbortController | null>(null);
+  const connectAttemptIdRef = useRef<number>(0);
+  const connectedRoomCodeRef = useRef<string | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
+
   const messageQueueRef = useRef<FortunariumClientMessage[]>([]);
   const cursorListenersRef = useRef<Set<(cursor: FortunariumRemoteCursor) => void>>(new Set());
   const lastCursorSentAtRef = useRef<number>(0);
@@ -80,6 +97,30 @@ export function useFortunariumSocket({
   const onWrongGameRef = useRef(onWrongGame);
   onWrongGameRef.current = onWrongGame;
 
+  const updateLifecycleState = useCallback((nextState: ExplicitSocketLifecycleState) => {
+    lifecycleStateRef.current = nextState;
+    switch (nextState) {
+      case 'IDLE':
+        setConnectionStatus('idle');
+        break;
+      case 'CONNECTING':
+        setConnectionStatus('connecting');
+        break;
+      case 'OPEN':
+        setConnectionStatus('connected');
+        break;
+      case 'RECONNECTING':
+        setConnectionStatus('reconnecting');
+        break;
+      case 'CLOSING':
+      case 'CLOSED':
+        if (isManuallyClosedRef.current) {
+          setConnectionStatus('disconnected');
+        }
+        break;
+    }
+  }, []);
+
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -94,152 +135,253 @@ export function useFortunariumSocket({
     }
   }, []);
 
+  const abortInFlightConnection = useCallback(
+    (reason = 'Connection superseded') => {
+      if (connectAbortRef.current) {
+        try {
+          connectAbortRef.current.abort();
+        } catch {
+          // Ignore abort errors
+        }
+        connectAbortRef.current = null;
+      }
+      if (wsRef.current) {
+        const prevSocket = wsRef.current;
+        wsRef.current = null;
+        safeCloseWebSocket(prevSocket, reason, updateLifecycleState);
+      }
+    },
+    [updateLifecycleState]
+  );
+
   const sendMessage = useCallback((msg: FortunariumClientMessage) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(msg));
+    const sock = wsRef.current;
+    if (sock && sock.readyState === WebSocket.OPEN) {
+      safeSendWebSocket(sock, msg as unknown as Record<string, unknown>);
     } else {
       messageQueueRef.current.push(msg);
     }
   }, []);
 
+  const handleServerEvent = useCallback((event: MessageEvent) => {
+    lastActivityRef.current = Date.now();
+    try {
+      const msg = JSON.parse(event.data) as FortunariumServerMessage;
+      if (msg.type === 'ROOM_STATE') {
+        if (
+          typeof msg.state.stateVersion === 'number' &&
+          msg.state.stateVersion < latestStateVersionRef.current
+        ) {
+          return;
+        }
+        latestStateVersionRef.current = msg.state.stateVersion || 0;
+        if (
+          msg.state.phase === 'LOBBY' ||
+          msg.state.totalSpinsInMatch === 0 ||
+          !msg.state.lastSpinResult
+        ) {
+          setSpinEvent(null);
+        }
+        setRoomState(msg.state);
+        lastActiveRoomRef.current = { code: msg.state.roomCode };
+        connectedRoomCodeRef.current = msg.state.roomCode;
+        sessionRecovery.saveActiveSession({
+          gameType: 'fortunarium',
+          roomCode: msg.state.roomCode,
+          playerId: playerRef.current.id,
+        });
+      } else if (msg.type === 'SPIN_STARTED') {
+        latestStateVersionRef.current =
+          msg.spinResult.stateVersion || msg.state.stateVersion || 0;
+        setRoomState(msg.state);
+        setSpinEvent(msg.spinResult);
+      } else if (msg.type === 'CURSOR_UPDATE') {
+        const cursorPacket: FortunariumRemoteCursor = {
+          playerId: msg.playerId,
+          name: msg.name,
+          color: msg.color,
+          x: msg.x,
+          y: msg.y,
+          updatedAt: Date.now(),
+        };
+        for (const listener of cursorListenersRef.current) {
+          listener(cursorPacket);
+        }
+      } else if (msg.type === 'NOTIFICATION') {
+        setNotification({ text: msg.text, variant: msg.variant });
+        setTimeout(() => setNotification(null), 5000);
+      } else if (msg.type === 'ERROR') {
+        setErrorMessage(msg.message);
+        setTimeout(() => setErrorMessage(null), 4500);
+      }
+    } catch (err) {
+      console.error('[useFortunariumSocket] Error parsing message:', err);
+    }
+  }, []);
+
   const connectToRoom = useCallback(
-    (roomCode: string) => {
+    async (roomCode: string, isReconnectAttempt = false): Promise<void> => {
       if (!roomCode) return;
       const cleanCode = roomCode.trim().toUpperCase();
-      clearReconnectTimer();
-      clearPingTimer();
+      if (!cleanCode) return;
 
-      if (wsRef.current) {
-        wsRef.current.onclose = null;
-        wsRef.current.onerror = null;
-        wsRef.current.close();
-        wsRef.current = null;
+      // Single logical connection owner check: do not create duplicate WebSockets
+      const existing = wsRef.current;
+      if (
+        existing &&
+        connectedRoomCodeRef.current === cleanCode &&
+        (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)
+      ) {
+        return;
       }
 
-      setConnectionStatus('connecting');
-      setErrorMessage(null);
+      clearReconnectTimer();
+      clearPingTimer();
+      abortInFlightConnection('Reconnecting to room');
+
       isManuallyClosedRef.current = false;
+      connectedRoomCodeRef.current = cleanCode;
+      lastActiveRoomRef.current = { code: cleanCode };
+      setErrorMessage(null);
 
-      const wsUrl = getGameWsUrl('/ws/fortunarium');
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      const attemptId = ++connectAttemptIdRef.current;
+      const abortController = new AbortController();
+      connectAbortRef.current = abortController;
 
-      ws.onopen = () => {
-        setConnectionStatus('connected');
-        reconnectAttemptsRef.current = 0;
+      updateLifecycleState(isReconnectAttempt ? 'RECONNECTING' : 'CONNECTING');
 
-        ws.send(
-          JSON.stringify({
-            type: 'JOIN_ROOM',
-            roomCode: cleanCode,
-            player: {
-              id: playerRef.current.id,
-              name: playerRef.current.name,
-              avatar: playerRef.current.avatar,
-              color: playerRef.current.color,
-            },
-          } satisfies FortunariumClientMessage)
-        );
-
-        while (messageQueueRef.current.length > 0) {
-          const queued = messageQueueRef.current.shift();
-          if (queued && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify(queued));
-          }
-        }
-
-        pingIntervalRef.current = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'PING' } satisfies FortunariumClientMessage));
-          }
-        }, 15000);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data) as FortunariumServerMessage;
-          if (msg.type === 'ROOM_STATE') {
-            if (
-              typeof msg.state.stateVersion === 'number' &&
-              msg.state.stateVersion < latestStateVersionRef.current
-            ) {
-              return;
-            }
-            latestStateVersionRef.current = msg.state.stateVersion || 0;
-            if (
-              msg.state.phase === 'LOBBY' ||
-              msg.state.totalSpinsInMatch === 0 ||
-              !msg.state.lastSpinResult
-            ) {
-              setSpinEvent(null);
-            }
-            setRoomState(msg.state);
-            lastActiveRoomRef.current = { code: msg.state.roomCode };
-            sessionRecovery.saveActiveSession({
-              gameType: 'fortunarium',
-              roomCode: msg.state.roomCode,
-              playerId: playerRef.current.id,
-            });
-          } else if (msg.type === 'SPIN_STARTED') {
-            latestStateVersionRef.current = msg.spinResult.stateVersion || msg.state.stateVersion || 0;
-            setRoomState(msg.state);
-            setSpinEvent(msg.spinResult);
-          } else if (msg.type === 'CURSOR_UPDATE') {
-            const cursorPacket: FortunariumRemoteCursor = {
-              playerId: msg.playerId,
-              name: msg.name,
-              color: msg.color,
-              x: msg.x,
-              y: msg.y,
-              updatedAt: Date.now(),
-            };
-            for (const listener of cursorListenersRef.current) {
-              listener(cursorPacket);
-            }
-          } else if (msg.type === 'NOTIFICATION') {
-            setNotification({ text: msg.text, variant: msg.variant });
-            setTimeout(() => setNotification(null), 5000);
-          } else if (msg.type === 'ERROR') {
-            setErrorMessage(msg.message);
-            setTimeout(() => setErrorMessage(null), 4500);
-          }
-        } catch (err) {
-          console.error('[useFortunariumSocket] Error parsing message:', err);
-        }
-      };
-
-      ws.onclose = () => {
-        clearPingTimer();
-        if (isManuallyClosedRef.current) {
-          setConnectionStatus('disconnected');
+      const scheduleRecoverableReconnect = () => {
+        if (isManuallyClosedRef.current || connectAttemptIdRef.current !== attemptId) {
+          updateLifecycleState('CLOSED');
           return;
         }
 
-        if (lastActiveRoomRef.current?.code && reconnectAttemptsRef.current < 8) {
-          setConnectionStatus('reconnecting');
-          const delay = Math.min(4000, 700 * Math.pow(1.5, reconnectAttemptsRef.current));
+        const targetCode = lastActiveRoomRef.current?.code;
+        if (targetCode && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+          updateLifecycleState('RECONNECTING');
+          const delay = getBoundedBackoffDelay(reconnectAttemptsRef.current, {
+            baseDelayMs: 750,
+            factor: 1.55,
+            maxDelayMs: 5000,
+            jitterMs: 180,
+          });
           reconnectAttemptsRef.current += 1;
+          clearReconnectTimer();
           reconnectTimeoutRef.current = setTimeout(() => {
-            if (lastActiveRoomRef.current?.code && !isManuallyClosedRef.current) {
-              connectToRoom(lastActiveRoomRef.current.code);
+            if (!isManuallyClosedRef.current && lastActiveRoomRef.current?.code) {
+              void connectToRoom(lastActiveRoomRef.current.code, true);
             }
           }, delay);
         } else {
+          updateLifecycleState('CLOSED');
           setConnectionStatus('failed');
         }
       };
+
+      const wsUrl = getGameWsUrl('/ws/fortunarium', 'VITE_FORTUNARIUM_WS_URL');
+
+      try {
+        const ws = await connectWebSocketSafely({
+          url: wsUrl,
+          timeoutMs: 12000,
+          signal: abortController.signal,
+          onStateChange: (state) => {
+            if (connectAttemptIdRef.current !== attemptId) return;
+            if (state === 'CONNECTING' && isReconnectAttempt) {
+              updateLifecycleState('RECONNECTING');
+            } else {
+              updateLifecycleState(state);
+            }
+          },
+          onMessage: (event, socket) => {
+            if (wsRef.current !== socket || connectAttemptIdRef.current !== attemptId) return;
+            handleServerEvent(event);
+          },
+          onPostOpenError: () => {
+            // Post-open errors are followed by onclose, which triggers bounded recovery
+          },
+          onPostOpenClose: (_event, socket) => {
+            if (wsRef.current === socket) {
+              wsRef.current = null;
+            }
+            clearPingTimer();
+            scheduleRecoverableReconnect();
+          },
+        });
+
+        if (
+          isManuallyClosedRef.current ||
+          abortController.signal.aborted ||
+          connectAttemptIdRef.current !== attemptId
+        ) {
+          safeCloseWebSocket(ws, 'Stale connection attempt');
+          return;
+        }
+
+        wsRef.current = ws;
+        lastActivityRef.current = Date.now();
+        reconnectAttemptsRef.current = 0;
+        updateLifecycleState('OPEN');
+        backendHealth.markHealthy();
+
+        safeSendWebSocket(ws, {
+          type: 'JOIN_ROOM',
+          roomCode: cleanCode,
+          player: {
+            id: playerRef.current.id,
+            name: playerRef.current.name,
+            avatar: playerRef.current.avatar,
+            color: playerRef.current.color,
+          },
+        } satisfies FortunariumClientMessage);
+
+        while (messageQueueRef.current.length > 0) {
+          const queued = messageQueueRef.current.shift();
+          if (queued) {
+            safeSendWebSocket(ws, queued as unknown as Record<string, unknown>);
+          }
+        }
+
+        clearPingTimer();
+        pingIntervalRef.current = setInterval(() => {
+          if (wsRef.current === ws && ws.readyState === WebSocket.OPEN) {
+            safeSendWebSocket(ws, { type: 'PING' } satisfies FortunariumClientMessage);
+          }
+        }, 15000);
+      } catch {
+        // Recoverable pre-open connection failure: never produce an unhandled rejection
+        clearPingTimer();
+        scheduleRecoverableReconnect();
+      }
     },
-    [clearPingTimer, clearReconnectTimer]
+    [
+      abortInFlightConnection,
+      clearPingTimer,
+      clearReconnectTimer,
+      handleServerEvent,
+      updateLifecycleState,
+    ]
   );
 
   useEffect(() => {
     if (!enabled) return;
+    let cancelled = false;
+
     const initial = getInitialFortunariumRoom(initialRoomCode);
     if (initial?.code) {
       validateJoinOnlineRoom(initial.code, 'fortunarium', playerRef.current)
         .then((res) => {
+          if (cancelled || isManuallyClosedRef.current) return;
+          // Do not clobber if a room connection was already started manually
+          if (
+            wsRef.current &&
+            (wsRef.current.readyState === WebSocket.OPEN ||
+              wsRef.current.readyState === WebSocket.CONNECTING)
+          ) {
+            return;
+          }
           if (res.valid) {
-            connectToRoom(initial.code);
+            void connectToRoom(initial.code);
           } else if (res.wrongGame && res.actualGameType && onWrongGameRef.current) {
             onWrongGameRef.current(res.actualGameType, initial.code);
           } else {
@@ -248,25 +390,51 @@ export function useFortunariumSocket({
           }
         })
         .catch(() => {
-          sessionRecovery.clearActiveSession();
+          if (!cancelled) {
+            sessionRecovery.clearActiveSession();
+          }
         });
     }
 
+    const cleanupResilience = createConnectionResilience({
+      getSocket: () => wsRef.current,
+      onReconnect: () => {
+        if (cancelled || isManuallyClosedRef.current) return;
+        const activeCode = lastActiveRoomRef.current?.code;
+        if (activeCode) {
+          reconnectAttemptsRef.current = 0;
+          void connectToRoom(activeCode, true);
+        }
+      },
+      sendPing: () => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          safeSendWebSocket(wsRef.current, { type: 'PING' } satisfies FortunariumClientMessage);
+        }
+      },
+      getLastActivityTime: () => lastActivityRef.current,
+      logTag: '[FortunariumSocket]',
+    });
+
     return () => {
+      cancelled = true;
       isManuallyClosedRef.current = true;
+      cleanupResilience();
       clearReconnectTimer();
       clearPingTimer();
-      if (wsRef.current) {
-        wsRef.current.onclose = null;
-        wsRef.current.close();
-        wsRef.current = null;
-      }
+      abortInFlightConnection('Component unmounted');
     };
-  }, [enabled, initialRoomCode, connectToRoom, clearReconnectTimer, clearPingTimer]);
+  }, [
+    enabled,
+    initialRoomCode,
+    connectToRoom,
+    clearReconnectTimer,
+    clearPingTimer,
+    abortInFlightConnection,
+  ]);
 
   const createRoom = useCallback(
     async (config?: Partial<FortunariumConfig>) => {
-      setConnectionStatus('connecting');
+      updateLifecycleState('CONNECTING');
       setErrorMessage(null);
       const created = await createOnlineRoom('fortunarium', playerRef.current, config);
       lastActiveRoomRef.current = { code: created.roomCode };
@@ -275,15 +443,15 @@ export function useFortunariumSocket({
         roomCode: created.roomCode,
         playerId: playerRef.current.id,
       });
-      connectToRoom(created.roomCode);
+      await connectToRoom(created.roomCode);
     },
-    [connectToRoom]
+    [connectToRoom, updateLifecycleState]
   );
 
   const joinRoom = useCallback(
     async (code: string) => {
       const cleanCode = code.trim().toUpperCase();
-      setConnectionStatus('connecting');
+      updateLifecycleState('CONNECTING');
       setErrorMessage(null);
 
       const validation = await validateJoinOnlineRoom(
@@ -292,7 +460,7 @@ export function useFortunariumSocket({
         playerRef.current
       );
       if (!validation.valid) {
-        setConnectionStatus('idle');
+        updateLifecycleState('IDLE');
         if (validation.wrongGame && validation.actualGameType && onWrongGameRef.current) {
           onWrongGameRef.current(validation.actualGameType, cleanCode);
           return;
@@ -306,9 +474,9 @@ export function useFortunariumSocket({
         roomCode: cleanCode,
         playerId: playerRef.current.id,
       });
-      connectToRoom(cleanCode);
+      await connectToRoom(cleanCode);
     },
-    [connectToRoom]
+    [connectToRoom, updateLifecycleState]
   );
 
   const leaveRoom = useCallback(() => {
@@ -316,17 +484,19 @@ export function useFortunariumSocket({
     clearReconnectTimer();
     clearPingTimer();
     lastActiveRoomRef.current = null;
+    connectedRoomCodeRef.current = null;
     sessionRecovery.clearActiveSession();
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'LEAVE_ROOM' } satisfies FortunariumClientMessage));
-      wsRef.current.close();
+      safeSendWebSocket(wsRef.current, {
+        type: 'LEAVE_ROOM',
+      } satisfies FortunariumClientMessage);
     }
-    wsRef.current = null;
+    abortInFlightConnection('User left room');
     setSpinEvent(null);
     setRoomState(null);
-    setConnectionStatus('idle');
-  }, [clearPingTimer, clearReconnectTimer]);
+    updateLifecycleState('IDLE');
+  }, [abortInFlightConnection, clearPingTimer, clearReconnectTimer, updateLifecycleState]);
 
   const subscribeToCursors = useCallback(
     (listener: (cursor: FortunariumRemoteCursor) => void) => {
@@ -344,13 +514,11 @@ export function useFortunariumSocket({
     if (now - lastCursorSentAtRef.current < 30) return;
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       lastCursorSentAtRef.current = now;
-      wsRef.current.send(
-        JSON.stringify({
-          type: 'CURSOR_MOVE',
-          x: Number(x.toFixed(4)),
-          y: Number(y.toFixed(4)),
-        } satisfies FortunariumClientMessage)
-      );
+      safeSendWebSocket(wsRef.current, {
+        type: 'CURSOR_MOVE',
+        x: Number(x.toFixed(4)),
+        y: Number(y.toFixed(4)),
+      } satisfies FortunariumClientMessage);
     }
   }, []);
 

@@ -1,27 +1,96 @@
 import { FortunariumWinTier } from '../types/fortunarium';
 
 export interface FortunariumAudioSettings {
-  masterVolume: number; // 0..100
-  effectsVolume: number; // 0..100
-  machineVolume: number; // 0..100
+  /** Canonical internal volume representation: 0.0 ... 1.0 */
+  masterVolume: number;
+  /** Ambient / workshop background volume: 0.0 ... 1.0 */
+  musicVolume: number;
+  /** Mechanical & UI SFX volume: 0.0 ... 1.0 */
+  sfxVolume: number;
+  /** Backwards-compatible aliases (0.0 ... 1.0) */
+  effectsVolume: number;
+  machineVolume: number;
   muted: boolean;
 }
 
 const STORAGE_KEY = 'fam2play_fortunarium_audio_v1';
 
-const DEFAULT_SETTINGS: FortunariumAudioSettings = {
-  masterVolume: 80,
-  effectsVolume: 85,
-  machineVolume: 80,
+export const DEFAULT_FORTUNARIUM_AUDIO_SETTINGS: FortunariumAudioSettings = {
+  masterVolume: 0.8,
+  musicVolume: 0.45,
+  sfxVolume: 0.55,
+  effectsVolume: 0.55,
+  machineVolume: 0.55,
   muted: false,
 };
 
+/**
+ * Safely normalizes any volume input (number, string, stale percentage, or malformed value)
+ * into a canonical finite number clamped between 0.0 and 1.0.
+ * - Rejects NaN, Infinity, -Infinity, null, undefined, booleans, objects, empty strings
+ * - Rejects absurd values (> 100 such as "8000" or < 0) by returning fallback
+ * - Converts legacy 1..100 percentage values only when explicitly migrating v1 storage
+ */
+export function normalizeVolume(
+  value: unknown,
+  fallback = 0.8,
+  allowLegacyPercentageConversion = false
+): number {
+  const safeFallback =
+    typeof fallback === 'number' && Number.isFinite(fallback)
+      ? Math.max(0, Math.min(1, fallback))
+      : 0.8;
+
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === 'boolean' ||
+    typeof value === 'object'
+  ) {
+    return safeFallback;
+  }
+
+  if (typeof value === 'string' && value.trim() === '') {
+    return safeFallback;
+  }
+
+  const parsed = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return safeFallback;
+  }
+
+  // Reject out-of-range values like "8000"
+  if (parsed > 1) {
+    if (allowLegacyPercentageConversion && parsed <= 100) {
+      return Math.max(0, Math.min(1, Number((parsed / 100).toFixed(4))));
+    }
+    return safeFallback;
+  }
+
+  return Math.max(0, Math.min(1, Number(parsed.toFixed(4))));
+}
+
+/**
+ * Always returns a finite integer percentage (0..100) for UI display.
+ */
+export function formatVolumePercentage(value: unknown, fallback = 0.8): number {
+  const normalized = normalizeVolume(value, fallback, false);
+  const pct = Math.round(normalized * 100);
+  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : Math.round(fallback * 100);
+}
+
 class FortunariumAudioEngine {
   private ctx: AudioContext | null = null;
-  private settings: FortunariumAudioSettings = { ...DEFAULT_SETTINGS };
+  private settings: FortunariumAudioSettings = { ...DEFAULT_FORTUNARIUM_AUDIO_SETTINGS };
   private listeners = new Set<(s: FortunariumAudioSettings) => void>();
   private reelTickTimer: ReturnType<typeof setInterval> | null = null;
   private reelTickStep = 0;
+
+  // Ambient workshop synthesizer nodes
+  private ambientGainNode: GainNode | null = null;
+  private ambientOscA: OscillatorNode | null = null;
+  private ambientOscB: OscillatorNode | null = null;
+  private isAmbientWanted = false;
 
   constructor() {
     this.loadSettings();
@@ -43,11 +112,87 @@ class FortunariumAudioEngine {
   }
 
   public startMusicLoop(_mode: 'lobby' | 'gameplay' = 'lobby') {
-    // Procedural audio engine uses event-driven mechanical/effect cues
+    this.isAmbientWanted = true;
+    this.syncAmbientDrone();
   }
 
   public stopMusicLoop() {
-    // No-op cleanup for ambient/music loop lifecycle
+    this.isAmbientWanted = false;
+    this.teardownAmbientDrone();
+  }
+
+  private teardownAmbientDrone() {
+    try {
+      if (this.ambientOscA) {
+        this.ambientOscA.stop();
+        this.ambientOscA.disconnect();
+      }
+    } catch {}
+    try {
+      if (this.ambientOscB) {
+        this.ambientOscB.stop();
+        this.ambientOscB.disconnect();
+      }
+    } catch {}
+    try {
+      if (this.ambientGainNode) {
+        this.ambientGainNode.disconnect();
+      }
+    } catch {}
+    this.ambientOscA = null;
+    this.ambientOscB = null;
+    this.ambientGainNode = null;
+  }
+
+  private syncAmbientDrone() {
+    const targetGain = this.getChannelGain('ambient') * 0.045;
+    if (!this.isAmbientWanted || targetGain <= 0.0005) {
+      if (this.ambientGainNode && this.ctx) {
+        this.ambientGainNode.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+      }
+      return;
+    }
+
+    if (!this.ctx) {
+      // Do not force-create AudioContext until user gesture or existing context is available
+      return;
+    }
+
+    if (!this.ambientGainNode || !this.ambientOscA || !this.ambientOscB) {
+      try {
+        const now = this.ctx.currentTime;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(targetGain, now);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(160, now);
+
+        const oscA = this.ctx.createOscillator();
+        oscA.type = 'sine';
+        oscA.frequency.setValueAtTime(55, now);
+
+        const oscB = this.ctx.createOscillator();
+        oscB.type = 'triangle';
+        oscB.frequency.setValueAtTime(110.2, now);
+
+        oscA.connect(filter);
+        oscB.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        oscA.start(now);
+        oscB.start(now);
+
+        this.ambientGainNode = gain;
+        this.ambientOscA = oscA;
+        this.ambientOscB = oscB;
+      } catch {}
+    } else {
+      try {
+        this.ambientGainNode.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.04);
+      } catch {}
+    }
   }
 
   public playLeverPull() {
@@ -197,38 +342,85 @@ class FortunariumAudioEngine {
     osc.stop(now + 0.82);
   }
 
-  private loadSettings() {
+  public normalizeSettingsObject(rawObj: unknown): FortunariumAudioSettings {
+    if (!rawObj || typeof rawObj !== 'object') {
+      return { ...DEFAULT_FORTUNARIUM_AUDIO_SETTINGS };
+    }
+    const parsed = rawObj as Record<string, unknown>;
+    const isLegacyV1 =
+      parsed.version !== 2 &&
+      parsed.musicVolume === undefined &&
+      parsed.sfxVolume === undefined;
+
+    const masterVolume = normalizeVolume(
+      parsed.masterVolume,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.masterVolume,
+      isLegacyV1
+    );
+    const musicVolume = normalizeVolume(
+      parsed.musicVolume,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.musicVolume,
+      isLegacyV1
+    );
+    const sfxFallbackSource =
+      parsed.sfxVolume !== undefined
+        ? parsed.sfxVolume
+        : parsed.machineVolume !== undefined
+        ? parsed.machineVolume
+        : parsed.effectsVolume;
+    const sfxVolume = normalizeVolume(
+      sfxFallbackSource,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.sfxVolume,
+      isLegacyV1
+    );
+
+    return {
+      masterVolume,
+      musicVolume,
+      sfxVolume,
+      effectsVolume: sfxVolume,
+      machineVolume: sfxVolume,
+      muted: Boolean(parsed.muted),
+    };
+  }
+
+  public loadSettings() {
     if (typeof window === 'undefined') return;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        this.settings = {
-          masterVolume:
-            typeof parsed.masterVolume === 'number'
-              ? Math.max(0, Math.min(100, parsed.masterVolume))
-              : DEFAULT_SETTINGS.masterVolume,
-          effectsVolume:
-            typeof parsed.effectsVolume === 'number'
-              ? Math.max(0, Math.min(100, parsed.effectsVolume))
-              : DEFAULT_SETTINGS.effectsVolume,
-          machineVolume:
-            typeof parsed.machineVolume === 'number'
-              ? Math.max(0, Math.min(100, parsed.machineVolume))
-              : DEFAULT_SETTINGS.machineVolume,
-          muted: Boolean(parsed.muted),
-        };
+        this.settings = this.normalizeSettingsObject(parsed);
+      } else {
+        this.settings = { ...DEFAULT_FORTUNARIUM_AUDIO_SETTINGS };
       }
     } catch {
-      this.settings = { ...DEFAULT_SETTINGS };
+      this.settings = { ...DEFAULT_FORTUNARIUM_AUDIO_SETTINGS };
     }
   }
 
-  private saveSettings() {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
-    } catch {}
+  public saveSettings() {
+    this.settings = this.normalizeSettingsObject({
+      ...this.settings,
+      version: 2,
+    });
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            version: 2,
+            masterVolume: this.settings.masterVolume,
+            musicVolume: this.settings.musicVolume,
+            sfxVolume: this.settings.sfxVolume,
+            effectsVolume: this.settings.sfxVolume,
+            machineVolume: this.settings.sfxVolume,
+            muted: this.settings.muted,
+          })
+        );
+      } catch {}
+    }
+    this.syncAmbientDrone();
     this.listeners.forEach((cb) => cb({ ...this.settings }));
   }
 
@@ -237,11 +429,72 @@ class FortunariumAudioEngine {
   }
 
   public updateSettings(partial: Partial<FortunariumAudioSettings>) {
-    this.settings = {
+    const next = {
       ...this.settings,
       ...partial,
+      version: 2,
+    };
+    this.settings = this.normalizeSettingsObject(next);
+    this.saveSettings();
+  }
+
+  public setMasterVolume(value: unknown) {
+    const masterVolume = normalizeVolume(
+      value,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.masterVolume,
+      false
+    );
+    this.settings = {
+      ...this.settings,
+      masterVolume,
     };
     this.saveSettings();
+  }
+
+  public setMusicVolume(value: unknown) {
+    const musicVolume = normalizeVolume(
+      value,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.musicVolume,
+      false
+    );
+    this.settings = {
+      ...this.settings,
+      musicVolume,
+    };
+    // Ensure AudioContext starts on user slider interaction so ambient workshop audio is audible
+    if (this.isAmbientWanted && !this.settings.muted && musicVolume > 0.001) {
+      this.getContext();
+    }
+    this.saveSettings();
+  }
+
+  public setSfxVolume(value: unknown) {
+    const sfxVolume = normalizeVolume(
+      value,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.sfxVolume,
+      false
+    );
+    this.settings = {
+      ...this.settings,
+      sfxVolume,
+      effectsVolume: sfxVolume,
+      machineVolume: sfxVolume,
+    };
+    this.saveSettings();
+  }
+
+  public setMuted(muted: boolean) {
+    this.settings = {
+      ...this.settings,
+      muted: Boolean(muted),
+    };
+    this.saveSettings();
+  }
+
+  public toggleMute(): boolean {
+    const nextMuted = !this.settings.muted;
+    this.setMuted(nextMuted);
+    return nextMuted;
   }
 
   public subscribe(cb: (s: FortunariumAudioSettings) => void): () => void {
@@ -254,7 +507,9 @@ class FortunariumAudioEngine {
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
       }
@@ -265,14 +520,27 @@ class FortunariumAudioEngine {
     return this.ctx;
   }
 
-  private getChannelGain(channel: 'machine' | 'effects' | 'ui'): number {
+  private getChannelGain(channel: 'machine' | 'effects' | 'ui' | 'ambient'): number {
     if (this.settings.muted) return 0;
-    const master = this.settings.masterVolume / 100;
-    const sub =
-      channel === 'machine'
-        ? this.settings.machineVolume / 100
-        : this.settings.effectsVolume / 100;
-    return master * sub;
+    const master = normalizeVolume(
+      this.settings.masterVolume,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.masterVolume,
+      false
+    );
+    if (channel === 'ambient') {
+      const ambient = normalizeVolume(
+        this.settings.musicVolume,
+        DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.musicVolume,
+        false
+      );
+      return master * ambient;
+    }
+    const sfx = normalizeVolume(
+      this.settings.sfxVolume,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.sfxVolume,
+      false
+    );
+    return master * sfx;
   }
 
   // 1. Mechanical Button Click (MÁQUINA channel)

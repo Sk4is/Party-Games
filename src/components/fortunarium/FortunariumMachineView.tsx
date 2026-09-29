@@ -413,7 +413,14 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       quotaTarget: roomState.quota,
       currentCredits: roomState.money,
       currentIntegrity: roomState.integrity,
-      repairCost: getRepairCostMoney(roomState.round, roomState.repairsUsedInQuota || 0),
+      repairCost: getRepairCostMoney({
+        round: roomState.round,
+        repairsUsedInQuota: roomState.repairsUsedInQuota ?? 0,
+        integrity: roomState.integrity,
+        maxIntegrity: roomState.maxIntegrity,
+        upgrades: roomState.upgrades,
+        activeModifiers: roomState.activeModifiers,
+      }),
       flavorQuote:
         roomState.round === 2
           ? 'El bobinado aguanta bien. Pero la demanda sube. Mantened un ojo en la temperatura.'
@@ -426,6 +433,9 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
     roomState.quota,
     roomState.money,
     roomState.integrity,
+    roomState.maxIntegrity,
+    roomState.upgrades,
+    roomState.activeModifiers,
     roomState.totalSpinsInMatch,
     roomState.repairsUsedInQuota,
   ]);
@@ -563,12 +573,14 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   }, []);
 
   useEffect(() => {
+    fortunariumAudio.startMusicLoop('gameplay');
     return () => {
       clearAllSpinTimers();
       clearCelebrationTimer();
       // Reset lastHandledSpinIdRef on unmount so StrictMode simulated unmount/remount doesn't swallow active spin timers
       lastHandledSpinIdRef.current = null;
       fortunariumAudio.stopReelSpinLoop();
+      fortunariumAudio.stopMusicLoop();
     };
   }, [clearAllSpinTimers, clearCelebrationTimer]);
 
@@ -1110,17 +1122,44 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
     12,
     Math.min(100, ((animatedVoltageFloat - 1) / 2.5) * 88 + 12)
   );
-  const repairCost = getRepairCostMoney(roomState.round, roomState.repairsUsedInQuota || 0);
+  const repairCost = useMemo(
+    () =>
+      getRepairCostMoney({
+        round: roomState.round,
+        repairsUsedInQuota: roomState.repairsUsedInQuota ?? 0,
+        integrity: displayedIntegrity,
+        maxIntegrity: roomState.maxIntegrity,
+        upgrades: roomState.upgrades,
+        activeModifiers: roomState.activeModifiers,
+      }),
+    [
+      roomState.round,
+      roomState.repairsUsedInQuota,
+      displayedIntegrity,
+      roomState.maxIntegrity,
+      roomState.upgrades,
+      roomState.activeModifiers,
+    ]
+  );
+  const isRepairCostValid = Number.isFinite(repairCost) && repairCost > 0;
+  const repairCostLabel = isRepairCostValid ? `${repairCost} CR` : '— CR';
   const repairValidation = useMemo(
     () =>
       validateWorkshopPurchase({
         currentMoney: displayedMoney,
-        cost: repairCost,
+        cost: isRepairCostValid ? repairCost : NaN,
         quotaTarget: roomState.quota,
         upgrades: roomState.upgrades,
         activeModifiers: roomState.activeModifiers,
       }),
-    [displayedMoney, repairCost, roomState.quota, roomState.upgrades, roomState.activeModifiers]
+    [
+      displayedMoney,
+      repairCost,
+      isRepairCostValid,
+      roomState.quota,
+      roomState.upgrades,
+      roomState.activeModifiers,
+    ]
   );
 
   const unitTestSuite = useMemo(() => runCanonicalPatternUnitTests(), []);
@@ -1835,12 +1874,12 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end justify-center shrink-0 pl-3 border-l border-cyan-500/30 min-w-[125px] sm:min-w-[150px]">
-                      <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-cyan-400/80">
+                    <div className="flex flex-col items-end justify-center shrink-0 pl-3 border-l border-cyan-500/30 w-[142px] sm:w-[172px]">
+                      <span className="text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-widest text-cyan-300/90 whitespace-nowrap">
                         GANANCIA TIRADA
                       </span>
-                      <span className="font-mono font-black text-xl sm:text-3xl text-cyan-300/70 tabular-nums leading-none">
-                        +0 CR
+                      <span className="font-mono font-black text-xl sm:text-3xl text-amber-300/85 tabular-nums leading-none whitespace-nowrap">
+                        +0 <span className="text-xs sm:text-base text-amber-400">CR</span>
                       </span>
                     </div>
                   </div>
@@ -1866,7 +1905,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                           <span
                             className={`px-2 py-0.5 rounded font-mono font-black text-xs sm:text-sm tabular-nums shrink-0 ${
                               activeRevealStep.amount > 0
-                                ? 'bg-cyan-950/90 border border-cyan-400/70 text-cyan-200'
+                                ? 'bg-amber-950/85 border border-amber-400/75 text-amber-300'
                                 : 'bg-rose-950/90 border border-rose-400/70 text-rose-300'
                             }`}
                           >
@@ -1898,20 +1937,21 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                     </div>
 
                     {/* Large Animated CRT Win Accumulator Counter */}
-                    <div className="flex flex-col items-end justify-center shrink-0 pl-3 border-l border-cyan-500/30 min-w-[125px] sm:min-w-[150px]">
-                      <span className="text-[9px] sm:text-[10px] font-mono font-black uppercase tracking-widest text-cyan-300">
+                    <div className="flex flex-col items-end justify-center shrink-0 pl-3 border-l border-cyan-500/30 w-[142px] sm:w-[172px]">
+                      <span className="text-[9px] sm:text-[10px] font-mono font-black uppercase tracking-widest text-cyan-300 whitespace-nowrap">
                         {spinEvent?.isJackpot ? 'JACKPOT ACUMULADO' : 'GANANCIA TIRADA'}
                       </span>
                       <span
-                        className={`font-mono font-black text-2xl sm:text-3xl md:text-4xl tabular-nums leading-none transition-transform duration-150 ${
+                        className={`font-mono font-black text-2xl sm:text-3xl md:text-4xl tabular-nums leading-none whitespace-nowrap transition-transform duration-150 ${
                           winCountUpPulse
                             ? 'scale-110 text-amber-300 drop-shadow-[0_0_14px_rgba(250,204,21,0.95)]'
                             : displayedAccumulatedWin > 0
-                            ? 'scale-100 text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.85)]'
-                            : 'scale-100 text-cyan-500/70'
+                            ? 'scale-100 text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.85)]'
+                            : 'scale-100 text-amber-300/80'
                         }`}
                       >
-                        +{displayedAccumulatedWin} <span className="text-xs sm:text-base">CR</span>
+                        +{displayedAccumulatedWin.toLocaleString('es-ES')}{' '}
+                        <span className="text-xs sm:text-base text-amber-400">CR</span>
                       </span>
                     </div>
                   </div>
@@ -1934,34 +1974,55 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                               finalOutcomeBanner.tier === 'HUGE' ||
                               finalOutcomeBanner.tier === 'JACKPOT'
                             ? 'text-amber-300 drop-shadow-[0_0_14px_rgba(250,204,21,0.9)]'
-                            : finalOutcomeBanner.grossPayout > 0
-                            ? 'text-cyan-200 drop-shadow-[0_0_10px_rgba(34,211,238,0.7)]'
                             : 'text-cyan-200'
                         }`}
                       >
-                        {finalOutcomeBanner.title}
+                        {finalOutcomeBanner.grossPayout > 0 ? (
+                          <>
+                            <span className="text-cyan-200">
+                              {finalOutcomeBanner.tier === 'JACKPOT'
+                                ? '¡JACKPOT SUPREMO! TOTAL GANADO: '
+                                : 'TOTAL GANADO: '}
+                            </span>
+                            <span className="font-mono font-black text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.9)] tabular-nums">
+                              +{finalOutcomeBanner.grossPayout.toLocaleString('es-ES')} CR
+                            </span>
+                          </>
+                        ) : (
+                          finalOutcomeBanner.title
+                        )}
                       </div>
                       <div className="font-mono font-bold text-[11px] sm:text-xs text-cyan-300/85 truncate tabular-nums">
-                        {finalOutcomeBanner.subtitle}
+                        TIRADA: -{finalOutcomeBanner.spinCost} CR · PREMIO:{' '}
+                        <span className="text-amber-300 font-black">
+                          +{finalOutcomeBanner.grossPayout.toLocaleString('es-ES')} CR
+                        </span>
+                        {finalOutcomeBanner.subtitle.includes('PENALIZACIÓN:')
+                          ? ` · ${
+                              finalOutcomeBanner.subtitle
+                                .split(' · ')
+                                .find((p) => p.startsWith('PENALIZACIÓN:')) || ''
+                            }`
+                          : ''}{' '}
+                        · CAJA COMÚN:{' '}
+                        <span className="text-amber-300 font-black">
+                          {finalOutcomeBanner.finalMoney.toLocaleString('es-ES')} CR
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end justify-center shrink-0 pl-3 border-l border-cyan-500/30 min-w-[125px] sm:min-w-[150px]">
-                      <span className="text-[9px] sm:text-[10px] font-mono font-black uppercase tracking-widest text-cyan-300">
+                    <div className="flex flex-col items-end justify-center shrink-0 pl-3 border-l border-cyan-500/30 w-[142px] sm:w-[172px]">
+                      <span className="text-[9px] sm:text-[10px] font-mono font-black uppercase tracking-widest text-cyan-300 whitespace-nowrap">
                         GANANCIA TIRADA
                       </span>
                       <span
-                        className={`font-mono font-black text-2xl sm:text-3xl md:text-4xl tabular-nums leading-none ${
-                          finalOutcomeBanner.tier === 'BIG' ||
-                          finalOutcomeBanner.tier === 'HUGE' ||
-                          finalOutcomeBanner.tier === 'JACKPOT'
+                        className={`font-mono font-black text-2xl sm:text-3xl md:text-4xl tabular-nums leading-none whitespace-nowrap ${
+                          finalOutcomeBanner.grossPayout > 0
                             ? 'text-amber-300 drop-shadow-[0_0_16px_rgba(250,204,21,0.95)]'
-                            : finalOutcomeBanner.grossPayout > 0
-                            ? 'text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.9)]'
-                            : 'text-cyan-500/70'
+                            : 'text-amber-300/80'
                         }`}
                       >
                         +{finalOutcomeBanner.grossPayout.toLocaleString('es-ES')}{' '}
-                        <span className="text-xs sm:text-base">CR</span>
+                        <span className="text-xs sm:text-base text-amber-400">CR</span>
                       </span>
                     </div>
                   </div>
@@ -1975,19 +2036,19 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                         {roomState.actionLog[0]?.text || 'Fortunarium encendido. Listo para accionar tambores.'}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end justify-center shrink-0 pl-3 border-l border-cyan-500/30 min-w-[125px] sm:min-w-[150px]">
-                      <span className="text-[9px] sm:text-[10px] font-mono font-black uppercase tracking-widest text-cyan-300/90">
+                    <div className="flex flex-col items-end justify-center shrink-0 pl-3 border-l border-cyan-500/30 w-[142px] sm:w-[172px]">
+                      <span className="text-[9px] sm:text-[10px] font-mono font-black uppercase tracking-widest text-cyan-300/90 whitespace-nowrap">
                         GANANCIA TIRADA
                       </span>
                       <span
-                        className={`font-mono font-black text-xl sm:text-2xl md:text-3xl tabular-nums leading-none ${
+                        className={`font-mono font-black text-xl sm:text-2xl md:text-3xl tabular-nums leading-none whitespace-nowrap ${
                           (displayedLastSpinResult?.grossPayout || 0) > 0
-                            ? 'text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]'
-                            : 'text-cyan-400/75'
+                            ? 'text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.85)]'
+                            : 'text-amber-300/85'
                         }`}
                       >
-                        +{displayedLastSpinResult?.grossPayout || 0}{' '}
-                        <span className="text-xs sm:text-sm">CR</span>
+                        +{(displayedLastSpinResult?.grossPayout || 0).toLocaleString('es-ES')}{' '}
+                        <span className="text-xs sm:text-sm text-amber-400">CR</span>
                       </span>
                     </div>
                   </div>
@@ -2214,20 +2275,21 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   {displayedIntegrity < roomState.maxIntegrity && !isBusy && (
                     <button
                       type="button"
-                      disabled={!repairValidation.allowed}
+                      disabled={!isRepairCostValid || !repairValidation.allowed}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (!isRepairCostValid) return;
                         fortunariumAudio.playButtonClick();
                         onRepairMachine(false);
                       }}
                       className="px-2 py-0.5 rounded bg-emerald-950 hover:bg-emerald-900 disabled:opacity-40 border border-emerald-400/60 text-emerald-200 font-mono font-black text-[10px] cursor-pointer disabled:cursor-not-allowed shrink-0 tabular-nums"
                       title={
                         repairValidation.allowed
-                          ? `Reparar máquina por ${repairCost} CR`
+                          ? `Reparar máquina por ${repairCostLabel}`
                           : repairValidation.reason
                       }
                     >
-                      +REPARAR ({repairCost} CR)
+                      +REPARAR ({repairCostLabel})
                     </button>
                   )}
                 </div>
@@ -2906,9 +2968,11 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                     disabled={
                       isBusy ||
                       displayedIntegrity >= roomState.maxIntegrity ||
+                      !isRepairCostValid ||
                       !repairValidation.allowed
                     }
                     onClick={() => {
+                      if (!isRepairCostValid) return;
                       fortunariumAudio.playButtonClick();
                       onRepairMachine(false);
                     }}
@@ -2918,7 +2982,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                         ? 'Integridad al 100%'
                         : !repairValidation.allowed
                         ? repairValidation.reason || 'No permitido'
-                        : `Reparar chasis por ${repairCost} CR`
+                        : `Reparar chasis por ${repairCostLabel}`
                     }
                   >
                     <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -2929,7 +2993,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                       <div className="font-mono text-[11px] text-emerald-300 tabular-nums truncate">
                         {repairValidation.code === 'SPIN_RESERVE_REQUIRED'
                           ? `RESERVA ${repairValidation.minSpinReserve} CR`
-                          : `${repairCost} CR`}
+                          : repairCostLabel}
                       </div>
                     </div>
                   </button>
@@ -3434,16 +3498,19 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   <button
                     type="button"
                     disabled={
-                      displayedIntegrity >= roomState.maxIntegrity || !repairValidation.allowed
+                      displayedIntegrity >= roomState.maxIntegrity ||
+                      !isRepairCostValid ||
+                      !repairValidation.allowed
                     }
                     onClick={() => {
+                      if (!isRepairCostValid) return;
                       fortunariumAudio.playButtonClick();
                       onRepairMachine(false);
                     }}
                     title={!repairValidation.allowed ? repairValidation.reason : undefined}
                     className="fort-arcade-btn px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 border border-emerald-200 text-slate-950 font-mono font-black text-xs cursor-pointer disabled:cursor-not-allowed tabular-nums"
                   >
-                    Reparar ({repairCost} CR)
+                    Reparar ({repairCostLabel})
                   </button>
                   <button
                     type="button"

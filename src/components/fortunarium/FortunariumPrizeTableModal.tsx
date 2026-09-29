@@ -237,50 +237,51 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
         {/* Scrollable Content */}
         <div className="overflow-y-auto pr-1 space-y-6">
           {/* ================================================================= */}
-          {/* 1. SYMBOLS / BASE VALUE / LINE PAYOUT / PERCENTAGE TABLE          */}
+          {/* 1. SYMBOLS / BASE VALUE / PERCENTAGE TABLE                        */}
           {/* ================================================================= */}
           <section className="space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-[#FF2A6D]">
                 <Percent className="w-4 h-4" />
                 <span>
-                  1. Símbolos Normales — Símbolo · Valor Base · Pagos (×3 / ×4 / ×5) · Probabilidad (%)
+                  1. Símbolos Normales — Símbolo · Valor Base · Probabilidad (%)
                 </span>
               </div>
               <span className="text-[11px] font-mono font-bold text-cyan-200/85">
                 {showLiveMode
-                  ? 'Mostrando valores base, pagos de línea y probabilidades con tus mejoras activas'
-                  : 'Mostrando valores base, pagos de línea y probabilidades de serie'}
+                  ? 'Mostrando valores base y probabilidades con tus mejoras activas'
+                  : 'Mostrando valores base y probabilidades de serie'}
               </span>
             </div>
 
-            {/* Structured CRT Table */}
+            {/* Structured CRT Table (3 Columns: SÍMBOLO & MEJORAS | VALOR BASE | PROBABILIDAD %) */}
             <div className="fort-crt-display rounded-2xl border border-cyan-400/45 overflow-hidden">
-              <div className="grid grid-cols-12 gap-2 px-3.5 py-2.5 bg-[#0a1828]/90 border-b border-cyan-500/35 text-[11px] font-mono font-black uppercase tracking-wider text-cyan-300">
-                <div className="col-span-4">SÍMBOLO &amp; MEJORAS</div>
-                <div className="col-span-2 text-center">VALOR BASE</div>
-                <div className="col-span-4 text-center">
-                  PAGO DE LÍNEA (×3 / ×4 / ×5)
-                </div>
-                <div className="col-span-2 text-right">PROBABILIDAD %</div>
+              <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-[#0a1828]/90 border-b border-cyan-500/35 text-[11px] sm:text-xs font-mono font-black uppercase tracking-wider text-cyan-300">
+                <div className="col-span-5 sm:col-span-6">SÍMBOLO &amp; MEJORAS</div>
+                <div className="col-span-4 sm:col-span-3 text-center">VALOR BASE</div>
+                <div className="col-span-3 text-right">PROBABILIDAD %</div>
               </div>
 
               <div className="divide-y divide-cyan-500/20">
                 {normalStats.map((sym) => {
-                  const baseVal = showLiveMode
-                    ? sym.liveSymbolBaseValue
-                    : sym.baseSymbolValue;
-                  const p3 = showLiveMode ? sym.livePayout3 : sym.basePayout3;
-                  const p4 = showLiveMode ? sym.livePayout4 : sym.basePayout4;
-                  const p5 = showLiveMode ? sym.livePayout5 : sym.basePayout5;
+                  const canonicalBase = Number.isFinite(Number(sym.baseSymbolValue))
+                    ? Number(sym.baseSymbolValue)
+                    : FORTUNARIUM_SYMBOLS[sym.id]?.baseSymbolValue ?? 0;
+                  const liveBase = Number.isFinite(Number(sym.liveBaseSymbolValue))
+                    ? Number(sym.liveBaseSymbolValue)
+                    : Number.isFinite(Number(sym.liveSymbolBaseValue))
+                    ? Number(sym.liveSymbolBaseValue)
+                    : canonicalBase;
+                  const baseVal = showLiveMode ? liveBase : canonicalBase;
                   const probPct = showLiveMode
                     ? sym.liveProbabilityPct
                     : sym.baseProbabilityPct;
-                  const hasUpgradeBoost =
+                  const isValueModified =
                     showLiveMode &&
-                    (sym.liveSymbolBaseValue > sym.baseSymbolValue ||
-                      sym.upgradePayoutMult > 1.001);
-                  const hasTotalBoost = showLiveMode && sym.totalPayoutMult > 1.001;
+                    (liveBase !== canonicalBase ||
+                      sym.upgradePayoutMult > 1.001 ||
+                      sym.totalPayoutMult > 1.001);
+                  const hasUpgradeBoost = showLiveMode && sym.upgradePayoutMult > 1.001;
                   const isProbBoosted = showLiveMode && sym.isProbabilityModified;
                   const probDelta = isProbBoosted ? sym.probabilityDeltaPct : 0;
                   const formattedProb =
@@ -289,15 +290,15 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                   return (
                     <div
                       key={sym.id}
-                      className={`grid grid-cols-12 gap-2 px-3.5 py-2.5 items-center transition-colors ${
-                        hasUpgradeBoost || isProbBoosted
+                      className={`grid grid-cols-12 gap-3 px-4 py-3 items-center transition-colors ${
+                        isValueModified || isProbBoosted
                           ? 'bg-[#0b1f33]/75'
                           : 'hover:bg-[#091726]/60'
                       }`}
                     >
                       {/* Column 1: Symbol Icon + Name + Active Upgrade Tags */}
-                      <div className="col-span-4 flex items-center gap-2.5 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-[#07111d] border border-cyan-400/50 p-1 flex items-center justify-center shrink-0 shadow-inner">
+                      <div className="col-span-5 sm:col-span-6 flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-xl bg-[#07111d] border border-cyan-400/50 p-1.5 flex items-center justify-center shrink-0 shadow-inner">
                           <img
                             src={sym.asset}
                             alt={sym.name}
@@ -305,86 +306,54 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                           />
                         </div>
                         <div className="min-w-0 flex flex-col">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-fortunarium text-sm sm:text-base text-white tracking-wide truncate">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-fortunarium text-base sm:text-lg text-white tracking-wide truncate">
                               {sym.name.toUpperCase()}
                             </span>
                             {hasUpgradeBoost && (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/50 text-[9px] font-mono font-black text-emerald-300 tabular-nums">
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/50 text-[10px] font-mono font-black text-emerald-300 tabular-nums">
                                 +{Math.round((sym.upgradePayoutMult - 1) * 100)}%
                               </span>
                             )}
                           </div>
                           {showLiveMode && sym.activeUpgradeSources.length > 0 && (
-                            <span className="text-[10px] font-mono font-bold text-[#FF2A6D] truncate">
+                            <span className="text-[11px] font-mono font-bold text-[#FF2A6D] truncate">
                               🔧 {sym.activeUpgradeSources.join(' · ')}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {/* Column 2: Canonical Base Symbol Value */}
-                      <div className="col-span-2 flex flex-col items-center justify-center font-mono tabular-nums">
-                        <span
-                          className={`px-2 py-0.5 rounded border text-xs sm:text-sm font-black ${
-                            showLiveMode && sym.liveSymbolBaseValue > sym.baseSymbolValue
-                              ? 'bg-emerald-950/80 border-emerald-400/65 text-emerald-300'
-                              : 'bg-[#050d17] border-amber-400/45 text-amber-300'
+                      {/* Column 2: Large Readable Canonical Base Symbol Value */}
+                      <div className="col-span-4 sm:col-span-3 flex flex-col items-center justify-center font-mono tabular-nums">
+                        <div
+                          className={`inline-flex items-baseline gap-1 px-3 py-1 rounded-xl border ${
+                            isValueModified
+                              ? 'bg-emerald-950/85 border-emerald-400/70 text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.2)]'
+                              : 'bg-[#050d17] border-amber-400/55 text-amber-300'
                           }`}
                         >
-                          {baseVal} CR
-                        </span>
-                        {showLiveMode && sym.liveSymbolBaseValue !== sym.baseSymbolValue && (
-                          <span className="text-[9.5px] text-cyan-300/75 mt-0.5">
-                            Serie: {sym.baseSymbolValue} CR
+                          <span className="text-lg sm:text-2xl font-black leading-none tracking-tight">
+                            {baseVal}
                           </span>
-                        )}
-                      </div>
-
-                      {/* Column 3: Line Payout (x3 / x4 / x5) */}
-                      <div className="col-span-4 flex flex-col items-center justify-center font-mono tabular-nums">
-                        <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-black flex-wrap justify-center">
-                          <span
-                            className={`px-2 py-0.5 rounded bg-[#040a12] border ${
-                              hasTotalBoost
-                                ? 'border-emerald-400/55 text-emerald-300'
-                                : 'border-cyan-500/40 text-cyan-100'
-                            }`}
-                          >
-                            <span className="text-[10px] text-cyan-400 mr-1">×3:</span>
-                            {p3}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded bg-[#040a12] border ${
-                              hasTotalBoost
-                                ? 'border-emerald-400/55 text-emerald-300'
-                                : 'border-cyan-500/40 text-amber-300'
-                            }`}
-                          >
-                            <span className="text-[10px] text-cyan-400 mr-1">×4:</span>
-                            {p4}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded bg-[#040a12] border ${
-                              hasTotalBoost
-                                ? 'border-amber-300 text-amber-300'
-                                : 'border-amber-400/60 text-emerald-300'
-                            }`}
-                          >
-                            <span className="text-[10px] text-cyan-400 mr-1">×5:</span>
-                            {p5} CR
+                          <span className="text-xs sm:text-sm font-extrabold opacity-90">
+                            CR
                           </span>
                         </div>
-                        {hasTotalBoost && (
-                          <span className="text-[10px] text-cyan-300/70 mt-0.5">
-                            Base: {sym.basePayout3} / {sym.basePayout4} / {sym.basePayout5} CR
+                        {isValueModified ? (
+                          <span className="text-[10px] font-bold text-emerald-300/90 mt-1 tracking-wide">
+                            ↑ MODIFICADO · BASE {canonicalBase} CR
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-cyan-300/65 mt-1 tracking-wider uppercase">
+                            VALOR BASE
                           </span>
                         )}
                       </div>
 
-                      {/* Column 4: Probability Percentage */}
-                      <div className="col-span-2 flex flex-col items-end justify-center font-mono tabular-nums">
-                        <div className="flex items-center gap-1.5">
+                      {/* Column 3: Probability Percentage */}
+                      <div className="col-span-3 flex flex-col items-end justify-center font-mono tabular-nums">
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
                           {isProbBoosted && Math.abs(probDelta) >= 0.01 && (
                             <span
                               className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
@@ -396,13 +365,13 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                               {probDelta > 0 ? `▲ +${probDelta}%` : `▼ ${probDelta}%`}
                             </span>
                           )}
-                          <span className="text-sm sm:text-base font-black text-white">
+                          <span className="text-base sm:text-lg font-black text-white">
                             {formattedProb}
                           </span>
                         </div>
 
                         {/* Subtle visual probability bar */}
-                        <div className="w-18 sm:w-22 h-1.5 rounded-full bg-[#030810] border border-cyan-500/30 overflow-hidden mt-1">
+                        <div className="w-20 sm:w-28 h-1.5 rounded-full bg-[#030810] border border-cyan-500/30 overflow-hidden mt-1">
                           <div
                             className={`h-full rounded-full ${
                               isProbBoosted ? 'bg-emerald-400' : 'bg-[#FF2A6D]'

@@ -16,6 +16,7 @@ import { sessionRecovery } from '../services/sessionRecovery';
 import { createConnectionResilience } from '../utils/connectionResilience';
 import { getGameWsUrl } from '../config/network';
 import { backendHealth } from '../services/backendHealth';
+import { safeCloseWebSocket } from '../utils/safeWebSocket';
 
 export type SocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -289,7 +290,11 @@ export function usePartySocket(options: UsePartySocketOptions) {
       isManuallyClosedRef.current = true;
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (wsRef.current) wsRef.current.close();
+      if (wsRef.current) {
+        const prev = wsRef.current;
+        wsRef.current = null;
+        safeCloseWebSocket(prev, 'Component unmounted');
+      }
     };
   }, [connect]);
 

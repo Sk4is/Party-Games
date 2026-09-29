@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Volume2, VolumeX, Music, Sparkles, Sliders, X } from 'lucide-react';
-import { fortunariumAudio, FortunariumAudioSettings } from '../../utils/fortunariumAudio';
+import {
+  fortunariumAudio,
+  FortunariumAudioSettings,
+  DEFAULT_FORTUNARIUM_AUDIO_SETTINGS,
+  formatVolumePercentage,
+  normalizeVolume,
+} from '../../utils/fortunariumAudio';
 
 interface FortunariumAudioModalProps {
   isOpen: boolean;
@@ -16,21 +22,56 @@ export const FortunariumAudioModal: React.FC<FortunariumAudioModalProps> = ({
   );
 
   useEffect(() => {
+    if (isOpen) {
+      fortunariumAudio.loadSettings();
+      setSettings(fortunariumAudio.getSettings());
+    }
     return fortunariumAudio.subscribe(setSettings);
-  }, []);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const masterPct = formatVolumePercentage(
+    settings.masterVolume,
+    DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.masterVolume
+  );
+  const musicPct = formatVolumePercentage(
+    settings.musicVolume,
+    DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.musicVolume
+  );
+  const sfxPct = formatVolumePercentage(
+    settings.sfxVolume,
+    DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.sfxVolume
+  );
+
   const handleMasterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    fortunariumAudio.setMasterVolume( parseFloat(e.target.value) );
+    const pct = Number(e.target.value);
+    const normalized = normalizeVolume(
+      Number.isFinite(pct) ? pct / 100 : DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.masterVolume,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.masterVolume,
+      false
+    );
+    fortunariumAudio.setMasterVolume(normalized);
   };
 
   const handleMusicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    fortunariumAudio.setMusicVolume( parseFloat(e.target.value) );
+    const pct = Number(e.target.value);
+    const normalized = normalizeVolume(
+      Number.isFinite(pct) ? pct / 100 : DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.musicVolume,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.musicVolume,
+      false
+    );
+    fortunariumAudio.setMusicVolume(normalized);
   };
 
   const handleSfxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    fortunariumAudio.setSfxVolume( parseFloat(e.target.value) );
+    const pct = Number(e.target.value);
+    const normalized = normalizeVolume(
+      Number.isFinite(pct) ? pct / 100 : DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.sfxVolume,
+      DEFAULT_FORTUNARIUM_AUDIO_SETTINGS.sfxVolume,
+      false
+    );
+    fortunariumAudio.setSfxVolume(normalized);
   };
 
   const handleToggleMute = () => {
@@ -38,6 +79,12 @@ export const FortunariumAudioModal: React.FC<FortunariumAudioModalProps> = ({
     if (!nextMuted) {
       fortunariumAudio.playButtonClick();
     }
+  };
+
+  const handleSaveAndClose = () => {
+    fortunariumAudio.saveSettings();
+    fortunariumAudio.playButtonClick();
+    onClose();
   };
 
   return (
@@ -119,17 +166,18 @@ export const FortunariumAudioModal: React.FC<FortunariumAudioModalProps> = ({
                 <Volume2 className="w-4 h-4 text-[#FF2A6D]" />
                 Volumen General
               </span>
-              <span className="font-mono font-black text-[#FF2A6D] tabular-nums">
-                {Math.round(settings.masterVolume * 100)}%
+              <span className="font-mono font-black text-sm text-[#FF2A6D] tabular-nums min-w-[3.25rem] text-right">
+                {masterPct}%
               </span>
             </div>
             <input
               type="range"
               min={0}
-              max={1}
-              step={0.01}
-              value={settings.masterVolume}
+              max={100}
+              step={1}
+              value={masterPct}
               onChange={handleMasterChange}
+              aria-label="Volumen General"
               className="w-full accent-[#FF2A6D] cursor-pointer h-2 bg-[#040811] rounded-lg"
             />
           </div>
@@ -141,17 +189,18 @@ export const FortunariumAudioModal: React.FC<FortunariumAudioModalProps> = ({
                 <Music className="w-4 h-4 text-cyan-400" />
                 Ambiente del Taller
               </span>
-              <span className="font-mono font-black text-cyan-300 tabular-nums">
-                {Math.round(settings.musicVolume * 100)}%
+              <span className="font-mono font-black text-sm text-cyan-300 tabular-nums min-w-[3.25rem] text-right">
+                {musicPct}%
               </span>
             </div>
             <input
               type="range"
               min={0}
-              max={1}
-              step={0.01}
-              value={settings.musicVolume}
+              max={100}
+              step={1}
+              value={musicPct}
               onChange={handleMusicChange}
+              aria-label="Ambiente del Taller"
               className="w-full accent-cyan-400 cursor-pointer h-2 bg-[#040811] rounded-lg"
             />
           </div>
@@ -163,18 +212,19 @@ export const FortunariumAudioModal: React.FC<FortunariumAudioModalProps> = ({
                 <Sparkles className="w-4 h-4 text-amber-400" />
                 Efectos Mecánicos (SFX)
               </span>
-              <span className="font-mono font-black text-amber-300 tabular-nums">
-                {Math.round(settings.sfxVolume * 100)}%
+              <span className="font-mono font-black text-sm text-amber-300 tabular-nums min-w-[3.25rem] text-right">
+                {sfxPct}%
               </span>
             </div>
             <input
               type="range"
               min={0}
-              max={1}
-              step={0.01}
-              value={settings.sfxVolume}
+              max={100}
+              step={1}
+              value={sfxPct}
               onChange={handleSfxChange}
               onPointerUp={() => fortunariumAudio.playButtonClick()}
+              aria-label="Efectos Mecánicos (SFX)"
               className="w-full accent-amber-400 cursor-pointer h-2 bg-[#040811] rounded-lg"
             />
           </div>
@@ -183,10 +233,7 @@ export const FortunariumAudioModal: React.FC<FortunariumAudioModalProps> = ({
         {/* Footer */}
         <button
           type="button"
-          onClick={() => {
-            fortunariumAudio.playButtonClick();
-            onClose();
-          }}
+          onClick={handleSaveAndClose}
           className="fort-arcade-btn w-full py-2.5 rounded-xl bg-[#FF2A6D] hover:bg-[#ff4782] border border-pink-200 text-white font-fortunarium text-sm tracking-wider shadow-[0_0_20px_rgba(255,42,109,0.4)] cursor-pointer"
         >
           GUARDAR Y VOLVER

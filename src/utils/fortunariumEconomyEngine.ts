@@ -1752,11 +1752,27 @@ export function validateWorkshopPurchase(params: {
     usedSlots = 0,
     maxSlots = 4,
   } = params;
-  const effectiveCost = params.cost ?? params.costMoney ?? 0;
-  const effectiveQuotaTarget = params.quotaTarget ?? params.quota ?? Infinity;
+  const rawCost = params.cost ?? params.costMoney ?? 0;
+  const effectiveCost = Number(rawCost);
+  const safeCurrentMoney = Number(currentMoney);
+  const rawQuotaTarget = params.quotaTarget ?? params.quota ?? Infinity;
+  const effectiveQuotaTarget = Number.isFinite(Number(rawQuotaTarget))
+    ? Number(rawQuotaTarget)
+    : Infinity;
 
   const minSpinReserve = getMinimumPlayableSpinCost(upgrades, activeModifiers);
-  const remainingCredits = currentMoney - effectiveCost;
+
+  if (!Number.isFinite(effectiveCost) || effectiveCost <= 0 || !Number.isFinite(safeCurrentMoney)) {
+    return {
+      allowed: false,
+      code: 'INSUFFICIENT_CREDITS',
+      reason: 'COSTE NO DISPONIBLE (— CR)',
+      minSpinReserve,
+      remainingCredits: Number.isFinite(safeCurrentMoney) ? safeCurrentMoney : 0,
+    };
+  }
+
+  const remainingCredits = safeCurrentMoney - effectiveCost;
 
   if (isMaxLevel) {
     return {
