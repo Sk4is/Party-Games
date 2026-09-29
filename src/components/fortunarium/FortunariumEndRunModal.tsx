@@ -40,7 +40,6 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
     ? roomState.round
     : Math.max(0, roomState.round - 1);
 
-  // Peak credits in match (approximate from highest player generation + starting or current money)
   const peakCredits = useMemo(() => {
     const totalGen = roomState.players.reduce(
       (acc, p) => acc + p.stats.totalMoneyGenerated,
@@ -49,7 +48,6 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
     return Math.max(roomState.money, 140 + Math.round(totalGen * 0.45), roomState.biggestSingleWinInMatch);
   }, [roomState.money, roomState.players, roomState.biggestSingleWinInMatch]);
 
-  // Dynamic Run Callouts (Section 41) — only generated from real non-zero match data
   const runCallouts = useMemo<RunCallout[]>(() => {
     const list: RunCallout[] = [];
     const players = roomState.players;
@@ -169,18 +167,18 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
   }, [roomState.players]);
 
   return (
-    <div className="fortunarium-root font-fortunarium fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+    <div className="fortunarium-root font-fortunarium fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto select-none">
       <div
-        className={`w-full max-w-4xl rounded-3xl border-2 p-5 sm:p-7 text-center shadow-[0_28px_90px_rgba(0,0,0,0.95)] my-auto ${
+        className={`fort-cyber-modal w-full max-w-4xl rounded-3xl p-5 sm:p-7 text-center my-auto ${
           isVictory
-            ? 'bg-gradient-to-b from-emerald-950 via-[#071a17] to-slate-950 border-emerald-400/70'
+            ? 'border-emerald-400/80 shadow-[0_28px_90px_rgba(0,0,0,0.95),0_0_40px_rgba(16,185,129,0.28)]'
             : isIntegrityDefeat
-            ? 'bg-gradient-to-b from-orange-950 via-[#1a0d07] to-slate-950 border-orange-500/70'
-            : 'bg-gradient-to-b from-rose-950 via-[#1a070c] to-slate-950 border-rose-500/70'
+            ? 'border-orange-500/80 shadow-[0_28px_90px_rgba(0,0,0,0.95),0_0_40px_rgba(249,115,22,0.28)]'
+            : 'border-[#FF2A6D]/85 shadow-[0_28px_90px_rgba(0,0,0,0.95),0_0_45px_rgba(255,42,109,0.32)]'
         }`}
       >
         {/* Top Status Badge */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-black/45 border border-white/15 text-[11px] font-mono uppercase tracking-widest text-amber-200 mb-2">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#1a0812] border border-[#FF2A6D]/55 text-[11px] font-mono uppercase tracking-widest text-[#FF2A6D] font-bold mb-2">
           {isVictory
             ? 'EXPEDICIÓN COMPLETADA · CUOTAS SELLADAS'
             : isIntegrityDefeat
@@ -195,7 +193,7 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
               ? 'text-emerald-300'
               : isIntegrityDefeat
               ? 'text-orange-300'
-              : 'text-rose-300'
+              : 'text-[#FF2A6D]'
           }`}
         >
           {isVictory
@@ -205,7 +203,7 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
             : 'SIN CRÉDITOS'}
         </h2>
 
-        <p className="mt-1 font-fortunarium text-sm sm:text-lg text-amber-200 tracking-wide">
+        <p className="mt-1 font-fortunarium text-sm sm:text-lg text-cyan-200 tracking-wide">
           {isVictory
             ? 'HABÉIS SELLADO TODAS LAS CUOTAS DE LA CÁMARA'
             : isIntegrityDefeat
@@ -215,31 +213,31 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
 
         {/* SECTION 42: RUN SUMMARY BLOCK */}
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
-          <div className="p-2.5 rounded-xl bg-slate-900/85 border border-white/10">
-            <div className="text-[10px] font-mono uppercase text-slate-400">
+          <div className="fort-crt-display p-2.5 rounded-xl border border-cyan-500/35">
+            <div className="text-[10px] font-mono uppercase text-cyan-300/80">
               Modo / Cuota Alcanzada
             </div>
-            <div className="text-sm sm:text-base font-mono font-extrabold text-amber-300 tabular-nums">
+            <div className="text-sm sm:text-base font-mono font-extrabold text-[#FF2A6D] tabular-nums">
               {isInfiniteMode
                 ? `Cuota ${roomState.round} · ∞`
                 : `Cuota ${quotasCompleted} / ${roomState.totalRounds}`}
             </div>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-slate-900/85 border border-white/10">
-            <div className="text-[10px] font-mono uppercase text-slate-400">
+          <div className="fort-crt-display p-2.5 rounded-xl border border-cyan-500/35">
+            <div className="text-[10px] font-mono uppercase text-cyan-300/80">
               Créditos Finales / Pico
             </div>
-            <div className="text-sm sm:text-base font-mono font-extrabold text-emerald-300 tabular-nums">
+            <div className="text-sm sm:text-base font-mono font-extrabold text-amber-300 tabular-nums">
               {roomState.money} CR{' '}
-              <span className="text-xs text-slate-400 font-normal">
+              <span className="text-xs text-cyan-200/70 font-normal">
                 (Pico: {peakCredits} CR)
               </span>
             </div>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-slate-900/85 border border-white/10">
-            <div className="text-[10px] font-mono uppercase text-slate-400">
+          <div className="fort-crt-display p-2.5 rounded-xl border border-cyan-500/35">
+            <div className="text-[10px] font-mono uppercase text-cyan-300/80">
               Tiradas / Patrones
             </div>
             <div className="text-sm sm:text-base font-mono font-extrabold text-cyan-300 tabular-nums">
@@ -247,13 +245,13 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
             </div>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-slate-900/85 border border-white/10">
-            <div className="text-[10px] font-mono uppercase text-slate-400">
+          <div className="fort-crt-display p-2.5 rounded-xl border border-cyan-500/35">
+            <div className="text-[10px] font-mono uppercase text-cyan-300/80">
               Mayor Premio / Integridad
             </div>
-            <div className="text-sm sm:text-base font-mono font-extrabold text-amber-200 tabular-nums">
+            <div className="text-sm sm:text-base font-mono font-extrabold text-emerald-300 tabular-nums">
               +{roomState.biggestSingleWinInMatch || 0} CR{' '}
-              <span className="text-xs text-slate-400 font-normal">
+              <span className="text-xs text-cyan-200/70 font-normal">
                 ({roomState.integrity}%)
               </span>
             </div>
@@ -261,22 +259,22 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
         </div>
 
         {/* Installed Upgrades Bar */}
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-900/75 border border-white/10 text-xs font-mono">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#050d17] border border-[#FF2A6D]/35 text-xs font-mono">
           <div>
-            <span className="text-slate-400">MEJOR PATRÓN: </span>
+            <span className="text-cyan-300/80">MEJOR PATRÓN: </span>
             <span className="text-amber-300 font-bold">
               {roomState.bestPatternNameInMatch || '—'}
             </span>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-slate-400">MEJORAS INSTALADAS:</span>
+            <span className="text-cyan-300/80">MEJORAS INSTALADAS:</span>
             {installedUpgrades.length === 0 ? (
               <span className="text-slate-500">Ninguna</span>
             ) : (
               installedUpgrades.map(([uId, lv]) => (
                 <span
                   key={uId}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-400/30 text-[10px] text-amber-200 font-bold"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#1f0815] border border-[#FF2A6D]/50 text-[10px] text-pink-200 font-bold"
                 >
                   <img
                     src={
@@ -297,20 +295,20 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
         {/* SECTION 41: DYNAMIC RUN CALLOUTS / HIGHLIGHTS */}
         {runCallouts.length > 0 && (
           <div className="mt-3">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-amber-300/80 text-left mb-1.5">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-[#FF2A6D] font-bold text-left mb-1.5">
               DESTACADOS DE LA PARTIDA
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-left">
               {runCallouts.map((c) => (
                 <div
                   key={c.id}
-                  className="px-3 py-2 rounded-xl bg-slate-900/80 border border-white/10 flex items-center gap-2.5"
+                  className="fort-crt-panel px-3 py-2 rounded-xl border border-cyan-500/35 flex items-center gap-2.5"
                 >
-                  <div className="p-2 rounded-lg bg-slate-950 border border-white/10 shrink-0">
+                  <div className="p-2 rounded-lg bg-[#040a12] border border-[#FF2A6D]/35 shrink-0">
                     {c.icon}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[9px] font-mono uppercase tracking-wider text-slate-400">
+                    <div className="text-[9px] font-mono uppercase tracking-wider text-cyan-300/80">
                       {c.title}
                     </div>
                     <div className="flex items-center gap-1.5 truncate">
@@ -334,7 +332,7 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
 
         {/* SECTIONS 40, 43, 44: PER-PLAYER DETAILED ECONOMIC BREAKDOWN CARDS */}
         <div className="mt-3.5">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-amber-300/80 text-left mb-1.5">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-[#FF2A6D] font-bold text-left mb-1.5">
             BALANCE ECONÓMICO POR JUGADOR ({roomState.players.length})
           </div>
           <div className="space-y-2 text-left max-h-60 overflow-y-auto pr-1">
@@ -353,10 +351,10 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
               return (
                 <div
                   key={p.id}
-                  className="p-3 rounded-2xl bg-slate-900/85 border border-white/12 flex flex-col gap-2"
+                  className="fort-crt-panel p-3 rounded-2xl border border-cyan-500/35 flex flex-col gap-2"
                 >
                   {/* Top row of player card: Identity + Net Balance */}
-                  <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1.5">
+                  <div className="flex items-center justify-between gap-2 border-b border-cyan-500/20 pb-1.5">
                     <div className="flex items-center gap-2">
                       <span
                         className="w-3 h-3 rounded-full border border-white/30"
@@ -365,7 +363,7 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
                       <span className="font-fortunarium text-base text-white tracking-wide">
                         {p.name}
                       </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 tabular-nums">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#050d17] border border-cyan-500/30 text-cyan-200 tabular-nums">
                         {p.stats.spinsTriggered} tiradas
                       </span>
                     </div>
@@ -383,8 +381,8 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
 
                   {/* Bottom row: 8 compact scannable stats */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono tabular-nums">
-                    <div className="px-2 py-1 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400 block text-[9px] uppercase">
+                    <div className="px-2 py-1 rounded bg-[#040a12] border border-cyan-500/20">
+                      <span className="text-cyan-300/70 block text-[9px] uppercase">
                         Créditos Ganados
                       </span>
                       <span className="text-emerald-300 font-bold">
@@ -392,8 +390,8 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="px-2 py-1 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400 block text-[9px] uppercase">
+                    <div className="px-2 py-1 rounded bg-[#040a12] border border-cyan-500/20">
+                      <span className="text-cyan-300/70 block text-[9px] uppercase">
                         Créditos Perdidos
                       </span>
                       <span className="text-rose-300 font-bold">
@@ -401,8 +399,8 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="px-2 py-1 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400 block text-[9px] uppercase">
+                    <div className="px-2 py-1 rounded bg-[#040a12] border border-cyan-500/20">
+                      <span className="text-cyan-300/70 block text-[9px] uppercase">
                         Mejor Premio / Pérdida
                       </span>
                       <span className="text-amber-300 font-bold">
@@ -413,8 +411,8 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="px-2 py-1 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400 block text-[9px] uppercase">
+                    <div className="px-2 py-1 rounded bg-[#040a12] border border-cyan-500/20">
+                      <span className="text-cyan-300/70 block text-[9px] uppercase">
                         Patrones / Especiales
                       </span>
                       <span className="text-cyan-300 font-bold">
@@ -425,8 +423,8 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="px-2 py-1 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400 block text-[9px] uppercase">
+                    <div className="px-2 py-1 rounded bg-[#040a12] border border-cyan-500/20">
+                      <span className="text-cyan-300/70 block text-[9px] uppercase">
                         Bombas (Sufridas / Desact.)
                       </span>
                       <span className="text-rose-300 font-bold">
@@ -437,8 +435,8 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="px-2 py-1 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400 block text-[9px] uppercase">
+                    <div className="px-2 py-1 rounded bg-[#040a12] border border-cyan-500/20">
+                      <span className="text-cyan-300/70 block text-[9px] uppercase">
                         Calaveras / Monedas
                       </span>
                       <span className="text-purple-300 font-bold">
@@ -449,8 +447,8 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="px-2 py-1 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400 block text-[9px] uppercase">
+                    <div className="px-2 py-1 rounded bg-[#040a12] border border-cyan-500/20">
+                      <span className="text-cyan-300/70 block text-[9px] uppercase">
                         Integridad (Rep. / Daño)
                       </span>
                       <span className="text-emerald-300 font-bold">
@@ -461,11 +459,11 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="px-2 py-1 rounded bg-slate-950/70 border border-white/5">
-                      <span className="text-slate-400 block text-[9px] uppercase">
+                    <div className="px-2 py-1 rounded bg-[#040a12] border border-cyan-500/20">
+                      <span className="text-cyan-300/70 block text-[9px] uppercase">
                         Taller (Mejoras / Rep.)
                       </span>
-                      <span className="text-amber-200 font-bold">
+                      <span className="text-pink-200 font-bold">
                         {p.stats.upgradesBought} mej. · {repairsDone} rep.
                       </span>
                     </div>
@@ -484,7 +482,7 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
               fortunariumAudio.playButtonClick();
               onRestartMatch();
             }}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-fortunarium text-base tracking-wider shadow-lg cursor-pointer"
+            className="fort-arcade-btn flex items-center gap-2 px-6 py-3 rounded-xl bg-[#FF2A6D] hover:bg-[#ff4782] border border-pink-200 text-white font-fortunarium text-base tracking-wider shadow-[0_0_24px_rgba(255,42,109,0.5)] cursor-pointer"
           >
             <RotateCcw className="w-4 h-4" />
             NUEVA PARTIDA
@@ -496,9 +494,9 @@ export const FortunariumEndRunModal: React.FC<FortunariumEndRunModalProps> = ({
               fortunariumAudio.playButtonClick();
               onReturnToLobby();
             }}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-fortunarium text-base tracking-wider border border-white/15 cursor-pointer"
+            className="fort-arcade-btn flex items-center gap-2 px-5 py-3 rounded-xl bg-[#0b1624] hover:bg-[#122338] text-cyan-100 font-fortunarium text-base tracking-wider border border-cyan-400/50 cursor-pointer"
           >
-            <Home className="w-4 h-4" />
+            <Home className="w-4 h-4 text-cyan-400" />
             VOLVER A LA SALA
           </button>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FortunariumRoomState,
   FortunariumConfig,
@@ -15,15 +15,13 @@ import {
   Play,
   Users,
   Settings,
-  Sparkles,
-  BookOpen,
-  Trophy,
-  Volume2,
   ArrowLeft,
+  Trophy,
   Shield,
   Zap,
   Coins,
-  Palette,
+  BookOpen,
+  Sliders,
 } from 'lucide-react';
 import { fortunariumAudio } from '../../utils/fortunariumAudio';
 import { FortunariumRulebookModal } from './FortunariumRulebookModal';
@@ -34,7 +32,7 @@ interface FortunariumLobbyProps {
   roomState: FortunariumRoomState;
   localPlayerId: string;
   onUpdateConfig: (config: Partial<FortunariumConfig>) => void;
-  onSetCursorColor: (color: string) => void;
+  onSetCursorColor?: (color: string) => void;
   onStartGame: () => void;
   onLeaveRoom: () => void;
 }
@@ -47,7 +45,8 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
   onStartGame,
   onLeaveRoom,
 }) => {
-  const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [activeGuideTab, setActiveGuideTab] = useState<'normal' | 'special'>('normal');
   const [showRulebook, setShowRulebook] = useState(false);
   const [showPrizeTable, setShowPrizeTable] = useState(false);
@@ -56,74 +55,75 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
   const localPlayer = roomState.players.find((p) => p.id === localPlayerId);
   const isHost = Boolean(localPlayer?.isHost);
   const connectedCount = roomState.players.filter((p) => p.isConnected).length;
-  const canStart = isHost && connectedCount >= 1 && connectedCount <= 4;
+  const canStart = connectedCount >= 1;
 
-  const handleCopyCode = () => {
+  useEffect(() => {
+    fortunariumAudio.startMusicLoop('lobby');
+    return () => {
+      fortunariumAudio.stopMusicLoop();
+    };
+  }, []);
+
+  const handleCopyCode = async () => {
     try {
-      navigator.clipboard.writeText(roomState.roomCode);
-      setCopied(true);
       fortunariumAudio.playButtonClick();
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(roomState.roomCode);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch {}
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      fortunariumAudio.playButtonClick();
+      const url = new URL(window.location.href);
+      url.searchParams.set('game', 'fortunarium');
+      url.searchParams.set('room', roomState.roomCode);
+      await navigator.clipboard.writeText(url.toString());
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
     } catch {}
   };
 
   return (
-    <div className="fortunarium-root font-fortunarium min-h-screen w-full bg-[#040810] text-cyan-50 flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-y-auto select-none relative">
-      {/* Background artwork (/assets/fortunarium/fondo.png) with subtle blur & dark navy overlay */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute inset-0 scale-[1.03]"
-          style={{
-            backgroundImage: "url('/assets/fortunarium/fondo.png')",
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            filter: 'blur(7px)',
-          }}
-        />
-        <div
-          className="absolute inset-0"
-          style={{ backgroundColor: 'rgba(2, 7, 15, 0.42)' }}
-        />
-      </div>
-
-      {/* Top Navigation Bar */}
-      <header className="relative z-10 w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3 pb-4 border-b-2 border-[#b98532]/60">
+    <div className="fortunarium-root font-fortunarium fort-lobby-bg relative min-h-screen w-full text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none overflow-x-hidden">
+      {/* Top Bar */}
+      <header className="relative z-10 w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#FF2A6D]/30">
         <button
           type="button"
           onClick={() => {
             fortunariumAudio.playButtonClick();
             onLeaveRoom();
           }}
-          className="fort-arcade-btn inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#261714] hover:bg-[#3d1c18] border-2 border-[#b98532] text-[#f5deb3] text-xs sm:text-sm font-bold transition-all cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#070B14]/90 hover:bg-[#0E1628] border border-[#FF2A6D]/45 hover:border-[#FF2A6D] text-slate-100 text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-[0_0_16px_rgba(255,42,109,0.2)]"
         >
-          <ArrowLeft className="w-4 h-4 text-[#e89b3c]" />
+          <ArrowLeft className="w-4 h-4 text-[#FF2A6D]" />
           <span>Salir al Menú</span>
         </button>
 
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              fortunariumAudio.playButtonClick();
-              setShowRulebook(true);
-            }}
-            className="fort-arcade-btn inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#193842] hover:bg-[#224956] border-2 border-[#b98532] text-[#f5e6c4] text-xs font-black transition-all cursor-pointer"
-          >
-            <BookOpen className="w-4 h-4 text-[#f4d06f]" />
-            <span>Manual</span>
-          </button>
-
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => {
               fortunariumAudio.playButtonClick();
               setShowPrizeTable(true);
             }}
-            className="fort-arcade-btn inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#193842] hover:bg-[#224956] border-2 border-[#b98532] text-[#f5e6c4] text-xs font-black transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#070B14]/90 hover:bg-[#0E1628] border border-amber-400/45 hover:border-amber-400 text-amber-200 text-xs font-black transition-all cursor-pointer shadow-md"
           >
-            <Trophy className="w-4 h-4 text-[#f4d06f]" />
-            <span>Premios</span>
+            <Trophy className="w-4 h-4 text-amber-400" />
+            <span>Tabla de Premios</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              fortunariumAudio.playButtonClick();
+              setShowRulebook(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#070B14]/90 hover:bg-[#0E1628] border border-cyan-400/45 hover:border-cyan-400 text-cyan-200 text-xs font-black transition-all cursor-pointer shadow-md"
+          >
+            <BookOpen className="w-4 h-4 text-cyan-400" />
+            <span>Manual</span>
           </button>
 
           <button
@@ -132,117 +132,140 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
               fortunariumAudio.playButtonClick();
               setShowAudioModal(true);
             }}
-            className="fort-arcade-btn inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#193842] hover:bg-[#224956] border-2 border-[#b98532] text-[#f5e6c4] text-xs font-black transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#070B14]/90 hover:bg-[#0E1628] border border-[#FF2A6D]/45 hover:border-[#FF2A6D] text-pink-200 text-xs font-bold transition-all cursor-pointer shadow-md"
+            title="Ajustes de Audio"
           >
-            <Volume2 className="w-4 h-4 text-[#f4d06f]" />
-            <span>Sonido</span>
+            <Sliders className="w-4 h-4 text-[#FF2A6D]" />
+            <span className="hidden sm:inline">Audio</span>
           </button>
+
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#FF2A6D]/15 border border-[#FF2A6D]/45 text-[#FF7AA2] text-xs font-mono font-black tracking-wider uppercase shadow-[0_0_15px_rgba(255,42,109,0.2)]">
+            <span className="w-2 h-2 rounded-full bg-[#FF2A6D] animate-ping" />
+            <span>FORTUNARIUM · 1–4 JUGADORES</span>
+          </div>
         </div>
       </header>
 
       {/* Main Content Grid */}
-      <main className="relative z-10 w-full max-w-6xl mx-auto my-auto py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Lobby Logo + Room Code + Cursor Color + Players (5 cols) */}
+      <main className="relative z-10 w-full max-w-6xl mx-auto my-auto py-4 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Machine Identity, Room Code & Players (5 cols) */}
         <div className="lg:col-span-5 flex flex-col gap-5">
-          {/* Room Header & Lobby Logo Card */}
-          <div className="fort-cabinet-metal p-5 sm:p-6 rounded-2xl border-[4px] border-[#b98532] flex flex-col gap-4">
+          {/* Canonical Lobby Logo Card */}
+          <div className="relative p-6 rounded-2xl fort-cyber-modal overflow-hidden">
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-xl bg-gradient-to-b from-[#401b13] to-[#1a0a07] border-2 border-[#b98532] flex items-center justify-center shrink-0 shadow-inner">
-                <span className="text-5xl leading-none select-none" role="img" aria-label="Arcade Machine">
+              <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-b from-[#FF2A6D]/30 via-[#120A1A] to-[#050810] border-2 border-[#FF2A6D]/70 p-2 shadow-[0_0_30px_rgba(255,42,109,0.35)] shrink-0 flex items-center justify-center">
+                <span className="text-5xl leading-none select-none" role="img" aria-label="Fortunarium">
                   🎰
                 </span>
               </div>
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-widest text-[#f4d06f] flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  Máquina Electromecánica · 1 a 4 Operadores
+                <span className="text-[10px] font-mono font-black uppercase tracking-widest text-[#FF2A6D] block">
+                  UNIDAD INDUSTRIAL COMPARTIDA
                 </span>
-                <div className="inline-block mt-1 px-2.5 py-0.5 rounded bg-gradient-to-b from-[#f3ead3] to-[#d5c295] border-2 border-[#5c3d12] shadow-[0_2px_0_#241504] -rotate-[0.6deg]">
-                  <h1 className="text-2xl sm:text-3xl font-fortunarium text-[#7c2212] tracking-wider leading-none">
-                    FORTUNARIUM
-                  </h1>
-                </div>
-                <p className="text-xs text-[#e2ece9] mt-1.5 leading-relaxed">
-                  Un ingenio mecánico de taller compartido en tiempo real. Superad la cuota de cada ciclo en solitario o con amigos.
+                <h1 className="text-2xl sm:text-3xl font-fortunarium text-white tracking-wider drop-shadow-[0_0_12px_rgba(255,42,109,0.45)]">
+                  FORTUNARIUM
+                </h1>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  Todos compartís la misma máquina, caja común, integridad y mejoras. ¡Sellad las cuotas antes de fundir el chasis!
                 </p>
               </div>
             </div>
 
-            {/* Room Code Box */}
-            <div className="fort-crt-display fort-dot-matrix p-3.5 rounded-xl border-2 border-[#8c6b32] flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-[#e9c46a] font-semibold">
-                  Código de Sala (CRT)
+            {/* Room Code Box (CRT Readout) */}
+            <div className="mt-5 p-4 rounded-xl fort-crt-display border border-[#FF2A6D]/45 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="relative z-10 text-center sm:text-left">
+                <div className="text-[10px] uppercase tracking-widest text-cyan-300/90 font-mono font-bold">
+                  CÓDIGO DE SALA
                 </div>
-                <div className="text-2xl font-mono font-black tracking-[0.22em] text-[#7ae582]">
+                <div className="text-2xl sm:text-3xl font-mono font-black tracking-[0.25em] text-[#FF2A6D] drop-shadow-[0_0_12px_rgba(255,42,109,0.55)]">
                   {roomState.roomCode}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                className="fort-arcade-btn px-4 py-2.5 rounded-lg bg-[#d99b26] hover:bg-[#f4d06f] border border-[#fef08a] text-stone-950 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-4 h-4" />
-                    <span>Copiado</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    <span>Copiar</span>
-                  </>
-                )}
-              </button>
-            </div>
 
-            {/* Cursor Color Picker */}
-            <div className="p-3.5 rounded-2xl bg-stone-900/75 border border-stone-800 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-stone-200 flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-amber-400" />
-                  Color de tu Cursor en Tiempo Real
-                </span>
-                <span className="text-[10px] text-stone-400 font-semibold">
-                  Visible para todo el equipo
-                </span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {FORTUNARIUM_CURSOR_COLORS.map((c) => {
-                  const isSelected =
-                    (localPlayer?.color || '').toLowerCase() === c.hex.toLowerCase();
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      title={c.label}
-                      onClick={() => {
-                        fortunariumAudio.playButtonClick();
-                        onSetCursorColor(c.hex);
-                      }}
-                      style={{ backgroundColor: c.hex }}
-                      className={`w-7 h-7 rounded-full transition-all cursor-pointer flex items-center justify-center ${
-                        isSelected
-                          ? 'ring-2 ring-white scale-110 shadow-[0_0_12px_rgba(255,255,255,0.6)]'
-                          : 'opacity-75 hover:opacity-100 hover:scale-105'
-                      }`}
-                    >
-                      {isSelected && <Check className="w-3.5 h-3.5 text-stone-950 stroke-[3]" />}
-                    </button>
-                  );
-                })}
+              <div className="relative z-10 flex items-center gap-2 w-full sm:w-auto justify-center">
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#FF2A6D]/20 hover:bg-[#FF2A6D]/35 border border-[#FF2A6D]/55 text-pink-100 text-xs font-bold transition-all cursor-pointer"
+                >
+                  {copiedCode ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Copiado</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-[#FF2A6D]" />
+                      <span>Código</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/45 text-cyan-200 text-xs font-bold transition-all cursor-pointer"
+                >
+                  {copiedLink ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Enlace Listo</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-cyan-300" />
+                      <span>Invitar</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
-            {/* 4 Physical Player Slots */}
-            <div className="flex flex-col gap-2.5">
-              <div className="flex items-center justify-between text-xs font-bold text-stone-300">
-                <span className="flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-amber-400" />
-                  Operadores en Sala ({connectedCount}/4)
+            {/* Real-time Cursor Color Picker */}
+            {onSetCursorColor && localPlayer && (
+              <div className="mt-4 p-3 rounded-xl fort-crt-panel flex items-center justify-between gap-2">
+                <span className="relative z-10 text-[11px] font-mono font-black uppercase tracking-wider text-cyan-300">
+                  Color de tu Cursor:
                 </span>
-                <span className="text-emerald-400/90">1 a 4 jugadores (Solo o Cooperativo)</span>
+                <div className="relative z-10 flex items-center gap-1.5">
+                  {FORTUNARIUM_CURSOR_COLORS.map((c) => {
+                    const selected =
+                      localPlayer.color.toLowerCase() === c.hex.toLowerCase();
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        title={c.label}
+                        onClick={() => {
+                          fortunariumAudio.playButtonClick();
+                          onSetCursorColor(c.hex);
+                        }}
+                        style={{ backgroundColor: c.hex }}
+                        className={`w-6 h-6 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                          selected
+                            ? 'ring-2 ring-white scale-110 shadow-[0_0_10px_rgba(255,255,255,0.7)]'
+                            : 'opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        {selected && (
+                          <Check className="w-3 h-3 text-slate-950 stroke-[3]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Players List (1 to 4 seats) */}
+            <div className="mt-5 space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                <span className="flex items-center gap-1.5 font-mono uppercase tracking-wider text-[#FF7AA2]">
+                  <Users className="w-4 h-4 text-[#FF2A6D]" />
+                  Operadores en la Máquina ({connectedCount}/4)
+                </span>
+                <span className="text-emerald-400 font-mono text-[11px]">
+                  1 a 4 Jugadores
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -252,12 +275,12 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                   return (
                     <div
                       key={slotIdx}
-                      className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${
+                      className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
                         p
                           ? isMe
-                            ? 'bg-amber-500/15 border-amber-400/60 shadow-md'
-                            : 'bg-stone-900/90 border-stone-700/80'
-                          : 'bg-stone-950/50 border-stone-800/60 border-dashed opacity-60'
+                            ? 'bg-[#FF2A6D]/15 border-[#FF2A6D]/65 shadow-[0_0_16px_rgba(255,42,109,0.2)]'
+                            : 'bg-[#070B14]/90 border-cyan-500/30'
+                          : 'bg-[#04070E]/60 border-slate-800/70 border-dashed opacity-60'
                       }`}
                     >
                       <div
@@ -270,7 +293,7 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                               }
                             : undefined
                         }
-                        className="w-10 h-10 rounded-xl bg-stone-950 border border-amber-500/30 flex items-center justify-center text-sm font-black text-amber-300 shrink-0"
+                        className="w-10 h-10 rounded-xl bg-[#050811] border border-[#FF2A6D]/35 flex items-center justify-center text-sm font-black text-pink-200 shrink-0"
                       >
                         {p ? p.name.slice(0, 2).toUpperCase() : `#${slotIdx + 1}`}
                       </div>
@@ -286,12 +309,12 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                                 {p.name}
                               </span>
                               {isMe && (
-                                <span className="text-[10px] font-bold text-amber-300">
+                                <span className="text-[10px] font-black text-[#FF2A6D]">
                                   (Tú)
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-stone-400 flex items-center gap-1.5">
+                            <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
                               <span>{p.isHost ? 'Jefe de Sala' : `Operador ${slotIdx + 1}`}</span>
                               <span>·</span>
                               <span
@@ -305,11 +328,11 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                           </>
                         ) : (
                           <>
-                            <div className="text-xs font-semibold text-stone-500">
+                            <div className="text-xs font-semibold text-slate-500">
                               Puesto Libre #{slotIdx + 1}
                             </div>
-                            <div className="text-[10px] text-stone-600">
-                              Esperando jugador...
+                            <div className="text-[10px] text-slate-600">
+                              Esperando operador...
                             </div>
                           </>
                         )}
@@ -321,7 +344,7 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
             </div>
 
             {/* Start Match CTA */}
-            <div className="pt-2">
+            <div className="pt-4">
               {isHost ? (
                 <button
                   type="button"
@@ -330,7 +353,7 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                     fortunariumAudio.playButtonClick();
                     onStartGame();
                   }}
-                  className="fort-girar-plunger w-full py-3.5 px-5 rounded-xl disabled:opacity-50 text-[#fff7e6] font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-[#FF2A6D] via-[#E01E5A] to-[#FF2A6D] hover:from-[#FF4782] hover:to-[#FF2A6D] border border-[#FF7AA2]/60 disabled:opacity-50 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-[0_10px_30px_rgba(255,42,109,0.42)] cursor-pointer disabled:cursor-not-allowed active:scale-[0.99]"
                 >
                   <Play className="w-4 h-4 fill-current" />
                   <span>
@@ -340,7 +363,7 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                   </span>
                 </button>
               ) : (
-                <div className="w-full py-3 px-4 rounded-xl bg-[#0d1d24] border-2 border-[#8c6b32] text-center text-xs font-semibold text-[#f4d06f]">
+                <div className="w-full py-3 px-4 rounded-xl fort-crt-panel text-center text-xs font-mono font-bold text-cyan-300">
                   Esperando a que el anfitrión accione el interruptor...
                 </div>
               )}
@@ -351,28 +374,28 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
         {/* Right Column: Configuration & Ordered Symbol Guide (7 cols) */}
         <div className="lg:col-span-7 flex flex-col gap-5">
           {/* Machine Rules & Settings */}
-          <div className="fort-cabinet-metal p-5 sm:p-6 rounded-2xl border-[4px] border-[#b98532] flex flex-col gap-4">
-            <div className="flex items-center justify-between">
+          <div className="fort-cyber-modal p-5 sm:p-6 rounded-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-[#FF2A6D]/25 pb-3">
               <div className="flex items-center gap-2">
-                <Settings className="w-5 h-5 text-amber-400" />
-                <h2 className="text-lg font-fortunarium text-amber-300 tracking-wide">
+                <Settings className="w-5 h-5 text-[#FF2A6D]" />
+                <h2 className="text-lg font-fortunarium text-white tracking-wide">
                   CALIBRACIÓN DE LA PARTIDA
                 </h2>
               </div>
               {!isHost && (
-                <span className="text-xs text-stone-400">
+                <span className="text-xs font-mono text-cyan-300/80">
                   Configurado por el anfitrión
                 </span>
               )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Total Quotas / Infinite Mode (Section 36) */}
+              {/* Total Quotas / Infinite Mode */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-stone-300">
+                <label className="text-[11px] font-mono font-black uppercase tracking-wider text-cyan-300">
                   CANTIDAD DE CUOTAS
                 </label>
-                <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-stone-900 border border-stone-800">
+                <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-[#050811] border border-slate-800">
                   {(
                     [
                       { val: 5, label: '5', title: '5 cuotas' },
@@ -393,8 +416,8 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                       }}
                       className={`py-2 px-1 rounded-lg text-xs sm:text-sm font-mono font-black transition-all cursor-pointer disabled:cursor-default tabular-nums ${
                         roomState.config.totalRounds === item.val
-                          ? 'bg-amber-500 text-stone-950 shadow'
-                          : 'text-stone-400 hover:text-white'
+                          ? 'bg-[#FF2A6D] text-white shadow-[0_0_12px_rgba(255,42,109,0.5)]'
+                          : 'text-slate-400 hover:text-white'
                       }`}
                     >
                       {item.label}
@@ -405,10 +428,10 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
 
               {/* Difficulty */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-stone-300">
-                  Exigencia del Casino
+                <label className="text-[11px] font-mono font-black uppercase tracking-wider text-cyan-300">
+                  EXIGENCIA DEL CASINO
                 </label>
-                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-stone-900 border border-stone-800">
+                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#050811] border border-slate-800">
                   {(
                     [
                       { id: 'normal', label: 'Normal' },
@@ -426,8 +449,8 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                       }}
                       className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:cursor-default ${
                         roomState.config.difficulty === d.id
-                          ? 'bg-amber-500 text-stone-950 shadow'
-                          : 'text-stone-400 hover:text-white'
+                          ? 'bg-[#FF2A6D] text-white shadow-[0_0_12px_rgba(255,42,109,0.5)]'
+                          : 'text-slate-400 hover:text-white'
                       }`}
                     >
                       {d.label}
@@ -438,10 +461,10 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
 
               {/* Turn Mode */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-stone-300">
-                  Control de Palanca
+                <label className="text-[11px] font-mono font-black uppercase tracking-wider text-cyan-300">
+                  CONTROL DE PALANCA
                 </label>
-                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-stone-900 border border-stone-800">
+                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#050811] border border-slate-800">
                   {(
                     [
                       { id: 'turns', label: 'Por Turnos' },
@@ -458,8 +481,8 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                       }}
                       className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:cursor-default ${
                         roomState.config.turnMode === m.id
-                          ? 'bg-amber-500 text-stone-950 shadow'
-                          : 'text-stone-400 hover:text-white'
+                          ? 'bg-[#FF2A6D] text-white shadow-[0_0_12px_rgba(255,42,109,0.5)]'
+                          : 'text-slate-400 hover:text-white'
                       }`}
                     >
                       {m.label}
@@ -471,41 +494,41 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
 
             {/* 3 Core Pillars Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-              <div className="p-3 rounded-2xl bg-stone-900/70 border border-stone-800 flex items-start gap-2.5">
-                <Coins className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div className="text-xs text-stone-300 leading-snug">
-                  <strong className="text-white block">Caja Común y Estadísticas</strong>
-                  El dinero es de todos, pero cada tirada registra quién genera más fortuna o quién arruina al grupo.
+              <div className="p-3 rounded-xl fort-crt-panel flex items-start gap-2.5">
+                <Coins className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 relative z-10" />
+                <div className="text-xs text-slate-300 leading-snug relative z-10">
+                  <strong className="text-amber-300 block">Caja Común y Cuotas</strong>
+                  El dinero es de todos y nunca se reinicia al sellar cuota. ¡Gestionad bien cada crédito!
                 </div>
               </div>
-              <div className="p-3 rounded-2xl bg-stone-900/70 border border-stone-800 flex items-start gap-2.5">
-                <Shield className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div className="text-xs text-stone-300 leading-snug">
-                  <strong className="text-white block">Integridad Mecánica</strong>
-                  Las Bombas y Calaveras dañan la máquina. Usad Llaves y el Taller antes de que llegue al 0%.
+              <div className="p-3 rounded-xl fort-crt-panel flex items-start gap-2.5">
+                <Shield className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5 relative z-10" />
+                <div className="text-xs text-slate-300 leading-snug relative z-10">
+                  <strong className="text-emerald-300 block">Integridad Mecánica</strong>
+                  El coste de reparación sube con cada cuota y uso. Usad Llaves y el Taller antes del 0%.
                 </div>
               </div>
-              <div className="p-3 rounded-2xl bg-stone-900/70 border border-stone-800 flex items-start gap-2.5">
-                <Zap className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                <div className="text-xs text-stone-300 leading-snug">
-                  <strong className="text-white block">Voltaje y Patrones</strong>
-                  Combinad líneas, columnas triples y plenos en la cuadrícula 3×5 con multiplicadores de Rayo.
+              <div className="p-3 rounded-xl fort-crt-panel flex items-start gap-2.5">
+                <Zap className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5 relative z-10" />
+                <div className="text-xs text-slate-300 leading-snug relative z-10">
+                  <strong className="text-cyan-300 block">Valor Base × Patrón</strong>
+                  Cada símbolo tiene su Valor Base (CR) que se multiplica por el patrón y las mejoras (hasta Nv. 10).
                 </div>
               </div>
             </div>
           </div>
 
           {/* Canonical Symbol Encyclopedia (Ordered Highest to Lowest Value) */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-stone-950/90 border border-amber-500/30 shadow-xl flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="p-5 sm:p-6 rounded-2xl fort-cyber-modal flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#FF2A6D]/25 pb-3">
               <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-amber-400" />
-                <h2 className="text-lg font-fortunarium text-amber-300 tracking-wide">
-                  SÍMBOLOS Y PREMIOS (MAYOR A MENOR VALOR)
+                <Trophy className="w-5 h-5 text-[#FF2A6D]" />
+                <h2 className="text-lg font-fortunarium text-white tracking-wide">
+                  SÍMBOLOS Y VALORES BASE (MAYOR A MENOR)
                 </h2>
               </div>
 
-              <div className="flex p-1 rounded-xl bg-stone-900 border border-stone-800">
+              <div className="flex p-1 rounded-xl bg-[#050811] border border-slate-800">
                 <button
                   type="button"
                   onClick={() => {
@@ -514,8 +537,8 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     activeGuideTab === 'normal'
-                      ? 'bg-amber-500 text-stone-950'
-                      : 'text-stone-400 hover:text-white'
+                      ? 'bg-[#FF2A6D] text-white shadow-[0_0_12px_rgba(255,42,109,0.45)]'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   Normales (12)
@@ -528,8 +551,8 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     activeGuideTab === 'special'
-                      ? 'bg-amber-500 text-stone-950'
-                      : 'text-stone-400 hover:text-white'
+                      ? 'bg-[#FF2A6D] text-white shadow-[0_0_12px_rgba(255,42,109,0.45)]'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   Especiales (7)
@@ -544,23 +567,26 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                   return (
                     <div
                       key={sym.id}
-                      className="p-2.5 rounded-2xl bg-stone-900/85 border border-stone-800 flex flex-col items-center text-center gap-1 relative"
+                      className="p-2.5 rounded-xl fort-crt-panel flex flex-col items-center text-center gap-1 relative"
                     >
-                      <span className="absolute top-1.5 left-2 text-[10px] font-black text-amber-400/75">
+                      <span className="absolute top-1.5 left-2 text-[10px] font-mono font-black text-[#FF2A6D] z-10">
                         #{idx + 1}
                       </span>
-                      <div className="w-11 h-11 rounded-xl bg-stone-950 border border-amber-500/20 p-1 flex items-center justify-center">
+                      <div className="w-11 h-11 rounded-xl bg-[#040811] border border-[#FF2A6D]/30 p-1 flex items-center justify-center relative z-10">
                         <img
                           src={sym.asset}
                           alt={sym.name}
                           className="w-full h-full object-contain"
                         />
                       </div>
-                      <div className="text-xs font-black text-white">{sym.name}</div>
-                      <div className="text-[11px] font-mono font-bold text-amber-300 tabular-nums">
-                        3x:{sym.basePayout3} CR · 4x:{sym.basePayout4} CR · 5x:{sym.basePayout5} CR
+                      <div className="text-xs font-black text-white relative z-10">{sym.name}</div>
+                      <div className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-400/35 text-[11px] font-mono font-black text-amber-300 tabular-nums relative z-10">
+                        Valor Base: {sym.baseSymbolValue} CR
                       </div>
-                      <div className="text-[10px] text-emerald-300/90 font-medium leading-tight">
+                      <div className="text-[10px] font-mono text-slate-400 tabular-nums relative z-10">
+                        3×:{sym.basePayout3} · 4×:{sym.basePayout4} · 5×:{sym.basePayout5}
+                      </div>
+                      <div className="text-[10px] text-cyan-300/90 font-medium leading-tight relative z-10">
                         {sym.specialProperty}
                       </div>
                     </div>
@@ -574,20 +600,20 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                   return (
                     <div
                       key={sym.id}
-                      className="p-2.5 rounded-2xl bg-stone-900/85 border border-stone-800 flex items-center gap-3"
+                      className="p-2.5 rounded-xl fort-crt-panel flex items-center gap-3"
                     >
-                      <div className="w-12 h-12 rounded-xl bg-stone-950 border border-amber-500/25 p-1 flex items-center justify-center shrink-0">
+                      <div className="w-12 h-12 rounded-xl bg-[#040811] border border-[#FF2A6D]/35 p-1 flex items-center justify-center shrink-0 relative z-10">
                         <img
                           src={sym.asset}
                           alt={sym.name}
                           className="w-full h-full object-contain"
                         />
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-black text-amber-300">
+                      <div className="min-w-0 flex-1 relative z-10">
+                        <div className="text-xs font-black text-[#FF7AA2]">
                           {sym.name}
                         </div>
-                        <p className="text-[11px] text-stone-300 leading-tight mt-0.5">
+                        <p className="text-[11px] text-slate-300 leading-tight mt-0.5">
                           {sym.specialProperty}
                         </p>
                       </div>

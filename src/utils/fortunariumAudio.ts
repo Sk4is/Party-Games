@@ -42,6 +42,14 @@ class FortunariumAudioEngine {
     }
   }
 
+  public startMusicLoop(_mode: 'lobby' | 'gameplay' = 'lobby') {
+    // Procedural audio engine uses event-driven mechanical/effect cues
+  }
+
+  public stopMusicLoop() {
+    // No-op cleanup for ambient/music loop lifecycle
+  }
+
   public playLeverPull() {
     this.playLeverAndMotorStart();
   }

@@ -56,6 +56,7 @@ export interface FortunariumSymbolMeta {
   category: 'normal' | 'special';
   tier: 1 | 2 | 3 | 4 | 5;
   asset: string;
+  baseSymbolValue: number;
   basePayout3: number;
   basePayout4: number;
   basePayout5: number;
@@ -78,12 +79,13 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 1,
     asset: FORTUNARIUM_SYMBOL_ASSETS.cereza,
+    baseSymbolValue: 11,
     basePayout3: 11,
-    basePayout4: 32,
-    basePayout5: 85,
+    basePayout4: 33,
+    basePayout5: 88,
     weight: 220,
     shortDesc: 'Fruta básica muy frecuente. Permite recuperar el coste de la tirada.',
-    specialProperty: 'Sinergia con «Cosecha Roja» (+35% pago por nivel)',
+    specialProperty: 'Sinergia con «Cosecha Roja» (+20% valor base por nivel)',
     badgeColor: '#fb7185',
   },
   limon: {
@@ -92,12 +94,13 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 1,
     asset: FORTUNARIUM_SYMBOL_ASSETS.limon,
+    baseSymbolValue: 13,
     basePayout3: 13,
-    basePayout4: 38,
-    basePayout5: 100,
+    basePayout4: 39,
+    basePayout5: 104,
     weight: 190,
     shortDesc: 'Cítrico frecuente que aporta pequeños beneficios iniciales.',
-    specialProperty: 'Sinergia con «Huerto Cítrico» (+18% frecuencia, +25% pago)',
+    specialProperty: 'Sinergia con «Huerto Cítrico» (+12% frecuencia, +15% valor base)',
     badgeColor: '#fde047',
   },
   naranja: {
@@ -106,12 +109,13 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 1,
     asset: FORTUNARIUM_SYMBOL_ASSETS.naranja,
+    baseSymbolValue: 17,
     basePayout3: 17,
-    basePayout4: 48,
-    basePayout5: 125,
+    basePayout4: 51,
+    basePayout5: 136,
     weight: 165,
     shortDesc: 'Fruta jugosa con retorno sólido en líneas de 3, 4 o 5.',
-    specialProperty: 'Sinergia con «Huerto Cítrico» (+18% frecuencia, +25% pago)',
+    specialProperty: 'Sinergia con «Huerto Cítrico» (+12% frecuencia, +15% valor base)',
     badgeColor: '#fb923c',
   },
   ciruela: {
@@ -120,12 +124,13 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 1,
     asset: FORTUNARIUM_SYMBOL_ASSETS.ciruela,
+    baseSymbolValue: 20,
     basePayout3: 20,
-    basePayout4: 58,
-    basePayout5: 150,
+    basePayout4: 60,
+    basePayout5: 160,
     weight: 140,
     shortDesc: 'Fruta clásica de buen rendimiento cuando forma diagonales o columnas.',
-    specialProperty: 'Sinergia con «Cosecha Roja» (+35% pago por nivel)',
+    specialProperty: 'Sinergia con «Cosecha Roja» (+20% valor base por nivel)',
     badgeColor: '#c084fc',
   },
   uvas: {
@@ -134,12 +139,13 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 2,
     asset: FORTUNARIUM_SYMBOL_ASSETS.uvas,
+    baseSymbolValue: 27,
     basePayout3: 27,
-    basePayout4: 76,
-    basePayout5: 195,
+    basePayout4: 81,
+    basePayout5: 216,
     weight: 115,
     shortDesc: 'Racimo selecto de valor medio con excelentes premios en 4 y 5 aciertos.',
-    specialProperty: 'Sinergia con «Reserva de la Viña» (+35% pago)',
+    specialProperty: 'Sinergia con «Reserva de la Viña» (+20% valor base)',
     badgeColor: '#a855f7',
   },
   trebol: {
@@ -148,9 +154,10 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 2,
     asset: FORTUNARIUM_SYMBOL_ASSETS.trebol,
+    baseSymbolValue: 36,
     basePayout3: 36,
-    basePayout4: 100,
-    basePayout5: 255,
+    basePayout4: 108,
+    basePayout5: 288,
     weight: 90,
     shortDesc: 'Amuleto de buena fortuna que además neutraliza Calaveras.',
     specialProperty: 'Cada Trébol neutraliza 1 Calavera en la tirada (+12 CR)',
@@ -162,12 +169,13 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 2,
     asset: FORTUNARIUM_SYMBOL_ASSETS.campana,
+    baseSymbolValue: 50,
     basePayout3: 50,
-    basePayout4: 140,
-    basePayout5: 355,
+    basePayout4: 150,
+    basePayout5: 400,
     weight: 68,
     shortDesc: 'Campana de bronce del casino con pagos potentes.',
-    specialProperty: 'Sinergia con «Campana de Bronce» (+45% en 4×/5×)',
+    specialProperty: 'Sinergia con «Campana de Bronce» (+25% valor base por nivel)',
     badgeColor: '#fbbf24',
   },
   herradura: {
@@ -176,9 +184,10 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.herradura,
+    baseSymbolValue: 68,
     basePayout3: 68,
-    basePayout4: 190,
-    basePayout5: 485,
+    basePayout4: 204,
+    basePayout5: 544,
     weight: 50,
     shortDesc: 'Forja pesada que repara el chasis al formar un patrón ganador.',
     specialProperty: 'Al formar patrón ganador repara +4% de Integridad',
@@ -190,9 +199,10 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.estrella,
+    baseSymbolValue: 95,
     basePayout3: 95,
-    basePayout4: 265,
-    basePayout5: 680,
+    basePayout4: 285,
+    basePayout5: 760,
     weight: 34,
     shortDesc: 'Astro brillante de alto valor para escalar cuotas avanzadas.',
     specialProperty: 'Al formar patrón ganador sube +0.10x el Voltaje',
@@ -204,12 +214,13 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 4,
     asset: FORTUNARIUM_SYMBOL_ASSETS.diamante,
+    baseSymbolValue: 145,
     basePayout3: 145,
-    basePayout4: 400,
-    basePayout5: 1000,
+    basePayout4: 435,
+    basePayout5: 1160,
     weight: 20,
     shortDesc: 'Joya de alta rareza capaz de sellar una cuota de un golpe.',
-    specialProperty: 'Sinergia con «Imán de Diamante» (+25% aparición)',
+    specialProperty: 'Sinergia con «Imán de Diamante» (+18% aparición por nivel)',
     badgeColor: '#38bdf8',
   },
   corona: {
@@ -218,9 +229,10 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 4,
     asset: FORTUNARIUM_SYMBOL_ASSETS.corona,
+    baseSymbolValue: 235,
     basePayout3: 235,
-    basePayout4: 640,
-    basePayout5: 1600,
+    basePayout4: 705,
+    basePayout5: 1880,
     weight: 9,
     shortDesc: 'Reliquia real extremadamente codiciada.',
     specialProperty: 'Otorga +1 Llave de Taller al alinear 4 o 5 Coronas',
@@ -232,12 +244,13 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 5,
     asset: FORTUNARIUM_SYMBOL_ASSETS.siete,
+    baseSymbolValue: 390,
     basePayout3: 390,
-    basePayout4: 1050,
-    basePayout5: 2750,
+    basePayout4: 1170,
+    basePayout5: 3120,
     weight: 3,
     shortDesc: 'El emblema supremo del Fortunarium (rareza máxima).',
-    specialProperty: 'Sinergia con «Siete Dorado» (+45% pago y mayor probabilidad de Jackpot)',
+    specialProperty: 'Sinergia con «Siete Dorado» (+25% valor base y prob. Jackpot)',
     badgeColor: '#f43f5e',
   },
 
@@ -250,6 +263,7 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'special',
     tier: 2,
     asset: FORTUNARIUM_SYMBOL_ASSETS.moneda,
+    baseSymbolValue: 16,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
@@ -266,6 +280,7 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'special',
     tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.llave,
+    baseSymbolValue: 0,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
@@ -282,6 +297,7 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'special',
     tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.rayo,
+    baseSymbolValue: 0,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
@@ -298,6 +314,7 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'special',
     tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.interrogacion,
+    baseSymbolValue: 20,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
@@ -314,6 +331,7 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'special',
     tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.bomba,
+    baseSymbolValue: 0,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
@@ -330,6 +348,7 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'special',
     tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.calavera,
+    baseSymbolValue: 0,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
@@ -346,15 +365,16 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'special',
     tier: 5,
     asset: FORTUNARIUM_SYMBOL_ASSETS.comodin,
+    baseSymbolValue: 180,
     basePayout3: 180,
-    basePayout4: 480,
-    basePayout5: 1200,
+    basePayout4: 540,
+    basePayout5: 1440,
     weight: 0.12,
     shortDesc:
       'Sustituye a cualquier símbolo normal en patrones Horizontales, Verticales, Diagonales y Triángulos otorgando +25% de bono.',
     specialProperty: 'Sustituye a cualquier símbolo normal (+25% pago)',
     activationRule: ' SUSTITUYE EN PATRONES',
-    badgeColor: '#c084fc',
+    badgeColor: '#c089fc',
   },
 };
 
@@ -443,7 +463,7 @@ export function computeEffectiveJackpotChance(
 
   let mult = 1.0;
   if ((upgrades.siete_dorado || 0) > 0) {
-    mult += upgrades.siete_dorado * 0.25;
+    mult += upgrades.siete_dorado * 0.12;
   }
   if (betMode === 'doble') mult *= 1.15;
   if (betMode === 'sobrecarga') mult *= 1.35;
@@ -521,7 +541,7 @@ export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
     baseMultiplier: 1.0,
     geometryDesc:
       '3, 4 o 5 símbolos iguales compatibles consecutivos en la misma fila horizontal (superior, central o inferior). Se paga la cadena máxima.',
-    payoutDesc: 'Multiplicador de línea ×1.00 (según longitud 3×, 4× o 5×)',
+    payoutDesc: 'Valor Base (VB) × 1.00 (3 casillas) · × 3.00 (4 casillas) · × 8.00 (5 casillas)',
     allowsWild: true,
     cells: [
       { col: 0, row: 1 },
@@ -536,10 +556,10 @@ export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
     name: 'Vertical (3)',
     patternType: 'VERTICAL',
     patternCategory: 'LINE',
-    baseMultiplier: 1.0,
+    baseMultiplier: 1.15,
     geometryDesc:
       '3 símbolos iguales compatibles alineados verticalmente en cualquiera de las 5 columnas.',
-    payoutDesc: 'Pago 3× del símbolo (Multiplicador ×1.00)',
+    payoutDesc: 'Valor Base del símbolo (VB) × 1.15',
     allowsWild: true,
     cells: [
       { col: 2, row: 0 },
@@ -552,10 +572,10 @@ export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
     name: 'Diagonal Descendente (3)',
     patternType: 'DIAGONAL',
     patternCategory: 'LINE',
-    baseMultiplier: 1.15,
+    baseMultiplier: 1.3,
     geometryDesc:
       '3 símbolos iguales compatibles en diagonal continua de arriba-izquierda a abajo-derecha en cualquier tramo de 3 columnas.',
-    payoutDesc: 'Pago 3× del símbolo × 1.15',
+    payoutDesc: 'Valor Base del símbolo (VB) × 1.30',
     allowsWild: true,
     cells: [
       { col: 0, row: 0 },
@@ -568,10 +588,10 @@ export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
     name: 'Diagonal Ascendente (3)',
     patternType: 'DIAGONAL',
     patternCategory: 'LINE',
-    baseMultiplier: 1.15,
+    baseMultiplier: 1.3,
     geometryDesc:
       '3 símbolos iguales compatibles en diagonal continua de abajo-izquierda a arriba-derecha en cualquier tramo de 3 columnas.',
-    payoutDesc: 'Pago 3× del símbolo × 1.15',
+    payoutDesc: 'Valor Base del símbolo (VB) × 1.30',
     allowsWild: true,
     cells: [
       { col: 0, row: 2 },
@@ -584,10 +604,10 @@ export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
     name: 'X (5 Casillas)',
     patternType: 'X',
     patternCategory: 'SHAPE',
-    baseMultiplier: 3.5,
+    baseMultiplier: 28.0,
     geometryDesc:
-      'Cinco símbolos iguales formando una X a través del tablero ( las 4 esquinas exteriores y el centro exacto ).',
-    payoutDesc: 'Pago 5× del símbolo × 3.50',
+      'Cinco símbolos iguales formando una X a través del tablero (las 4 esquinas exteriores y el centro exacto).',
+    payoutDesc: 'Valor Base del símbolo (VB) × 28.00',
     allowsWild: true,
     cells: X_MASK_CELLS,
   },
@@ -596,10 +616,10 @@ export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
     name: 'Triángulo (8 Casillas)',
     patternType: 'TRIANGULO',
     patternCategory: 'SHAPE',
-    baseMultiplier: 8.0,
+    baseMultiplier: 64.0,
     geometryDesc:
       'Figura completa de 8 casillas: las 5 de la fila inferior, los 2 hombros interiores de la fila central y el vértice superior central. Todas deben tener el mismo símbolo compatible.',
-    payoutDesc: 'Pago 5× del símbolo × 8.00 (Figura Suprema)',
+    payoutDesc: 'Valor Base del símbolo (VB) × 64.00 (Figura Suprema)',
     allowsWild: true,
     cells: TRIANGLE_MASK_CELLS,
   },
@@ -608,12 +628,40 @@ export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
     name: 'Triángulo Invertido (8 Casillas)',
     patternType: 'TRIANGULO_INVERTIDO',
     patternCategory: 'SHAPE',
-    baseMultiplier: 8.0,
+    baseMultiplier: 64.0,
     geometryDesc:
       'Figura completa de 8 casillas: las 5 de la fila superior, los 2 hombros interiores de la fila central y el vértice inferior central. Todas deben tener el mismo símbolo compatible.',
-    payoutDesc: 'Pago 5× del símbolo × 8.00 (Figura Suprema)',
+    payoutDesc: 'Valor Base del símbolo (VB) × 64.00 (Figura Suprema)',
     allowsWild: true,
     cells: INVERTED_TRIANGLE_MASK_CELLS,
+  },
+  {
+    id: 'pantalla_completa',
+    name: 'Pantalla Completa / Jackpot (15 Casillas)',
+    patternType: 'PANTALLA_COMPLETA',
+    patternCategory: 'SHAPE',
+    baseMultiplier: 100.0,
+    geometryDesc:
+      'Las 15 casillas del tablero 3×5 muestran el mismo símbolo compatible (o sustituidas con Comodín ⭐). Activa el Gran Jackpot y el desfile completo de patrones.',
+    payoutDesc: 'Valor Base del símbolo (VB) × 100.00 + Bono Jackpot',
+    allowsWild: true,
+    cells: [
+      { col: 0, row: 0 },
+      { col: 1, row: 0 },
+      { col: 2, row: 0 },
+      { col: 3, row: 0 },
+      { col: 4, row: 0 },
+      { col: 0, row: 1 },
+      { col: 1, row: 1 },
+      { col: 2, row: 1 },
+      { col: 3, row: 1 },
+      { col: 4, row: 1 },
+      { col: 0, row: 2 },
+      { col: 1, row: 2 },
+      { col: 2, row: 2 },
+      { col: 3, row: 2 },
+      { col: 4, row: 2 },
+    ],
   },
 ];
 
@@ -643,12 +691,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     name: 'Cosecha Roja',
     rarity: 'COMÚN',
     synergyTags: ['fruit', 'economy'],
-    description: 'Aumenta los pagos de Cereza y Ciruela un +35% por nivel.',
-    effectSummary: '+35% pago de Cereza y Ciruela',
+    description: 'Aumenta el valor base y pagos de Cereza y Ciruela un +20% por nivel (hasta Nv. 10).',
+    effectSummary: '+20% valor base Cereza y Ciruela / nv.',
     baseCostMoney: 55,
-    costMultiplierPerLevel: 1.55,
+    costMultiplierPerLevel: 1.28,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'cereza',
   },
   huerto_citrico: {
@@ -657,12 +705,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'COMÚN',
     synergyTags: ['fruit', 'economy'],
     description:
-      'Limón y Naranja aparecen un +18% más a menudo y pagan un +25% adicional por nivel.',
-    effectSummary: '+18% frecuencia y +25% pago en Limón/Naranja',
+      'Limón y Naranja aparecen un +12% más a menudo y su valor base sube +15% por nivel (hasta Nv. 10).',
+    effectSummary: '+12% frecuencia y +15% valor Limón/Naranja / nv.',
     baseCostMoney: 60,
-    costMultiplierPerLevel: 1.55,
+    costMultiplierPerLevel: 1.28,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'limon',
   },
   campana_bronce: {
@@ -671,12 +719,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'POCO COMÚN',
     synergyTags: ['high_value', 'economy'],
     description:
-      'Campana y Herradura pagan +45% más en patrones y +20% más de frecuencia por nivel.',
-    effectSummary: '+45% pago y +20% frecuencia Campana/Herradura',
+      'Campana y Herradura suben +25% su valor base y +12% su frecuencia por nivel (hasta Nv. 10).',
+    effectSummary: '+25% valor y +12% frecuencia Campana/Herradura / nv.',
     baseCostMoney: 70,
-    costMultiplierPerLevel: 1.6,
+    costMultiplierPerLevel: 1.3,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'campana',
   },
   iman_diamante: {
@@ -685,12 +733,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'RARA',
     synergyTags: ['high_value', 'geometry'],
     description:
-      'Diamante y Estrella aparecen un +30% más a menudo, pero el coste de tirada sube +5%.',
-    effectSummary: '+30% peso Diamante/Estrella · +5% coste tirada',
+      'Diamante y Estrella aparecen un +18% más a menudo por nivel, pero el coste de tirada sube +3%.',
+    effectSummary: '+18% peso Diamante/Estrella · +3% coste tirada / nv.',
     baseCostMoney: 85,
-    costMultiplierPerLevel: 1.65,
+    costMultiplierPerLevel: 1.32,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'diamante',
   },
   siete_dorado: {
@@ -699,12 +747,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'EXCEPCIONAL',
     synergyTags: ['high_value', 'geometry'],
     description:
-      'Los pagos de Siete y Corona aumentan un +45% por nivel y mejora un +25% la probabilidad de Jackpot.',
-    effectSummary: '+45% pago Siete/Corona · +25% prob. Jackpot',
+      'El valor base de Siete y Corona sube un +25% por nivel y mejora un +12% la probabilidad de Jackpot.',
+    effectSummary: '+25% valor Siete/Corona · +12% prob. Jackpot / nv.',
     baseCostMoney: 95,
-    costMultiplierPerLevel: 1.7,
+    costMultiplierPerLevel: 1.35,
     keyCost: 2,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'siete',
   },
   geometra: {
@@ -713,12 +761,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'RARA',
     synergyTags: ['geometry', 'high_value'],
     description:
-      'Aumenta los multiplicadores de patrones Vertical, Diagonal, X y Triángulos un +30% por nivel.',
-    effectSummary: '+30% en patrones Vertical, Diagonal, X y Triángulos',
+      'Aumenta los multiplicadores de patrones Vertical, Diagonal, X y Triángulos un +18% por nivel (hasta Nv. 10).',
+    effectSummary: '+18% en patrones Vertical, Diagonal, X y Triángulos / nv.',
     baseCostMoney: 80,
-    costMultiplierPerLevel: 1.6,
+    costMultiplierPerLevel: 1.3,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'estrella',
   },
   mano_tahur: {
@@ -727,12 +775,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'RARA',
     synergyTags: ['geometry', 'economy'],
     description:
-      'El Comodín aparece un +50% más a menudo y el Trébol un +25% más a menudo.',
-    effectSummary: '+50% frecuencia Comodín · +25% Trébol',
+      'El Comodín aparece un +30% más a menudo y el Trébol un +15% más a menudo por nivel (hasta Nv. 10).',
+    effectSummary: '+30% frecuencia Comodín · +15% Trébol / nv.',
     baseCostMoney: 90,
-    costMultiplierPerLevel: 1.65,
+    costMultiplierPerLevel: 1.32,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'comodin',
   },
   mecanico_jefe: {
@@ -741,12 +789,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'COMÚN',
     synergyTags: ['repair', 'economy'],
     description:
-      'La Llave aparece un +40% más a menudo y cada reparación restaura +10% extra de Integridad.',
-    effectSummary: '+40% frecuencia Llave · +10% reparación',
+      'La Llave aparece un +25% más a menudo, cada reparación restaura +5% extra de Integridad y reduce -6% el coste de reparación por nivel.',
+    effectSummary: '+25% frec. Llave · +5% rep. · -6% coste rep. / nv.',
     baseCostMoney: 65,
-    costMultiplierPerLevel: 1.55,
+    costMultiplierPerLevel: 1.28,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'llave',
   },
   cableado_ilegal: {
@@ -755,12 +803,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'POCO COMÚN',
     synergyTags: ['voltage', 'high_value'],
     description:
-      'El Rayo aparece un +50% más a menudo y da +0.15x extra de Voltaje, pero añade +1% de desgaste por tirada.',
-    effectSummary: '+50% Rayo y más Voltaje · +1% desgaste',
+      'El Rayo aparece un +30% más a menudo y da +0.08x extra de Voltaje por nivel, pero añade +1% de desgaste por tirada.',
+    effectSummary: '+30% Rayo y +0.08x Voltaje/nv. · +1% desgaste',
     baseCostMoney: 75,
-    costMultiplierPerLevel: 1.6,
+    costMultiplierPerLevel: 1.3,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'rayo',
   },
   prensa_uvas: {
@@ -769,12 +817,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'POCO COMÚN',
     synergyTags: ['fruit', 'economy'],
     description:
-      'Uvas y Trébol pagan +35% más por nivel y las Monedas dan +10 CR extra.',
-    effectSummary: '+35% pago Uvas/Trébol · +10 CR por Moneda',
+      'Uvas y Trébol suben +20% su valor base por nivel y las Monedas dan +6 CR extra por nivel.',
+    effectSummary: '+20% valor Uvas/Trébol · +6 CR por Moneda / nv.',
     baseCostMoney: 70,
-    costMultiplierPerLevel: 1.6,
+    costMultiplierPerLevel: 1.3,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'uvas',
   },
   artificiero: {
@@ -783,12 +831,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'POCO COMÚN',
     synergyTags: ['repair', 'economy'],
     description:
-      'Desactiva automáticamente 1 Bomba por tirada por nivel y otorga +35 CR al neutralizarla.',
-    effectSummary: 'Desactiva 1 Bomba/nivel (+35 CR)',
+      'Desactiva automáticamente Bombas por tirada y otorga +35 CR (+10 CR extra por nivel) al neutralizarlas.',
+    effectSummary: 'Desactiva Bombas auto. · Bono neutralización / nv.',
     baseCostMoney: 80,
-    costMultiplierPerLevel: 1.65,
+    costMultiplierPerLevel: 1.32,
     keyCost: 1,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'herradura',
   },
   motor_extra: {
@@ -797,12 +845,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
     rarity: 'EXCEPCIONAL',
     synergyTags: ['repair', 'economy'],
     description:
-      'Aumenta +15% la Integridad máxima por nivel y reduce en -1 CR el coste base de cada tirada.',
-    effectSummary: '-1 CR coste tirada · +15% Integridad máx.',
+      'Aumenta +8% la Integridad máxima por nivel y reduce el coste base de cada tirada (hasta Nv. 10).',
+    effectSummary: 'Reduce coste tirada · +8% Integridad máx. / nv.',
     baseCostMoney: 90,
-    costMultiplierPerLevel: 1.7,
+    costMultiplierPerLevel: 1.35,
     keyCost: 2,
-    maxLevel: 3,
+    maxLevel: 10,
     iconSymbol: 'corona',
   },
 };
@@ -1080,6 +1128,59 @@ export function getUpgradeCostMoney(
   );
 }
 
+// ============================================================================
+// AUTHORITATIVE REPAIR COST SCALING (SINGLE SOURCE OF TRUTH)
+// Scales with:
+// 1. Current quota (`round`): 1 + (round - 1) * 0.25
+// 2. Repairs used in current quota (`repairsUsedInQuota`): 1 + repairsUsed * 0.35
+// 3. Missing integrity severity & Mecánico Jefe discount (-6% per level, max -60%)
+// ============================================================================
+export function getRepairCostMoney(params: {
+  round: number;
+  repairsUsedInQuota?: number;
+  integrity?: number;
+  maxIntegrity?: number;
+  upgrades?: Record<FortunariumUpgradeId, number>;
+  activeModifiers?: Pick<FortunariumActiveModifier, 'modifierId'>[];
+}): number {
+  const {
+    round,
+    repairsUsedInQuota = 0,
+    integrity = 70,
+    maxIntegrity = 100,
+    upgrades,
+    activeModifiers = [],
+  } = params;
+
+  const baseRepairCost = 28;
+  const quotaScale = 1 + Math.max(0, round - 1) * 0.25;
+  const repeatScale = 1 + Math.max(0, repairsUsedInQuota) * 0.35;
+
+  const missingRatio = Math.max(
+    0,
+    Math.min(1, (maxIntegrity - integrity) / Math.max(1, maxIntegrity))
+  );
+  const damageScale =
+    missingRatio <= 0.25
+      ? 0.9
+      : missingRatio >= 0.65
+      ? 1.25
+      : 1.0 + (missingRatio - 0.25) * 0.5;
+
+  const mecanicoLv = upgrades?.mecanico_jefe || 0;
+  const discountMult = Math.max(0.4, 1 - mecanicoLv * 0.06);
+
+  const hasRecalentamiento = activeModifiers.some(
+    (m) => m.modifierId === 'recalentamiento'
+  );
+  const debuffMult = hasRecalentamiento ? 1.3 : 1.0;
+
+  return Math.max(
+    15,
+    Math.round(baseRepairCost * quotaScale * repeatScale * damageScale * discountMult * debuffMult)
+  );
+}
+
 export function calculateEffectiveSpinCost(
   betMode: FortunariumBetMode,
   upgrades: Record<FortunariumUpgradeId, number>
@@ -1087,8 +1188,10 @@ export function calculateEffectiveSpinCost(
   const base = FORTUNARIUM_BET_MODES[betMode].baseSpinCost;
   const imanLv = upgrades.iman_diamante || 0;
   const motorLv = upgrades.motor_extra || 0;
-  const mult = 1 + imanLv * 0.05;
-  const discounted = Math.round(base * mult) - motorLv * FORTUNARIUM_BET_MODES[betMode].costMultiplier;
+  const mult = 1 + imanLv * 0.03;
+  const discountPerUnit = Math.floor((motorLv + 1) / 2);
+  const discounted =
+    Math.round(base * mult) - discountPerUnit * FORTUNARIUM_BET_MODES[betMode].costMultiplier;
   return Math.max(2, discounted);
 }
 
@@ -1111,27 +1214,27 @@ export function computeEffectiveSymbolWeights(
   for (const id of ALL_FORTUNARIUM_SYMBOL_IDS) {
     let w = FORTUNARIUM_SYMBOLS[id].weight;
 
-    // Permanent upgrade modifiers
+    // Permanent upgrade modifiers (scaled for 10 levels)
     if ((id === 'limon' || id === 'naranja') && (upgrades.huerto_citrico || 0) > 0) {
-      w *= 1 + upgrades.huerto_citrico * 0.18;
+      w *= 1 + upgrades.huerto_citrico * 0.12;
     }
     if ((id === 'campana' || id === 'herradura') && (upgrades.campana_bronce || 0) > 0) {
-      w *= 1 + upgrades.campana_bronce * 0.2;
+      w *= 1 + upgrades.campana_bronce * 0.12;
     }
     if ((id === 'diamante' || id === 'estrella') && (upgrades.iman_diamante || 0) > 0) {
-      w *= 1 + upgrades.iman_diamante * 0.3;
+      w *= 1 + upgrades.iman_diamante * 0.18;
     }
     if (id === 'comodin' && (upgrades.mano_tahur || 0) > 0) {
-      w *= 1 + upgrades.mano_tahur * 0.5;
+      w *= 1 + upgrades.mano_tahur * 0.3;
     }
     if (id === 'trebol' && (upgrades.mano_tahur || 0) > 0) {
-      w *= 1 + upgrades.mano_tahur * 0.25;
+      w *= 1 + upgrades.mano_tahur * 0.15;
     }
     if (id === 'llave' && (upgrades.mecanico_jefe || 0) > 0) {
-      w *= 1 + upgrades.mecanico_jefe * 0.4;
+      w *= 1 + upgrades.mecanico_jefe * 0.25;
     }
     if (id === 'rayo' && (upgrades.cableado_ilegal || 0) > 0) {
-      w *= 1 + upgrades.cableado_ilegal * 0.5;
+      w *= 1 + upgrades.cableado_ilegal * 0.3;
     }
 
     // Slight voltage risk/reward modifier in sobrecarga
@@ -1149,3 +1252,528 @@ export function computeEffectiveSymbolWeights(
 
   return list;
 }
+
+// ============================================================================
+// CANONICAL UPGRADE PROGRESSION & LIVE SYMBOL METRICS (SINGLE SOURCE OF TRUTH)
+// ============================================================================
+export interface FortunariumUpgradeStatLine {
+  label: string;
+  currentValue: string;
+  nextValue?: string;
+}
+
+export interface FortunariumUpgradeLevelDetails {
+  upgradeId: FortunariumUpgradeId;
+  level: number;
+  maxLevel: number;
+  isMax: boolean;
+  compactLines: string[];
+  detailedLines: FortunariumUpgradeStatLine[];
+}
+
+export function getUpgradeLevelDetails(
+  upgradeId: FortunariumUpgradeId,
+  level: number
+): FortunariumUpgradeLevelDetails {
+  const meta = FORTUNARIUM_UPGRADES_CATALOG[upgradeId];
+  const lv = Math.max(0, level);
+  const effectiveLv = Math.max(1, lv);
+  const nextLv = Math.min(meta.maxLevel, lv + 1);
+  const isMax = lv >= meta.maxLevel;
+
+  switch (upgradeId) {
+    case 'cosecha_roja':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 20}% valor base Cereza/Ciruela`,
+          `+2% Integridad por línea Cerezas`,
+        ],
+        detailedLines: [
+          {
+            label: 'Valor Base Cereza y Ciruela',
+            currentValue: lv > 0 ? `+${lv * 20}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 20}%` : undefined,
+          },
+          {
+            label: 'Reparación por línea de Cerezas',
+            currentValue: lv > 0 ? '+2% INT / línea' : 'Inactivo (0%)',
+            nextValue: lv === 0 ? '+2% INT / línea' : undefined,
+          },
+        ],
+      };
+
+    case 'huerto_citrico':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 15}% valor base Limón/Naranja`,
+          `+${effectiveLv * 12}% frecuencia Limón/Naranja`,
+        ],
+        detailedLines: [
+          {
+            label: 'Valor Base Limón y Naranja',
+            currentValue: lv > 0 ? `+${lv * 15}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 15}%` : undefined,
+          },
+          {
+            label: 'Frecuencia Limón/Naranja',
+            currentValue: lv > 0 ? `+${lv * 12}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 12}%` : undefined,
+          },
+        ],
+      };
+
+    case 'campana_bronce':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 25}% valor base Campana/Herradura`,
+          `+${effectiveLv * 12}% frecuencia Campana/Herradura`,
+        ],
+        detailedLines: [
+          {
+            label: 'Valor Base Campana y Herradura',
+            currentValue: lv > 0 ? `+${lv * 25}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 25}%` : undefined,
+          },
+          {
+            label: 'Frecuencia Campana/Herradura',
+            currentValue: lv > 0 ? `+${lv * 12}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 12}%` : undefined,
+          },
+        ],
+      };
+
+    case 'iman_diamante':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 18}% frecuencia Diamante/Estrella`,
+          `+${effectiveLv * 3}% coste de tirada`,
+        ],
+        detailedLines: [
+          {
+            label: 'Frecuencia Diamante y Estrella',
+            currentValue: lv > 0 ? `+${lv * 18}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 18}%` : undefined,
+          },
+          {
+            label: 'Sobrecoste de tirada',
+            currentValue: lv > 0 ? `+${lv * 3}%` : '0%',
+            nextValue: !isMax ? `+${nextLv * 3}%` : undefined,
+          },
+        ],
+      };
+
+    case 'geometra':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 18}% pago Vertical/Diagonal/Figuras`,
+          `Multiplicador extra ×${(1 + effectiveLv * 0.18).toFixed(2)}`,
+        ],
+        detailedLines: [
+          {
+            label: 'Bono Vertical, Diagonal, X y Triángulos',
+            currentValue: lv > 0 ? `+${lv * 18}% (×${(1 + lv * 0.18).toFixed(2)})` : 'Base (×1.00)',
+            nextValue: !isMax ? `+${nextLv * 18}% (×${(1 + nextLv * 0.18).toFixed(2)})` : undefined,
+          },
+        ],
+      };
+
+    case 'siete_dorado':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 25}% valor base Siete/Corona`,
+          `+${effectiveLv * 12}% bono prob. Jackpot`,
+        ],
+        detailedLines: [
+          {
+            label: 'Valor Base Siete (7) y Corona',
+            currentValue: lv > 0 ? `+${lv * 25}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 25}%` : undefined,
+          },
+          {
+            label: 'Bono Probabilidad Jackpot',
+            currentValue: lv > 0 ? `+${lv * 12}%` : 'Base (0.10%)',
+            nextValue: !isMax ? `+${nextLv * 12}%` : undefined,
+          },
+        ],
+      };
+
+    case 'mano_tahur':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 30}% frecuencia Comodín`,
+          `+${effectiveLv * 15}% frecuencia Trébol`,
+        ],
+        detailedLines: [
+          {
+            label: 'Frecuencia Comodín (Wild)',
+            currentValue: lv > 0 ? `+${lv * 30}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 30}%` : undefined,
+          },
+          {
+            label: 'Frecuencia Trébol Protector',
+            currentValue: lv > 0 ? `+${lv * 15}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 15}%` : undefined,
+          },
+        ],
+      };
+
+    case 'mecanico_jefe':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 25}% frec. Llave · -${Math.min(60, effectiveLv * 6)}% coste rep.`,
+          `+${25 + effectiveLv * 5}% Integridad por reparación`,
+        ],
+        detailedLines: [
+          {
+            label: 'Frecuencia Llaves de Taller',
+            currentValue: lv > 0 ? `+${lv * 25}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 25}%` : undefined,
+          },
+          {
+            label: 'Integridad restaurada en Taller',
+            currentValue: `+${25 + lv * 5}% INT`,
+            nextValue: !isMax ? `+${25 + nextLv * 5}% INT` : undefined,
+          },
+          {
+            label: 'Descuento coste reparación',
+            currentValue: lv > 0 ? `-${Math.min(60, lv * 6)}%` : '0%',
+            nextValue: !isMax ? `-${Math.min(60, nextLv * 6)}%` : undefined,
+          },
+        ],
+      };
+
+    case 'cableado_ilegal':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${(0.25 + effectiveLv * 0.08).toFixed(2)}x Voltaje por Rayo`,
+          `+${effectiveLv * 30}% frec. Rayo (-1% INT/giro)`,
+        ],
+        detailedLines: [
+          {
+            label: 'Carga de Voltaje por Rayo',
+            currentValue: `+${(0.25 + lv * 0.08).toFixed(2)}x`,
+            nextValue: !isMax ? `+${(0.25 + nextLv * 0.08).toFixed(2)}x` : undefined,
+          },
+          {
+            label: 'Frecuencia Rayo Eléctrico',
+            currentValue: lv > 0 ? `+${lv * 30}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 30}%` : undefined,
+          },
+          {
+            label: 'Desgaste adicional chasis',
+            currentValue: lv > 0 ? '-1% INT / giro' : '0%',
+            nextValue: lv === 0 ? '-1% INT / giro' : undefined,
+          },
+        ],
+      };
+
+    case 'prensa_uvas':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 20}% valor base Uvas/Trébol`,
+          `${16 + effectiveLv * 6} CR base por Moneda (+${effectiveLv * 6} CR)`,
+        ],
+        detailedLines: [
+          {
+            label: 'Valor Base Uvas y Trébol',
+            currentValue: lv > 0 ? `+${lv * 20}%` : 'Base (0%)',
+            nextValue: !isMax ? `+${nextLv * 20}%` : undefined,
+          },
+          {
+            label: 'Bono base por Moneda Directa',
+            currentValue: `${16 + lv * 6} CR (+${lv * 6} CR)`,
+            nextValue: !isMax ? `${16 + nextLv * 6} CR (+${nextLv * 6} CR)` : undefined,
+          },
+        ],
+      };
+
+    case 'artificiero':
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `Desactiva ${Math.ceil(effectiveLv / 2)} Bomba(s) / giro auto.`,
+          `+${35 + effectiveLv * 10} CR de bono por bomba neutralizada`,
+        ],
+        detailedLines: [
+          {
+            label: 'Desactivación automática de Bombas',
+            currentValue: lv > 0 ? `${Math.ceil(lv / 2)} bomba(s) / giro` : '0 bombas / giro',
+            nextValue: !isMax ? `${Math.ceil(nextLv / 2)} bomba(s) / giro` : undefined,
+          },
+          {
+            label: 'Recompensa por neutralización',
+            currentValue: `+${35 + lv * 10} CR × apuesta`,
+            nextValue: !isMax ? `+${35 + nextLv * 10} CR × apuesta` : undefined,
+          },
+        ],
+      };
+
+    case 'motor_extra': {
+      const curDisc = Math.floor((lv + 1) / 2);
+      const nextDisc = Math.floor((nextLv + 1) / 2);
+      return {
+        upgradeId,
+        level: lv,
+        maxLevel: meta.maxLevel,
+        isMax,
+        compactLines: [
+          `+${effectiveLv * 8}% Integridad máxima del chasis`,
+          `-${Math.floor((effectiveLv + 1) / 2)} CR coste tirada Estándar`,
+        ],
+        detailedLines: [
+          {
+            label: 'Integridad Máxima del Chasis',
+            currentValue: lv > 0 ? `+${lv * 8}% (${100 + lv * 8}% máx)` : '100% Base',
+            nextValue: !isMax ? `+${nextLv * 8}% (${100 + nextLv * 8}% máx)` : undefined,
+          },
+          {
+            label: 'Reducción coste tirada (×1 / ×2 / ×3)',
+            currentValue: lv > 0 ? `-${curDisc} / -${curDisc * 2} / -${curDisc * 3} CR` : '0 CR',
+            nextValue: !isMax ? `-${nextDisc} / -${nextDisc * 2} / -${nextDisc * 3} CR` : undefined,
+          },
+        ],
+      };
+    }
+  }
+}
+
+export function computeSymbolUpgradeMultiplier(
+  symId: FortunariumSymbolId,
+  upgrades: Record<FortunariumUpgradeId, number>
+): number {
+  let m = 1.0;
+  if ((symId === 'cereza' || symId === 'ciruela') && (upgrades.cosecha_roja || 0) > 0) {
+    m += upgrades.cosecha_roja * 0.2;
+  }
+  if ((symId === 'limon' || symId === 'naranja') && (upgrades.huerto_citrico || 0) > 0) {
+    m += upgrades.huerto_citrico * 0.15;
+  }
+  if ((symId === 'campana' || symId === 'herradura') && (upgrades.campana_bronce || 0) > 0) {
+    m += upgrades.campana_bronce * 0.25;
+  }
+  if ((symId === 'siete' || symId === 'corona') && (upgrades.siete_dorado || 0) > 0) {
+    m += upgrades.siete_dorado * 0.25;
+  }
+  if ((symId === 'uvas' || symId === 'trebol') && (upgrades.prensa_uvas || 0) > 0) {
+    m += upgrades.prensa_uvas * 0.2;
+  }
+  return m;
+}
+
+export interface FortunariumLiveSymbolStat {
+  id: FortunariumSymbolId;
+  name: string;
+  category: 'normal' | 'special';
+  asset: string;
+  baseWeight: number;
+  effectiveWeight: number;
+  baseProbabilityPct: number;
+  liveProbabilityPct: number;
+  probabilityDeltaPct: number;
+  baseSymbolValue: number;
+  liveBaseSymbolValue: number;
+  basePayout3: number;
+  basePayout4: number;
+  basePayout5: number;
+  livePayout3: number;
+  livePayout4: number;
+  livePayout5: number;
+  upgradePayoutMult: number;
+  totalPayoutMult: number;
+  isValueBoosted: boolean;
+  isProbabilityModified: boolean;
+  activeUpgradeSources: string[];
+  specialLiveValueLabel?: string;
+}
+
+export function computeLiveSymbolStats(
+  upgrades: Record<FortunariumUpgradeId, number>,
+  betMode: FortunariumBetMode = 'normal',
+  currentVoltage = 1.0,
+  activeModifiers: FortunariumActiveModifier[] = []
+): FortunariumLiveSymbolStat[] {
+  const baseTotalWeight = ALL_FORTUNARIUM_SYMBOL_IDS.reduce(
+    (acc, id) => acc + FORTUNARIUM_SYMBOLS[id].weight,
+    0
+  );
+
+  const effectiveWeights = computeEffectiveSymbolWeights(upgrades, betMode).map((item) => ({
+    ...item,
+  }));
+
+  const hasFiebreCerezas = activeModifiers.some((m) => m.modifierId === 'fiebre_cerezas');
+  const hasLluviaMonedas = activeModifiers.some((m) => m.modifierId === 'lluvia_monedas');
+  const hasSobrecargaDorada = activeModifiers.some((m) => m.modifierId === 'sobrecarga_dorada');
+  const hasImanRoto = activeModifiers.some((m) => m.modifierId === 'iman_roto');
+  const hasMalaRacha = activeModifiers.some((m) => m.modifierId === 'mala_racha');
+  const hasRodillosOxidados = activeModifiers.some((m) => m.modifierId === 'rodillos_oxidados');
+  const hasManoAfortunada = activeModifiers.some((m) => m.modifierId === 'mano_afortunada');
+
+  for (const w of effectiveWeights) {
+    if (hasFiebreCerezas && w.id === 'cereza') {
+      w.weight *= 1.85;
+    }
+    if (hasLluviaMonedas && w.id === 'moneda') {
+      w.weight *= 2.8;
+    }
+  }
+
+  const effectiveTotalWeight = effectiveWeights.reduce((acc, item) => acc + item.weight, 0);
+  const betMult = FORTUNARIUM_BET_MODES[betMode].payoutMultiplier;
+
+  return ALL_FORTUNARIUM_SYMBOL_IDS.map((id) => {
+    const meta = FORTUNARIUM_SYMBOLS[id];
+    const effEntry = effectiveWeights.find((w) => w.id === id);
+    const effWeight = effEntry ? effEntry.weight : meta.weight;
+
+    const baseProbabilityPct = Number(((meta.weight / baseTotalWeight) * 100).toFixed(2));
+    const liveProbabilityPct = Number(((effWeight / effectiveTotalWeight) * 100).toFixed(2));
+    const probabilityDeltaPct = Number((liveProbabilityPct - baseProbabilityPct).toFixed(2));
+
+    const upgradePayoutMult = computeSymbolUpgradeMultiplier(id, upgrades);
+    let modMult = 1.0;
+    if (hasSobrecargaDorada) modMult *= 1.5;
+    if (hasFiebreCerezas && id === 'cereza') modMult *= 2.0;
+    if (hasImanRoto && (id === 'diamante' || id === 'estrella')) modMult *= 0.65;
+    if (hasMalaRacha) modMult *= 0.7;
+    if (hasRodillosOxidados) modMult *= 0.85;
+    if (hasManoAfortunada) modMult *= 1.25;
+
+    const totalPayoutMult = betMult * currentVoltage * upgradePayoutMult * modMult;
+
+    const liveBaseSymbolValue = Math.max(0, Math.round(meta.baseSymbolValue * totalPayoutMult));
+    const livePayout3 = Math.max(0, Math.round(meta.baseSymbolValue * 1.0 * totalPayoutMult));
+    const livePayout4 = Math.max(0, Math.round(meta.baseSymbolValue * 3.0 * totalPayoutMult));
+    const livePayout5 = Math.max(0, Math.round(meta.baseSymbolValue * 8.0 * totalPayoutMult));
+
+    const activeUpgradeSources: string[] = [];
+    if ((id === 'cereza' || id === 'ciruela') && (upgrades.cosecha_roja || 0) > 0) {
+      activeUpgradeSources.push(`Cosecha Roja Nv.${upgrades.cosecha_roja}`);
+    }
+    if ((id === 'limon' || id === 'naranja') && (upgrades.huerto_citrico || 0) > 0) {
+      activeUpgradeSources.push(`Huerto Cítrico Nv.${upgrades.huerto_citrico}`);
+    }
+    if ((id === 'campana' || id === 'herradura') && (upgrades.campana_bronce || 0) > 0) {
+      activeUpgradeSources.push(`Campana de Bronce Nv.${upgrades.campana_bronce}`);
+    }
+    if ((id === 'diamante' || id === 'estrella') && (upgrades.iman_diamante || 0) > 0) {
+      activeUpgradeSources.push(`Imán de Diamantes Nv.${upgrades.iman_diamante}`);
+    }
+    if ((id === 'siete' || id === 'corona') && (upgrades.siete_dorado || 0) > 0) {
+      activeUpgradeSources.push(`Siete Dorado Nv.${upgrades.siete_dorado}`);
+    }
+    if ((id === 'uvas' || id === 'trebol') && (upgrades.prensa_uvas || 0) > 0) {
+      activeUpgradeSources.push(`Reserva de la Viña Nv.${upgrades.prensa_uvas}`);
+    }
+    if ((id === 'comodin' || id === 'trebol') && (upgrades.mano_tahur || 0) > 0) {
+      activeUpgradeSources.push(`Mano del Tahúr Nv.${upgrades.mano_tahur}`);
+    }
+    if (id === 'llave' && (upgrades.mecanico_jefe || 0) > 0) {
+      activeUpgradeSources.push(`Mecánico Nv.${upgrades.mecanico_jefe}`);
+    }
+    if (id === 'rayo' && (upgrades.cableado_ilegal || 0) > 0) {
+      activeUpgradeSources.push(`Cableado Ilegal Nv.${upgrades.cableado_ilegal}`);
+    }
+    if (id === 'moneda' && (upgrades.prensa_uvas || 0) > 0) {
+      activeUpgradeSources.push(`Reserva de la Viña Nv.${upgrades.prensa_uvas}`);
+    }
+    if (id === 'bomba' && (upgrades.artificiero || 0) > 0) {
+      activeUpgradeSources.push(`Artificiero Nv.${upgrades.artificiero}`);
+    }
+
+    let specialLiveValueLabel: string | undefined;
+    if (id === 'moneda') {
+      const perCoin = Math.round(
+        (16 + (upgrades.prensa_uvas || 0) * 6) * betMult * currentVoltage
+      );
+      specialLiveValueLabel = `+${perCoin} CR directo`;
+    } else if (id === 'rayo') {
+      const perRayo = (0.25 + (upgrades.cableado_ilegal || 0) * 0.08).toFixed(2);
+      specialLiveValueLabel = `+${perRayo}x Voltaje`;
+    } else if (id === 'llave') {
+      specialLiveValueLabel = `+1 🔑 y +8% INT`;
+    } else if (id === 'comodin') {
+      specialLiveValueLabel = `Wild +25% línea (VB: ${liveBaseSymbolValue} CR)`;
+    } else if (id === 'bomba') {
+      specialLiveValueLabel =
+        (upgrades.artificiero || 0) > 0
+          ? `Artificiero (${Math.ceil((upgrades.artificiero || 0) / 2)}/giro)`
+          : `-14% INT / -CR`;
+    } else if (id === 'calavera') {
+      specialLiveValueLabel = `-6% INT / -20% CR`;
+    } else if (id === 'interrogacion') {
+      const mysCash = Math.round(20 * betMult * currentVoltage);
+      specialLiveValueLabel = `+${mysCash} CR + Evento`;
+    }
+
+    return {
+      id,
+      name: meta.name,
+      category: meta.category,
+      asset: meta.asset,
+      baseWeight: meta.weight,
+      effectiveWeight: Number(effWeight.toFixed(2)),
+      baseProbabilityPct,
+      liveProbabilityPct,
+      probabilityDeltaPct,
+      baseSymbolValue: meta.baseSymbolValue,
+      liveBaseSymbolValue,
+      basePayout3: meta.basePayout3,
+      basePayout4: meta.basePayout4,
+      basePayout5: meta.basePayout5,
+      livePayout3,
+      livePayout4,
+      livePayout5,
+      upgradePayoutMult: Number(upgradePayoutMult.toFixed(2)),
+      totalPayoutMult: Number(totalPayoutMult.toFixed(2)),
+      isValueBoosted: upgradePayoutMult > 1.001 || totalPayoutMult > 1.001,
+      isProbabilityModified: Math.abs(effWeight - meta.weight) > 0.01,
+      activeUpgradeSources,
+      specialLiveValueLabel,
+    };
+  });
+}
+

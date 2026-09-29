@@ -186,15 +186,15 @@ export const FortunariumGarageIntro: React.FC<FortunariumGarageIntroProps> = ({
         {/* Top Heavy Steel Overhead Beam */}
         <div className="w-full h-12 bg-gradient-to-b from-[#0a0f16] to-[#17202c] border-b-4 border-[#070b10] flex items-center justify-between px-6 shadow-lg shrink-0">
           <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-amber-300/85 font-bold">
+            <span className="w-3 h-3 rounded-full bg-[#FF2A6D] shadow-[0_0_8px_#FF2A6D] animate-pulse" />
+            <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-pink-200 font-bold">
               {quotaInfo
                 ? `TALLER FORTUNARIUM · COMPUERTA CUOTA ${quotaInfo.quotaNumber}`
                 : 'TALLER CLANDESTINO · COMPUERTA MANUAL'}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-slate-400 tabular-nums">
+            <span className="text-[10px] font-mono text-cyan-300/85 tabular-nums">
               APERTURA: {Math.round(progress * 100)}%
             </span>
           </div>
@@ -222,67 +222,69 @@ export const FortunariumGarageIntro: React.FC<FortunariumGarageIntroProps> = ({
 
           {quotaInfo ? (
             /* PART H: NEXT-QUOTA TAPED PAPER NOTE (Handwritten / Marker workshop style) */
-            <div className="relative max-w-lg w-full mx-auto p-6 sm:p-7 bg-[#fbf5e5] text-[#1c1917] rounded-sm shadow-[0_20px_60px_rgba(0,0,0,0.92)] border border-[#d6cda7] rotate-[-0.6deg] select-none my-auto">
+            <div className="relative max-w-lg w-full mx-auto p-6 sm:p-7 bg-[#fbf5e5] text-[#17120d] rounded-sm shadow-[0_24px_65px_rgba(0,0,0,0.94)] border-2 border-[#b8a27b] rotate-[-0.6deg] select-none my-auto">
               {/* Masking tape pieces on all 4 corners */}
-              <div className="absolute -top-3.5 -left-4 w-14 h-7 bg-[#fef08a]/70 border border-[#ca8a04]/40 rotate-[-22deg] shadow-sm pointer-events-none" />
-              <div className="absolute -top-3.5 -right-4 w-14 h-7 bg-[#fef08a]/70 border border-[#ca8a04]/40 rotate-[24deg] shadow-sm pointer-events-none" />
-              <div className="absolute -bottom-3.5 -left-4 w-14 h-7 bg-[#fef08a]/70 border border-[#ca8a04]/40 rotate-[18deg] shadow-sm pointer-events-none" />
-              <div className="absolute -bottom-3.5 -right-4 w-14 h-7 bg-[#fef08a]/70 border border-[#ca8a04]/40 rotate-[-20deg] shadow-sm pointer-events-none" />
+              <div className="absolute -top-3.5 -left-4 w-14 h-7 bg-[#fef08a]/80 border border-[#ca8a04]/50 rotate-[-22deg] shadow-sm pointer-events-none" />
+              <div className="absolute -top-3.5 -right-4 w-14 h-7 bg-[#fef08a]/80 border border-[#ca8a04]/50 rotate-[24deg] shadow-sm pointer-events-none" />
+              <div className="absolute -bottom-3.5 -left-4 w-14 h-7 bg-[#fef08a]/80 border border-[#ca8a04]/50 rotate-[18deg] shadow-sm pointer-events-none" />
+              <div className="absolute -bottom-3.5 -right-4 w-14 h-7 bg-[#fef08a]/80 border border-[#ca8a04]/50 rotate-[-20deg] shadow-sm pointer-events-none" />
 
-              <div className="flex items-center justify-between border-b-2 border-stone-800 pb-2 mb-3.5">
+              <div className="flex items-center justify-between border-b-2 border-[#261c12] pb-2.5 mb-3.5">
                 <div>
-                  <span className="font-mono text-[10px] sm:text-xs font-bold uppercase tracking-widest text-stone-600 block">
+                  <span className="font-mono text-[11px] sm:text-xs font-extrabold uppercase tracking-widest text-[#3b2c1d] block">
                     TALLER FORTUNARIUM · PARTE DE OBJETIVO
                   </span>
-                  <h2 className="font-fortunarium text-xl sm:text-2xl text-stone-900 tracking-wide mt-0.5">
+                  <h2 className="font-fortunarium text-2xl sm:text-3xl font-extrabold text-[#120d08] tracking-wide mt-0.5">
                     CUOTA {quotaInfo.quotaNumber}
                   </h2>
                 </div>
-                <span className="font-mono text-xs sm:text-sm font-black bg-stone-900 text-amber-300 px-3 py-1 rounded shadow">
+                <span className="font-mono text-xs sm:text-sm font-black bg-[#17120d] text-amber-300 px-3 py-1 rounded shadow">
                   NIVEL ACTIVO
                 </span>
               </div>
 
               <div className="space-y-2.5 text-xs sm:text-sm font-mono">
-                <div className="flex justify-between items-baseline bg-amber-500/15 p-2 rounded border border-amber-500/30">
-                  <span className="font-black text-stone-900">OBJETIVO DE CAJA:</span>
-                  <span className="font-black text-base sm:text-xl text-emerald-800 tabular-nums">
+                <div className="flex justify-between items-baseline bg-amber-500/20 p-2.5 rounded border-2 border-amber-700/45">
+                  <span className="font-extrabold text-[#120d08] text-xs sm:text-sm tracking-wide">
+                    OBJETIVO DE CAJA:
+                  </span>
+                  <span className="font-black text-lg sm:text-2xl text-[#064e3b] tabular-nums tracking-tight">
                     {quotaInfo.quotaTarget} CR
                   </span>
                 </div>
 
-                <div className="flex justify-between items-baseline px-1">
-                  <span className="text-stone-700">Caja común acumulada:</span>
-                  <span className="font-bold text-stone-950 tabular-nums">
+                <div className="flex justify-between items-baseline px-1 py-0.5">
+                  <span className="text-[#231910] font-bold">Caja común acumulada:</span>
+                  <span className="font-extrabold text-[#120d08] text-sm sm:text-[15px] tabular-nums">
                     {quotaInfo.currentCredits} CR (CONSERVADA)
                   </span>
                 </div>
 
-                <div className="flex justify-between items-baseline px-1">
-                  <span className="text-stone-700">Integridad del chasis:</span>
+                <div className="flex justify-between items-baseline px-1 py-0.5">
+                  <span className="text-[#231910] font-bold">Integridad del chasis:</span>
                   <span
-                    className={`font-bold tabular-nums ${
-                      quotaInfo.currentIntegrity <= 35 ? 'text-rose-700' : 'text-stone-950'
+                    className={`font-extrabold text-sm sm:text-[15px] tabular-nums ${
+                      quotaInfo.currentIntegrity <= 35 ? 'text-[#8c1515]' : 'text-[#120d08]'
                     }`}
                   >
                     {quotaInfo.currentIntegrity}% (LA MÁQUINA AGUANTA)
                   </span>
                 </div>
 
-                <div className="flex justify-between items-baseline px-1">
-                  <span className="text-stone-700">Coste de reparación en taller:</span>
-                  <span className="font-bold text-stone-950 tabular-nums">
+                <div className="flex justify-between items-baseline px-1 py-0.5">
+                  <span className="text-[#231910] font-bold">Coste de reparación:</span>
+                  <span className="font-extrabold text-[#120d08] text-sm sm:text-[15px] tabular-nums">
                     {quotaInfo.repairCost} CR
                   </span>
                 </div>
               </div>
 
-              <div className="mt-4 pt-3 border-t-2 border-dashed border-stone-400 text-xs italic text-stone-700 leading-snug">
+              <div className="mt-4 pt-3 border-t-2 border-dashed border-[#6e563b] text-[13px] sm:text-sm italic font-semibold text-[#231910] leading-snug">
                 "{quotaInfo.flavorQuote || 'Si escucháis golpes o chispas dentro, probablemente no sea nada. La manivela sigue respondiendo.'}"
               </div>
 
-              <div className="mt-4 flex flex-col items-center gap-1.5">
-                <div className="inline-flex items-center gap-1.5 text-xs font-mono font-black text-stone-900 uppercase tracking-wider">
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <div className="inline-flex items-center gap-1.5 text-xs font-mono font-extrabold text-[#120d08] uppercase tracking-wider">
                   <span className="animate-bounce">⬆</span>
                   <span>ARRASTRA HACIA ARRIBA PARA ACCEDER</span>
                   <span className="animate-bounce">⬆</span>
@@ -291,7 +293,7 @@ export const FortunariumGarageIntro: React.FC<FortunariumGarageIntroProps> = ({
                   type="button"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={triggerFullOpen}
-                  className="px-4 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-amber-300 font-fortunarium text-xs tracking-wider shadow cursor-pointer transition active:scale-95"
+                  className="px-4 py-1.5 rounded-lg bg-[#17120d] hover:bg-[#2b2118] text-amber-300 font-fortunarium font-bold text-xs tracking-wider shadow cursor-pointer transition active:scale-95 border border-amber-500/40"
                 >
                   ABRIR MANUALMENTE
                 </button>
@@ -299,21 +301,21 @@ export const FortunariumGarageIntro: React.FC<FortunariumGarageIntroProps> = ({
             </div>
           ) : (
             /* INITIAL RUN STENCILED PLATE */
-            <div className="relative px-8 py-6 rounded-2xl bg-[#111823]/92 border-2 border-amber-500/45 shadow-[0_20px_50px_rgba(0,0,0,0.85)] text-center max-w-lg">
-              <span className="absolute top-2.5 left-2.5 w-2.5 h-2.5 rounded-full bg-amber-600/70 border border-amber-300/50" />
-              <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 rounded-full bg-amber-600/70 border border-amber-300/50" />
-              <span className="absolute bottom-2.5 left-2.5 w-2.5 h-2.5 rounded-full bg-amber-600/70 border border-amber-300/50" />
-              <span className="absolute bottom-2.5 right-2.5 w-2.5 h-2.5 rounded-full bg-amber-600/70 border border-amber-300/50" />
+            <div className="relative px-8 py-6 rounded-2xl bg-[#09101b]/95 border-2 border-[#FF2A6D]/70 shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_28px_rgba(255,42,109,0.28)] text-center max-w-lg">
+              <span className="absolute top-2.5 left-2.5 w-2.5 h-2.5 rounded-full bg-[#FF2A6D]/80 border border-pink-200/60" />
+              <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 rounded-full bg-[#FF2A6D]/80 border border-pink-200/60" />
+              <span className="absolute bottom-2.5 left-2.5 w-2.5 h-2.5 rounded-full bg-[#FF2A6D]/80 border border-pink-200/60" />
+              <span className="absolute bottom-2.5 right-2.5 w-2.5 h-2.5 rounded-full bg-[#FF2A6D]/80 border border-pink-200/60" />
 
-              <div className="text-[11px] font-mono uppercase tracking-[0.3em] text-amber-400/85 mb-1">
+              <div className="text-[11px] font-mono uppercase tracking-[0.3em] text-cyan-300 mb-1">
                 CÁMARA MECÁNICA DE AZAR
               </div>
-              <h1 className="font-fortunarium text-4xl sm:text-6xl text-amber-300 tracking-wider drop-shadow-[0_4px_0_rgba(0,0,0,0.9)]">
+              <h1 className="font-fortunarium text-4xl sm:text-6xl text-[#FF2A6D] tracking-wider drop-shadow-[0_0_16px_rgba(255,42,109,0.55)]">
                 FORTUNARIUM
               </h1>
 
               <div className="mt-4 flex flex-col items-center gap-2">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/40 text-xs font-mono text-amber-200 uppercase tracking-wider">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#1a0812] border border-[#FF2A6D]/45 text-xs font-mono text-pink-100 uppercase tracking-wider">
                   <span className="animate-bounce">⬆</span>
                   <span>ARRASTRA EL TIRADOR HACIA ARRIBA (1:1)</span>
                   <span className="animate-bounce">⬆</span>
@@ -323,7 +325,7 @@ export const FortunariumGarageIntro: React.FC<FortunariumGarageIntroProps> = ({
                   type="button"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={triggerFullOpen}
-                  className="mt-1 px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-fortunarium text-sm tracking-wider shadow-md cursor-pointer transition active:scale-95"
+                  className="mt-1 px-4 py-1.5 rounded-lg bg-[#FF2A6D] hover:bg-[#ff4782] border border-pink-200 text-white font-fortunarium text-sm tracking-wider shadow-[0_0_18px_rgba(255,42,109,0.45)] cursor-pointer transition active:scale-95"
                 >
                   LEVANTAR COMPUERTA MANUALMENTE
                 </button>

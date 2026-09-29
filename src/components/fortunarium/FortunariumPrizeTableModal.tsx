@@ -1,351 +1,624 @@
-import React, { useState } from 'react';
-import { X, Trophy, Sparkles, Grid } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, Trophy, Sparkles, Shapes, Percent, TrendingUp } from 'lucide-react';
 import {
   FORTUNARIUM_SYMBOLS,
-  NORMAL_SYMBOLS_BY_VALUE_DESC,
-  SPECIAL_SYMBOL_IDS,
-  FORTUNARIUM_PATTERNS_CATALOG,
+  FORTUNARIUM_BET_MODES,
+  createInitialUpgradesState,
+  computeLiveSymbolStats,
+  computeEffectiveJackpotChance,
 } from '../../data/fortunarium/fortunariumAssets';
+import {
+  FortunariumUpgradeId,
+  FortunariumBetMode,
+  FortunariumActiveModifier,
+} from '../../types/fortunarium';
 import { fortunariumAudio } from '../../utils/fortunariumAudio';
 
 interface FortunariumPrizeTableModalProps {
-  isOpen: boolean;
+  isOpen?: boolean;
   onClose: () => void;
+  upgrades?: Record<FortunariumUpgradeId, number>;
+  betMode?: FortunariumBetMode;
   currentVoltage?: number;
+  activeModifiers?: FortunariumActiveModifier[];
 }
 
+const PATTERN_GEOMETRIES: {
+  id: string;
+  name: string;
+  baseMult: number;
+  isJackpotPattern?: boolean;
+  rule: string;
+  mask: number[][];
+}[] = [
+  {
+    id: 'horizontal',
+    name: 'HORIZONTAL (3, 4 o 5)',
+    baseMult: 1.0,
+    rule: '3, 4 o 5 símbolos iguales contiguos en la misma fila horizontal (p. ej. cols 0-1-2, 1-2-3 o 2-3-4). Solo puntúa la racha máxima de esa fila.',
+    mask: [
+      [0, 0, 0, 0, 0],
+      [1, 1, 1, 1, 1],
+      [0, 0, 0, 0, 0],
+    ],
+  },
+  {
+    id: 'vertical',
+    name: 'VERTICAL (×3)',
+    baseMult: 1.15,
+    rule: 'Los 3 símbolos de una misma columna vertical iguales (cualquiera de las 5 columnas).',
+    mask: [
+      [0, 0, 1, 0, 0],
+      [0, 0, 1, 0, 0],
+      [0, 0, 1, 0, 0],
+    ],
+  },
+  {
+    id: 'diagonal',
+    name: 'DIAGONAL (×3)',
+    baseMult: 1.3,
+    rule: '3 símbolos iguales en diagonal continua de 3 filas (↘ o ↙) comenzando en col. 1, 2 o 3.',
+    mask: [
+      [1, 0, 0, 0, 0],
+      [0, 1, 0, 0, 0],
+      [0, 0, 1, 0, 0],
+    ],
+  },
+  {
+    id: 'pat_x',
+    name: 'PATRÓN X (5 CASILLAS)',
+    baseMult: 3.5,
+    rule: 'Las 4 esquinas exteriores más el centro exacto del tablero con el mismo símbolo.',
+    mask: [
+      [1, 0, 0, 0, 1],
+      [0, 0, 1, 0, 0],
+      [1, 0, 0, 0, 1],
+    ],
+  },
+  {
+    id: 'triangulo',
+    name: 'TRIÁNGULO ▲ (8 CASILLAS)',
+    baseMult: 8.0,
+    rule: 'Cúspide central superior, 2 apoyos medios y las 5 casillas de la base inferior iguales.',
+    mask: [
+      [0, 0, 1, 0, 0],
+      [0, 1, 0, 1, 0],
+      [1, 1, 1, 1, 1],
+    ],
+  },
+  {
+    id: 'triangulo_inv',
+    name: 'TRIÁNGULO INVERTIDO ▼ (8 CASILLAS)',
+    baseMult: 8.0,
+    rule: 'Las 5 casillas superiores, 2 apoyos medios y el vértice central inferior iguales.',
+    mask: [
+      [1, 1, 1, 1, 1],
+      [0, 1, 0, 1, 0],
+      [0, 0, 1, 0, 0],
+    ],
+  },
+  {
+    id: 'pantalla_completa',
+    name: 'PANTALLA COMPLETA / JACKPOT (15 CASILLAS)',
+    baseMult: 12.0,
+    isJackpotPattern: true,
+    rule: 'Las 15 casillas de la cuadrícula 3×5 muestran el mismo símbolo compatible (o con Comodín ⭐). Otorga el multiplicador máximo ×12.0 y activa el Gran Jackpot.',
+    mask: [
+      [1, 1, 1, 1, 1],
+      [1, 1, 1, 1, 1],
+      [1, 1, 1, 1, 1],
+    ],
+  },
+];
+
 export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProps> = ({
-  isOpen,
+  isOpen = true,
   onClose,
-  currentVoltage = 1,
+  upgrades,
+  betMode = 'normal' as FortunariumBetMode,
+  currentVoltage = 1.0,
+  activeModifiers = [],
 }) => {
-  const [activeTab, setActiveTab] = useState<'normales' | 'especiales' | 'patrones'>('normales');
+  const [showLiveMode, setShowLiveMode] = useState<boolean>(true);
+
+  const effectiveUpgrades = useMemo(
+    () => upgrades || createInitialUpgradesState(),
+    [upgrades]
+  );
+
+  const liveSymbolStats = useMemo(
+    () =>
+      computeLiveSymbolStats(
+        effectiveUpgrades,
+        betMode,
+        currentVoltage,
+        activeModifiers
+      ),
+    [effectiveUpgrades, betMode, currentVoltage, activeModifiers]
+  );
+
+  const normalStats = useMemo(
+    () => liveSymbolStats.filter((s) => s.category === 'normal'),
+    [liveSymbolStats]
+  );
+
+  const specialStats = useMemo(
+    () => liveSymbolStats.filter((s) => s.category === 'special'),
+    [liveSymbolStats]
+  );
+
+  const geometraLv = effectiveUpgrades.geometra || 0;
+  const geometraMult = 1 + geometraLv * 0.35;
+
+  const liveJackpotChancePct = useMemo(
+    () =>
+      Number(
+        (
+          computeEffectiveJackpotChance(effectiveUpgrades, betMode, activeModifiers) * 100
+        ).toFixed(2)
+      ),
+    [effectiveUpgrades, betMode, activeModifiers]
+  );
 
   if (!isOpen) return null;
 
-  const switchTab = (tab: 'normales' | 'especiales' | 'patrones') => {
-    fortunariumAudio.playButtonClick();
-    setActiveTab(tab);
-  };
-
   return (
     <div
-      className="fortunarium-root font-fortunarium fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      className="fortunarium-root font-fortunarium fixed inset-0 z-[80] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto select-none"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-4xl rounded-2xl bg-[#132a34] border-[3px] border-[#b98532] p-4 sm:p-6 shadow-[0_24px_60px_rgba(0,0,0,0.9),inset_0_2px_0_rgba(255,255,255,0.12)] flex flex-col gap-4 my-auto text-amber-50 max-h-[90dvh]"
+        className="fort-cyber-modal w-full max-w-5xl rounded-2xl p-4 sm:p-6 flex flex-col gap-5 my-auto max-h-[92dvh] overflow-hidden text-cyan-50"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-[#8c6b32] pb-3">
-          <div>
-            <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-[#f4d06f]">
-              PLACA TÉCNICA DE PAGOS · VOLTAJE ACTUAL x{currentVoltage.toFixed(2)}
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-fortunarium text-[#fff3d6] tracking-wide">
-              TABLA DE PREMIOS
-            </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#FF2A6D]/40 pb-3 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-[#1f0815] border-2 border-[#FF2A6D]/80 flex items-center justify-center text-[#FF2A6D] shadow-[0_0_18px_rgba(255,42,109,0.35)] shrink-0">
+              <Trophy className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-[#FF2A6D] font-bold block">
+                TABLA DE SÍMBOLOS, VALOR BASE Y PROBABILIDADES EN TIEMPO REAL
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-fortunarium text-white tracking-wide">
+                TABLA DE PREMIOS · FORTUNARIUM
+              </h2>
+            </div>
           </div>
 
-          {/* Category Tabs */}
           <div className="flex items-center gap-2">
-            <div className="flex p-1 rounded-lg bg-[#0a181f] border-2 border-[#6e5223]">
+            {/* Toggle between Live (with upgrades/bet/voltage) and Base values */}
+            <div className="inline-flex rounded-xl bg-[#050a14] border border-[#FF2A6D]/45 p-0.5">
               <button
                 type="button"
-                onClick={() => switchTab('normales')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  activeTab === 'normales'
-                    ? 'bg-[#d99b26] text-stone-950 shadow font-black border border-[#fef08a]'
-                    : 'text-[#d9e5e3] hover:text-white'
+                onClick={() => {
+                  fortunariumAudio.playButtonClick();
+                  setShowLiveMode(true);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-black uppercase tracking-wider cursor-pointer transition ${
+                  showLiveMode
+                    ? 'bg-[#FF2A6D] text-white shadow-[0_0_14px_rgba(255,42,109,0.45)]'
+                    : 'text-cyan-200/80 hover:text-white'
                 }`}
               >
-                <Trophy className="w-3.5 h-3.5" />
-                <span>NORMALES (12)</span>
+                ⚡ En Vivo ({FORTUNARIUM_BET_MODES[betMode].shortLabel} · {currentVoltage.toFixed(2)}x)
               </button>
               <button
                 type="button"
-                onClick={() => switchTab('especiales')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  activeTab === 'especiales'
-                    ? 'bg-[#d99b26] text-stone-950 shadow font-black border border-[#fef08a]'
-                    : 'text-[#d9e5e3] hover:text-white'
+                onClick={() => {
+                  fortunariumAudio.playButtonClick();
+                  setShowLiveMode(false);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-black uppercase tracking-wider cursor-pointer transition ${
+                  !showLiveMode
+                    ? 'bg-[#FF2A6D] text-white shadow-[0_0_14px_rgba(255,42,109,0.45)]'
+                    : 'text-cyan-200/80 hover:text-white'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>ESPECIALES (7)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => switchTab('patrones')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  activeTab === 'patrones'
-                    ? 'bg-[#d99b26] text-stone-950 shadow font-black border border-[#fef08a]'
-                    : 'text-[#d9e5e3] hover:text-white'
-                }`}
-              >
-                <Grid className="w-3.5 h-3.5" />
-                <span>PATRONES</span>
+                Base (×1.0)
               </button>
             </div>
 
             <button
               type="button"
-              onClick={onClose}
-              className="fort-arcade-btn p-2 rounded-lg bg-[#2b1a14] hover:bg-[#3d251d] border-2 border-[#b98532] text-[#f4d06f] cursor-pointer"
+              onClick={() => {
+                fortunariumAudio.playButtonClick();
+                onClose();
+              }}
+              className="fort-arcade-btn p-2 rounded-xl bg-[#1a0b14] hover:bg-[#2a1020] border border-[#FF2A6D]/65 text-[#FF2A6D] hover:text-white cursor-pointer"
+              title="Cerrar Tabla de Premios"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Content Body */}
-        <div className="overflow-y-auto pr-1 flex-1">
-          {/* TAB 1: NORMALES (ORDERED HIGHEST TO LOWEST VALUE) */}
-          {activeTab === 'normales' && (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between text-xs text-stone-400 px-1">
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto pr-1 space-y-6">
+          {/* ================================================================= */}
+          {/* 1. SYMBOLS / BASE VALUE / LINE PAYOUT / PERCENTAGE TABLE          */}
+          {/* ================================================================= */}
+          <section className="space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-[#FF2A6D]">
+                <Percent className="w-4 h-4" />
                 <span>
-                  Ordenados de <strong className="text-amber-300">MAYOR VALOR</strong> a{' '}
-                  <strong className="text-stone-300">MENOR VALOR</strong> (pagos base antes de multiplicadores).
-                </span>
-                <span className="hidden sm:inline font-mono text-amber-300/90">
-                  3× / 4× / 5× iguales en patrón
+                  1. Símbolos Normales — Símbolo · Valor Base · Pagos (×3 / ×4 / ×5) · Probabilidad (%)
                 </span>
               </div>
+              <span className="text-[11px] font-mono font-bold text-cyan-200/85">
+                {showLiveMode
+                  ? 'Mostrando valores base, pagos de línea y probabilidades con tus mejoras activas'
+                  : 'Mostrando valores base, pagos de línea y probabilidades de serie'}
+              </span>
+            </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {NORMAL_SYMBOLS_BY_VALUE_DESC.map((symId, index) => {
-                  const sym = FORTUNARIUM_SYMBOLS[symId];
-                  const isTopTier = index < 4;
+            {/* Structured CRT Table */}
+            <div className="fort-crt-display rounded-2xl border border-cyan-400/45 overflow-hidden">
+              <div className="grid grid-cols-12 gap-2 px-3.5 py-2.5 bg-[#0a1828]/90 border-b border-cyan-500/35 text-[11px] font-mono font-black uppercase tracking-wider text-cyan-300">
+                <div className="col-span-4">SÍMBOLO &amp; MEJORAS</div>
+                <div className="col-span-2 text-center">VALOR BASE</div>
+                <div className="col-span-4 text-center">
+                  PAGO DE LÍNEA (×3 / ×4 / ×5)
+                </div>
+                <div className="col-span-2 text-right">PROBABILIDAD %</div>
+              </div>
+
+              <div className="divide-y divide-cyan-500/20">
+                {normalStats.map((sym) => {
+                  const baseVal = showLiveMode
+                    ? sym.liveSymbolBaseValue
+                    : sym.baseSymbolValue;
+                  const p3 = showLiveMode ? sym.livePayout3 : sym.basePayout3;
+                  const p4 = showLiveMode ? sym.livePayout4 : sym.basePayout4;
+                  const p5 = showLiveMode ? sym.livePayout5 : sym.basePayout5;
+                  const probPct = showLiveMode
+                    ? sym.liveProbabilityPct
+                    : sym.baseProbabilityPct;
+                  const hasUpgradeBoost =
+                    showLiveMode &&
+                    (sym.liveSymbolBaseValue > sym.baseSymbolValue ||
+                      sym.upgradePayoutMult > 1.001);
+                  const hasTotalBoost = showLiveMode && sym.totalPayoutMult > 1.001;
+                  const isProbBoosted = showLiveMode && sym.isProbabilityModified;
+                  const probDelta = isProbBoosted ? sym.probabilityDeltaPct : 0;
+                  const formattedProb =
+                    probPct < 1 ? `${probPct.toFixed(2)}%` : `${probPct.toFixed(1)}%`;
 
                   return (
                     <div
                       key={sym.id}
-                      className={`p-3.5 rounded-xl border-2 flex flex-col justify-between gap-2.5 transition-all shadow-[inset_0_2px_0_rgba(255,255,255,0.1)] ${
-                        isTopTier
-                          ? 'bg-gradient-to-b from-[#2b2012] via-[#1c3842] to-[#132933] border-[#d99b26] shadow-lg'
-                          : 'bg-[#193640] border-[#8c6b32]'
+                      className={`grid grid-cols-12 gap-2 px-3.5 py-2.5 items-center transition-colors ${
+                        hasUpgradeBoost || isProbBoosted
+                          ? 'bg-[#0b1f33]/75'
+                          : 'hover:bg-[#091726]/60'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-14 h-14 rounded-xl bg-[#f4ead2] border-2 border-[#8c6b32] p-1.5 flex items-center justify-center shrink-0 shadow-inner">
+                      {/* Column 1: Symbol Icon + Name + Active Upgrade Tags */}
+                      <div className="col-span-4 flex items-center gap-2.5 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-[#07111d] border border-cyan-400/50 p-1 flex items-center justify-center shrink-0 shadow-inner">
                           <img
                             src={sym.asset}
                             alt={sym.name}
                             className="w-full h-full object-contain"
                           />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-base font-fortunarium text-[#fff3d6] tracking-wide truncate">
+                        <div className="min-w-0 flex flex-col">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-fortunarium text-sm sm:text-base text-white tracking-wide truncate">
                               {sym.name.toUpperCase()}
                             </span>
-                            <span className="text-[10px] font-mono font-bold text-[#c2d6d3]">
-                              #{index + 1}
-                            </span>
+                            {hasUpgradeBoost && (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/50 text-[9px] font-mono font-black text-emerald-300 tabular-nums">
+                                +{Math.round((sym.upgradePayoutMult - 1) * 100)}%
+                              </span>
+                            )}
                           </div>
+                          {showLiveMode && sym.activeUpgradeSources.length > 0 && (
+                            <span className="text-[10px] font-mono font-bold text-[#FF2A6D] truncate">
+                              🔧 {sym.activeUpgradeSources.join(' · ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Column 2: Canonical Base Symbol Value */}
+                      <div className="col-span-2 flex flex-col items-center justify-center font-mono tabular-nums">
+                        <span
+                          className={`px-2 py-0.5 rounded border text-xs sm:text-sm font-black ${
+                            showLiveMode && sym.liveSymbolBaseValue > sym.baseSymbolValue
+                              ? 'bg-emerald-950/80 border-emerald-400/65 text-emerald-300'
+                              : 'bg-[#050d17] border-amber-400/45 text-amber-300'
+                          }`}
+                        >
+                          {baseVal} CR
+                        </span>
+                        {showLiveMode && sym.liveSymbolBaseValue !== sym.baseSymbolValue && (
+                          <span className="text-[9.5px] text-cyan-300/75 mt-0.5">
+                            Serie: {sym.baseSymbolValue} CR
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Column 3: Line Payout (x3 / x4 / x5) */}
+                      <div className="col-span-4 flex flex-col items-center justify-center font-mono tabular-nums">
+                        <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-black flex-wrap justify-center">
                           <span
-                            className={`text-[10px] font-bold uppercase tracking-wider ${
-                              sym.tier >= 4
-                                ? 'text-[#f4d06f]'
-                                : sym.tier === 3
-                                ? 'text-sky-300'
-                                : sym.tier === 2
-                                ? 'text-[#7ae582]'
-                                : 'text-[#c2d6d3]'
+                            className={`px-2 py-0.5 rounded bg-[#040a12] border ${
+                              hasTotalBoost
+                                ? 'border-emerald-400/55 text-emerald-300'
+                                : 'border-cyan-500/40 text-cyan-100'
                             }`}
                           >
-                            {sym.tier >= 4
-                              ? 'Legendario'
-                              : sym.tier === 3
-                              ? 'Muy Valioso'
-                              : sym.tier === 2
-                              ? 'Intermedio'
-                              : 'Común'}
+                            <span className="text-[10px] text-cyan-400 mr-1">×3:</span>
+                            {p3}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded bg-[#040a12] border ${
+                              hasTotalBoost
+                                ? 'border-emerald-400/55 text-emerald-300'
+                                : 'border-cyan-500/40 text-amber-300'
+                            }`}
+                          >
+                            <span className="text-[10px] text-cyan-400 mr-1">×4:</span>
+                            {p4}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded bg-[#040a12] border ${
+                              hasTotalBoost
+                                ? 'border-amber-300 text-amber-300'
+                                : 'border-amber-400/60 text-emerald-300'
+                            }`}
+                          >
+                            <span className="text-[10px] text-cyan-400 mr-1">×5:</span>
+                            {p5} CR
                           </span>
                         </div>
+                        {hasTotalBoost && (
+                          <span className="text-[10px] text-cyan-300/70 mt-0.5">
+                            Base: {sym.basePayout3} / {sym.basePayout4} / {sym.basePayout5} CR
+                          </span>
+                        )}
                       </div>
 
-                      {/* 3x / 4x / 5x Payout Table */}
-                      <div className="p-2.5 rounded-lg bg-[#081318] border border-[#6e5223] grid grid-cols-3 gap-1 text-center font-mono">
-                        <div>
-                          <span className="text-[10px] text-[#9eb8b4] block">3×</span>
-                          <span className="text-xs sm:text-sm font-black text-amber-200 tabular-nums">
-                            {sym.basePayout3} CR
+                      {/* Column 4: Probability Percentage */}
+                      <div className="col-span-2 flex flex-col items-end justify-center font-mono tabular-nums">
+                        <div className="flex items-center gap-1.5">
+                          {isProbBoosted && Math.abs(probDelta) >= 0.01 && (
+                            <span
+                              className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                                probDelta > 0
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+                                  : 'bg-amber-500/15 text-amber-200 border border-amber-400/30'
+                              }`}
+                            >
+                              {probDelta > 0 ? `▲ +${probDelta}%` : `▼ ${probDelta}%`}
+                            </span>
+                          )}
+                          <span className="text-sm sm:text-base font-black text-white">
+                            {formattedProb}
                           </span>
                         </div>
-                        <div className="border-x border-[#3b525c]">
-                          <span className="text-[10px] text-[#9eb8b4] block">4×</span>
-                          <span className="text-xs sm:text-sm font-black text-amber-300 tabular-nums">
-                            {sym.basePayout4} CR
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-[#9eb8b4] block">5×</span>
-                          <span className="text-xs sm:text-sm font-black text-[#f4d06f] tabular-nums">
-                            {sym.basePayout5} CR
-                          </span>
+
+                        {/* Subtle visual probability bar */}
+                        <div className="w-18 sm:w-22 h-1.5 rounded-full bg-[#030810] border border-cyan-500/30 overflow-hidden mt-1">
+                          <div
+                            className={`h-full rounded-full ${
+                              isProbBoosted ? 'bg-emerald-400' : 'bg-[#FF2A6D]'
+                            }`}
+                            style={{ width: `${Math.min(100, Math.max(4, probPct * 5.0))}%` }}
+                          />
                         </div>
                       </div>
-
-                      {/* Only show specialProperty if relevant */}
-                      {sym.specialProperty && (
-                        <div className="px-2.5 py-1.5 rounded-md bg-[#2b1d0e] border border-[#b98532] text-[11px] font-medium text-[#f4d06f] leading-tight">
-                          {sym.specialProperty}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
-          )}
+          </section>
 
-          {/* TAB 2: ESPECIALES (SEPARATED & CLEARLY EXPLAINED) */}
-          {activeTab === 'especiales' && (
-            <div className="flex flex-col gap-3">
-              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200">
-                <strong>Importante:</strong> A diferencia de las frutas y joyas normales, los símbolos especiales (salvo el Comodín en línea){' '}
-                <strong className="text-white underline">
-                  se activan con UNA SOLA aparición
-                </strong>{' '}
-                en cualquier casilla de la ventana 3×5.
+          {/* ================================================================= */}
+          {/* 2. SPECIAL SYMBOLS TABLE (Símbolo · Efecto/Valor · Probabilidad)  */}
+          {/* ================================================================= */}
+          <section className="space-y-2.5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-[#FF2A6D]">
+                <Sparkles className="w-4 h-4" />
+                <span>
+                  2. Símbolos Especiales — Símbolo · Valor / Efecto · Probabilidad (%)
+                </span>
               </div>
+              <span className="fort-crt-display px-3 py-1 rounded-lg border border-amber-400/50 text-xs font-mono font-black text-amber-300 tabular-nums">
+                Prob. Jackpot Directo: {liveJackpotChancePct}%
+              </span>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {SPECIAL_SYMBOL_IDS.map((symId) => {
-                  const sym = FORTUNARIUM_SYMBOLS[symId];
-                  const isHazard = symId === 'bomba' || symId === 'calavera';
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {specialStats.map((sym) => {
+                const meta = FORTUNARIUM_SYMBOLS[sym.id];
+                const isHazard = sym.id === 'bomba' || sym.id === 'calavera';
+                const probPct = showLiveMode
+                  ? sym.liveProbabilityPct
+                  : sym.baseProbabilityPct;
+                const isProbBoosted = showLiveMode && sym.isProbabilityModified;
+                const probDelta = isProbBoosted ? sym.probabilityDeltaPct : 0;
+                const formattedProb =
+                  probPct < 1 ? `${probPct.toFixed(2)}%` : `${probPct.toFixed(1)}%`;
 
-                  return (
-                    <div
-                      key={sym.id}
-                      className={`p-4 rounded-2xl border flex items-start gap-3.5 ${
-                        isHazard
-                          ? 'bg-rose-950/25 border-rose-500/40'
-                          : 'bg-stone-900/90 border-amber-500/30'
-                      }`}
-                    >
-                      <div className="w-16 h-16 rounded-2xl bg-stone-950 border border-amber-500/30 p-2 flex items-center justify-center shrink-0 shadow-md">
+                return (
+                  <div
+                    key={sym.id}
+                    className={`p-3 rounded-2xl border flex flex-col justify-between gap-2 ${
+                      isHazard
+                        ? 'bg-[#240b12]/90 border-rose-500/65 shadow-[inset_0_0_16px_rgba(244,63,94,0.15)]'
+                        : 'fort-crt-panel border-cyan-500/40'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div
+                        className={`w-11 h-11 rounded-xl p-1.5 flex items-center justify-center shrink-0 border ${
+                          isHazard
+                            ? 'bg-[#140509] border-rose-500/50'
+                            : 'bg-[#050d17] border-cyan-400/45'
+                        }`}
+                      >
                         <img
                           src={sym.asset}
                           alt={sym.name}
                           className="w-full h-full object-contain"
                         />
                       </div>
-
-                      <div className="min-w-0 flex-1 flex flex-col gap-1">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-lg font-fortunarium text-white tracking-wide">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-fortunarium text-sm text-white tracking-wide truncate">
                             {sym.name.toUpperCase()}
                           </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                              isHazard
-                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                            }`}
-                          >
-                            {sym.activationRule || 'SE ACTIVA CON 1 APARICIÓN'}
+                          <span className="font-mono text-xs font-black text-amber-300 tabular-nums shrink-0">
+                            {formattedProb}
                           </span>
                         </div>
 
-                        <p className="text-xs text-stone-200 leading-relaxed">
-                          {sym.shortDesc}
-                        </p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                          {sym.specialLiveValueLabel && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-black ${
+                                isHazard
+                                  ? 'bg-rose-950 text-rose-200 border border-rose-400/50'
+                                  : 'bg-[#05141c] text-emerald-300 border border-emerald-400/40'
+                              }`}
+                            >
+                              {sym.specialLiveValueLabel}
+                            </span>
+                          )}
+                          {isProbBoosted && Math.abs(probDelta) >= 0.01 && (
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[9.5px] font-black tabular-nums">
+                              {probDelta > 0 ? `+${probDelta}%` : `${probDelta}%`}
+                            </span>
+                          )}
+                        </div>
 
-                        {sym.id === 'comodin' && (
-                          <div className="mt-1 text-[11px] font-mono text-amber-300 tabular-nums">
-                            Sustituye a cualquier símbolo normal en los 6 patrones oficiales (+25% bono por Comodín).
-                          </div>
+                        <p className="text-[11px] text-cyan-100/80 leading-snug mt-1 font-sans">
+                          {meta.shortDesc}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* ================================================================= */}
+          {/* 3. CANONICAL WINNING PATTERNS (Including Full-Grid Jackpot 15/15) */}
+          {/* ================================================================= */}
+          <section className="space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-[#FF2A6D]">
+                <Shapes className="w-4 h-4" />
+                <span>3. Geometría Canónica de Patrones Ganadores (Cuadrícula 3×5)</span>
+              </div>
+              {geometraLv > 0 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-emerald-500/20 border border-emerald-400/50 font-mono text-xs font-black text-emerald-300">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  El Geómetra Nv.{geometraLv}: +{geometraLv * 35}% en patrones no horizontales
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {PATTERN_GEOMETRIES.map((pat) => {
+                const liveMult =
+                  pat.id === 'horizontal'
+                    ? pat.baseMult
+                    : Number((pat.baseMult * (showLiveMode ? geometraMult : 1)).toFixed(2));
+                const isBoosted = showLiveMode && pat.id !== 'horizontal' && geometraLv > 0;
+
+                return (
+                  <div
+                    key={pat.id}
+                    className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2.5 ${
+                      pat.isJackpotPattern
+                        ? 'bg-gradient-to-br from-[#230918] via-[#130c1c] to-[#081624] border-[#FF2A6D] shadow-[0_0_24px_rgba(255,42,109,0.28)] sm:col-span-2 lg:col-span-3'
+                        : 'fort-crt-panel border-cyan-500/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-fortunarium text-sm sm:text-base text-white tracking-wide">
+                          {pat.name}
+                        </span>
+                        {pat.isJackpotPattern && (
+                          <span className="px-2 py-0.5 rounded bg-[#FF2A6D] text-white font-mono text-[10px] font-black uppercase tracking-wider shadow-[0_0_10px_rgba(255,42,109,0.5)]">
+                            🏆 GRAN JACKPOT 15/15
+                          </span>
                         )}
                       </div>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-lg font-mono text-xs font-black tabular-nums ${
+                          pat.isJackpotPattern
+                            ? 'bg-amber-400 text-slate-950'
+                            : isBoosted
+                            ? 'bg-emerald-950 border border-emerald-400 text-emerald-300'
+                            : 'bg-[#1a0914] border border-[#FF2A6D]/60 text-pink-200'
+                        }`}
+                      >
+                        ×{liveMult}
+                        {pat.isJackpotPattern ? ' + JACKPOT' : ''}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
-          {/* TAB 3: PATRONES (VISUAL MINIATURE 3x5 SLOT GRIDS) */}
-          {activeTab === 'patrones' && (
-            <div className="flex flex-col gap-3">
-              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-stone-200">
-                <strong className="text-amber-300">Regla Oficial de Patrones:</strong>{' '}
-                <strong className="text-white underline">
-                  Todas las casillas marcadas deben contener el mismo símbolo compatible
-                </strong>{' '}
-                (el Comodín puede sustituir a cualquier símbolo normal otorgando +25% de bono).
-                En líneas horizontales se paga la cadena máxima contigua (3, 4 o 5).
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {FORTUNARIUM_PATTERNS_CATALOG.map((pat) => {
-                  const cellSet = new Set(pat.cells.map((c) => `${c.col},${c.row}`));
-
-                  return (
                     <div
-                      key={pat.id}
-                      className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 flex flex-col justify-between gap-3"
+                      className={`flex ${
+                        pat.isJackpotPattern
+                          ? 'flex-col sm:flex-row items-center gap-4'
+                          : 'flex-col gap-2'
+                      }`}
                     >
-                      <div>
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <h3 className="text-base font-fortunarium text-amber-300 tracking-wide">
-                            {pat.name.toUpperCase()}
-                          </h3>
-                          <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-xs font-mono font-black text-amber-300 tabular-nums">
-                            x{pat.baseMultiplier}
-                          </span>
-                        </div>
-
-                        {/* Visual Miniature 3x5 Grid */}
-                        <div className="p-2 rounded-xl bg-stone-950 border border-stone-800 grid grid-cols-5 gap-1.5 mb-2.5">
-                          {[0, 1, 2, 3, 4].map((col) => (
-                            <div key={col} className="grid grid-rows-3 gap-1.5">
-                              {[0, 1, 2].map((row) => {
-                                const active = cellSet.has(`${col},${row}`);
-                                return (
-                                  <div
-                                    key={row}
-                                    className={`h-5 rounded flex items-center justify-center transition-all ${
-                                      active
-                                        ? 'bg-amber-400 border border-yellow-200 shadow-[0_0_8px_rgba(251,191,36,0.65)]'
-                                        : 'bg-stone-900 border border-stone-800/80'
-                                    }`}
-                                  >
-                                    {active && (
-                                      <span className="w-2 h-2 rounded-full bg-stone-950" />
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
-
-                        <p className="text-xs text-stone-200 leading-snug">
-                          {pat.geometryDesc}
-                        </p>
+                      {/* Visual 3x5 Grid Diagram */}
+                      <div className="grid grid-cols-5 gap-1 p-2 rounded-xl bg-[#040a12] border border-cyan-500/35 w-fit mx-auto shrink-0">
+                        {pat.mask.map((row, rIdx) =>
+                          row.map((cell, cIdx) => (
+                            <div
+                              key={`${rIdx}-${cIdx}`}
+                              className={`w-6 h-5 rounded ${
+                                cell === 1
+                                  ? pat.isJackpotPattern
+                                    ? 'bg-amber-400 border border-yellow-100 shadow-[0_0_8px_rgba(251,191,36,0.9)]'
+                                    : 'bg-[#FF2A6D] border border-pink-200 shadow-[0_0_8px_rgba(255,42,109,0.75)]'
+                                  : 'bg-[#0b1929]/55 border border-cyan-500/20'
+                              }`}
+                            />
+                          ))
+                        )}
                       </div>
 
-                      <div className="pt-2 border-t border-stone-800/80 flex flex-col gap-1 text-[11px]">
-                        <div className="text-amber-300 font-semibold">{pat.payoutDesc}</div>
-                        <div className="text-stone-400">
-                          Comodín:{' '}
-                          <strong className="text-stone-200">
-                            {pat.allowsWild
-                              ? 'Sí completa el patrón (+25% bono)'
-                              : 'No aplica en agrupación dispersa'}
-                          </strong>
-                        </div>
-                      </div>
+                      <p className="text-[11px] sm:text-xs text-cyan-100/85 leading-snug font-sans">
+                        {pat.rule}
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </section>
+        </div>
+
+        {/* Footer */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#FF2A6D]/35 shrink-0">
+          <span className="text-xs text-cyan-100/85 font-bold font-sans">
+            💡 El Comodín ⭐ sustituye cualquier símbolo normal y añade +25% al premio del patrón.
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              fortunariumAudio.playButtonClick();
+              onClose();
+            }}
+            className="fort-arcade-btn px-5 py-2 rounded-xl bg-[#FF2A6D] hover:bg-[#ff4782] border border-pink-200 text-white font-fortunarium text-sm tracking-wider shadow-[0_0_20px_rgba(255,42,109,0.4)] cursor-pointer"
+          >
+            VOLVER A LA MÁQUINA
+          </button>
         </div>
       </div>
     </div>

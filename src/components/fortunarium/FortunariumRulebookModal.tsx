@@ -72,7 +72,7 @@ const MiniPatternGrid: React.FC<{
 }> = ({ cells, symbolAsset = FORTUNARIUM_SYMBOL_ASSETS.cereza }) => {
   const activeSet = new Set(cells.map((c) => `${c.col},${c.row}`));
   return (
-    <div className="p-2 rounded-xl bg-stone-950 border border-amber-500/30 grid grid-cols-5 gap-1.5 w-full max-w-[230px]">
+    <div className="p-2 rounded-xl bg-[#040a12] border border-cyan-500/35 grid grid-cols-5 gap-1.5 w-full max-w-[230px]">
       {[0, 1, 2, 3, 4].map((col) => (
         <div key={col} className="grid grid-rows-3 gap-1.5">
           {[0, 1, 2].map((row) => {
@@ -82,8 +82,8 @@ const MiniPatternGrid: React.FC<{
                 key={row}
                 className={`h-7 rounded-md flex items-center justify-center p-0.5 ${
                   active
-                    ? 'bg-amber-400/25 border border-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.45)]'
-                    : 'bg-stone-900 border border-stone-800 opacity-40'
+                    ? 'bg-[#FF2A6D]/25 border border-[#FF2A6D] shadow-[0_0_8px_rgba(255,42,109,0.5)]'
+                    : 'bg-[#081320] border border-cyan-500/20 opacity-40'
                 }`}
               >
                 {active && (
@@ -132,24 +132,24 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
 
   return (
     <div
-      className="fortunarium-root font-fortunarium fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      className="fortunarium-root font-fortunarium fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto select-none"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-5xl rounded-2xl bg-[#132a34] border-[3px] border-[#b98532] shadow-[0_24px_60px_rgba(0,0,0,0.9),inset_0_2px_0_rgba(255,255,255,0.12)] flex flex-col max-h-[90dvh] my-auto text-amber-50 overflow-hidden"
+        className="fort-cyber-modal w-full max-w-5xl rounded-2xl flex flex-col max-h-[90dvh] my-auto text-cyan-50 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Book Header */}
-        <div className="px-4 sm:px-6 py-3.5 bg-gradient-to-r from-[#0e2028] via-[#193640] to-[#0e2028] border-b-2 border-[#8c6b32] flex items-center justify-between gap-3">
+        <div className="px-4 sm:px-6 py-3.5 bg-gradient-to-r from-[#130714] via-[#091322] to-[#081524] border-b border-[#FF2A6D]/45 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#2b1d0e] border-2 border-[#b98532] flex items-center justify-center text-[#f4d06f] shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[#1f0815] border border-[#FF2A6D]/75 flex items-center justify-center text-[#FF2A6D] shadow-[0_0_14px_rgba(255,42,109,0.3)] shrink-0">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#f4d06f] block">
-                MANUAL DE TALLER Y OPERACIÓN · EDICIÓN ELECTROMECÁNICA
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#FF2A6D] block">
+                MANUAL DE TALLER Y OPERACIÓN · EDICIÓN CYBER-MECÁNICA
               </span>
-              <h2 className="text-xl sm:text-2xl font-fortunarium text-[#fff3d6] tracking-wide">
+              <h2 className="text-xl sm:text-2xl font-fortunarium text-white tracking-wide">
                 MANUAL DEL FORTUNARIUM
               </h2>
             </div>
@@ -157,8 +157,11 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
 
           <button
             type="button"
-            onClick={onClose}
-            className="fort-arcade-btn p-2 rounded-lg bg-[#2b1a14] hover:bg-[#3d251d] border-2 border-[#b98532] text-[#f4d06f] cursor-pointer"
+            onClick={() => {
+              fortunariumAudio.playButtonClick();
+              onClose();
+            }}
+            className="fort-arcade-btn p-2 rounded-xl bg-[#1a0b14] hover:bg-[#2a1020] border border-[#FF2A6D]/65 text-[#FF2A6D] hover:text-white cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -167,7 +170,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
         {/* Body: Sidebar Chapters + Illustrated Page */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 min-h-0 overflow-hidden">
           {/* Left Index (3 cols on desktop, horizontal scroll on mobile) */}
-          <nav className="md:col-span-4 lg:col-span-3 bg-[#0d1d24] border-b md:border-b-0 md:border-r-2 border-[#8c6b32] p-2.5 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar">
+          <nav className="md:col-span-4 lg:col-span-3 bg-[#050b14] border-b md:border-b-0 md:border-r border-[#FF2A6D]/35 p-2.5 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar">
             {SECTIONS.map((sec) => {
               const Icon = sec.icon;
               const isSelected = sec.id === activeId;
@@ -176,17 +179,17 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                   key={sec.id}
                   type="button"
                   onClick={() => selectSection(sec.id)}
-                  className={`px-3 py-2 rounded-lg text-left flex items-center gap-2.5 shrink-0 transition-all cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-left flex items-center gap-2.5 shrink-0 transition-all cursor-pointer border ${
                     isSelected
-                      ? 'bg-[#d99b26] text-stone-950 font-black border border-[#fef08a] shadow-md'
-                      : 'text-[#d9e5e3] hover:bg-[#193640] hover:text-white font-semibold border border-transparent'
+                      ? 'bg-[#FF2A6D] text-white font-black border-pink-200 shadow-[0_0_16px_rgba(255,42,109,0.45)]'
+                      : 'text-cyan-100/80 hover:bg-[#0b1828] hover:text-white font-semibold border-transparent'
                   }`}
                 >
                   <span
                     className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
                       isSelected
-                        ? 'bg-stone-950/20 text-stone-950'
-                        : 'bg-[#081318] text-[#f4d06f] border border-[#6e5223]'
+                        ? 'bg-black/30 text-white'
+                        : 'bg-[#081320] text-[#FF2A6D] border border-[#FF2A6D]/40'
                     }`}
                   >
                     {sec.num}
@@ -201,29 +204,29 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
           </nav>
 
           {/* Right Page Content */}
-          <div className="md:col-span-8 lg:col-span-9 p-4 sm:p-6 overflow-y-auto flex flex-col justify-between gap-6">
+          <div className="md:col-span-8 lg:col-span-9 p-4 sm:p-6 overflow-y-auto flex flex-col justify-between gap-6 font-sans">
             <div className="flex flex-col gap-4">
-              <div className="border-b border-stone-800 pb-2.5 flex items-center justify-between">
-                <h3 className="text-2xl sm:text-3xl font-fortunarium text-amber-300 tracking-wide">
+              <div className="border-b border-[#FF2A6D]/35 pb-2.5 flex items-center justify-between">
+                <h3 className="text-2xl sm:text-3xl font-fortunarium text-[#FF2A6D] tracking-wide">
                   {currentSection.num}. {currentSection.label}
                 </h3>
-                <span className="text-xs font-mono text-stone-400">
-                  Página {currentIndex + 1} de {SECTIONS.length}
+                <span className="text-xs font-mono text-cyan-300/80">
+                  Capítulo {currentIndex + 1} de {SECTIONS.length}
                 </span>
               </div>
 
               {/* 1. OBJETIVO */}
               {activeId === 'objetivo' && (
                 <div className="flex flex-col gap-4">
-                  <div className="p-4 rounded-2xl bg-stone-900/90 border border-amber-500/30 flex flex-col sm:flex-row items-center gap-4">
+                  <div className="fort-crt-panel p-4 rounded-2xl border border-cyan-500/40 flex flex-col sm:flex-row items-center gap-4">
                     <img
                       src={FORTUNARIUM_MACHINE_ASSET}
                       alt="Fortunarium"
                       className="w-28 h-28 object-contain shrink-0"
                     />
-                    <div className="flex flex-col gap-2 text-xs sm:text-sm text-stone-200 leading-relaxed">
+                    <div className="flex flex-col gap-2 text-xs sm:text-sm text-cyan-50 leading-relaxed">
                       <p>
-                        En <strong className="text-amber-300">FORTUNARIUM</strong>, de 1 a 4 jugadores operáis{' '}
+                        En <strong className="text-[#FF2A6D]">FORTUNARIUM</strong>, de 1 a 4 jugadores operáis{' '}
                         <strong className="text-white">una única máquina tragaperras física compartida</strong> (en solitario o cooperativo).
                       </p>
                       <p>
@@ -233,27 +236,27 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/35">
+                    <div className="p-3.5 rounded-2xl bg-emerald-950/35 border border-emerald-400/45">
                       <div className="text-sm font-fortunarium text-emerald-300 mb-1">
                         CÓMO GANAR
                       </div>
-                      <p className="text-xs text-stone-300">
+                      <p className="text-xs text-cyan-100/85">
                         Alcanza o supera el umbral de <strong>Cuota</strong> en créditos y séllala para elegir 1 mejora gratis y pasar al siguiente umbral sin perder tu dinero.
                       </p>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-500/35">
+                    <div className="p-3.5 rounded-2xl bg-rose-950/35 border border-rose-500/45">
                       <div className="text-sm font-fortunarium text-rose-300 mb-1">
                         DERROTA: SIN CRÉDITOS
                       </div>
-                      <p className="text-xs text-stone-300">
+                      <p className="text-xs text-cyan-100/85">
                         Si al terminar una tirada la Caja Común queda a <strong>0 CR</strong> (o no podéis pagar la tirada mínima), la fortuna se termina.
                       </p>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-500/35">
+                    <div className="p-3.5 rounded-2xl bg-rose-950/35 border border-rose-500/45">
                       <div className="text-sm font-fortunarium text-rose-300 mb-1">
                         DERROTA POR EXPLOSIÓN
                       </div>
-                      <p className="text-xs text-stone-300">
+                      <p className="text-xs text-cyan-100/85">
                         Si la <strong>Integridad</strong> cae al <strong>0%</strong> por Bombas, Calaveras o Sobrecargas, la máquina revienta al instante.
                       </p>
                     </div>
@@ -264,40 +267,40 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {/* 2. LA MÁQUINA */}
               {activeId === 'maquina' && (
                 <div className="flex flex-col gap-4">
-                  <p className="text-xs sm:text-sm text-stone-200">
-                    Todos los botones y pantallas están integrados directamente sobre el mueble físico de la tragaperras:
+                  <p className="text-xs sm:text-sm text-cyan-100">
+                    Todos los botones y visores CRT están integrados directamente sobre el chasis electromecánico de la máquina:
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800">
-                      <strong className="text-amber-300 block mb-1">
-                        1. Ventana Central 3×5 (15 Casillas)
+                    <div className="fort-crt-panel p-3.5 rounded-2xl border border-cyan-500/35">
+                      <strong className="text-[#FF2A6D] block mb-1 uppercase">
+                        1. Ventana CRT Central 3×5 (15 Casillas)
                       </strong>
-                      <p className="text-stone-300">
+                      <p className="text-cyan-100/85">
                         5 columnas verticales con 3 filas visibles. Al girar, los rodillos caen de arriba abajo y se bloquean en orden de columna 1 a 5.
                       </p>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800">
-                      <strong className="text-amber-300 block mb-1">
+                    <div className="fort-crt-panel p-3.5 rounded-2xl border border-cyan-500/35">
+                      <strong className="text-[#FF2A6D] block mb-1 uppercase">
                         2. Botón Central «GIRAR» y Palanca Derecha
                       </strong>
-                      <p className="text-stone-300">
-                        Puedes iniciar la tirada pulsando el gran botón rojo <strong>GIRAR</strong> del frontal o tirando de la <strong>palanca lateral derecha</strong>.
+                      <p className="text-cyan-100/85">
+                        Puedes iniciar la tirada pulsando el gran botón <strong>GIRAR</strong> del frontal o arrastrando la <strong>palanca lateral derecha</strong>.
                       </p>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800">
-                      <strong className="text-amber-300 block mb-1">
-                        3. Botones «APUESTA MÍN», «APUESTA MÁX», «-» y «+»
+                    <div className="fort-crt-panel p-3.5 rounded-2xl border border-cyan-500/35">
+                      <strong className="text-cyan-300 block mb-1 uppercase">
+                        3. Selectores «AP. MÍN», «AP. MÁX», «-» y «+»
                       </strong>
-                      <p className="text-stone-300">
+                      <p className="text-cyan-100/85">
                         Regulan el modo de voltaje de la máquina entre Estándar (x1), Doble (x2) y Sobrecarga (x3).
                       </p>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800">
-                      <strong className="text-amber-300 block mb-1">
-                        4. Tres Visores Digitales Inferiores
+                    <div className="fort-crt-panel p-3.5 rounded-2xl border border-cyan-500/35">
+                      <strong className="text-amber-300 block mb-1 uppercase">
+                        4. Tres Indicadores CRT Animados
                       </strong>
-                      <p className="text-stone-300">
-                        Muestran el coste/apuesta actual, la ganancia una vez resuelta la tirada y el saldo común respecto a la cuota.
+                      <p className="text-cyan-100/85">
+                        Muestran en tiempo real el progreso de Cuota, el saldo de Créditos / Voltaje / Llaves y la barra de Integridad del chasis.
                       </p>
                     </div>
                   </div>
@@ -307,28 +310,31 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {/* 3. SÍMBOLOS */}
               {activeId === 'simbolos' && (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs sm:text-sm text-stone-200">
-                    Existen <strong className="text-amber-300">12 símbolos normales</strong> ordenados de mayor a menor valor. Pagan al alinear 3, 4 o 5 iguales en un patrón:
+                  <p className="text-xs sm:text-sm text-cyan-100">
+                    Existen <strong className="text-[#FF2A6D]">7 símbolos normales canónicos</strong> ordenados de mayor a menor Valor Base. Cada patrón multiplica el <strong className="text-amber-300">Valor Base</strong> del símbolo:
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                     {NORMAL_SYMBOLS_BY_VALUE_DESC.map((id) => {
                       const s = FORTUNARIUM_SYMBOLS[id];
                       return (
                         <div
                           key={id}
-                          className="p-2.5 rounded-xl bg-stone-900 border border-stone-800 flex items-center gap-2.5"
+                          className="fort-crt-panel p-3 rounded-xl border border-cyan-500/35 flex items-center gap-3"
                         >
                           <img
                             src={s.asset}
                             alt={s.name}
-                            className="w-10 h-10 object-contain shrink-0"
+                            className="w-11 h-11 object-contain shrink-0"
                           />
                           <div className="min-w-0">
-                            <div className="text-xs font-black text-white truncate">
-                              {s.name}
+                            <div className="text-sm font-fortunarium text-white tracking-wide truncate">
+                              {s.name.toUpperCase()}
+                            </div>
+                            <div className="text-[11px] font-mono font-bold text-[#FF2A6D] tabular-nums">
+                              Valor Base: {s.baseMultiplier} CR
                             </div>
                             <div className="text-[10px] font-mono text-amber-300 tabular-nums">
-                              3×{s.basePayout3} CR · 5×{s.basePayout5} CR
+                              ×3: {s.basePayout3} · ×4: {s.basePayout4} · ×5: {s.basePayout5} CR
                             </div>
                           </div>
                         </div>
@@ -341,30 +347,30 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {/* 4. PATRONES */}
               {activeId === 'patrones' && (
                 <div className="flex flex-col gap-3">
-                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-xs sm:text-sm text-amber-100">
-                    <strong>Regla fundamental:</strong>{' '}
+                  <div className="p-3 rounded-2xl bg-[#1f0815]/80 border border-[#FF2A6D]/50 text-xs sm:text-sm text-pink-100">
+                    <strong className="text-[#FF2A6D]">Regla fundamental:</strong>{' '}
                     <span className="underline font-bold text-white">
                       Todas las casillas marcadas deben contener el mismo símbolo compatible
                     </span>{' '}
-                    (3, 4 o 5 en Horizontal; 3 en Vertical; 3 en Diagonal; las 5 casillas de las columnas 2, 3 y 4 en <strong>Patrón X</strong>; o las 8 casillas completas en Triángulo y Triángulo Invertido).
+                    (3, 4 o 5 en Horizontal; 3 en Vertical; 3 en Diagonal; las 5 casillas de esquina y centro en <strong>Patrón X</strong>; las 8 casillas en Triángulo y Triángulo Invertido; o las 15 casillas en <strong>Pantalla Completa / Jackpot</strong>).
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {FORTUNARIUM_PATTERNS_CATALOG.map((pat) => (
                       <div
                         key={pat.id}
-                        className="p-3 rounded-2xl bg-stone-900 border border-stone-800 flex flex-col gap-2"
+                        className="fort-crt-panel p-3.5 rounded-2xl border border-cyan-500/35 flex flex-col gap-2"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-fortunarium text-amber-300">
+                          <div className="text-sm font-fortunarium text-white tracking-wide">
                             {pat.name.toUpperCase()}
                           </div>
-                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-[10px] font-mono font-black text-amber-300 tabular-nums">
+                          <span className="px-2 py-0.5 rounded bg-[#FF2A6D]/20 border border-[#FF2A6D]/55 text-[10px] font-mono font-black text-pink-200 tabular-nums">
                             ×{pat.baseMultiplier}
                           </span>
                         </div>
                         <MiniPatternGrid cells={pat.cells} />
-                        <p className="text-xs text-stone-300">{pat.geometryDesc}</p>
-                        <span className="text-[11px] font-mono text-emerald-300">
+                        <p className="text-xs text-cyan-100/85">{pat.geometryDesc}</p>
+                        <span className="text-[11px] font-mono text-emerald-300 font-bold">
                           {pat.payoutDesc}
                         </span>
                       </div>
@@ -376,16 +382,21 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {/* 5. SÍMBOLOS ESPECIALES */}
               {activeId === 'especiales' && (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs sm:text-sm text-stone-200">
-                    Los <strong className="text-amber-300">7 símbolos especiales</strong> (excepto el Comodín) producen su efecto con <strong className="text-white">una sola aparición</strong> en cualquier lugar de la ventana:
+                  <p className="text-xs sm:text-sm text-cyan-100">
+                    Los <strong className="text-[#FF2A6D]">{SPECIAL_SYMBOL_IDS.length} símbolos especiales</strong> (excepto el Comodín) producen su efecto con <strong className="text-white">una sola aparición</strong> en cualquier lugar de la ventana:
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {SPECIAL_SYMBOL_IDS.map((id) => {
                       const s = FORTUNARIUM_SYMBOLS[id];
+                      const isHazard = id === 'bomba' || id === 'calavera';
                       return (
                         <div
                           key={id}
-                          className="p-3 rounded-2xl bg-stone-900 border border-stone-800 flex items-start gap-3"
+                          className={`p-3 rounded-2xl border flex items-start gap-3 ${
+                            isHazard
+                              ? 'bg-[#240b12]/85 border-rose-500/55'
+                              : 'fort-crt-panel border-cyan-500/35'
+                          }`}
                         >
                           <img
                             src={s.asset}
@@ -393,10 +404,14 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                             className="w-12 h-12 object-contain shrink-0"
                           />
                           <div>
-                            <div className="text-sm font-fortunarium text-amber-300">
+                            <div
+                              className={`text-sm font-fortunarium tracking-wide ${
+                                isHazard ? 'text-rose-300' : 'text-amber-300'
+                              }`}
+                            >
                               {s.name.toUpperCase()}
                             </div>
-                            <p className="text-xs text-stone-300 leading-snug">
+                            <p className="text-xs text-cyan-100/85 leading-snug">
                               {s.shortDesc}
                             </p>
                           </div>
@@ -409,8 +424,8 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
 
               {/* 6. CUOTAS */}
               {activeId === 'cuotas' && (
-                <div className="flex flex-col gap-3 text-xs sm:text-sm text-stone-200 leading-relaxed">
-                  <div className="p-4 rounded-2xl bg-stone-900 border border-amber-500/30 flex items-center gap-4">
+                <div className="flex flex-col gap-3 text-xs sm:text-sm text-cyan-100 leading-relaxed">
+                  <div className="fort-crt-panel p-4 rounded-2xl border border-amber-400/45 flex items-center gap-4">
                     <img
                       src={FORTUNARIUM_SYMBOL_ASSETS.moneda}
                       alt="Cuota"
@@ -420,25 +435,25 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                       <h4 className="text-base font-fortunarium text-amber-300">
                         LAS CUOTAS SON UMBRALES DE DINERO (NUNCA SE RESETEAN)
                       </h4>
-                      <p className="text-stone-300 mt-1">
+                      <p className="text-cyan-100/85 mt-1">
                         Cada cuota es un umbral de créditos (por ejemplo, <strong>220 CR</strong> en la Cuota 1). Al sellar una cuota, <strong>conserváis el 100% de vuestro dinero</strong> y el siguiente umbral aproximadamente se duplica respecto al objetivo anterior.
                       </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800">
+                    <div className="fort-crt-panel p-3.5 rounded-2xl border border-emerald-400/40">
                       <strong className="text-emerald-300 block mb-1">
                         Sellar Ahora o Seguir Arriesgando
                       </strong>
-                      <p className="text-xs text-stone-300">
+                      <p className="text-xs text-cyan-100/85">
                         Al alcanzar la cuota podéis pulsar <strong>«SELLAR CUOTA»</strong> para asegurar vuestro avance y elegir 1 de 3 mejoras gratuitas, o seguir girando para acumular más margen (la siguiente cuota se calcula sobre el objetivo anterior, ¡no os penaliza por superar el umbral!).
                       </p>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800">
+                    <div className="fort-crt-panel p-3.5 rounded-2xl border border-rose-500/45">
                       <strong className="text-rose-300 block mb-1">
                         Bancarrota (Sin Créditos) y Modo Ilimitado
                       </strong>
-                      <p className="text-xs text-stone-300">
+                      <p className="text-xs text-cyan-100/85">
                         Si al terminar una tirada os quedáis a <strong>0 CR</strong> (o sin créditos suficientes para pagar la tirada mínima), la partida termina por bancarrota. En modo <strong>CUOTAS ILIMITADAS</strong> la partida continúa indefinidamente hasta caer en bancarrota o romper la máquina.
                       </p>
                     </div>
@@ -448,8 +463,8 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
 
               {/* 7. INTEGRIDAD */}
               {activeId === 'integridad' && (
-                <div className="flex flex-col gap-3 text-xs sm:text-sm text-stone-200">
-                  <div className="p-4 rounded-2xl bg-stone-900 border border-emerald-500/30 flex items-center gap-4">
+                <div className="flex flex-col gap-3 text-xs sm:text-sm text-cyan-100">
+                  <div className="fort-crt-panel p-4 rounded-2xl border border-emerald-400/45 flex items-center gap-4">
                     <img
                       src={FORTUNARIUM_SYMBOL_ASSETS.llave}
                       alt="Integridad"
@@ -457,32 +472,32 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                     />
                     <div>
                       <h4 className="text-base font-fortunarium text-emerald-300">
-                        SALUD MECÁNICA DEL CHASIS (0% – 100%+)
+                        SALUD MECÁNICA DEL CHASIS (0% – 300%)
                       </h4>
-                      <p className="text-stone-300 mt-1">
-                        La Integridad representa la resistencia física de la máquina. Si cae al <strong>0%</strong>, la máquina explota y el grupo pierde la partida en el acto.
+                      <p className="text-cyan-100/85 mt-1">
+                        La Integridad representa la resistencia física de la máquina. Si cae al <strong>0%</strong>, la máquina explota y el grupo pierde la partida en el acto. El coste de reparación en créditos escala con cada cuota y con cada reparación realizada dentro de la misma cuota.
                       </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-500/35">
+                    <div className="p-3.5 rounded-2xl bg-rose-950/35 border border-rose-500/45">
                       <strong className="text-rose-300 block mb-1">
                         ¿Qué daña la Integridad?
                       </strong>
-                      <ul className="list-disc list-inside text-stone-300 space-y-1">
-                        <li>Cada <strong>Bomba</strong> sin desactivar (-14%).</li>
-                        <li>Cada <strong>Calavera</strong> sin Trébol (-7%).</li>
+                      <ul className="list-disc list-inside text-cyan-100/85 space-y-1">
+                        <li>Cada <strong>Bomba</strong> sin desactivar (-16% INT y -26 CR).</li>
+                        <li>Cada <strong>Calavera</strong> sin Trébol (-8% INT y -20% premio).</li>
                         <li>Tirar en modo <strong>Doble x2</strong> (-3%) o <strong>Sobrecarga x3</strong> (-7%).</li>
                       </ul>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/35">
+                    <div className="p-3.5 rounded-2xl bg-emerald-950/35 border border-emerald-500/45">
                       <strong className="text-emerald-300 block mb-1">
                         ¿Cómo se repara?
                       </strong>
-                      <ul className="list-disc list-inside text-stone-300 space-y-1">
-                        <li>Símbolo <strong>Llave</strong> en los rodillos (+8% automático).</li>
-                        <li>Línea ganadora de <strong>Herraduras</strong> (+4%).</li>
-                        <li>Botón <strong>Reparar (+25%)</strong> usando dinero o 1 Llave.</li>
+                      <ul className="list-disc list-inside text-cyan-100/85 space-y-1">
+                        <li>Símbolo <strong>Llave</strong> en los rodillos (+6% automático y +1 🔑).</li>
+                        <li>Patrón ganador de <strong>Herraduras</strong> (+5% INT por patrón).</li>
+                        <li>Botón <strong>Reparar (+25% base)</strong> usando créditos o 1 Llave.</li>
                       </ul>
                     </div>
                   </div>
@@ -492,8 +507,8 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {/* 8. VOLTAJE / APUESTAS */}
               {activeId === 'voltaje' && (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs sm:text-sm text-stone-200">
-                    El premio de cualquier patrón se multiplica por el <strong className="text-sky-300">Voltaje de la Máquina</strong> y por el <strong className="text-amber-300">Modo de Apuesta</strong> elegido:
+                  <p className="text-xs sm:text-sm text-cyan-100">
+                    El premio de cualquier patrón se multiplica por el <strong className="text-cyan-300">Voltaje de la Máquina</strong> y por el <strong className="text-[#FF2A6D]">Modo de Apuesta</strong> elegido:
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {(['normal', 'doble', 'sobrecarga'] as const).map((m) => {
@@ -501,9 +516,9 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                       return (
                         <div
                           key={m}
-                          className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800 flex flex-col gap-1.5"
+                          className="fort-crt-panel p-3.5 rounded-2xl border border-cyan-500/35 flex flex-col gap-1.5"
                         >
-                          <div className="text-base font-fortunarium text-amber-300">
+                          <div className="text-base font-fortunarium text-[#FF2A6D]">
                             {cfg.shortLabel}
                           </div>
                           <div className="text-xs font-mono text-white">
@@ -512,7 +527,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                           <div className="text-[11px] text-rose-300 font-semibold">
                             Desgaste por tirada: -{cfg.integrityWear}% Integridad
                           </div>
-                          <p className="text-xs text-stone-300 mt-1">{cfg.description}</p>
+                          <p className="text-xs text-cyan-100/85 mt-1">{cfg.description}</p>
                         </div>
                       );
                     })}
@@ -522,23 +537,23 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
 
               {/* 9. MULTIJUGADOR */}
               {activeId === 'multijugador' && (
-                <div className="flex flex-col gap-3 text-xs sm:text-sm text-stone-200">
+                <div className="flex flex-col gap-3 text-xs sm:text-sm text-cyan-100">
                   <p>
-                    Todos los jugadores ven exactamente los mismos rodillos en tiempo real y comparten la misma Caja Común, pero <strong className="text-amber-300">cada jugador tiene su propio cursor de color y su balance económico individual</strong>:
+                    Todos los jugadores ven exactamente los mismos rodillos en tiempo real y comparten la misma Caja Común, pero <strong className="text-[#FF2A6D]">cada jugador tiene su propio cursor de color y su balance económico individual</strong>:
                   </p>
-                  <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800 flex flex-col gap-2">
+                  <div className="fort-crt-panel p-3.5 rounded-2xl border border-cyan-500/35 flex flex-col gap-2">
                     <strong className="text-amber-300">
                       Colores de Cursor en Tiempo Real
                     </strong>
-                    <p className="text-xs text-stone-300">
-                      Cada operador elige su color en la sala. Verás el puntero de tus compañeros moverse sobre la máquina para señalar símbolos, botones o mejoras.
+                    <p className="text-xs text-cyan-100/85">
+                      Cada operador elige su color en la sala o desde el panel de Equipo. Verás el puntero de tus compañeros moverse sobre la máquina para señalar símbolos, botones o mejoras.
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1">
                       {FORTUNARIUM_CURSOR_COLORS.map((c) => (
                         <span
                           key={c.id}
                           style={{ borderColor: c.hex, color: c.hex }}
-                          className="px-2.5 py-1 rounded-lg bg-stone-950 border text-xs font-bold flex items-center gap-1.5"
+                          className="px-2.5 py-1 rounded-lg bg-[#040a12] border text-xs font-bold flex items-center gap-1.5"
                         >
                           <span
                             style={{ backgroundColor: c.hex }}
@@ -555,14 +570,14 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {/* 10. TALLER / MEJORAS */}
               {activeId === 'taller' && (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs sm:text-sm text-stone-200">
-                    En el <strong className="text-amber-300">Taller del Fortunarium</strong> podéis instalar mejoras permanentes pagando con dinero de la Caja Común o con Llaves:
+                  <p className="text-xs sm:text-sm text-cyan-100">
+                    En el <strong className="text-[#FF2A6D]">Taller del Fortunarium</strong> podéis instalar hasta <strong className="text-amber-300">Nivel 10</strong> en cada mejora permanente pagando con créditos de la Caja Común o con Llaves:
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {Object.values(FORTUNARIUM_UPGRADES_CATALOG).map((up) => (
                       <div
                         key={up.id}
-                        className="p-3 rounded-2xl bg-stone-900 border border-stone-800 flex items-start gap-3"
+                        className="fort-crt-panel p-3 rounded-2xl border border-cyan-500/35 flex items-start gap-3"
                       >
                         <img
                           src={FORTUNARIUM_SYMBOL_ASSETS[up.iconSymbol]}
@@ -570,10 +585,10 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                           className="w-10 h-10 object-contain shrink-0"
                         />
                         <div>
-                          <div className="text-xs font-black text-amber-300">
+                          <div className="text-xs font-black text-[#FF2A6D]">
                             {up.name} (Máx. Nv.{up.maxLevel})
                           </div>
-                          <p className="text-[11px] text-stone-300 leading-snug mt-0.5">
+                          <p className="text-[11px] text-cyan-100/85 leading-snug mt-0.5">
                             {up.description}
                           </p>
                         </div>
@@ -587,34 +602,34 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {activeId === 'buffs' && (
                 <div className="flex flex-col gap-3 text-xs">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/35 flex flex-col gap-2">
+                    <div className="p-3.5 rounded-2xl bg-emerald-950/35 border border-emerald-400/45 flex flex-col gap-2">
                       <div className="text-base font-fortunarium text-emerald-300">
                         SINERGIAS POSITIVAS (BUFFS)
                       </div>
-                      <p className="text-stone-200">
+                      <p className="text-cyan-100">
                         • <strong>Llave + Bomba:</strong> Cada Llave en pantalla (o nivel de Artificiero) desactiva 1 Bomba y la convierte en <strong>+30 CR</strong> de recompensa.
                       </p>
-                      <p className="text-stone-200">
-                        • <strong>Trébol + Calavera:</strong> Cada Trébol bloquea la maldición de 1 Calavera en la misma tirada y otorga <strong>+12 CR</strong>.
+                      <p className="text-cyan-100">
+                        • <strong>Trébol + Calavera:</strong> Cada Trébol bloquea la maldición de 1 Calavera en la misma tirada y otorga <strong>+14 CR</strong>.
                       </p>
-                      <p className="text-stone-200">
+                      <p className="text-cyan-100">
                         • <strong>3+ Rayos:</strong> Además de subir el Voltaje, otorgan <strong>+1 Tirada Extra</strong> inmediata.
                       </p>
                       <p className="text-amber-200">
                         • <strong>Fortuna Desatada / Siete de la Suerte:</strong> Buffs de probabilidad de <strong>JACKPOT SUPREMO</strong> (base 0.25% → hasta un tope máximo del 1.00% durante las tiradas indicadas).
                       </p>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-500/35 flex flex-col gap-2">
+                    <div className="p-3.5 rounded-2xl bg-rose-950/35 border border-rose-500/45 flex flex-col gap-2">
                       <div className="text-base font-fortunarium text-rose-300">
                         PELIGROS Y PENALIZACIONES (DEBUFFS)
                       </div>
-                      <p className="text-stone-200">
+                      <p className="text-cyan-100">
                         • <strong>Explosión de Bomba:</strong> Resta <strong>-16% de Integridad</strong> y destruye <strong>-26 CR</strong> del fondo común.
                       </p>
-                      <p className="text-stone-200">
+                      <p className="text-cyan-100">
                         • <strong>Corrupción de Calavera:</strong> Absorbe el <strong>20% de la ganancia</strong> de la tirada (mínimo -14 CR) y daña -8% la Integridad.
                       </p>
-                      <p className="text-stone-200">
+                      <p className="text-cyan-100">
                         • <strong>Desgaste por Sobrecarga:</strong> Jugar en x2 o x3 consume Integridad en cada giro aunque ganes premios mayores.
                       </p>
                     </div>
@@ -624,12 +639,12 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
             </div>
 
             {/* Bottom Page Navigation */}
-            <div className="pt-3 border-t border-stone-800 flex items-center justify-between">
+            <div className="pt-3 border-t border-[#FF2A6D]/35 flex items-center justify-between">
               <button
                 type="button"
                 disabled={currentIndex === 0}
                 onClick={handlePrev}
-                className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 disabled:opacity-40 border border-stone-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                className="fort-arcade-btn px-3.5 py-2 rounded-xl bg-[#0a1422] hover:bg-[#102036] disabled:opacity-40 border border-cyan-500/45 text-cyan-100 text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span>Anterior</span>
@@ -639,7 +654,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                 type="button"
                 disabled={currentIndex === SECTIONS.length - 1}
                 onClick={handleNext}
-                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-stone-950 text-xs font-black flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                className="fort-arcade-btn px-4 py-2 rounded-xl bg-[#FF2A6D] hover:bg-[#ff4782] disabled:opacity-40 border border-pink-200 text-white text-xs font-black flex items-center gap-1.5 shadow-[0_0_16px_rgba(255,42,109,0.4)] cursor-pointer disabled:cursor-not-allowed"
               >
                 <span>Siguiente Capítulo</span>
                 <ChevronRight className="w-4 h-4" />

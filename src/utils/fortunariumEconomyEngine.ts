@@ -24,6 +24,8 @@ import {
   MAX_JACKPOT_CHANCE,
   computeEffectiveSymbolWeights,
   computeEffectiveJackpotChance,
+  computeSymbolUpgradeMultiplier,
+  getRepairCostMoney,
   calculateEffectiveSpinCost,
   calculateMinimumSpinCost,
   createInitialUpgradesState,
@@ -540,7 +542,7 @@ export function evaluateSpinGridCore(params: {
   const rayoCoords = coordsBySymbol.rayo;
   let extraSpinsGained = 0;
   if (rayoCoords.length > 0) {
-    const perRayo = 0.25 + (upgrades.cableado_ilegal || 0) * 0.15;
+    const perRayo = 0.25 + (upgrades.cableado_ilegal || 0) * 0.08;
     const deltaV = Number((rayoCoords.length * perRayo).toFixed(2));
     activeVoltage = Number((activeVoltage + deltaV).toFixed(2));
 
@@ -564,27 +566,10 @@ export function evaluateSpinGridCore(params: {
 
   const totalBetAndVoltageMult = betConfig.payoutMultiplier * activeVoltage;
 
-  const getSymbolUpgradeMult = (symId: FortunariumSymbolId): number => {
-    let m = 1.0;
-    if ((symId === 'cereza' || symId === 'ciruela') && (upgrades.cosecha_roja || 0) > 0) {
-      m += upgrades.cosecha_roja * 0.35;
-    }
-    if ((symId === 'limon' || symId === 'naranja') && (upgrades.huerto_citrico || 0) > 0) {
-      m += upgrades.huerto_citrico * 0.25;
-    }
-    if ((symId === 'campana' || symId === 'herradura') && (upgrades.campana_bronce || 0) > 0) {
-      m += upgrades.campana_bronce * 0.45;
-    }
-    if ((symId === 'siete' || symId === 'corona') && (upgrades.siete_dorado || 0) > 0) {
-      m += upgrades.siete_dorado * 0.45;
-    }
-    if ((symId === 'uvas' || symId === 'trebol') && (upgrades.prensa_uvas || 0) > 0) {
-      m += upgrades.prensa_uvas * 0.35;
-    }
-    return m;
-  };
+  const getSymbolUpgradeMult = (symId: FortunariumSymbolId): number =>
+    computeSymbolUpgradeMultiplier(symId, upgrades);
 
-  const geometraBonus = 1 + (upgrades.geometra || 0) * 0.3;
+  const geometraBonus = 1 + (upgrades.geometra || 0) * 0.18;
 
   const registerPatternWin = (opts: {
     patternType: FortunariumPatternType;
@@ -609,12 +594,7 @@ export function evaluateSpinGridCore(params: {
 
     const symMeta = FORTUNARIUM_SYMBOLS[opts.symbolId];
     const len = opts.cells.length;
-    const baseVal =
-      opts.patternCategory === 'SHAPE' || len >= 5
-        ? symMeta.basePayout5
-        : len === 4
-        ? symMeta.basePayout4
-        : symMeta.basePayout3;
+    const baseSymbolVal = symMeta.baseSymbolValue;
 
     const effectivePatternMult = Number(
       (
@@ -622,6 +602,8 @@ export function evaluateSpinGridCore(params: {
         (opts.patternType === 'HORIZONTAL' ? 1.0 : geometraBonus)
       ).toFixed(2)
     );
+    const baseVal = Math.max(1, Math.round(baseSymbolVal * opts.basePatternMult));
+
     const wildBonus = opts.wildCount > 0 ? 1.25 : 1.0;
     const symUpgradeMult = getSymbolUpgradeMult(opts.symbolId);
     let modMult = 1.0;
@@ -656,7 +638,7 @@ export function evaluateSpinGridCore(params: {
     const payout = Math.max(
       1,
       Math.round(
-        baseVal *
+        baseSymbolVal *
           effectivePatternMult *
           wildBonus *
           symUpgradeMult *
@@ -689,6 +671,7 @@ export function evaluateSpinGridCore(params: {
       cells: opts.cells,
       length: len,
       count: len,
+      baseSymbolValue: baseSymbolVal,
       baseReward: baseVal,
       multiplier: effectivePatternMult,
       patternMultiplier: effectivePatternMult,
@@ -702,9 +685,6 @@ export function evaluateSpinGridCore(params: {
   // ==========================================================================
   // 3A. HORIZONTAL PATTERNS (Sections 14, 15, 20, 22)
   // Maximal contiguous run of 3, 4, or 5 identical compatible symbols per row.
-  // Because a 5-column row cannot hold two disjoint 3+ runs (3+3=6 > 5), each row
-  // produces at most ONE horizontal win (resolving any shared Wild to the longest
-  // / highest-value run on that row).
   // ==========================================================================
   for (let row = 0; row < 3; row++) {
     const validIntervals: {
@@ -727,12 +707,8 @@ export function evaluateSpinGridCore(params: {
         if (match) {
           const runLen = endCol - startCol + 1;
           const symMeta = FORTUNARIUM_SYMBOLS[match.symbolId];
-          const baseScore =
-            runLen >= 5
-              ? symMeta.basePayout5
-              : runLen === 4
-              ? symMeta.basePayout4
-              : symMeta.basePayout3;
+          const horizMult = runLen >= 5 ? 8.0 : runLen === 4 ? 3.0 : 1.0;
+          const baseScore = Math.round(symMeta.baseSymbolValue * horizMult);
 
           validIntervals.push({
             startCol,
@@ -759,16 +735,17 @@ export function evaluateSpinGridCore(params: {
     );
 
     if (maximalIntervals.length > 0) {
-      // Sort by length DESC, then baseScore DESC so ambiguous Wilds resolve to the single best run on the row
       maximalIntervals.sort((a, b) =>
         b.runLen !== a.runLen ? b.runLen - a.runLen : b.baseScore - a.baseScore
       );
       const bestRun = maximalIntervals[0];
+      const horizPatternMult =
+        bestRun.runLen >= 5 ? 8.0 : bestRun.runLen === 4 ? 3.0 : 1.0;
       registerPatternWin({
         patternType: 'HORIZONTAL',
         patternCategory: 'LINE',
         displayName: `HORIZONTAL ×${bestRun.runLen}`,
-        basePatternMult: 1.0,
+        basePatternMult: horizPatternMult,
         symbolId: bestRun.symbolId,
         wildCount: bestRun.wildCount,
         cells: bestRun.cells,
@@ -778,7 +755,6 @@ export function evaluateSpinGridCore(params: {
 
   // ==========================================================================
   // 3B. VERTICAL PATTERNS (Sections 14, 16, 20, 22)
-  // Exactly 3 vertically aligned compatible matching symbols in any column 0..4
   // ==========================================================================
   for (let col = 0; col < 5; col++) {
     const cells: FortunariumCellCoord[] = [
@@ -802,10 +778,8 @@ export function evaluateSpinGridCore(params: {
 
   // ==========================================================================
   // 3C. DIAGONAL PATTERNS (Sections 14, 17, 20, 22)
-  // Every legitimate 3-cell continuous diagonal across the 3×5 board (startCol 0..2)
   // ==========================================================================
   for (let startCol = 0; startCol <= 2; startCol++) {
-    // Down-right diagonal (↘): (row 0, startCol) -> (row 1, startCol+1) -> (row 2, startCol+2)
     const downCells: FortunariumCellCoord[] = [
       { col: startCol, row: 0 },
       { col: startCol + 1, row: 1 },
@@ -824,7 +798,6 @@ export function evaluateSpinGridCore(params: {
       });
     }
 
-    // Down-left diagonal (↙): (row 0, startCol+2) -> (row 1, startCol+1) -> (row 2, startCol)
     const upCells: FortunariumCellCoord[] = [
       { col: startCol + 2, row: 0 },
       { col: startCol + 1, row: 1 },
@@ -846,7 +819,6 @@ export function evaluateSpinGridCore(params: {
 
   // ==========================================================================
   // 3D. SHAPE PATTERNS: X, TRIÁNGULO & TRIÁNGULO INVERTIDO (Sections 17–21)
-  // Require all cells of the exact mask to contain the SAME compatible symbol
   // ==========================================================================
   const xPatternMatch = resolveCompatibleSymbolGroup(X_MASK_CELLS, board);
   if (xPatternMatch) {
@@ -854,7 +826,7 @@ export function evaluateSpinGridCore(params: {
       patternType: 'X',
       patternCategory: 'SHAPE',
       displayName: 'PATRÓN X',
-      basePatternMult: 3.5,
+      basePatternMult: 28.0,
       symbolId: xPatternMatch.symbolId,
       wildCount: xPatternMatch.wildCount,
       cells: X_MASK_CELLS,
@@ -867,7 +839,7 @@ export function evaluateSpinGridCore(params: {
       patternType: 'TRIANGULO',
       patternCategory: 'SHAPE',
       displayName: 'TRIÁNGULO',
-      basePatternMult: 8.0,
+      basePatternMult: 64.0,
       symbolId: triangleMatch.symbolId,
       wildCount: triangleMatch.wildCount,
       cells: TRIANGLE_MASK_CELLS,
@@ -883,7 +855,7 @@ export function evaluateSpinGridCore(params: {
       patternType: 'TRIANGULO_INVERTIDO',
       patternCategory: 'SHAPE',
       displayName: 'TRIÁNGULO INVERTIDO',
-      basePatternMult: 8.0,
+      basePatternMult: 64.0,
       symbolId: invTriangleMatch.symbolId,
       wildCount: invTriangleMatch.wildCount,
       cells: INVERTED_TRIANGLE_MASK_CELLS,
@@ -891,7 +863,6 @@ export function evaluateSpinGridCore(params: {
   }
 
   // 3E. CANONICAL FULL GRID JACKPOT PATTERN (PART D: ALL 15 CELLS)
-  // All 15 cells (3 rows x 5 columns) must contain identical compatible symbols resolving to the same base symbol.
   const all15GridCells: FortunariumCellCoord[] = [];
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 5; c++) {
@@ -906,7 +877,7 @@ export function evaluateSpinGridCore(params: {
       patternType: 'PANTALLA_COMPLETA',
       patternCategory: 'SHAPE',
       displayName: 'PANTALLA COMPLETA / JACKPOT',
-      basePatternMult: 12.0,
+      basePatternMult: 100.0,
       symbolId: fullGridMatch.symbolId,
       wildCount: fullGridMatch.wildCount,
       cells: all15GridCells,
@@ -967,7 +938,7 @@ export function evaluateSpinGridCore(params: {
   // 5. Process MONEDA (Direct Coin Bonus)
   const monedaCoords = coordsBySymbol.moneda;
   if (monedaCoords.length > 0) {
-    const perCoinBase = 16 + (upgrades.prensa_uvas || 0) * 10;
+    const perCoinBase = 16 + (upgrades.prensa_uvas || 0) * 6;
     const trioBonus = monedaCoords.length >= 3 ? 45 : 0;
     const coinReward = Math.round(
       (monedaCoords.length * perCoinBase + trioBonus) * totalBetAndVoltageMult
@@ -994,7 +965,7 @@ export function evaluateSpinGridCore(params: {
   // 6. Process LLAVE & BOMBA (Keys + Bombs + Defuse Synergy)
   const llaveCoords = coordsBySymbol.llave;
   const bombaCoords = coordsBySymbol.bomba;
-  const autoDefuseCapacity = upgrades.artificiero || 0;
+  const autoDefuseCapacity = Math.ceil((upgrades.artificiero || 0) / 2);
 
   if (llaveCoords.length > 0) {
     const keysFromSymbol = llaveCoords.length;
@@ -1025,7 +996,8 @@ export function evaluateSpinGridCore(params: {
     const explodedCount = bombaCoords.length - defusedCount;
 
     if (defusedCount > 0) {
-      const defuseReward = Math.round(defusedCount * 35 * betConfig.payoutMultiplier);
+      const perDefuseBase = 35 + (upgrades.artificiero || 0) * 10;
+      const defuseReward = Math.round(defusedCount * perDefuseBase * betConfig.payoutMultiplier);
       grossPayout += defuseReward;
       specialEffects.push({
         id: `fx_defuse_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
@@ -1238,36 +1210,13 @@ export function evaluateSpinGridCore(params: {
 // ============================================================================
 export function calculateRepairCost(params: {
   round: number;
+  repairsUsedInQuota?: number;
   integrity: number;
   maxIntegrity?: number;
   upgrades?: Record<FortunariumUpgradeId, number>;
+  activeModifiers?: Pick<FortunariumActiveModifier, 'modifierId'>[];
 }): number {
-  const { round, integrity, maxIntegrity = 100, upgrades } = params;
-  const baseRepairCost = 26;
-  const quotaScaling =
-    1 + (round - 1) * 0.28 + Math.pow(Math.max(0, round - 3), 1.2) * 0.12;
-
-  const missingRatio = Math.max(
-    0,
-    Math.min(1, (maxIntegrity - integrity) / Math.max(1, maxIntegrity))
-  );
-  // Early maintenance (integrity >= 75%) is efficient; deep reconstruction (<= 35%) is expensive
-  const damageScaling =
-    missingRatio <= 0.25
-      ? 0.85
-      : missingRatio >= 0.65
-      ? 1.45
-      : 1.0 + (missingRatio - 0.25) * 0.85;
-
-  const totalUpgradeLevels = upgrades
-    ? Object.values(upgrades).reduce((acc, v) => acc + (v || 0), 0)
-    : 0;
-  const complexityModifier = 1 + totalUpgradeLevels * 0.05;
-
-  return Math.max(
-    18,
-    Math.round(baseRepairCost * quotaScaling * damageScaling * complexityModifier)
-  );
+  return getRepairCostMoney(params);
 }
 
 export function calculateIncidentProbability(params: {

@@ -28,6 +28,8 @@ import {
   TRIANGLE_MASK_CELLS,
   INVERTED_TRIANGLE_MASK_CELLS,
   getUpgradeCostMoney,
+  getUpgradeLevelDetails,
+  getRepairCostMoney,
   calculateEffectiveSpinCost,
   calculateMinimumSpinCost,
   computeEffectiveJackpotChance,
@@ -294,6 +296,40 @@ function buildJackpotParadeSteps(spin: FortunariumSpinResult): RevealStep[] {
   });
 }
 
+function useAnimatedFloat(target: number, durationMs = 460): number {
+  const [current, setCurrent] = useState<number>(target);
+  const currentRef = useRef<number>(target);
+  currentRef.current = current;
+
+  useEffect(() => {
+    const startVal = currentRef.current;
+    const diff = target - startVal;
+    if (Math.abs(diff) < 0.001) {
+      setCurrent(target);
+      return;
+    }
+    let rafId = 0;
+    const startTime = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / durationMs);
+      // Cubic ease-out
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next = startVal + diff * eased;
+      setCurrent(next);
+      if (t < 1) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        setCurrent(target);
+      }
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [target, durationMs]);
+
+  return current;
+}
+
 export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   roomState,
   localPlayerId,
@@ -377,7 +413,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       quotaTarget: roomState.quota,
       currentCredits: roomState.money,
       currentIntegrity: roomState.integrity,
-      repairCost: 28 + (roomState.round - 1) * 8,
+      repairCost: getRepairCostMoney(roomState.round, roomState.repairsUsedInQuota || 0),
       flavorQuote:
         roomState.round === 2
           ? 'El bobinado aguanta bien. Pero la demanda sube. Mantened un ojo en la temperatura.'
@@ -391,6 +427,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
     roomState.money,
     roomState.integrity,
     roomState.totalSpinsInMatch,
+    roomState.repairsUsedInQuota,
   ]);
 
   // Upgrade Installation Physical Toast (Section 25)
@@ -485,6 +522,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   const [exceptionalWinCelebration, setExceptionalWinCelebration] = useState<{
     id: string;
     tier: 'HUGE' | 'JACKPOT';
+    headline: string;
     grossPayout: number;
   } | null>(null);
   const celebrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -977,6 +1015,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
           setExceptionalWinCelebration({
             id: activeSpinEvent.spinId,
             tier,
+            headline: tier === 'JACKPOT' ? '¡JACKPOT SUPREMO!' : '¡PREMIO MASIVO!',
             grossPayout: activeSpinEvent.grossPayout,
           });
           celebrationTimerRef.current = setTimeout(() => {
@@ -1041,16 +1080,37 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
     roomState.money >= currentSpinCost &&
     isMyTurn;
 
+  const animatedMoneyFloat = useAnimatedFloat(displayedMoney, 460);
+  const animatedQuotaFloat = useAnimatedFloat(roomState.quota, 460);
+  const animatedIntegrityFloat = useAnimatedFloat(displayedIntegrity, 440);
+  const animatedVoltageFloat = useAnimatedFloat(displayedVoltage, 440);
+
+  const smoothDisplayedMoney = Math.round(animatedMoneyFloat);
+  const smoothDisplayedQuota = Math.round(animatedQuotaFloat);
+  const smoothDisplayedIntegrity = Math.round(animatedIntegrityFloat);
+
   const quotaMet = displayedMoney >= roomState.quota;
   const quotaPct = Math.min(
     100,
-    Math.round((displayedMoney / Math.max(1, roomState.quota)) * 100)
+    Math.round((smoothDisplayedMoney / Math.max(1, roomState.quota)) * 100)
+  );
+  const quotaBarWidthPct = Math.max(
+    0,
+    Math.min(100, (animatedMoneyFloat / Math.max(1, roomState.quota)) * 100)
   );
   const integrityPct = Math.max(
     0,
-    Math.min(100, Math.round((displayedIntegrity / roomState.maxIntegrity) * 100))
+    Math.min(100, Math.round((smoothDisplayedIntegrity / roomState.maxIntegrity) * 100))
   );
-  const repairCost = 28 + (roomState.round - 1) * 8;
+  const integrityBarWidthPct = Math.max(
+    0,
+    Math.min(100, (animatedIntegrityFloat / Math.max(1, roomState.maxIntegrity)) * 100)
+  );
+  const voltageBarWidthPct = Math.max(
+    12,
+    Math.min(100, ((animatedVoltageFloat - 1) / 2.5) * 88 + 12)
+  );
+  const repairCost = getRepairCostMoney(roomState.round, roomState.repairsUsedInQuota || 0);
   const repairValidation = useMemo(
     () =>
       validateWorkshopPurchase({
@@ -1306,9 +1366,15 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
     setLeverProgress(0);
   };
 
-  // Spacebar shortcut to spin when no modal is open
+  // Spacebar shortcut to spin when no modal is open & Escape to close Team Drawer
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showTeamDrawer) {
+        e.preventDefault();
+        fortunariumAudio.playButtonClick();
+        setShowTeamDrawer(false);
+        return;
+      }
       if (
         e.code === 'Space' &&
         !showGarageIntro &&
@@ -1432,9 +1498,9 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       {/* ===================================================================== */}
       {/* 1. UPPER CYBERPUNK SYSTEM CONTROL RAIL HEADER (h-12)                  */}
       {/* ===================================================================== */}
-      <header className="relative z-30 h-12 shrink-0 w-full bg-gradient-to-b from-[#0d1522] via-[#09101a] to-[#050911] border-b border-cyan-400/55 px-2.5 sm:px-4 flex items-center justify-between gap-2 shadow-[0_4px_20px_rgba(0,0,0,0.9),0_1px_12px_rgba(6,182,212,0.22)]">
-        {/* Subtle bottom neon magenta/cyan accent seam */}
-        <div className="pointer-events-none absolute bottom-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-pink-500/70 to-transparent" />
+      <header className="relative z-30 h-12 shrink-0 w-full bg-gradient-to-b from-[#0d1522] via-[#09101a] to-[#050911] border-b border-[#FF2A6D]/60 px-2.5 sm:px-4 flex items-center justify-between gap-2 shadow-[0_4px_20px_rgba(0,0,0,0.9),0_1px_14px_rgba(255,42,109,0.25)]">
+        {/* Subtle bottom neon pink/cyan accent seam */}
+        <div className="pointer-events-none absolute bottom-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-[#FF2A6D] to-transparent" />
 
         {/* Left Group: SALIR, FORTUNARIUM MK-IV, SALA, CUOTA */}
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
@@ -1444,19 +1510,19 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
               fortunariumAudio.playButtonClick();
               setShowExitConfirmModal(true);
             }}
-            className="fort-sys-header-btn inline-flex items-center gap-1.5 px-2.5 rounded-md bg-[#160d14] hover:bg-[#24111e] border border-rose-500/65 hover:border-rose-400 text-rose-100 text-xs font-bold cursor-pointer shrink-0"
+            className="fort-sys-header-btn inline-flex items-center gap-1.5 px-2.5 rounded-md bg-[#1a0b14] hover:bg-[#2a1020] border border-[#FF2A6D]/70 hover:border-[#FF2A6D] text-pink-100 text-xs font-bold cursor-pointer shrink-0"
           >
-            <ArrowLeft className="w-3.5 h-3.5 text-rose-400" />
+            <ArrowLeft className="w-3.5 h-3.5 text-[#FF2A6D]" />
             <span>SALIR</span>
           </button>
 
-          <div className="hidden md:inline-flex items-center gap-2 px-2.5 h-8 rounded-md bg-[#07131d] border border-cyan-400/45 shadow-[inset_0_0_10px_rgba(6,182,212,0.18)] shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
+          <div className="hidden md:inline-flex items-center gap-2 px-2.5 h-8 rounded-md bg-[#140812] border border-[#FF2A6D]/55 shadow-[inset_0_0_10px_rgba(255,42,109,0.22)] shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#FF2A6D] shadow-[0_0_6px_#FF2A6D]" />
             <div className="flex flex-col leading-none">
-              <span className="font-fortunarium text-xs text-cyan-200 tracking-wider">
+              <span className="font-fortunarium text-xs text-white tracking-wider">
                 FORTUNARIUM MK-IV
               </span>
-              <span className="text-[7px] font-mono text-cyan-400/75 tracking-widest">
+              <span className="text-[7px] font-mono text-[#FF2A6D] tracking-widest">
                 フォーチュナリウム
               </span>
             </div>
@@ -1466,10 +1532,10 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
             type="button"
             onClick={handleCopyRoomCode}
             title="Copiar código de sala"
-            className="fort-sys-header-btn inline-flex items-center gap-1.5 px-2.5 rounded-md bg-[#060f18] hover:bg-[#0b1926] border border-cyan-500/45 hover:border-cyan-400 text-xs font-mono font-black text-amber-300 cursor-pointer shrink-0 tabular-nums"
+            className="fort-sys-header-btn inline-flex items-center gap-1.5 px-2.5 rounded-md bg-[#060f18] hover:bg-[#0b1926] border border-cyan-500/45 hover:border-[#FF2A6D]/70 text-xs font-mono font-black text-amber-300 cursor-pointer shrink-0 tabular-nums"
           >
             <span className="text-cyan-300/80 font-sans font-bold text-[10px]">SALA</span>
-            <span className="tracking-wider text-rose-300">{roomState.roomCode}</span>
+            <span className="tracking-wider text-[#FF2A6D]">{roomState.roomCode}</span>
             {copiedCode ? (
               <Check className="w-3 h-3 text-emerald-400" />
             ) : (
@@ -1490,10 +1556,10 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
               fortunariumAudio.playButtonClick();
               setShowDevModal(true);
             }}
-            className="fort-sys-header-btn px-2.5 rounded-md bg-[#190d24] hover:bg-[#271338] border border-fuchsia-400/70 hover:border-fuchsia-300 text-fuchsia-200 text-xs font-black flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="fort-sys-header-btn px-2.5 rounded-md bg-[#1f0815] hover:bg-[#300c20] border border-[#FF2A6D]/75 hover:border-pink-300 text-pink-100 text-xs font-black flex items-center gap-1.5 cursor-pointer shrink-0"
             title="Simulador de Economía y Patrones (Sandbox Aislado)"
           >
-            <FlaskConical className="w-3.5 h-3.5 text-fuchsia-400" />
+            <FlaskConical className="w-3.5 h-3.5 text-[#FF2A6D]" />
             <span className="hidden xl:inline">SIMULADOR</span>
           </button>
 
@@ -1527,15 +1593,19 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
               fortunariumAudio.playButtonClick();
               setShowWorkshopModal(true);
             }}
-            className="fort-sys-header-btn px-2.5 rounded-md bg-[#1c1208] hover:bg-[#2b1b0c] border border-amber-400/75 hover:border-amber-300 text-amber-200 text-xs font-black flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="fort-sys-header-btn pl-2.5 pr-1.5 rounded-md bg-[#1c1208] hover:bg-[#2b1b0c] border border-amber-400/75 hover:border-amber-300 text-amber-100 text-xs font-black flex items-center gap-2 cursor-pointer shrink-0"
           >
-            <Wrench className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">TALLER</span>
-            {displayedKeys > 0 && (
-              <span className="px-1.5 py-0.2 rounded bg-amber-400 text-stone-950 font-mono text-[10px] font-black tabular-nums">
-                {displayedKeys}🔑
-              </span>
-            )}
+            <span className="flex items-center gap-1.5">
+              <Wrench className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">TALLER</span>
+            </span>
+            <span
+              className="inline-flex items-center justify-center gap-1 min-w-[2.45rem] px-1.5 py-0.5 rounded bg-[#070d16] border border-amber-400/65 shadow-inner font-mono text-[11.5px] leading-none font-extrabold text-[#fff8e7] tabular-nums"
+              title={`Llaves de taller disponibles: ${displayedKeys}`}
+            >
+              <Key className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>{displayedKeys}</span>
+            </span>
           </button>
 
           <button
@@ -1596,21 +1666,22 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       {/* ===================================================================== */}
       {/* 2. CENTRAL CYBERPUNK ARCADE CABINET STAGE + LEFT PAPER OVERLAY        */}
       {/* ===================================================================== */}
-      <main className="relative z-10 flex-1 min-h-0 w-full flex items-center justify-center px-2 sm:px-6 py-2 overflow-hidden">
-        {/* Centered Machine Anchor Wrapper (Visual center = 50vw; Paper note is absolute outside left) */}
+      <main className="fortunarium-game-stage relative z-10 flex-1 min-h-0 w-full flex items-center justify-center px-2 sm:px-6 py-2 overflow-hidden">
+        {/* LEFT-SIDE PHYSICAL TAPED PAPER OVERLAY (Independent layer: NEVER shifts machine centering) */}
+        <FortunariumPaperBoard
+          activeModifiers={roomState.activeModifiers || []}
+          installedUpgrades={installedUpgradeTuples}
+          players={roomState.players}
+          localPlayerId={localPlayerId}
+          onOpenWorkshop={() => setShowWorkshopModal(true)}
+        />
+
+        {/* Centered Machine Anchor Wrapper (Visual center = 50vw, completely independent of side notes) */}
         <div
-          className={`relative w-full max-w-[930px] h-full max-h-[810px] mx-auto flex items-center justify-center transition-transform duration-150 ${
+          className={`machine-centered-layer relative w-full max-w-[930px] h-full max-h-[810px] mx-auto flex items-center justify-center transition-transform duration-150 ${
             machineShake ? '-translate-y-0.5 scale-[1.008]' : ''
           }`}
         >
-          {/* LEFT-SIDE PHYSICAL TAPED PAPER OVERLAY (NEVER shifts machine centering) */}
-          <FortunariumPaperBoard
-            activeModifiers={roomState.activeModifiers || []}
-            installedUpgradesCount={installedUpgrades.length}
-            installedUpgrades={installedUpgrades}
-            effectiveJackpotChance={effectiveJackpotChance}
-            onOpenWorkshop={() => setShowWorkshopModal(true)}
-          />
 
           {/* PROTRUDING SIDE MECHANICAL HARDWARE VENTS & NEON CONDUITS */}
           <div
@@ -1676,14 +1747,14 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
                   {/* Small Japanese Kanji Luck Badge (運) */}
-                  <div className="w-8 h-8 rounded-lg bg-[#1a0b16] border border-pink-500/60 shadow-[inset_0_0_10px_rgba(236,72,153,0.35)] flex items-center justify-center shrink-0">
-                    <span className="text-sm font-black text-pink-400 drop-shadow-[0_0_6px_rgba(236,72,153,0.8)]">
+                  <div className="w-8 h-8 rounded-lg bg-[#1f0815] border border-[#FF2A6D]/80 shadow-[inset_0_0_12px_rgba(255,42,109,0.45)] flex items-center justify-center shrink-0">
+                    <span className="text-sm font-black text-[#FF2A6D] drop-shadow-[0_0_8px_rgba(255,42,109,0.9)]">
                       運
                     </span>
                   </div>
 
                   {/* Status LED Strip */}
-                  <div className="hidden sm:flex items-center gap-1.5 bg-[#050a10] px-2 py-1 rounded-full border border-cyan-500/30 shrink-0">
+                  <div className="hidden sm:flex items-center gap-1.5 bg-[#050a10] px-2 py-1 rounded-full border border-[#FF2A6D]/40 shrink-0">
                     {[0, 1, 2].map((b) => (
                       <span
                         key={b}
@@ -1693,7 +1764,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                             : integrityPct <= 30
                             ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-pulse'
                             : b === 1
-                            ? 'bg-pink-400 shadow-[0_0_8px_#f472b6] animate-fort-bulb'
+                            ? 'bg-[#FF2A6D] shadow-[0_0_8px_#FF2A6D] animate-fort-bulb'
                             : 'bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-fort-bulb'
                         }`}
                       />
@@ -1701,10 +1772,10 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   </div>
 
                   {/* Illuminated Cyberpunk Marquee Housing */}
-                  <div className="relative px-3.5 py-1 rounded-xl bg-gradient-to-r from-[#1a0b1e] via-[#0b1929] to-[#1a0b1e] border-2 border-pink-500/65 shadow-[0_0_22px_rgba(236,72,153,0.28),inset_0_0_14px_rgba(34,211,238,0.2)] flex items-center gap-2.5 shrink-0">
-                    <span className="w-1.5 h-3.5 rounded-xs bg-pink-400 shadow-[0_0_8px_#f472b6]" />
+                  <div className="relative px-3.5 py-1 rounded-xl bg-gradient-to-r from-[#240817] via-[#0b1929] to-[#240817] border-2 border-[#FF2A6D] shadow-[0_0_24px_rgba(255,42,109,0.38),inset_0_0_14px_rgba(34,211,238,0.2)] flex items-center gap-2.5 shrink-0">
+                    <span className="w-1.5 h-3.5 rounded-xs bg-[#FF2A6D] shadow-[0_0_8px_#FF2A6D]" />
                     <div className="flex flex-col items-center leading-none">
-                      <h1 className="font-fortunarium text-lg sm:text-2xl md:text-3xl text-white tracking-wider drop-shadow-[0_0_10px_rgba(244,114,182,0.85)] leading-none">
+                      <h1 className="font-fortunarium text-lg sm:text-2xl md:text-3xl text-white tracking-wider drop-shadow-[0_0_12px_rgba(255,42,109,0.9)] leading-none">
                         FORTUNARIUM
                       </h1>
                       <span className="text-[8px] font-mono text-cyan-300/80 tracking-[0.25em] mt-0.5">
@@ -1948,15 +2019,15 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   </span>
                 </div>
 
-                {/* Physical Segmented LED Quota Bar */}
+                {/* Physical Segmented LED Quota Bar (Smooth Animated Gauge) */}
                 <div className="relative w-full h-4 rounded bg-[#02060a] p-0.5 border border-cyan-500/35 shadow-[inset_0_2px_6px_rgba(0,0,0,0.95)] overflow-hidden">
                   <div
-                    className={`h-full rounded-xs transition-all duration-300 ${
+                    className={`h-full rounded-xs fort-gauge-fill ${
                       quotaMet
                         ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-300 shadow-[0_0_12px_rgba(52,211,153,0.85)]'
-                        : 'bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-300 shadow-[0_0_10px_rgba(251,191,36,0.65)]'
+                        : 'bg-gradient-to-r from-[#FF2A6D] via-amber-400 to-yellow-300 shadow-[0_0_10px_rgba(251,191,36,0.65)]'
                     }`}
-                    style={{ width: `${quotaPct}%` }}
+                    style={{ width: `${quotaBarWidthPct}%` }}
                   />
                   {/* Segmented LED cell dividers */}
                   <div
@@ -1970,7 +2041,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
 
                 <div className="flex items-center justify-between gap-1 min-h-[20px]">
                   <span className="font-mono font-bold text-[11px] sm:text-xs text-cyan-100 tabular-nums truncate">
-                    {displayedMoney} / {roomState.quota} CR
+                    {smoothDisplayedMoney} / {smoothDisplayedQuota} CR
                   </span>
 
                   {quotaMet && !isBusy && roomState.phase === 'PLAYING' && (
@@ -2056,14 +2127,22 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
 
                 <div className="flex items-baseline justify-between gap-2">
                   <div className="font-mono font-black text-xl sm:text-3xl text-amber-200 tabular-nums tracking-tight leading-none drop-shadow-[0_0_10px_rgba(251,191,36,0.35)] truncate">
-                    {displayedMoney} <span className="text-xs sm:text-base text-amber-400">CR</span>
+                    {smoothDisplayedMoney} <span className="text-xs sm:text-base text-amber-400">CR</span>
                   </div>
+                </div>
+
+                {/* Animated Voltage Sub-Gauge Bar */}
+                <div className="relative w-full h-1.5 rounded-full bg-[#02060a] border border-cyan-500/30 overflow-hidden">
+                  <div
+                    className="h-full fort-gauge-fill bg-gradient-to-r from-cyan-500 via-cyan-300 to-[#FF2A6D]"
+                    style={{ width: `${voltageBarWidthPct}%` }}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between gap-1.5 pt-0.5 border-t border-cyan-500/25 text-[10px] sm:text-[11px] font-mono font-black tabular-nums">
                   <span className="text-cyan-300 flex items-center gap-1">
                     <Zap className="w-3 h-3 text-cyan-400" />
-                    VOLT x{displayedVoltage.toFixed(2)}
+                    VOLT x{animatedVoltageFloat.toFixed(2)}
                   </span>
                   <span className="text-amber-300 flex items-center gap-1">
                     <Key className="w-3 h-3 text-amber-400" />
@@ -2087,24 +2166,24 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                         ? 'text-rose-400 animate-pulse'
                         : integrityPct <= 70
                         ? 'text-amber-300'
-                        : 'text-cyan-300'
+                        : 'text-emerald-300'
                     }`}
                   >
-                    {displayedIntegrity}%
+                    {smoothDisplayedIntegrity}%
                   </span>
                 </div>
 
-                {/* Physical Illuminated Segmented Integrity Bar */}
+                {/* Physical Illuminated Segmented Integrity Bar (Smooth Animated Gauge) */}
                 <div className="relative w-full h-4 rounded bg-[#02060a] p-0.5 border border-cyan-500/35 shadow-[inset_0_2px_6px_rgba(0,0,0,0.95)] overflow-hidden">
                   <div
-                    className={`h-full rounded-xs transition-all duration-300 ${
+                    className={`h-full rounded-xs fort-gauge-fill ${
                       integrityPct < 35
-                        ? 'bg-gradient-to-r from-rose-700 via-rose-500 to-pink-400 shadow-[0_0_12px_rgba(244,63,94,0.85)]'
+                        ? 'bg-gradient-to-r from-rose-700 via-rose-500 to-[#FF2A6D] shadow-[0_0_12px_rgba(244,63,94,0.85)]'
                         : integrityPct <= 70
                         ? 'bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-300'
                         : 'bg-gradient-to-r from-teal-500 via-cyan-400 to-emerald-300 shadow-[0_0_10px_rgba(34,211,238,0.6)]'
                     }`}
-                    style={{ width: `${integrityPct}%` }}
+                    style={{ width: `${integrityBarWidthPct}%` }}
                   />
                   <div
                     className="pointer-events-none absolute inset-0 opacity-75"
@@ -2861,17 +2940,28 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                       fortunariumAudio.playButtonClick();
                       setShowWorkshopModal(true);
                     }}
-                    className="fort-arcade-btn px-3 py-1.5 h-9 sm:h-10 rounded-lg bg-[#211508] hover:bg-[#301e0b] border border-amber-400/75 text-amber-100 text-xs font-black flex items-center gap-1.5 cursor-pointer w-28 sm:w-34 shrink-0"
+                    className="fort-arcade-btn px-2.5 py-1.5 h-9 sm:h-10 rounded-lg bg-[#211508] hover:bg-[#301e0b] border border-amber-400/75 text-amber-100 text-xs font-black flex items-center justify-between gap-2 cursor-pointer min-w-[8.25rem] sm:min-w-[9.5rem] shrink-0"
                   >
-                    <Wrench className="w-4 h-4 text-amber-400 shrink-0" />
-                    <div className="text-left leading-tight min-w-0 truncate">
-                      <div className="text-[10px] font-fortunarium tracking-wide uppercase truncate">
-                        TALLER
-                      </div>
-                      <div className="font-mono text-[11px] text-amber-300 tabular-nums truncate">
-                        {installedUpgrades.length} MEJ.
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Wrench className="w-4 h-4 text-amber-400 shrink-0" />
+                      <div className="text-left leading-tight min-w-0 truncate">
+                        <div className="text-[10px] sm:text-[11px] font-fortunarium tracking-wide uppercase truncate text-[#fff3d6]">
+                          TALLER
+                        </div>
+                        <div className="font-mono text-[9.5px] text-amber-300/90 tabular-nums truncate">
+                          {installedUpgrades.length} MEJ.
+                        </div>
                       </div>
                     </div>
+
+                    {/* Dedicated High-Contrast Key Badge */}
+                    <span
+                      className="inline-flex items-center justify-center gap-1 min-w-[2.5rem] px-2 py-1 rounded-md bg-[#060c14] border border-amber-400/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] font-mono text-xs font-extrabold text-[#fff8e7] tabular-nums shrink-0"
+                      title={`Llaves de taller: ${displayedKeys}`}
+                    >
+                      <Key className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>{displayedKeys}</span>
+                    </span>
                   </button>
                 </div>
               </div>
@@ -2985,10 +3075,10 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       {/* 2C. EFFECT ROULETTE OVERLAY (`roomState.activeRoulette`)              */}
       {/* ===================================================================== */}
       {roomState.activeRoulette && !isBusy && (
-        <div className="fixed inset-0 z-[76] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-[#132a34] border-[3px] border-[#b98532] p-5 sm:p-6 shadow-[0_24px_60px_rgba(0,0,0,0.95)] flex flex-col gap-4">
+        <div className="fixed inset-0 z-[76] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="fort-cyber-modal w-full max-w-lg rounded-2xl p-5 sm:p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between gap-2">
-              <span className="px-3 py-1 rounded bg-[#0d1d24] border border-[#b98532] text-xs font-mono font-black text-[#f4d06f] uppercase tracking-wider">
+              <span className="px-3 py-1 rounded bg-[#1a0812] border border-[#FF2A6D]/65 text-xs font-mono font-black text-[#FF2A6D] uppercase tracking-wider">
                 🎡 RULETA DE EFECTOS · {roomState.activeRoulette.triggeredByReason}
               </span>
             </div>
@@ -3027,7 +3117,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                 fortunariumAudio.playButtonClick();
                 onDismissRoulette?.();
               }}
-              className="fort-arcade-btn w-full py-3 rounded-xl bg-[#d99b26] hover:bg-[#f4d06f] border-2 border-[#fef08a] text-stone-950 font-black text-xs uppercase tracking-wider cursor-pointer"
+              className="fort-arcade-btn w-full py-3 rounded-xl bg-[#FF2A6D] hover:bg-[#ff4782] border border-pink-200 text-white font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(255,42,109,0.45)] cursor-pointer"
             >
               Anotar en Hoja de Máquina y Continuar
             </button>
@@ -3094,13 +3184,13 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       {/* ===================================================================== */}
       {roomState.phase === 'ROUND_SHOP' && !isBusy && (
         <div className="fixed inset-0 z-[75] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-          <div className="w-full max-w-4xl rounded-2xl bg-[#08131f] border-[3px] border-cyan-400/65 p-5 sm:p-6 shadow-[0_25px_70px_rgba(0,0,0,0.95),0_0_32px_rgba(6,182,212,0.2)] flex flex-col gap-5 my-auto">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cyan-500/35 pb-3">
+          <div className="fort-cyber-modal w-full max-w-4xl rounded-2xl p-5 sm:p-6 flex flex-col gap-5 my-auto">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#FF2A6D]/40 pb-3">
               <div>
                 <span className="text-xs font-black uppercase tracking-widest text-emerald-300">
                   ¡Cuota {roomState.round} Sellada! (Conserváis todos vuestros créditos)
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-fortunarium text-cyan-100 tracking-wide mt-0.5">
+                <h2 className="text-2xl sm:text-3xl font-fortunarium text-white tracking-wide mt-0.5">
                   BANCO DE MONTAJE: ELEGID 1 PIEZA DE BUILD
                 </h2>
               </div>
@@ -3117,15 +3207,15 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
 
             {roomState.offeredUpgradeIds.length > 0 ? (
               <div className="flex flex-col gap-3">
-                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-400/35 text-xs sm:text-sm text-amber-100 flex items-center justify-between gap-2">
+                <div className="p-3 rounded-2xl bg-[#1a0812] border border-[#FF2A6D]/50 text-xs sm:text-sm text-pink-100 flex items-center justify-between gap-2">
                   <span>
                     {roomState.players.filter((p) => p.isConnected).length > 1 ? (
                       <>
-                        <strong>Acuerdo Unánime Requerido:</strong> Todos los operadores conectados deben votar la <strong>misma mejora</strong> para instalarla gratis en la máquina.
+                        <strong className="text-[#FF2A6D]">Acuerdo Unánime Requerido:</strong> Todos los operadores conectados deben votar la <strong>misma mejora</strong> para instalarla gratis en la máquina.
                       </>
                     ) : (
                       <>
-                        <strong>Mejora Gratuita de Cuota:</strong> Elige 1 de las 3 mejoras aleatorias para especializar la máquina.
+                        <strong className="text-[#FF2A6D]">Mejora Gratuita de Cuota:</strong> Elige 1 de las 3 mejoras aleatorias para especializar la máquina.
                       </>
                     )}
                   </span>
@@ -3135,6 +3225,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   {roomState.offeredUpgradeIds.map((upId) => {
                     const meta = FORTUNARIUM_UPGRADES_CATALOG[upId];
                     const currentLv = roomState.upgrades[upId] || 0;
+                    const upDetails = getUpgradeLevelDetails(upId, currentLv);
                     const myVote = roomState.upgradeVotes[localPlayerId] === upId;
                     const voters = roomState.players.filter(
                       (p) => p.isConnected && roomState.upgradeVotes[p.id] === upId
@@ -3150,20 +3241,20 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                         }}
                         className={`p-4 rounded-2xl border-2 text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
                           myVote
-                            ? 'bg-amber-500/20 border-yellow-300 shadow-[0_0_25px_rgba(245,158,11,0.35)] scale-[1.01]'
-                            : 'bg-stone-900/90 hover:bg-stone-900 border-stone-700 hover:border-amber-400/60'
+                            ? 'bg-[#210817] border-[#FF2A6D] shadow-[0_0_25px_rgba(255,42,109,0.4)] scale-[1.01]'
+                            : 'fort-crt-panel border-cyan-500/40 hover:border-[#FF2A6D]/70'
                         }`}
                       >
                         <div className="flex flex-col gap-2.5">
                           <div className="flex items-start justify-between gap-2">
-                            <div className="w-12 h-12 rounded-2xl bg-stone-950 border border-amber-500/35 p-1.5 flex items-center justify-center shrink-0">
+                            <div className="w-12 h-12 rounded-2xl bg-[#040a12] border border-cyan-400/45 p-1.5 flex items-center justify-center shrink-0">
                               <img
                                 src={FORTUNARIUM_SYMBOLS[meta.iconSymbol].asset}
                                 alt={meta.name}
                                 className="w-full h-full object-contain"
                               />
                             </div>
-                            <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/40 text-[10px] font-black uppercase text-amber-300">
+                            <span className="px-2 py-0.5 rounded-md bg-[#1f0815] border border-[#FF2A6D]/55 text-[10px] font-black uppercase text-pink-200">
                               {meta.effectSummary}
                             </span>
                           </div>
@@ -3177,19 +3268,31 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                             </div>
                           </div>
 
-                          <p className="text-xs text-stone-200 leading-relaxed">
+                          <p className="text-xs text-cyan-100/85 leading-relaxed font-sans">
                             {meta.description}
                           </p>
+
+                          <div className="p-2 rounded-xl bg-[#040a12] border border-cyan-500/35 flex flex-col gap-1 font-mono text-[11px] tabular-nums">
+                            {upDetails.detailedLines.map((stat, sIdx) => (
+                              <div key={sIdx} className="flex items-center justify-between gap-1.5">
+                                <span className="text-cyan-200/75 truncate">{stat.label}:</span>
+                                <span className="font-bold text-emerald-300 shrink-0">
+                                  {stat.currentValue}
+                                  {stat.nextValue ? ` → ${stat.nextValue}` : ''}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
 
-                        <div className="pt-2.5 border-t border-stone-800 flex flex-col gap-2">
+                        <div className="pt-2.5 border-t border-cyan-500/25 flex flex-col gap-2">
                           <div className="flex flex-wrap items-center gap-1.5 min-h-[24px]">
                             {voters.length > 0 ? (
                               voters.map((v) => (
                                 <span
                                   key={v.id}
                                   style={{ borderColor: v.color, color: v.color }}
-                                  className="px-2 py-0.5 rounded-full bg-stone-950 border text-[10px] font-black flex items-center gap-1"
+                                  className="px-2 py-0.5 rounded-full bg-[#040a12] border text-[10px] font-black flex items-center gap-1"
                                 >
                                   <span
                                     style={{ backgroundColor: v.color }}
@@ -3199,15 +3302,15 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                                 </span>
                               ))
                             ) : (
-                              <span className="text-[11px] text-stone-500">Sin votos aún</span>
+                              <span className="text-[11px] text-cyan-300/60">Sin votos aún</span>
                             )}
                           </div>
 
                           <div
                             className={`w-full py-2 rounded-xl text-center text-xs font-black uppercase tracking-wider ${
                               myVote
-                                ? 'bg-amber-400 text-stone-950'
-                                : 'bg-stone-800 text-amber-200'
+                                ? 'bg-[#FF2A6D] text-white shadow-[0_0_14px_rgba(255,42,109,0.5)]'
+                                : 'bg-[#091626] border border-[#FF2A6D]/50 text-pink-200'
                             }`}
                           >
                             {myVote ? '✓ Votado por ti' : 'Votar esta Mejora'}
@@ -3224,21 +3327,21 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                 <div className="text-lg font-fortunarium text-emerald-300 tracking-wide">
                   ¡MEJORA DE CUOTA INSTALADA EN LA MÁQUINA!
                 </div>
-                <p className="text-xs text-stone-300">
+                <p className="text-xs text-cyan-100/85">
                   Podéis abrir el Taller para gastar créditos/llaves extra o iniciar ya la Cuota{' '}
                   {roomState.round + 1}.
                 </p>
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-stone-800">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#FF2A6D]/35">
               <button
                 type="button"
                 onClick={() => {
                   fortunariumAudio.playButtonClick();
                   setShowWorkshopModal(true);
                 }}
-                className="px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-amber-500/40 text-amber-200 text-xs font-black flex items-center gap-2 cursor-pointer tabular-nums"
+                className="fort-arcade-btn px-4 py-2.5 rounded-xl bg-[#091524] hover:bg-[#10243b] border border-amber-400/55 text-amber-200 text-xs font-black flex items-center gap-2 cursor-pointer tabular-nums"
               >
                 <Wrench className="w-4 h-4 text-amber-400" />
                 <span>Abrir Taller Completo ({roomState.money} CR)</span>
@@ -3251,7 +3354,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   fortunariumAudio.playButtonClick();
                   onNextRound();
                 }}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 disabled:from-stone-800 disabled:to-stone-800 disabled:text-stone-500 text-stone-950 font-fortunarium text-sm tracking-wider shadow-xl cursor-pointer disabled:cursor-not-allowed"
+                className="fort-arcade-btn px-6 py-3 rounded-xl bg-[#FF2A6D] hover:bg-[#ff4782] disabled:bg-slate-800 disabled:text-slate-500 border border-pink-200 disabled:border-slate-700 text-white font-fortunarium text-sm tracking-wider shadow-[0_0_24px_rgba(255,42,109,0.45)] cursor-pointer disabled:cursor-not-allowed"
               >
                 {roomState.offeredUpgradeIds.length > 0
                   ? 'ELEGID PRIMERO LA MEJORA DE CUOTA'
@@ -3279,26 +3382,26 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       {/* ===================================================================== */}
       {showWorkshopModal && (
         <div
-          className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          className="fixed inset-0 z-[80] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
           onClick={() => setShowWorkshopModal(false)}
         >
           <div
-            className="w-full max-w-4xl rounded-2xl bg-[#08131f] border-[3px] border-cyan-400/65 p-4 sm:p-6 shadow-[0_25px_70px_rgba(0,0,0,0.95),0_0_32px_rgba(6,182,212,0.2)] flex flex-col gap-4 my-auto max-h-[90dvh]"
+            className="fort-cyber-modal w-full max-w-4xl rounded-2xl p-4 sm:p-6 flex flex-col gap-4 my-auto max-h-[90dvh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between gap-3 border-b border-cyan-500/35 pb-3">
+            <div className="flex items-center justify-between gap-3 border-b border-[#FF2A6D]/40 pb-3">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-widest text-cyan-300">
-                  Banco de Mantenimiento · Piezas y Engranajes
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#FF2A6D]">
+                  Banco de Mantenimiento · Piezas y Engranajes (Hasta Nv. 10)
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-fortunarium text-amber-300 tracking-wide">
+                <h2 className="text-2xl sm:text-3xl font-fortunarium text-white tracking-wide">
                   TALLER MECÁNICO DEL FORTUNARIUM
                 </h2>
               </div>
 
               <div className="flex items-center gap-2">
                 <span className="fort-crt-display px-3 py-1.5 rounded-lg border border-cyan-400/55 font-mono text-xs font-black text-amber-300 tabular-nums">
-                  {displayedMoney} CR
+                  {smoothDisplayedMoney} CR
                 </span>
                 <span className="fort-crt-display px-3 py-1.5 rounded-lg border border-cyan-400/55 font-mono text-xs font-black text-cyan-300 tabular-nums">
                   {displayedKeys} 🔑
@@ -3306,7 +3409,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowWorkshopModal(false)}
-                  className="p-2 rounded-lg bg-[#160d14] hover:bg-[#24111e] border border-rose-500/65 text-rose-200 cursor-pointer"
+                  className="fort-arcade-btn p-2 rounded-lg bg-[#1a0b14] hover:bg-[#2a1020] border border-[#FF2A6D]/65 text-[#FF2A6D] hover:text-white cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -3319,10 +3422,10 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                 <Shield className="w-6 h-6 text-emerald-400 shrink-0" />
                 <div>
                   <div className="text-sm font-black text-white font-mono tabular-nums">
-                    Integridad del Chasis: {displayedIntegrity}% / {roomState.maxIntegrity}%
+                    Integridad del Chasis: {smoothDisplayedIntegrity}% / {roomState.maxIntegrity}%
                   </div>
                   <div className="text-xs text-cyan-100/80">
-                    Soldadura y ajuste: restaura +{25 + (roomState.upgrades.mecanico_jefe || 0) * 10}% de Integridad usando créditos o 1 Llave.
+                    Soldadura y ajuste: restaura +{25 + (roomState.upgrades.mecanico_jefe || 0) * 10}% de Integridad (Reparaciones en Cuota {roomState.round}: {roomState.repairsUsedInQuota || 0}).
                   </div>
                 </div>
               </div>
@@ -3369,6 +3472,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                 const meta = FORTUNARIUM_UPGRADES_CATALOG[upId];
                 const lv = roomState.upgrades[upId] || 0;
                 const isMax = lv >= meta.maxLevel;
+                const upDetails = getUpgradeLevelDetails(upId, lv);
                 const costMoney = getUpgradeCostMoney(upId, lv);
                 const upgradeMoneyCheck = validateWorkshopPurchase({
                   currentMoney: displayedMoney,
@@ -3408,6 +3512,18 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                         <p className="text-xs text-cyan-100/80 mt-1 leading-snug">
                           {meta.description}
                         </p>
+
+                        <div className="mt-2 p-2 rounded-lg bg-[#050d16] border border-cyan-500/30 flex flex-col gap-1 font-mono text-[10.5px] tabular-nums">
+                          {upDetails.detailedLines.map((stat, sIdx) => (
+                            <div key={sIdx} className="flex items-center justify-between gap-1.5">
+                              <span className="text-cyan-200/75 truncate">{stat.label}:</span>
+                              <span className="font-bold text-emerald-300 shrink-0">
+                                {stat.currentValue}
+                                {stat.nextValue ? ` → ${stat.nextValue}` : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -3458,137 +3574,165 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       )}
 
       {/* ===================================================================== */}
-      {/* 7. TEAM & CURSOR COLOR DRAWER (`showTeamDrawer`)                      */}
+      {/* 7. ANIMATED RIGHT-SIDE TEAM & CURSOR DRAWER (`showTeamDrawer`)        */}
       {/* ===================================================================== */}
-      {showTeamDrawer && (
-        <div
-          className="fixed inset-0 z-[75] bg-black/65 backdrop-blur-sm flex justify-end"
-          onClick={() => setShowTeamDrawer(false)}
+      <div
+        aria-hidden={!showTeamDrawer}
+        className={`fixed inset-0 z-[75] flex justify-end transition-all duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          showTeamDrawer
+            ? 'pointer-events-auto bg-black/55 backdrop-blur-[5px] opacity-100'
+            : 'pointer-events-none bg-black/0 backdrop-blur-0 opacity-0'
+        }`}
+        onClick={() => {
+          if (showTeamDrawer) {
+            fortunariumAudio.playButtonClick();
+            setShowTeamDrawer(false);
+          }
+        }}
+      >
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-label="Panel de Equipo de Operadores"
+          style={{
+            width: 'min(430px, 100vw)',
+            transform: showTeamDrawer ? 'translate3d(0, 0, 0)' : 'translate3d(100%, 0, 0)',
+            transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+          className="h-full max-h-[100dvh] bg-[#070d17]/98 border-l-[3px] border-[#FF2A6D] p-5 flex flex-col justify-between gap-4 overflow-y-auto shadow-[-20px_0_60px_rgba(0,0,0,0.95),0_0_32px_rgba(255,42,109,0.25)] will-change-transform"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div
-            className="w-full max-w-md h-full bg-[#132a34] border-l-[3px] border-[#b98532] p-5 flex flex-col justify-between gap-4 overflow-y-auto shadow-[0_0_50px_rgba(0,0,0,0.9)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b-2 border-[#8c6b32] pb-3">
-                <div>
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#f4d06f]">
-                    REGISTRO DE TURNOS EN VIVO
-                  </span>
-                  <h3 className="text-2xl font-fortunarium text-[#fff3d6] tracking-wide">
-                    EQUIPO DE OPERADORES
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowTeamDrawer(false)}
-                  className="fort-arcade-btn p-2 rounded-lg bg-[#2b1a14] hover:bg-[#3d251d] border-2 border-[#b98532] text-[#f4d06f] cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Cursor Color Selector */}
-              <div className="p-3.5 rounded-xl bg-[#0d1d24] border-2 border-[#8c6b32] flex flex-col gap-2">
-                <span className="text-xs font-bold text-[#fff3d6] flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-[#f4d06f]" />
-                  Color de tu Cursor en Tiempo Real
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-[#FF2A6D]/40 pb-3">
+              <div>
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#FF2A6D]">
+                  REGISTRO DE TURNOS EN VIVO
                 </span>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {FORTUNARIUM_CURSOR_COLORS.map((c) => {
-                    const selected =
-                      (localPlayer?.color || '').toLowerCase() === c.hex.toLowerCase();
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => onSetCursorColor(c.hex)}
-                        style={{ backgroundColor: c.hex }}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center cursor-pointer ${
-                          selected ? 'ring-2 ring-white scale-110' : 'opacity-75 hover:opacity-100'
-                        }`}
-                      >
-                        {selected && <Check className="w-3.5 h-3.5 text-stone-950 stroke-[3]" />}
-                      </button>
-                    );
-                  })}
-                </div>
+                <h3 className="text-2xl font-fortunarium text-white tracking-wide">
+                  EQUIPO DE OPERADORES
+                </h3>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  fortunariumAudio.playButtonClick();
+                  setShowTeamDrawer(false);
+                }}
+                className="fort-arcade-btn p-2 rounded-lg bg-[#1a0b14] hover:bg-[#2a1020] border border-[#FF2A6D]/65 text-[#FF2A6D] hover:text-white cursor-pointer"
+                title="Cerrar panel de equipo (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              {/* Players List */}
-              <div className="flex flex-col gap-2.5">
-                {displayedPlayers.map((p) => (
-                  <div
-                    key={p.id}
-                    className="p-3.5 rounded-xl bg-[#193640] border-2 border-[#8c6b32] flex flex-col gap-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: p.color }}
-                        />
-                        <span className="font-bold text-sm text-[#fff3d6]">{p.name}</span>
-                        {p.id === localPlayerId && (
-                          <span className="text-[10px] font-bold text-[#f4d06f]">(Tú)</span>
-                        )}
-                      </div>
-                      <span className="font-mono text-xs font-black text-[#f4d06f] tabular-nums">
-                        {p.stats.spinsTriggered} tiradas
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-[#8c6b32]/60 font-mono text-xs tabular-nums">
-                      <div>
-                        <span className="text-[10px] text-[#c2d6d3] block">Generado</span>
-                        <span className="font-black text-[#7ae582]">
-                          +{p.stats.totalMoneyGenerated} CR
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-[#c2d6d3] block">Gastado/Perd.</span>
-                        <span className="font-black text-[#ff7b7b]">
-                          -{p.stats.totalMoneyLost} CR
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-[#c2d6d3] block">Balance Neto</span>
-                        <span
-                          className={`font-black ${
-                            p.stats.netBalance >= 0 ? 'text-[#f4d06f]' : 'text-[#ff7b7b]'
-                          }`}
-                        >
-                          {p.stats.netBalance >= 0
-                            ? `+${p.stats.netBalance}`
-                            : p.stats.netBalance}{' '}
-                          CR
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            {/* Cursor Color Selector */}
+            <div className="fort-crt-panel p-3.5 rounded-xl border border-cyan-500/40 flex flex-col gap-2.5">
+              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-[#FF2A6D]" />
+                Color de tu Cursor en Tiempo Real
+              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {FORTUNARIUM_CURSOR_COLORS.map((c) => {
+                  const selected =
+                    (localPlayer?.color || '').toLowerCase() === c.hex.toLowerCase();
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => onSetCursorColor(c.hex)}
+                      style={{ backgroundColor: c.hex }}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center cursor-pointer transition-transform ${
+                        selected ? 'ring-2 ring-white scale-110' : 'opacity-75 hover:opacity-100'
+                      }`}
+                    >
+                      {selected && <Check className="w-3.5 h-3.5 text-stone-950 stroke-[3]" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+
+            {/* Players List */}
+            <div className="flex flex-col gap-3">
+              {displayedPlayers.map((p) => (
+                <div
+                  key={p.id}
+                  className="fort-crt-panel p-3.5 rounded-xl border border-cyan-500/35 flex flex-col gap-2.5 shadow-sm"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/30"
+                        style={{ backgroundColor: p.color }}
+                      />
+                      <span className="font-bold text-sm sm:text-base text-white truncate">
+                        {p.name}
+                      </span>
+                      {p.id === localPlayerId && (
+                        <span className="px-1.5 py-0.5 rounded bg-[#1f0815] border border-[#FF2A6D]/60 text-[10px] font-mono font-black text-[#FF2A6D] shrink-0">
+                          TÚ
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-mono text-xs font-black text-cyan-300 tabular-nums shrink-0">
+                      {p.stats.spinsTriggered} tiradas
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-cyan-500/20 font-mono text-xs tabular-nums">
+                    <div>
+                      <span className="text-[10px] font-bold text-cyan-200/75 block">Generado</span>
+                      <span className="font-black text-emerald-300 text-xs sm:text-sm">
+                        +{p.stats.totalMoneyGenerated} CR
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-cyan-200/75 block">
+                        Gastado/Perd.
+                      </span>
+                      <span className="font-black text-rose-400 text-xs sm:text-sm">
+                        -{p.stats.totalMoneyLost} CR
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-cyan-200/75 block">
+                        Balance Neto
+                      </span>
+                      <span
+                        className={`font-black text-xs sm:text-sm ${
+                          p.stats.netBalance >= 0 ? 'text-amber-300' : 'text-rose-400'
+                        }`}
+                      >
+                        {p.stats.netBalance >= 0
+                          ? `+${p.stats.netBalance}`
+                          : p.stats.netBalance}{' '}
+                        CR
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        </aside>
+      </div>
 
       {/* ===================================================================== */}
       {/* 8. EXIT CONFIRMATION MODAL (`showExitConfirmModal`)                   */}
       {/* ===================================================================== */}
       {showExitConfirmModal && (
         <div
-          className="fixed inset-0 z-[85] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+          className="fixed inset-0 z-[85] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
           onClick={() => setShowExitConfirmModal(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-[#132a34] border-[3px] border-[#b98532] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.9),inset_0_2px_0_rgba(255,255,255,0.12)] flex flex-col gap-4"
+            className="fort-cyber-modal w-full max-w-md rounded-2xl p-6 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-2xl font-fortunarium text-[#fff3d6] tracking-wide">
+            <h3 className="text-2xl font-fortunarium text-white tracking-wide">
               ¿SALIR DE LA PARTIDA?
             </h3>
-            <p className="text-xs sm:text-sm text-[#d9e5e3] leading-relaxed">
+            <p className="text-xs sm:text-sm text-cyan-100/85 leading-relaxed font-sans">
               Puedes volver a la sala de configuración con tu grupo o abandonar la sala para regresar al menú principal de FAM2PLAY.
             </p>
 
@@ -3600,7 +3744,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   setShowExitConfirmModal(false);
                   onReturnToLobby();
                 }}
-                className="fort-arcade-btn w-full py-3 px-4 rounded-xl bg-[#d99b26] hover:bg-[#f4d06f] border-2 border-[#fef08a] text-stone-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                className="fort-arcade-btn w-full py-3 px-4 rounded-xl bg-[#FF2A6D] hover:bg-[#ff4782] border border-pink-200 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,42,109,0.45)] cursor-pointer"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Volver al Lobby de la Sala</span>
@@ -3613,7 +3757,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   setShowExitConfirmModal(false);
                   onLeaveRoom();
                 }}
-                className="fort-arcade-btn w-full py-3 px-4 rounded-xl bg-[#451414] hover:bg-[#5c1b1b] border-2 border-[#dc2626] text-rose-100 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                className="fort-arcade-btn w-full py-3 px-4 rounded-xl bg-[#451414] hover:bg-[#5c1b1b] border border-rose-500 text-rose-100 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Abandonar Sala y Salir al Menú</span>
@@ -3622,7 +3766,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowExitConfirmModal(false)}
-                className="fort-arcade-btn w-full py-2.5 px-4 rounded-xl bg-[#0d1d24] hover:bg-[#193640] border-2 border-[#8c6b32] text-[#f4d06f] font-bold text-xs cursor-pointer"
+                className="fort-arcade-btn w-full py-2.5 px-4 rounded-xl bg-[#091524] hover:bg-[#10233a] border border-cyan-500/45 text-cyan-200 font-bold text-xs cursor-pointer"
               >
                 Cancelar y Seguir Jugando
               </button>
@@ -3640,13 +3784,13 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
           onClick={() => setShowDevModal(false)}
         >
           <div
-            className="w-full max-w-4xl rounded-3xl bg-stone-950 border-2 border-fuchsia-500/60 p-4 sm:p-6 shadow-2xl flex flex-col gap-4 my-auto max-h-[92dvh] overflow-y-auto"
+            className="fort-cyber-modal w-full max-w-4xl rounded-3xl p-4 sm:p-6 flex flex-col gap-4 my-auto max-h-[92dvh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+            <div className="flex items-center justify-between border-b border-[#FF2A6D]/40 pb-3">
               <div>
-                <span className="text-[10px] font-mono font-bold uppercase text-fuchsia-400">
+                <span className="text-[10px] font-mono font-bold uppercase text-[#FF2A6D]">
                   ENTORNO DE PRUEBAS 100% AISLADO · SANDBOX
                 </span>
                 <h3 className="text-xl sm:text-2xl font-fortunarium text-white tracking-wide">
@@ -3656,7 +3800,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowDevModal(false)}
-                className="p-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-white cursor-pointer"
+                className="fort-arcade-btn p-2 rounded-xl bg-[#1a0b14] hover:bg-[#2a1020] border border-[#FF2A6D]/65 text-[#FF2A6D] hover:text-white cursor-pointer"
                 title="Cerrar Simulador"
               >
                 <X className="w-5 h-5" />
@@ -4084,7 +4228,10 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       <FortunariumPrizeTableModal
         isOpen={showPrizeTableModal}
         onClose={() => setShowPrizeTableModal(false)}
+        upgrades={roomState.upgrades}
+        betMode={roomState.betMode}
         currentVoltage={displayedVoltage}
+        activeModifiers={roomState.activeModifiers}
       />
       <FortunariumAudioModal
         isOpen={showAudioModal}

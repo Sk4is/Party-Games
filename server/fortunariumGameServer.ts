@@ -193,6 +193,7 @@ export class FortunariumServer {
       bestPatternNameInMatch: '—',
       integrity: 100,
       maxIntegrity: 100,
+      repairsUsedInQuota: 0,
       voltageMultiplier: 1.0,
       keys: 1,
       betMode: 'normal',
@@ -247,6 +248,7 @@ export class FortunariumServer {
       bestPatternNameInMatch: room.bestPatternNameInMatch,
       integrity: room.integrity,
       maxIntegrity: room.maxIntegrity,
+      repairsUsedInQuota: room.repairsUsedInQuota || 0,
       voltageMultiplier: room.voltageMultiplier,
       keys: room.keys,
       betMode: room.betMode,
@@ -347,8 +349,8 @@ export class FortunariumServer {
     });
 
     if (upgradeId === 'motor_extra') {
-      room.maxIntegrity += 15;
-      room.integrity = Math.min(room.maxIntegrity, room.integrity + 15);
+      room.maxIntegrity += 8;
+      room.integrity = Math.min(room.maxIntegrity, room.integrity + 8);
     }
 
     this.addLog(room, {
@@ -972,7 +974,7 @@ export class FortunariumServer {
           return;
         }
 
-        const baseRepairAmount = 25 + (room.upgrades.mecanico_jefe || 0) * 10;
+        const baseRepairAmount = 25 + (room.upgrades.mecanico_jefe || 0) * 5;
         if (msg.useKey) {
           if (room.keys < 1) {
             this.sendError(ws, 'No tenéis Llaves disponibles.');
@@ -982,9 +984,11 @@ export class FortunariumServer {
         } else {
           const repairCost = calculateRepairCost({
             round: room.round,
+            repairsUsedInQuota: room.repairsUsedInQuota || 0,
             integrity: room.integrity,
             maxIntegrity: room.maxIntegrity,
             upgrades: room.upgrades,
+            activeModifiers: room.activeModifiers,
           });
           const check = validateWorkshopPurchase({
             currentMoney: room.money,
@@ -1004,6 +1008,7 @@ export class FortunariumServer {
           }
           room.money -= repairCost;
           room.quotaProgress = room.money;
+          room.repairsUsedInQuota = (room.repairsUsedInQuota || 0) + 1;
           player.stats.totalMoneyLost += repairCost;
           player.stats.netBalance =
             player.stats.totalMoneyGenerated - player.stats.totalMoneyLost;
@@ -1359,6 +1364,7 @@ export class FortunariumServer {
           // Next quota is calculated from `previousQuota`, NOT `room.money`!
           room.quota = calculateNextQuotaTarget(room.quota, room.config.difficulty);
           room.quotaProgress = room.money;
+          room.repairsUsedInQuota = 0;
           room.overdriveSpins = 0;
           room.activeIncident = null;
           room.activeRoulette = null;
@@ -1513,9 +1519,11 @@ export class FortunariumServer {
 
     const baseRepair = calculateRepairCost({
       round: room.round,
+      repairsUsedInQuota: room.repairsUsedInQuota || 0,
       integrity: room.integrity,
       maxIntegrity: room.maxIntegrity,
       upgrades: room.upgrades,
+      activeModifiers: room.activeModifiers,
     });
     const emergencyRepairCost = Math.max(12, Math.round(baseRepair * 0.58));
     const overdriveBonusDmg = Math.min(8, (room.overdriveSpins || 0) * 2);
@@ -1809,6 +1817,7 @@ export class FortunariumServer {
     room.bestPatternNameInMatch = '—';
     room.integrity = 100;
     room.maxIntegrity = 100;
+    room.repairsUsedInQuota = 0;
     room.voltageMultiplier = 1.0;
     room.keys = 1;
     room.betMode = 'normal';

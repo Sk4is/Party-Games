@@ -130,6 +130,7 @@ export interface FortunariumWinLine {
   cells: FortunariumCellCoord[];
   length: number;
   count: number;
+  baseSymbolValue?: number;
   baseReward: number;
   multiplier: number;
   patternMultiplier: number;
@@ -394,6 +395,7 @@ export interface FortunariumRoomState {
 
   integrity: number;
   maxIntegrity: number;
+  repairsUsedInQuota?: number;
   voltageMultiplier: number;
   keys: number;
   betMode: FortunariumBetMode;

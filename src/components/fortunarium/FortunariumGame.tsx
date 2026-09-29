@@ -160,16 +160,16 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
   if (roomState) {
     if (roomState.phase === 'LOBBY') {
       return (
-        <div className="fortunarium-root font-fortunarium relative min-h-screen w-full bg-[#09060e]">
+        <div className="fortunarium-root font-fortunarium fort-lobby-bg relative min-h-screen w-full">
           {notification && (
-            <div className="fixed top-4 inset-x-4 max-w-md mx-auto z-50 p-3 rounded-2xl bg-amber-950/95 border border-amber-500/50 text-amber-200 text-xs font-bold shadow-2xl flex items-center gap-2 backdrop-blur-md">
-              <Bell className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="fixed top-4 inset-x-4 max-w-md mx-auto z-50 p-3 rounded-2xl bg-[#09111C]/95 border border-[#FF2A6D]/60 text-pink-100 text-xs font-bold shadow-[0_0_25px_rgba(255,42,109,0.3)] flex items-center gap-2 backdrop-blur-md">
+              <Bell className="w-4 h-4 text-[#FF2A6D] shrink-0" />
               <span>{notification.text}</span>
             </div>
           )}
 
           {errorMessage && (
-            <div className="fixed top-16 inset-x-4 max-w-md mx-auto z-50 p-3 rounded-2xl bg-rose-950/95 border border-rose-500/50 text-rose-200 text-xs font-bold shadow-2xl flex items-center gap-2 backdrop-blur-md">
+            <div className="fixed top-16 inset-x-4 max-w-md mx-auto z-50 p-3 rounded-2xl bg-rose-950/95 border border-rose-500/60 text-rose-200 text-xs font-bold shadow-2xl flex items-center gap-2 backdrop-blur-md">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{errorMessage}</span>
             </div>
@@ -219,16 +219,14 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
   }
 
   return (
-    <div className="fortunarium-root font-fortunarium fixed inset-0 w-screen h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-[#09060e] text-stone-100 select-none overflow-hidden z-50">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.15),transparent_70%)] pointer-events-none" />
-
+    <div className="fortunarium-root font-fortunarium fort-lobby-bg fixed inset-0 w-screen h-screen flex flex-col items-center justify-center p-4 sm:p-6 text-slate-100 select-none overflow-hidden z-50">
       <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between">
         <button
           type="button"
           onClick={handleLeaveAndBack}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-amber-500/30 text-stone-200 text-xs font-bold transition-colors shadow-lg cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#070B14]/90 hover:bg-[#0D1424] border border-[#FF2A6D]/45 hover:border-[#FF2A6D] text-slate-100 text-xs font-bold transition-all shadow-[0_0_16px_rgba(255,42,109,0.2)] cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4 text-amber-400" />
+          <ArrowLeft className="w-4 h-4 text-[#FF2A6D]" />
           <span>Volver al Menú</span>
         </button>
 
@@ -238,18 +236,18 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
             fortunariumAudio.playButtonClick();
             setShowRulebook(true);
           }}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-amber-500/35 text-amber-200 text-xs font-black transition-colors shadow-lg cursor-pointer"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#070B14]/90 hover:bg-[#0D1424] border border-cyan-400/45 hover:border-cyan-400 text-cyan-200 text-xs font-black transition-all shadow-[0_0_16px_rgba(34,211,238,0.18)] cursor-pointer"
         >
-          <BookOpen className="w-4 h-4 text-amber-400" />
+          <BookOpen className="w-4 h-4 text-cyan-400" />
           <span>Manual</span>
         </button>
       </div>
 
-      <div className="relative z-10 w-full max-w-md bg-stone-950/90 border border-amber-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl backdrop-blur-md flex flex-col items-center gap-4">
+      <div className="relative z-10 w-full max-w-md fort-cyber-modal rounded-3xl p-6 sm:p-7 flex flex-col items-center gap-4">
         {/* Canonical Lobby Emoji Logo */}
         <div className="relative">
-          <div className="absolute -inset-4 rounded-full bg-amber-500/20 blur-xl pointer-events-none" />
-          <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-b from-amber-500/25 to-stone-950 border border-amber-400/50 flex items-center justify-center shadow-[0_0_35px_rgba(245,158,11,0.3)]">
+          <div className="absolute -inset-4 rounded-full bg-[#FF2A6D]/25 blur-xl pointer-events-none" />
+          <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-b from-[#FF2A6D]/30 via-[#120A1A] to-[#050810] border-2 border-[#FF2A6D]/70 flex items-center justify-center shadow-[0_0_35px_rgba(255,42,109,0.4)]">
             <span className="text-5xl leading-none select-none" role="img" aria-label="Fortunarium">
               🎰
             </span>
@@ -257,20 +255,23 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
         </div>
 
         <div className="text-center">
-          <h1 className="text-2xl sm:text-3xl font-fortunarium text-amber-300 tracking-wider">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF2A6D]/15 border border-[#FF2A6D]/45 text-[10px] font-mono font-black uppercase tracking-widest text-[#FF7AA2] mb-1">
+            SISTEMA COOPERATIVO · 1–4 OPERADORES
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-fortunarium text-white tracking-wider drop-shadow-[0_0_14px_rgba(255,42,109,0.55)]">
             FORTUNARIUM
           </h1>
-          <p className="text-xs text-stone-300 mt-1 max-w-xs mx-auto leading-relaxed">
-            Tragaperras en tiempo real (1 a 4 jugadores). Juega en solitario o comparte la máquina con tus amigos.
+          <p className="text-xs text-slate-300 mt-1 max-w-xs mx-auto leading-relaxed">
+            Tragaperras industrial en tiempo real (1 a 4 jugadores). Juega en solitario o comparte la máquina con tus amigos.
           </p>
         </div>
 
         <div className="w-full flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-stone-300">
+          <label className="text-[11px] font-mono font-black uppercase tracking-wider text-cyan-300">
             Tu Nombre de Operador:
           </label>
           <div className="flex items-center gap-2">
-            <div className="w-11 h-11 rounded-xl bg-stone-900 border border-amber-500/30 p-1.5 flex items-center justify-center shrink-0">
+            <div className="w-11 h-11 rounded-xl fort-crt-panel p-1.5 flex items-center justify-center shrink-0">
               <img
                 src={FORTUNARIUM_SYMBOL_ASSETS.siete}
                 alt="Siete"
@@ -283,17 +284,17 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
               maxLength={20}
               onChange={(e) => handleUpdateName(e.target.value)}
               placeholder="Tu apodo"
-              className="flex-1 px-4 py-2.5 rounded-xl bg-stone-900 border border-stone-700 focus:border-amber-500 text-sm font-bold text-white outline-none transition-all"
+              className="flex-1 px-4 py-2.5 rounded-xl bg-[#050811] border border-slate-700/80 focus:border-[#FF2A6D] focus:shadow-[0_0_14px_rgba(255,42,109,0.3)] text-sm font-bold text-white outline-none transition-all"
             />
           </div>
         </div>
 
         {/* Cursor Color Selector */}
         <div className="w-full flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-stone-300">
+          <label className="text-[11px] font-mono font-black uppercase tracking-wider text-cyan-300">
             Color de tu Cursor en Tiempo Real:
           </label>
-          <div className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-stone-900/90 border border-stone-800">
+          <div className="flex items-center justify-between gap-1.5 p-2 rounded-xl fort-crt-panel">
             {FORTUNARIUM_CURSOR_COLORS.map((c) => {
               const selected = player.color.toLowerCase() === c.hex.toLowerCase();
               return (
@@ -303,27 +304,27 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
                   title={c.label}
                   onClick={() => handleSelectColor(c.hex)}
                   style={{ backgroundColor: c.hex }}
-                  className={`w-7 h-7 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                  className={`w-7 h-7 rounded-full transition-all cursor-pointer flex items-center justify-center relative z-10 ${
                     selected
-                      ? 'ring-2 ring-white scale-110 shadow-[0_0_10px_rgba(255,255,255,0.6)]'
+                      ? 'ring-2 ring-white scale-110 shadow-[0_0_12px_rgba(255,255,255,0.75)]'
                       : 'opacity-75 hover:opacity-100'
                   }`}
                 >
-                  {selected && <Check className="w-3.5 h-3.5 text-stone-950 stroke-[3]" />}
+                  {selected && <Check className="w-3.5 h-3.5 text-slate-950 stroke-[3]" />}
                 </button>
               );
             })}
           </div>
         </div>
 
-        <div className="w-full flex p-1 rounded-xl bg-stone-900 border border-stone-800">
+        <div className="w-full flex p-1 rounded-xl bg-[#050811] border border-slate-800">
           <button
             type="button"
             onClick={() => setActiveTab('create')}
             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
               activeTab === 'create'
-                ? 'bg-amber-500 text-stone-950 shadow-md font-black'
-                : 'text-stone-400 hover:text-stone-200'
+                ? 'bg-[#FF2A6D] text-white shadow-[0_0_16px_rgba(255,42,109,0.45)] font-black'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Crear Sala
@@ -333,8 +334,8 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
             onClick={() => setActiveTab('join')}
             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
               activeTab === 'join'
-                ? 'bg-amber-500 text-stone-950 shadow-md font-black'
-                : 'text-stone-400 hover:text-stone-200'
+                ? 'bg-[#FF2A6D] text-white shadow-[0_0_16px_rgba(255,42,109,0.45)] font-black'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Unirse con Código
@@ -342,7 +343,7 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
         </div>
 
         {(errorMessage || localError) && (
-          <div className="w-full p-3 rounded-xl bg-rose-950/70 border border-rose-600/60 text-xs font-semibold text-rose-200 flex items-center gap-2">
+          <div className="w-full p-3 rounded-xl bg-rose-950/80 border border-rose-500/60 text-xs font-semibold text-rose-200 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>{errorMessage || localError}</span>
           </div>
@@ -354,7 +355,7 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
               type="button"
               onClick={handleCreate}
               disabled={connectionStatus === 'connecting'}
-              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-stone-950 font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#FF2A6D] via-[#E01E5A] to-[#FF2A6D] hover:from-[#FF4782] hover:to-[#FF2A6D] border border-[#FF7AA2]/50 text-white font-black text-sm uppercase tracking-wider transition-all shadow-[0_8px_28px_rgba(255,42,109,0.4)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
             >
               <Play className="w-4 h-4 fill-current" />
               <span>
@@ -363,7 +364,7 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
                   : 'Abrir Sala de Fortunarium'}
               </span>
             </button>
-            <p className="text-[11px] text-stone-400 text-center">
+            <p className="text-[11px] text-slate-400 text-center">
               Comparte el código de 5 letras con 1 a 3 amigos para operar la misma tragaperras.
             </p>
           </div>
@@ -375,13 +376,13 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
               onChange={(e) => setInputCode(e.target.value.toUpperCase())}
               placeholder="CÓDIGO DE SALA"
               maxLength={6}
-              className="w-full px-4 py-3 rounded-xl bg-stone-900 border border-stone-700 text-center font-mono font-black text-lg tracking-widest text-amber-300 outline-none focus:border-amber-500 uppercase placeholder:text-stone-600"
+              className="w-full px-4 py-3 rounded-xl fort-crt-display border border-cyan-400/40 text-center font-mono font-black text-lg tracking-widest text-cyan-300 outline-none focus:border-[#FF2A6D] uppercase placeholder:text-slate-600"
             />
             <button
               type="button"
               onClick={handleJoin}
               disabled={connectionStatus === 'connecting' || !inputCode.trim()}
-              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-stone-950 font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50"
+              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#FF2A6D] via-[#E01E5A] to-[#FF2A6D] hover:from-[#FF4782] hover:to-[#FF2A6D] border border-[#FF7AA2]/50 text-white font-black text-sm uppercase tracking-wider transition-all shadow-[0_8px_28px_rgba(255,42,109,0.4)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50"
             >
               <LogIn className="w-4 h-4" />
               <span>
