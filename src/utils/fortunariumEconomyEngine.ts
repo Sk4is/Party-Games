@@ -15,6 +15,8 @@ import {
 import {
   FORTUNARIUM_SYMBOLS,
   FORTUNARIUM_BET_MODES,
+  FORTUNARIUM_UPGRADES_CATALOG,
+  ALL_UPGRADE_IDS,
   X_MASK_CELLS,
   TRIANGLE_MASK_CELLS,
   INVERTED_TRIANGLE_MASK_CELLS,
@@ -421,12 +423,14 @@ export interface EvaluatedSpinCore {
   jackpotPayout: number;
   penalties: number;
   integrityDelta: number;
+  overdriveWearAdded: number;
   voltageMultiplierUsed: number;
   voltageMultiplierAfter: number;
   keysGained: number;
   extraSpinsGained: number;
   shouldTriggerMysteryEvent: boolean;
   isJackpot: boolean;
+  consumedOjoDorado: boolean;
 }
 
 export function evaluateSpinGridCore(params: {
@@ -435,6 +439,8 @@ export function evaluateSpinGridCore(params: {
   upgrades: Record<FortunariumUpgradeId, number>;
   currentVoltage: number;
   round: number;
+  overdriveSpins?: number;
+  playerId?: string;
   activeModifiers?: FortunariumActiveModifier[];
   allowMysteryEvents?: boolean;
   forceJackpot?: boolean;
@@ -445,17 +451,43 @@ export function evaluateSpinGridCore(params: {
     betMode,
     upgrades,
     round,
+    overdriveSpins = 0,
+    playerId,
     activeModifiers = [],
     allowMysteryEvents = true,
     forceJackpot = false,
     enableJackpotRoll = true,
   } = params;
 
+  const hasFiebreCerezas = activeModifiers.some((m) => m.modifierId === 'fiebre_cerezas');
+  const hasGeometraEfecto = activeModifiers.some((m) => m.modifierId === 'geometra_efecto');
+  const hasDiagonalPerfecta = activeModifiers.some((m) => m.modifierId === 'diagonal_perfecta');
+  const hasOjoDorado = activeModifiers.some((m) => m.modifierId === 'ojo_dorado');
+  const hasDinamita = activeModifiers.some((m) => m.modifierId === 'dinamita');
+  const hasMotorFino = activeModifiers.some((m) => m.modifierId === 'motor_fino');
+  const hasLluviaMonedas = activeModifiers.some((m) => m.modifierId === 'lluvia_monedas');
   const hasEscudoTermico = activeModifiers.some((m) => m.modifierId === 'escudo_termico');
   const hasSobrecargaDorada = activeModifiers.some((m) => m.modifierId === 'sobrecarga_dorada');
+  const hasMotorAlRojo = activeModifiers.some((m) => m.modifierId === 'motor_al_rojo');
   const hasCableadoQuemado = activeModifiers.some((m) => m.modifierId === 'cableado_quemado');
+  const hasImanRoto = activeModifiers.some((m) => m.modifierId === 'iman_roto');
+  const hasRodilloPegado = activeModifiers.some((m) => m.modifierId === 'rodillo_pegado');
+  const hasHacienda = activeModifiers.some((m) => m.modifierId === 'hacienda');
+  const hasMalaRacha = activeModifiers.some((m) => m.modifierId === 'mala_racha');
   const hasFugaCreditos = activeModifiers.some((m) => m.modifierId === 'fuga_creditos');
   const hasRodillosOxidados = activeModifiers.some((m) => m.modifierId === 'rodillos_oxidados');
+  const hasManoAfortunada = activeModifiers.some(
+    (m) =>
+      m.modifierId === 'mano_afortunada' &&
+      (!m.targetPlayerId || !playerId || m.targetPlayerId === playerId)
+  );
+  const hasManoNegra = activeModifiers.some(
+    (m) =>
+      m.modifierId === 'mano_negra' &&
+      (!m.targetPlayerId || !playerId || m.targetPlayerId === playerId)
+  );
+
+  let consumedOjoDorado = false;
 
   const betConfig = FORTUNARIUM_BET_MODES[betMode];
   const board = toRowMajorBoard(grid); // Canonical 3 rows × 5 columns: board[row][col]
@@ -593,8 +625,33 @@ export function evaluateSpinGridCore(params: {
     const wildBonus = opts.wildCount > 0 ? 1.25 : 1.0;
     const symUpgradeMult = getSymbolUpgradeMult(opts.symbolId);
     let modMult = 1.0;
-    if (hasSobrecargaDorada) modMult *= 1.35;
-    if (hasRodillosOxidados && opts.patternType === 'HORIZONTAL') modMult *= 0.8;
+    if (hasSobrecargaDorada) modMult *= 1.5;
+    if (hasFiebreCerezas && opts.symbolId === 'cereza') modMult *= 2.0;
+    if (hasImanRoto && (opts.symbolId === 'diamante' || opts.symbolId === 'estrella')) {
+      modMult *= 0.65;
+    }
+    if (hasGeometraEfecto && opts.patternType !== 'HORIZONTAL') {
+      modMult *= 1.4;
+    }
+    if (hasDiagonalPerfecta && opts.patternType === 'DIAGONAL') {
+      modMult *= 1.75;
+    }
+    if (
+      hasOjoDorado &&
+      !consumedOjoDorado &&
+      (opts.patternType === 'X' ||
+        opts.patternType === 'TRIANGULO' ||
+        opts.patternType === 'TRIANGULO_INVERTIDO')
+    ) {
+      modMult *= 2.0;
+      consumedOjoDorado = true;
+    }
+    if (hasManoAfortunada) {
+      modMult *= 1.25;
+    }
+    if ((hasRodillosOxidados || hasRodilloPegado) && opts.patternType === 'HORIZONTAL') {
+      modMult *= 0.8;
+    }
 
     const payout = Math.max(
       1,
@@ -858,11 +915,41 @@ export function evaluateSpinGridCore(params: {
 
   // 4. Sum line & shape pattern payouts and apply symbol-specific line perks
   let grossPayout = 0;
-  let integrityDelta = -(
+  const lateGameWear = round >= 5 ? Math.min(3, Math.floor((round - 3) / 2)) : 0;
+  let baseSpinWear =
     betConfig.integrityWear +
-    ((upgrades.cableado_ilegal || 0) > 0 ? 1 : 0)
-  );
+    lateGameWear +
+    ((upgrades.cableado_ilegal || 0) > 0 ? 1 : 0) +
+    (hasMotorAlRojo ? 2 : 0) +
+    (hasManoNegra ? 2 : 0);
+
+  if (hasMotorFino) {
+    baseSpinWear = Math.max(0, Math.floor(baseSpinWear * 0.5));
+  }
+  if (hasEscudoTermico) {
+    baseSpinWear = 0;
+  }
+
+  // Post-quota overdrive wear curve (Sections 2, 3, 10)
+  let overdriveWearAdded = 0;
+  if (overdriveSpins > 0 && !hasEscudoTermico) {
+    if (overdriveSpins === 1) {
+      overdriveWearAdded = 1 + (Math.random() < 0.45 ? 1 : 0);
+    } else if (overdriveSpins === 2) {
+      overdriveWearAdded = 2 + Math.floor(Math.random() * 2);
+    } else if (overdriveSpins === 3) {
+      overdriveWearAdded = 4 + Math.floor(Math.random() * 3);
+    } else {
+      overdriveWearAdded = overdriveSpins * 2 + Math.floor(Math.random() * 3);
+    }
+  }
+
+  let integrityDelta = -(baseSpinWear + overdriveWearAdded);
   let keysGained = 0;
+
+  if (hasLluviaMonedas) {
+    grossPayout += Math.round(12 * betConfig.payoutMultiplier);
+  }
 
   for (const w of winLines) {
     grossPayout += w.payout;
@@ -955,36 +1042,51 @@ export function evaluateSpinGridCore(params: {
     }
 
     if (explodedCount > 0) {
-      const rawDmg = explodedCount * 14 + (hasCableadoQuemado ? 4 : 0);
-      const dmg = hasEscudoTermico ? 0 : rawDmg;
-      const cashLoss = explodedCount * (20 + round * 3);
-      integrityDelta -= dmg;
-      PenaltiesTotal += cashLoss;
-      markHazardCells(bombaCoords.slice(defusedCount));
+      if (hasDinamita || hasEscudoTermico) {
+        const dynBonus = Math.round(explodedCount * 45 * betConfig.payoutMultiplier);
+        grossPayout += dynBonus;
+        specialEffects.push({
+          id: `fx_bomba_dyn_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+          symbolId: 'bomba',
+          title: hasDinamita
+            ? `¡Dinamita Beneficiosa! (${explodedCount}× Bomba)`
+            : `¡Blindaje Térmico! (${explodedCount}× Bomba)`,
+          description: `Las bombas explotan a vuestro favor: +${dynBonus} CR y 0 daño al chasis.`,
+          moneyDelta: dynBonus,
+          integrityDelta: 0,
+          voltageDelta: 0,
+          keysDelta: 0,
+          variant: 'positive',
+          cells: bombaCoords.slice(defusedCount),
+        });
+      } else {
+        const hazardMult = (hasMalaRacha ? 1.3 : 1.0) * (hasManoNegra ? 1.15 : 1.0);
+        const rawDmg = Math.round((explodedCount * 14 + (hasCableadoQuemado ? 3 : 0)) * hazardMult);
+        const cashLoss = Math.round(explodedCount * (20 + round * 3) * hazardMult);
+        integrityDelta -= rawDmg;
+        PenaltiesTotal += cashLoss;
+        markHazardCells(bombaCoords.slice(defusedCount));
 
-      specialEffects.push({
-        id: `fx_bomba_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
-        symbolId: 'bomba',
-        title: hasEscudoTermico
-          ? `¡Escudo Térmico Activo! (${explodedCount}× Bomba)`
-          : `¡Explosión en Rodillos! (${explodedCount}× Bomba)`,
-        description: hasEscudoTermico
-          ? `El Escudo Térmico absorbió el daño de integridad (-${cashLoss} CR).`
-          : `Daña -${dmg}% la Integridad y destruye -${cashLoss} CR.`,
-        moneyDelta: -cashLoss,
-        integrityDelta: -dmg,
-        voltageDelta: 0,
-        keysDelta: 0,
-        variant: hasEscudoTermico ? 'neutral' : 'negative',
-        cells: bombaCoords.slice(defusedCount),
-      });
+        specialEffects.push({
+          id: `fx_bomba_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+          symbolId: 'bomba',
+          title: `¡Explosión en Rodillos! (${explodedCount}× Bomba)`,
+          description: `Daña -${rawDmg}% la Integridad y destruye -${cashLoss} CR.`,
+          moneyDelta: -cashLoss,
+          integrityDelta: -rawDmg,
+          voltageDelta: 0,
+          keysDelta: 0,
+          variant: 'negative',
+          cells: bombaCoords.slice(defusedCount),
+        });
+      }
     }
-  } else if (hasCableadoQuemado) {
-    integrityDelta -= 4;
+  } else if (hasCableadoQuemado && !hasEscudoTermico) {
+    integrityDelta -= 3;
   }
 
   if (hasFugaCreditos) {
-    PenaltiesTotal += 4;
+    PenaltiesTotal += 6;
   }
 
   // 7. Process CALAVERA & TRÉBOL Synergy
@@ -1106,6 +1208,11 @@ export function evaluateSpinGridCore(params: {
     return { col, row };
   });
 
+  if (hasHacienda && grossPayout > 0) {
+    const tax = Math.max(1, Math.round(grossPayout * 0.18));
+    PenaltiesTotal += tax;
+  }
+
   return {
     winLines,
     specialEffects,
@@ -1115,13 +1222,200 @@ export function evaluateSpinGridCore(params: {
     jackpotPayout,
     penalties: PenaltiesTotal,
     integrityDelta,
+    overdriveWearAdded,
     voltageMultiplierUsed: activeVoltage,
     voltageMultiplierAfter,
     keysGained,
     extraSpinsGained,
     shouldTriggerMysteryEvent,
     isJackpot,
+    consumedOjoDorado,
   };
+}
+
+// ============================================================================
+// REPAIR COST SCALING, INCIDENT PROBABILITY, SYNERGY OFFERS & BIG WIN (PASS 2)
+// ============================================================================
+export function calculateRepairCost(params: {
+  round: number;
+  integrity: number;
+  maxIntegrity?: number;
+  upgrades?: Record<FortunariumUpgradeId, number>;
+}): number {
+  const { round, integrity, maxIntegrity = 100, upgrades } = params;
+  const baseRepairCost = 26;
+  const quotaScaling =
+    1 + (round - 1) * 0.28 + Math.pow(Math.max(0, round - 3), 1.2) * 0.12;
+
+  const missingRatio = Math.max(
+    0,
+    Math.min(1, (maxIntegrity - integrity) / Math.max(1, maxIntegrity))
+  );
+  // Early maintenance (integrity >= 75%) is efficient; deep reconstruction (<= 35%) is expensive
+  const damageScaling =
+    missingRatio <= 0.25
+      ? 0.85
+      : missingRatio >= 0.65
+      ? 1.45
+      : 1.0 + (missingRatio - 0.25) * 0.85;
+
+  const totalUpgradeLevels = upgrades
+    ? Object.values(upgrades).reduce((acc, v) => acc + (v || 0), 0)
+    : 0;
+  const complexityModifier = 1 + totalUpgradeLevels * 0.05;
+
+  return Math.max(
+    18,
+    Math.round(baseRepairCost * quotaScaling * damageScaling * complexityModifier)
+  );
+}
+
+export function calculateIncidentProbability(params: {
+  round: number;
+  overdriveSpins?: number;
+  integrity: number;
+  maxIntegrity?: number;
+  spinsSinceLastIncident: number;
+  activeModifiers?: FortunariumActiveModifier[];
+  playerId?: string;
+}): number {
+  const {
+    round,
+    overdriveSpins = 0,
+    integrity,
+    maxIntegrity = 100,
+    spinsSinceLastIncident,
+    activeModifiers = [],
+    playerId,
+  } = params;
+
+  // Quota 1 has no random incidents unless players push into Overdrive
+  if (round <= 1 && overdriveSpins === 0) {
+    return 0;
+  }
+
+  // Minimum spacing cooldown (shorter cooldown only when pushing deep into Overdrive)
+  const minCooldown = overdriveSpins >= 3 ? 2 : 4;
+  if (spinsSinceLastIncident < minCooldown) {
+    return 0;
+  }
+
+  let prob =
+    round <= 1
+      ? 0.02
+      : round === 2
+      ? 0.06
+      : Math.min(0.18, 0.09 + (round - 3) * 0.015);
+
+  // Overdrive pressure curve
+  if (overdriveSpins === 1) prob += 0.06;
+  else if (overdriveSpins === 2) prob += 0.14;
+  else if (overdriveSpins === 3) prob += 0.24;
+  else if (overdriveSpins >= 4) prob += Math.min(0.42, 0.24 + (overdriveSpins - 3) * 0.08);
+
+  // Damaged machine instability
+  if (integrity / Math.max(1, maxIntegrity) <= 0.45) {
+    prob += 0.05;
+  }
+
+  // Mano Negra player-specific debuff
+  const hasManoNegra = activeModifiers.some(
+    (m) =>
+      m.modifierId === 'mano_negra' &&
+      (!m.targetPlayerId || !playerId || m.targetPlayerId === playerId)
+  );
+  if (hasManoNegra) {
+    prob += 0.07;
+  }
+
+  return Number(Math.min(0.6, prob).toFixed(3));
+}
+
+export function isBigWinSpin(params: {
+  winLinesCount: number;
+  grossPayout: number;
+  spinCost: number;
+  isJackpot?: boolean;
+}): boolean {
+  if (params.isJackpot) return true;
+  if (params.winLinesCount >= 3) return true;
+  const relativeThreshold = Math.max(42, params.spinCost * 4.2);
+  return params.grossPayout >= relativeThreshold;
+}
+
+export function rollSynergyWeightedUpgrades(params: {
+  upgrades: Record<FortunariumUpgradeId, number>;
+  integrity: number;
+  maxIntegrity: number;
+  round: number;
+}): FortunariumUpgradeId[] {
+  const { upgrades, integrity, maxIntegrity, round } = params;
+  const candidates = ALL_UPGRADE_IDS.filter((id) => {
+    const lv = upgrades[id] || 0;
+    return lv < FORTUNARIUM_UPGRADES_CATALOG[id].maxLevel;
+  });
+
+  if (candidates.length <= 3) {
+    return [...candidates];
+  }
+
+  // Calculate synergy weights without guaranteeing ideal picks
+  const fruitInstalled =
+    (upgrades.cosecha_roja || 0) +
+    (upgrades.huerto_citrico || 0) +
+    (upgrades.prensa_uvas || 0);
+  const geoInstalled = (upgrades.geometra || 0) + (upgrades.mano_tahur || 0);
+  const lowIntegrity = integrity / Math.max(1, maxIntegrity) <= 0.65;
+
+  const weightedPool = candidates.map((id) => {
+    const item = FORTUNARIUM_UPGRADES_CATALOG[id];
+    let weight =
+      item.rarity === 'COMÚN'
+        ? 38
+        : item.rarity === 'POCO COMÚN'
+        ? 30
+        : item.rarity === 'RARA'
+        ? 20
+        : 12;
+
+    if (round >= 3 && (item.rarity === 'RARA' || item.rarity === 'EXCEPCIONAL')) {
+      weight *= 1.35;
+    }
+    if (fruitInstalled > 0 && item.synergyTags.includes('fruit')) {
+      weight *= 1.3;
+    }
+    if (geoInstalled > 0 && item.synergyTags.includes('geometry')) {
+      weight *= 1.3;
+    }
+    if (lowIntegrity && item.synergyTags.includes('repair')) {
+      weight *= 1.4;
+    }
+    if ((upgrades[id] || 0) > 0) {
+      weight *= 1.2;
+    }
+
+    return { id, weight };
+  });
+
+  const picked: FortunariumUpgradeId[] = [];
+  const pool = [...weightedPool];
+
+  while (picked.length < 3 && pool.length > 0) {
+    const totalW = pool.reduce((acc, p) => acc + p.weight, 0);
+    let r = Math.random() * totalW;
+    let chosenIdx = 0;
+    for (let i = 0; i < pool.length; i++) {
+      r -= pool[i].weight;
+      if (r <= 0) {
+        chosenIdx = i;
+        break;
+      }
+    }
+    picked.push(pool[chosenIdx].id);
+    pool.splice(chosenIdx, 1);
+  }
+
+  return picked;
 }
 
 // ============================================================================

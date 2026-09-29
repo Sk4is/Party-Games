@@ -77,6 +77,12 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
     setBetMode,
     spinSlot,
     devGrantModifier,
+    resolveIncident,
+    dismissRoulette,
+    devTriggerIncident,
+    devTriggerRoulette,
+    devSetIntegrity,
+    devForceOverdrive,
     repairMachine,
     buyUpgrade,
     voteUpgrade,
@@ -193,6 +199,12 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
         onSetBetMode={setBetMode}
         onSpinSlot={spinSlot}
         onDevGrantModifier={devGrantModifier}
+        onResolveIncident={resolveIncident}
+        onDismissRoulette={dismissRoulette}
+        onDevTriggerIncident={devTriggerIncident}
+        onDevTriggerRoulette={devTriggerRoulette}
+        onDevSetIntegrity={devSetIntegrity}
+        onDevForceOverdrive={devForceOverdrive}
         onRepairMachine={repairMachine}
         onBuyUpgrade={buyUpgrade}
         onVoteUpgrade={voteUpgrade}

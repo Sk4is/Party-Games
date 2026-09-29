@@ -17,17 +17,25 @@
 }
 
 @font-face {
+  font-family: "FortunariumRajdhani";
+  src: url("/assets/fonts/Rajdhani-Regular.ttf") format("truetype");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "Fortunarium";
-  src: url("/assets/fonts/JandaManateeSolid.ttf") format("truetype");
-  font-weight: 400;
+  src: url("/assets/fonts/Rajdhani-Regular.ttf") format("truetype");
+  font-weight: 400 700;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
   font-family: "FortunariumDisplay";
-  src: url("/assets/fonts/JandaManateeSolid.ttf") format("truetype");
-  font-weight: 400;
+  src: url("/assets/fonts/Rajdhani-Regular.ttf") format("truetype");
+  font-weight: 400 700;
   font-style: normal;
   font-display: swap;
 }
@@ -70,8 +78,9 @@ body,
     font-family: 'BLAZE', 'Chalkboard SE', 'Comic Sans MS', 'Caveat', cursive, sans-serif;
   }
   .font-fortunarium {
-    font-family: "Fortunarium", "Titan One", "Fredoka", cursive, sans-serif;
+    font-family: "FortunariumRajdhani", "Fortunarium", sans-serif;
     letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -907,13 +916,28 @@ body,
   animation: fort-wild-morph 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Global Fortunarium Typography: JandaManateeSolid applied across all Fortunarium screens */
-.fortunarium-root,
-.fortunarium-root *,
-.fortunarium-root .font-mono,
-.fortunarium-root .font-sans {
-  font-family: "FortunariumDisplay", "Fortunarium", "Titan One", "Fredoka", sans-serif !important;
-  letter-spacing: 0.035em;
+/* Scoped Fortunarium Typography: Rajdhani for all Fortunarium UI text & tabular numerals */
+.fortunarium-root {
+  font-family: "FortunariumRajdhani", sans-serif;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.fortunarium-root * {
+  font-family: "FortunariumRajdhani", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.fortunarium-root .font-fortunarium {
+  font-family: "FortunariumRajdhani", sans-serif !important;
+  letter-spacing: 0.045em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.fortunarium-root .font-mono {
+  font-family: "FortunariumRajdhani", sans-serif !important;
+  letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -921,19 +945,19 @@ body,
 @keyframes fort-symbol-grow-cycle {
   0% {
     transform: scale(1);
-    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+    filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.25));
   }
   26% {
-    transform: scale(1.18);
-    filter: brightness(1.14) drop-shadow(0 6px 14px rgba(251, 191, 36, 0.85));
+    transform: scale(1.16);
+    filter: brightness(1.18) drop-shadow(0 0 14px rgba(34, 211, 238, 0.85)) drop-shadow(0 0 22px rgba(250, 204, 21, 0.55));
   }
   74% {
-    transform: scale(1.17);
-    filter: brightness(1.12) drop-shadow(0 6px 14px rgba(251, 191, 36, 0.85));
+    transform: scale(1.15);
+    filter: brightness(1.15) drop-shadow(0 0 14px rgba(34, 211, 238, 0.85)) drop-shadow(0 0 22px rgba(250, 204, 21, 0.55));
   }
   100% {
     transform: scale(1);
-    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+    filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.25));
   }
 }
 
@@ -967,16 +991,16 @@ body,
 
 @keyframes fort-total-light-sweep {
   0% {
-    transform: scale(0.94);
-    box-shadow: 0 0 0 rgba(250, 204, 21, 0);
+    transform: scale(0.96);
+    box-shadow: 0 0 0 rgba(34, 211, 238, 0);
   }
   45% {
-    transform: scale(1.06);
-    box-shadow: 0 0 36px rgba(250, 204, 21, 0.65);
+    transform: scale(1.03);
+    box-shadow: 0 0 32px rgba(34, 211, 238, 0.55), 0 0 18px rgba(236, 72, 153, 0.35);
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 18px rgba(16, 185, 129, 0.45);
+    box-shadow: 0 0 16px rgba(34, 211, 238, 0.28);
   }
 }
 
@@ -985,91 +1009,166 @@ body,
 }
 
 /* =========================================================================
-   FORTUNARIUM RETRO CARTOON ARCADE & ELECTROMECHANICAL WORKSHOP IDENTITY
+   FORTUNARIUM CYBERPUNK JAPANESE ARCADE / CRT MACHINE VISUAL SYSTEM
    ========================================================================= */
 
-/* Subtle amber/green phosphor CRT scanline & vignette overlay for displays */
+/* Dark blue/black CRT glass with subtle cyan phosphor tint & horizontal scanlines */
 .fort-crt-display {
   position: relative;
-  background-color: #09110d;
+  background-color: #040a10;
   background-image:
-    radial-gradient(ellipse at 50% 45%, rgba(245, 158, 11, 0.14) 0%, rgba(6, 14, 12, 0.96) 80%),
+    radial-gradient(ellipse at 50% 45%, rgba(6, 182, 212, 0.11) 0%, rgba(3, 8, 14, 0.97) 82%),
     repeating-linear-gradient(
-      0deg,
-      rgba(0, 0, 0, 0.32) 0px,
-      rgba(0, 0, 0, 0.32) 2px,
-      rgba(255, 214, 102, 0.03) 2px,
-      rgba(255, 214, 102, 0.03) 4px
+      180deg,
+      rgba(0, 0, 0, 0.34) 0px,
+      rgba(0, 0, 0, 0.34) 2px,
+      rgba(34, 211, 238, 0.03) 2px,
+      rgba(34, 211, 238, 0.03) 4px
     );
   box-shadow:
-    inset 0 4px 16px rgba(0, 0, 0, 0.95),
-    inset 0 0 22px rgba(217, 119, 6, 0.16),
-    0 2px 0 rgba(255, 228, 160, 0.22);
+    inset 0 4px 18px rgba(0, 0, 0, 0.95),
+    inset 0 0 20px rgba(6, 182, 212, 0.12),
+    0 1px 0 rgba(34, 211, 238, 0.16);
 }
 
-/* Pixel-matrix subtle dot background for retro sub-counters */
+/* Unified 3x5 Main CRT Slot Screen */
+.fort-crt-slot-screen {
+  position: relative;
+  background-color: #030912;
+  background-image:
+    radial-gradient(ellipse at 50% 48%, rgba(14, 165, 233, 0.16) 0%, rgba(5, 15, 26, 0.94) 66%, rgba(2, 5, 11, 0.99) 100%);
+  box-shadow:
+    inset 0 0 48px rgba(0, 0, 0, 0.96),
+    inset 0 0 22px rgba(34, 211, 238, 0.18),
+    0 0 26px rgba(6, 182, 212, 0.16);
+}
+
+/* Subtle horizontal CRT scanlines, phosphor grid & faint glass reflection over the 3x5 display */
+.fort-crt-slot-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 22;
+  border-radius: inherit;
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.045) 0%, transparent 30%, transparent 72%, rgba(236, 72, 153, 0.03) 100%),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.32) 2px,
+      rgba(0, 0, 0, 0.32) 4px
+    );
+}
+
+/* Individual CRT column channel inside the unified 3x5 monitor */
+.fort-crt-reel-channel {
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    rgba(2, 8, 15, 0.92) 0%,
+    rgba(6, 20, 33, 0.72) 50%,
+    rgba(2, 8, 15, 0.92) 100%
+  );
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  box-shadow:
+    inset 0 12px 24px rgba(0, 0, 0, 0.88),
+    inset 0 -12px 24px rgba(0, 0, 0, 0.88),
+    inset 0 0 14px rgba(6, 182, 212, 0.09);
+}
+
+/* Pixel-matrix subtle cyan dot background for electronic sub-counters */
 .fort-dot-matrix {
-  background-image: radial-gradient(rgba(234, 179, 8, 0.14) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(34, 211, 238, 0.11) 1px, transparent 1px);
   background-size: 5px 5px;
 }
 
-/* Hand-painted petrol/teal metal cabinet body texture with subtle wear */
+/* Dark painted scratched steel cabinet body with cyan & magenta edge reflections */
 .fort-cabinet-metal {
   background:
-    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.12) 0%, transparent 38%),
-    radial-gradient(circle at 85% 82%, rgba(0, 0, 0, 0.38) 0%, transparent 45%),
-    linear-gradient(180deg, #215d68 0%, #16444e 52%, #0e2e36 100%);
+    radial-gradient(circle at 14% 10%, rgba(34, 211, 238, 0.11) 0%, transparent 36%),
+    radial-gradient(circle at 88% 16%, rgba(236, 72, 153, 0.09) 0%, transparent 34%),
+    radial-gradient(circle at 82% 88%, rgba(0, 0, 0, 0.65) 0%, transparent 50%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.012) 0px, rgba(255, 255, 255, 0.012) 1px, transparent 1px, transparent 11px),
+    linear-gradient(180deg, #16202e 0%, #0e1622 48%, #080d15 100%);
   box-shadow:
-    0 26px 65px rgba(0, 0, 0, 0.9),
-    inset 0 3px 0 rgba(255, 243, 209, 0.28),
-    inset 0 -6px 0 rgba(7, 20, 24, 0.92);
+    0 30px 80px rgba(0, 0, 0, 0.96),
+    0 0 38px rgba(6, 182, 212, 0.12),
+    inset 0 2px 0 rgba(103, 232, 249, 0.25),
+    inset 2px 0 0 rgba(34, 211, 238, 0.14),
+    inset -2px 0 0 rgba(236, 72, 153, 0.16),
+    inset 0 -6px 0 rgba(2, 6, 12, 0.96);
 }
 
-/* Worn brass / painted mustard trim instead of shiny casino gold */
+/* Metallic trim with subtle cyan/steel highlight */
 .fort-brass-trim {
-  border-color: #b98532;
+  border-color: #1e3a4c;
   box-shadow:
-    inset 0 2px 0 rgba(253, 230, 138, 0.35),
-    inset 0 -2px 0 rgba(69, 39, 10, 0.8),
-    0 4px 10px rgba(0, 0, 0, 0.65);
+    inset 0 1px 0 rgba(103, 232, 249, 0.28),
+    inset 0 -2px 0 rgba(2, 6, 12, 0.9),
+    0 4px 12px rgba(0, 0, 0, 0.75);
 }
 
-/* Chunky physical arcade push-button with 3D plunger lip */
+/* Tactile cyberpunk hardware push-button */
 .fort-arcade-btn {
   box-shadow:
-    0 5px 0 #451a03,
-    0 7px 14px rgba(0, 0, 0, 0.65),
-    inset 0 2px 1px rgba(255, 255, 255, 0.38);
-  transition: transform 90ms ease, box-shadow 90ms ease;
+    0 4px 0 #05080f,
+    0 6px 14px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition: transform 120ms cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 120ms ease, border-color 140ms ease, filter 140ms ease;
+}
+.fort-arcade-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 .fort-arcade-btn:active:not(:disabled) {
-  transform: translateY(3px);
+  transform: translateY(2px) scale(0.985);
   box-shadow:
-    0 2px 0 #451a03,
-    0 3px 6px rgba(0, 0, 0, 0.6),
-    inset 0 1px 1px rgba(255, 255, 255, 0.25);
+    0 1px 0 #05080f,
+    0 2px 6px rgba(0, 0, 0, 0.7),
+    inset 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
-/* Massive tactile GIRAR arcade plunger button */
-.fort-girar-plunger {
-  background: linear-gradient(180deg, #e05324 0%, #c23814 58%, #8f2209 100%);
-  border: 3px solid #f2b24c;
+/* System Control Rail Header Button */
+.fort-sys-header-btn {
+  height: 32px;
   box-shadow:
-    0 7px 0 #471205,
-    0 11px 22px rgba(0, 0, 0, 0.75),
-    inset 0 3px 2px rgba(255, 228, 181, 0.55),
-    inset 0 -4px 6px rgba(68, 16, 4, 0.8);
-  transition: transform 95ms cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 95ms ease, filter 120ms ease;
+    0 2px 0 #03060c,
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: transform 120ms ease, border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+.fort-sys-header-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Massive tactile GIRAR neon red/magenta arcade plunger button */
+.fort-girar-plunger {
+  background: linear-gradient(180deg, #ff2a6d 0%, #e11d48 52%, #9f1239 100%);
+  border: 3px solid #fda4af;
+  box-shadow:
+    0 6px 0 #3b0414,
+    0 0 28px rgba(244, 63, 94, 0.55),
+    0 12px 24px rgba(0, 0, 0, 0.85),
+    inset 0 3px 3px rgba(255, 228, 230, 0.62),
+    inset 0 -4px 8px rgba(76, 5, 25, 0.85);
+  transition: transform 110ms cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 110ms ease, filter 130ms ease;
 }
 .fort-girar-plunger:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(1.12);
+  box-shadow:
+    0 6px 0 #3b0414,
+    0 0 36px rgba(244, 63, 94, 0.8),
+    0 12px 24px rgba(0, 0, 0, 0.85),
+    inset 0 3px 3px rgba(255, 228, 230, 0.75),
+    inset 0 -4px 8px rgba(76, 5, 25, 0.85);
 }
 .fort-girar-plunger:active:not(:disabled) {
-  transform: translateY(5px);
+  transform: translateY(4px) scale(0.985);
   box-shadow:
-    0 2px 0 #471205,
-    0 4px 10px rgba(0, 0, 0, 0.7),
-    inset 0 2px 4px rgba(0, 0, 0, 0.45);
+    0 2px 0 #3b0414,
+    0 0 20px rgba(244, 63, 94, 0.65),
+    0 4px 10px rgba(0, 0, 0, 0.75),
+    inset 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
 /* Accessibility: Respect user reduced motion preference */

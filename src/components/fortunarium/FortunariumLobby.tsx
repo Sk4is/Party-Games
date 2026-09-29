@@ -68,9 +68,24 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
   };
 
   return (
-    <div className="fortunarium-root font-fortunarium min-h-screen w-full bg-[#0b1c24] text-amber-50 flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-y-auto select-none relative">
-      {/* Warm workshop pegboard & incandescent overhead lamp */}
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(224,122,46,0.18),transparent_65%),radial-gradient(ellipse_at_bottom_right,rgba(33,93,104,0.35),transparent_60%)] pointer-events-none" />
+    <div className="fortunarium-root font-fortunarium min-h-screen w-full bg-[#040810] text-cyan-50 flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-y-auto select-none relative">
+      {/* Background artwork (/assets/fortunarium/fondo.png) with subtle blur & dark navy overlay */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div
+          className="absolute inset-0 scale-[1.03]"
+          style={{
+            backgroundImage: "url('/assets/fortunarium/fondo.png')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            filter: 'blur(7px)',
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{ backgroundColor: 'rgba(2, 7, 15, 0.42)' }}
+        />
+      </div>
 
       {/* Top Navigation Bar */}
       <header className="relative z-10 w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3 pb-4 border-b-2 border-[#b98532]/60">

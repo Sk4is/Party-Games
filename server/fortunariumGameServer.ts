@@ -12,6 +12,9 @@ import {
   FortunariumActiveEvent,
   FortunariumActionLogEntry,
   FortunariumModifierId,
+  FortunariumIncidentType,
+  FortunariumActiveIncident,
+  FortunariumEffectRouletteState,
 } from '../src/types/fortunarium';
 import {
   FORTUNARIUM_UPGRADES_CATALOG,
@@ -20,6 +23,7 @@ import {
   getUpgradeCostMoney,
   calculateEffectiveSpinCost,
   FORTUNARIUM_MODIFIERS_CATALOG,
+  ALL_MODIFIER_IDS,
 } from '../src/data/fortunarium/fortunariumAssets';
 import {
   generateAuthoritativeGrid,
@@ -28,6 +32,10 @@ import {
   calculateInitialQuota,
   calculateNextQuotaTarget,
   validateWorkshopPurchase,
+  calculateRepairCost,
+  calculateIncidentProbability,
+  isBigWinSpin,
+  rollSynergyWeightedUpgrades,
 } from '../src/utils/fortunariumEconomyEngine';
 import { roomRegistry } from './roomRegistry';
 
@@ -41,6 +49,7 @@ interface ServerFortunariumRoom extends FortunariumRoomState {
   hostId: string;
   spinTimer: NodeJS.Timeout | null;
   disconnectTimers: Map<string, NodeJS.Timeout>;
+  spinsSinceLastIncident: number;
 }
 
 const DEFAULT_CONFIG: FortunariumConfig = {
@@ -194,14 +203,19 @@ export class FortunariumServer {
       offeredUpgradeIds: [],
       upgradeVotes: {},
       lastInstalledUpgradeId: null,
+      upgradeHistory: [],
+      overdriveSpins: 0,
       activeModifiers: [],
       activeEvent: null,
+      activeIncident: null,
+      activeRoulette: null,
       readyForNextRoundPlayerIds: [],
       actionLog: [],
       defeatCause: null,
       endReason: null,
       spinTimer: null,
       disconnectTimers: new Map(),
+      spinsSinceLastIncident: 0,
     };
 
     this.rooms.set(code, room);
@@ -243,8 +257,12 @@ export class FortunariumServer {
       offeredUpgradeIds: room.offeredUpgradeIds,
       upgradeVotes: room.upgradeVotes,
       lastInstalledUpgradeId: room.lastInstalledUpgradeId,
+      upgradeHistory: room.upgradeHistory || [],
+      overdriveSpins: room.overdriveSpins || 0,
       activeModifiers: room.activeModifiers,
       activeEvent: room.activeEvent,
+      activeIncident: room.activeIncident || null,
+      activeRoulette: room.activeRoulette || null,
       readyForNextRoundPlayerIds: room.readyForNextRoundPlayerIds,
       actionLog: room.actionLog.slice(0, 18),
       defeatCause: room.defeatCause,
@@ -296,21 +314,14 @@ export class FortunariumServer {
     }
   }
 
-  // Pick 3 random distinct upgrades that are not yet at max level
+  // Pick 3 synergy- & rarity-weighted distinct upgrades that are not yet at max level
   private rollRandomUpgrades(room: ServerFortunariumRoom): FortunariumUpgradeId[] {
-    const candidates = ALL_UPGRADE_IDS.filter((id) => {
-      const currentLv = room.upgrades[id] || 0;
-      return currentLv < FORTUNARIUM_UPGRADES_CATALOG[id].maxLevel;
+    return rollSynergyWeightedUpgrades({
+      upgrades: room.upgrades,
+      integrity: room.integrity,
+      maxIntegrity: room.maxIntegrity,
+      round: room.round,
     });
-
-    const pool = [...candidates];
-    const picked: FortunariumUpgradeId[] = [];
-    while (picked.length < 3 && pool.length > 0) {
-      const idx = Math.floor(Math.random() * pool.length);
-      picked.push(pool[idx]);
-      pool.splice(idx, 1);
-    }
-    return picked;
   }
 
   private installUpgradeOnMachine(
@@ -323,8 +334,17 @@ export class FortunariumServer {
     const currentLv = room.upgrades[upgradeId] || 0;
     if (currentLv >= catalogItem.maxLevel) return;
 
-    room.upgrades[upgradeId] = currentLv + 1;
+    const newLevel = currentLv + 1;
+    room.upgrades[upgradeId] = newLevel;
     room.lastInstalledUpgradeId = upgradeId;
+    if (!room.upgradeHistory) room.upgradeHistory = [];
+    room.upgradeHistory.push({
+      upgradeId,
+      level: newLevel,
+      round: room.round,
+      installedBy: installedByText,
+      timestamp: Date.now(),
+    });
 
     if (upgradeId === 'motor_extra') {
       room.maxIntegrity += 15;
@@ -332,7 +352,7 @@ export class FortunariumServer {
     }
 
     this.addLog(room, {
-      text: `${installedByText}: «${catalogItem.name}» (Nv. ${currentLv + 1}) instalada permanentemente.`,
+      text: `${installedByText}: «${catalogItem.name}» [${catalogItem.rarity}] (Nv. ${newLevel}) instalada permanentemente.`,
       variant: 'upgrade',
     });
   }
@@ -624,6 +644,17 @@ export class FortunariumServer {
           return;
         }
 
+        // Enforce 'apuesta_forzada' debuff if active and affordable
+        const hasApuestaForzada = room.activeModifiers.some(
+          (m) => m.modifierId === 'apuesta_forzada'
+        );
+        if (hasApuestaForzada && room.betMode === 'normal') {
+          const dobleCost = calculateEffectiveSpinCost('doble', room.upgrades);
+          if (room.money >= dobleCost) {
+            room.betMode = 'doble';
+          }
+        }
+
         let currentBetCost = calculateEffectiveSpinCost(room.betMode, room.upgrades);
         if (room.money < currentBetCost) {
           // Auto-adjust to normal bet mode if they can afford normal but not higher bet mode
@@ -631,17 +662,37 @@ export class FortunariumServer {
           currentBetCost = cheapestSpinCost;
         }
 
-        const actualSpinCost = currentBetCost;
+        // Player-specific 'mal_contacto' adds +4 CR cost if affordable
+        const hasMalContacto = room.activeModifiers.some(
+          (m) =>
+            m.modifierId === 'mal_contacto' &&
+            (!m.targetPlayerId || m.targetPlayerId === player.id)
+        );
+        const extraContactCost =
+          hasMalContacto && room.money >= currentBetCost + 4 ? 4 : 0;
+
+        const actualSpinCost = currentBetCost + extraContactCost;
         const moneyBeforeSpin = room.money;
         const moneyAfterSpinCost = Math.max(0, moneyBeforeSpin - actualSpinCost);
+
+        // Track post-quota Overdrive spins if quota was already reached before this spin
+        if (moneyBeforeSpin >= room.quota || (room.overdriveSpins || 0) > 0) {
+          room.overdriveSpins = (room.overdriveSpins || 0) + 1;
+        }
+
+        // Clear any leftover roulette popup when spinning
+        room.activeRoulette = null;
 
         // Deduct ONLY spin cost when spin starts; do NOT evaluate bankruptcy mid-spin!
         room.money = moneyAfterSpinCost;
         room.quotaProgress = moneyAfterSpinCost;
         room.totalSpinsInMatch += 1;
 
-        const newGrid = msg.forceScenario
-          ? generateDeterministicTestGrid(msg.forceScenario)
+        const scenarioToUse =
+          msg.forceScenario === 'big_win' ? 'multi_pattern' : msg.forceScenario;
+
+        const newGrid = scenarioToUse
+          ? generateDeterministicTestGrid(scenarioToUse)
           : generateAuthoritativeGrid(room.upgrades, room.betMode, room.activeModifiers);
 
         const core = evaluateSpinGridCore({
@@ -650,11 +701,22 @@ export class FortunariumServer {
           upgrades: room.upgrades,
           currentVoltage: room.voltageMultiplier,
           round: room.round,
+          overdriveSpins: room.overdriveSpins || 0,
+          playerId: player.id,
           activeModifiers: room.activeModifiers,
           allowMysteryEvents: true,
           forceJackpot: msg.forceScenario === 'jackpot',
           enableJackpotRoll: !msg.forceScenario || msg.forceScenario === 'jackpot',
         });
+
+        const spinIsBigWin =
+          msg.forceScenario === 'big_win' ||
+          isBigWinSpin({
+            winLinesCount: core.winLines.length,
+            grossPayout: core.grossPayout,
+            spinCost: actualSpinCost,
+            isJackpot: core.isJackpot,
+          });
 
         let triggeredEventId: string | null = null;
         if (core.shouldTriggerMysteryEvent) {
@@ -678,6 +740,8 @@ export class FortunariumServer {
         let summaryText = '';
         if (core.isJackpot) {
           summaryText = `¡JACKPOT DEL FORTUNARIUM! ${player.name} desató +${core.grossPayout} CR`;
+        } else if (spinIsBigWin) {
+          summaryText = `¡GRAN PREMIO ARCADE! ${player.name} logró +${core.grossPayout} CR (${core.winLines.length} patrón/es)`;
         } else if (core.grossPayout > 0 && core.penalties > 0) {
           summaryText = `${player.name} ganó +${core.grossPayout} CR (-${core.penalties} CR en penalizaciones)`;
         } else if (core.grossPayout > 0) {
@@ -721,6 +785,9 @@ export class FortunariumServer {
           extraSpinsGained: core.extraSpinsGained,
           triggeredEventId,
           isJackpot: core.isJackpot,
+          isBigWin: spinIsBigWin,
+          overdriveSpinNumber: room.overdriveSpins || 0,
+          overdriveWearAdded: core.overdriveWearAdded,
           summaryText,
           timestamp: Date.now(),
         };
@@ -765,6 +832,13 @@ export class FortunariumServer {
             }
           }
 
+          // Remove Ojo Dorado if it was consumed this spin
+          if (core.consumedOjoDorado) {
+            room.activeModifiers = room.activeModifiers.filter(
+              (m) => m.modifierId !== 'ojo_dorado'
+            );
+          }
+
           // Decrement existing temporary modifiers by 1 spin and remove expired ones
           room.activeModifiers = room.activeModifiers
             .map((m) => ({
@@ -776,7 +850,7 @@ export class FortunariumServer {
           // Apply any new temporary modifier granted during this spin (e.g. from '?')
           for (const fx of core.specialEffects) {
             if (fx.grantedModifierId) {
-              this.applyTemporaryModifier(room, fx.grantedModifierId);
+              this.applyTemporaryModifier(room, fx.grantedModifierId, player);
             }
           }
 
@@ -852,7 +926,36 @@ export class FortunariumServer {
             return;
           }
 
-          // 3. Advance turn and evaluate bankruptcy ONLY after full spin transaction resolves
+          // 3. Random Machine Incident or Overdrive Effect Roulette check
+          room.spinsSinceLastIncident = (room.spinsSinceLastIncident || 0) + 1;
+          const incidentProb = calculateIncidentProbability({
+            round: room.round,
+            overdriveSpins: room.overdriveSpins || 0,
+            integrity: room.integrity,
+            maxIntegrity: room.maxIntegrity,
+            spinsSinceLastIncident: room.spinsSinceLastIncident,
+            activeModifiers: room.activeModifiers,
+            playerId: player.id,
+          });
+
+          if (!room.activeIncident && Math.random() < incidentProb) {
+            room.spinsSinceLastIncident = 0;
+            this.triggerRandomIncident(room, player);
+          } else if (
+            !room.activeIncident &&
+            !room.activeRoulette &&
+            (room.overdriveSpins || 0) >= 2 &&
+            Math.random() < 0.26
+          ) {
+            this.triggerEffectRoulette(
+              room,
+              `SOBRECARGA DE CUOTA (+${room.overdriveSpins})`,
+              true,
+              player
+            );
+          }
+
+          // 4. Advance turn and evaluate bankruptcy ONLY after full spin transaction resolves
           this.advanceTurn(room);
           this.evaluateBankruptcyOrQuota(room);
           this.broadcastRoomState(room);
@@ -877,7 +980,12 @@ export class FortunariumServer {
           }
           room.keys -= 1;
         } else {
-          const repairCost = 28 + (room.round - 1) * 8;
+          const repairCost = calculateRepairCost({
+            round: room.round,
+            integrity: room.integrity,
+            maxIntegrity: room.maxIntegrity,
+            upgrades: room.upgrades,
+          });
           const check = validateWorkshopPurchase({
             currentMoney: room.money,
             cost: repairCost,
@@ -918,6 +1026,97 @@ export class FortunariumServer {
         });
 
         this.evaluateBankruptcyOrQuota(room);
+        this.broadcastRoomState(room);
+        break;
+      }
+
+      case 'RESOLVE_INCIDENT': {
+        if (!room.activeIncident || room.isSpinning) return;
+        const inc = room.activeIncident;
+
+        if (msg.choice === 'EMERGENCY_REPAIR') {
+          const canUseKey = room.keys >= 1 && room.money < inc.emergencyRepairCost + 10;
+          if (canUseKey) {
+            room.keys -= 1;
+            const dmg = inc.reducedDamage;
+            room.integrity = Math.max(1, room.integrity - dmg);
+            this.addLog(room, {
+              playerId: player.id,
+              playerName: player.name,
+              text: `${player.name} contuvo «${inc.title}» con 1 Llave (-${dmg}% INT, avería evitada).`,
+              integrityDelta: -dmg,
+              variant: 'repair',
+            });
+          } else {
+            const check = validateWorkshopPurchase({
+              currentMoney: room.money,
+              cost: inc.emergencyRepairCost,
+              quotaTarget: room.quota,
+              upgrades: room.upgrades,
+              activeModifiers: room.activeModifiers,
+            });
+            if (!check.allowed) {
+              this.sendError(
+                ws,
+                `No podéis pagar los ${inc.emergencyRepairCost} CR sin quedaros sin reserva de giro.`
+              );
+              return;
+            }
+            room.money -= inc.emergencyRepairCost;
+            room.quotaProgress = room.money;
+            player.stats.totalMoneyLost += inc.emergencyRepairCost;
+            player.stats.netBalance =
+              player.stats.totalMoneyGenerated - player.stats.totalMoneyLost;
+            const dmg = inc.reducedDamage;
+            room.integrity = Math.max(1, room.integrity - dmg);
+            this.addLog(room, {
+              playerId: player.id,
+              playerName: player.name,
+              text: `${player.name} realizó reparación de emergencia en «${inc.title}» (-${inc.emergencyRepairCost} CR, -${dmg}% INT).`,
+              moneyDelta: -inc.emergencyRepairCost,
+              integrityDelta: -dmg,
+              variant: 'repair',
+            });
+          }
+        } else {
+          // ABSORB_IMPACT
+          const dmg = inc.integrityDamage;
+          room.integrity = Math.max(0, room.integrity - dmg);
+          player.stats.integrityDamageCaused += dmg;
+          if (inc.inflictedModifierId) {
+            this.applyTemporaryModifier(room, inc.inflictedModifierId, player);
+          }
+          this.addLog(room, {
+            playerId: player.id,
+            playerName: player.name,
+            text: `La máquina absorbió «${inc.title}» (-${dmg}% Integridad${
+              inc.inflictedModifierId
+                ? ` y efecto «${FORTUNARIUM_MODIFIERS_CATALOG[inc.inflictedModifierId].name}»`
+                : ''
+            }).`,
+            integrityDelta: -dmg,
+            variant: 'hazard',
+          });
+        }
+
+        room.activeIncident = null;
+
+        if (room.integrity <= 0) {
+          room.phase = 'DEFEAT';
+          room.defeatCause = 'integrity';
+          room.endReason =
+            '¡AVERÍA CATASTRÓFICA! El incidente mecánico destruyó la integridad del Fortunarium (0%).';
+          this.broadcastRoomState(room);
+          return;
+        }
+
+        this.evaluateBankruptcyOrQuota(room);
+        this.broadcastRoomState(room);
+        break;
+      }
+
+      case 'DISMISS_ROULETTE': {
+        room.activeRoulette = null;
         this.broadcastRoomState(room);
         break;
       }
@@ -1160,6 +1359,9 @@ export class FortunariumServer {
           // Next quota is calculated from `previousQuota`, NOT `room.money`!
           room.quota = calculateNextQuotaTarget(room.quota, room.config.difficulty);
           room.quotaProgress = room.money;
+          room.overdriveSpins = 0;
+          room.activeIncident = null;
+          room.activeRoulette = null;
           room.readyForNextRoundPlayerIds = [];
           room.offeredUpgradeIds = [];
           room.upgradeVotes = {};
@@ -1174,6 +1376,11 @@ export class FortunariumServer {
             text: `¡Comienza la ${quotaLabel}! Nuevo umbral: ${room.quota} CR (Conserváis ${room.money} CR).`,
             variant: 'round',
           });
+
+          // Milestone quota Effect Roulette (Quotas 3, 5, 8, 10, 13...)
+          if (room.round >= 3 && (room.round === 3 || room.round === 5 || room.round % 3 === 2)) {
+            this.triggerEffectRoulette(room, `HITO DE CUOTA ${room.round}`, false, player);
+          }
 
           // If player spent all their money in the workshop during ROUND_SHOP, check bankruptcy on entering PLAYING
           this.evaluateBankruptcyOrQuota(room);
@@ -1196,6 +1403,9 @@ export class FortunariumServer {
         room.phase = 'LOBBY';
         room.isSpinning = false;
         room.activeEvent = null;
+        room.activeIncident = null;
+        room.activeRoulette = null;
+        room.overdriveSpins = 0;
         room.defeatCause = null;
         room.endReason = null;
         this.broadcastRoomState(room);
@@ -1209,38 +1419,292 @@ export class FortunariumServer {
       }
 
       case 'DEV_GRANT_MODIFIER': {
-        this.applyTemporaryModifier(room, msg.modifierId);
+        const targetP = msg.targetPlayerId
+          ? room.players.find((p) => p.id === msg.targetPlayerId) || player
+          : player;
+        this.applyTemporaryModifier(room, msg.modifierId, targetP);
+        this.broadcastRoomState(room);
+        break;
+      }
+
+      case 'DEV_TRIGGER_INCIDENT': {
+        this.triggerRandomIncident(room, player, msg.incidentType);
+        this.broadcastRoomState(room);
+        break;
+      }
+
+      case 'DEV_TRIGGER_ROULETTE': {
+        this.triggerEffectRoulette(
+          room,
+          (room.overdriveSpins || 0) > 0
+            ? `SOBRECARGA DE CUOTA (+${room.overdriveSpins})`
+            : 'RULETA DE TALLER',
+          (room.overdriveSpins || 0) > 0,
+          player
+        );
+        this.broadcastRoomState(room);
+        break;
+      }
+
+      case 'DEV_SET_INTEGRITY': {
+        room.integrity = Math.max(0, Math.min(room.maxIntegrity, Math.round(msg.integrity)));
+        if (room.integrity <= 0) {
+          room.phase = 'DEFEAT';
+          room.defeatCause = 'integrity';
+          room.endReason =
+            '¡AVERÍA CATASTRÓFICA! La integridad de la máquina cayó al 0% y el Fortunarium quedó fuera de servicio.';
+        }
+        this.broadcastRoomState(room);
+        break;
+      }
+
+      case 'DEV_FORCE_OVERDRIVE': {
+        if (room.money < room.quota) {
+          room.money = room.quota + 35;
+          room.quotaProgress = room.money;
+        }
+        room.overdriveSpins = (room.overdriveSpins || 0) + 1;
+        this.addLog(room, {
+          playerId: player.id,
+          playerName: player.name,
+          text: `⚡ [DEV] Sobrecarga de Cuota activada (Giro extra +${room.overdriveSpins}).`,
+          variant: 'event',
+        });
         this.broadcastRoomState(room);
         break;
       }
     }
   }
 
+  private triggerRandomIncident(
+    room: ServerFortunariumRoom,
+    player: FortunariumPlayer,
+    forcedType?: FortunariumIncidentType
+  ) {
+    const allTypes: FortunariumIncidentType[] = [
+      'chispazo',
+      'sobrecalentamiento',
+      'atasco_engranajes',
+      'fuga_aceite',
+      'cortocircuito',
+      'vibracion_critica',
+      'ruleta_averiada',
+    ];
+    const chosenType =
+      forcedType || allTypes[Math.floor(Math.random() * allTypes.length)];
+
+    if (chosenType === 'ruleta_averiada') {
+      room.integrity = Math.max(1, room.integrity - 4);
+      this.triggerEffectRoulette(
+        room,
+        'AVERÍA EN RULETA INTERNA (-4% INT)',
+        (room.overdriveSpins || 0) > 0,
+        player
+      );
+      return;
+    }
+
+    const baseRepair = calculateRepairCost({
+      round: room.round,
+      integrity: room.integrity,
+      maxIntegrity: room.maxIntegrity,
+      upgrades: room.upgrades,
+    });
+    const emergencyRepairCost = Math.max(12, Math.round(baseRepair * 0.58));
+    const overdriveBonusDmg = Math.min(8, (room.overdriveSpins || 0) * 2);
+
+    const incidentConfigs: Record<
+      Exclude<FortunariumIncidentType, 'ruleta_averiada'>,
+      {
+        title: string;
+        description: string;
+        baseDmg: number;
+        reducedDamage: number;
+        inflictedModifierId?: FortunariumModifierId;
+      }
+    > = {
+      chispazo: {
+        title: '¡CHISPAZO EN RELÉ PRINCIPAL!',
+        description:
+          'Un arco voltaico sacude el cuadro superior. Podéis aislar el cable ahora o absorber la descarga.',
+        baseDmg: 10 + overdriveBonusDmg,
+        reducedDamage: 2,
+        inflictedModifierId: 'cableado_quemado',
+      },
+      sobrecalentamiento: {
+        title: '¡BOBINAS AL ROJO VIVO!',
+        description:
+          'El motor echa humo espeso por la rejilla lateral. Purgad el circuito o el chasis sufrirá recalentamiento.',
+        baseDmg: 12 + overdriveBonusDmg,
+        reducedDamage: 3,
+        inflictedModifierId: 'recalentamiento',
+      },
+      atasco_engranajes: {
+        title: '¡ATASCO EN ENGRANAJES CENTRALES!',
+        description:
+          'Un diente de latón bloquea la tracción del rodillo 3. Lubricad de urgencia o los rodillos quedarán oxidados.',
+        baseDmg: 11 + overdriveBonusDmg,
+        reducedDamage: 2,
+        inflictedModifierId: 'rodillos_oxidados',
+      },
+      fuga_aceite: {
+        title: '¡FUGA DE PRESIÓN HIDRÁULICA!',
+        description:
+          'Una junta reventada gotea sobre el cajón de monedas. Sellad la válvula o habrá fuga de créditos.',
+        baseDmg: 9 + overdriveBonusDmg,
+        reducedDamage: 2,
+        inflictedModifierId: 'fuga_creditos',
+      },
+      cortocircuito: {
+        title: '¡CORTOCIRCUITO EN SELECTOR DE APUESTA!',
+        description:
+          'El conmutador de potencia chisporrotea sin control. Reparad el puente o forzará la apuesta mínima.',
+        baseDmg: 12 + overdriveBonusDmg,
+        reducedDamage: 3,
+        inflictedModifierId: 'apuesta_forzada',
+      },
+      vibracion_critica: {
+        title: '¡VIBRACIÓN CRÍTICA DEL CHASIS!',
+        description:
+          'Los pernos traseros ceden bajo la tensión. Apretad los anclajes o la máquina entrará en mala racha.',
+        baseDmg: 13 + overdriveBonusDmg,
+        reducedDamage: 3,
+        inflictedModifierId: 'mala_racha',
+      },
+    };
+
+    const cfg = incidentConfigs[chosenType];
+    const incident: FortunariumActiveIncident = {
+      id: `inc_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      type: chosenType,
+      title: cfg.title,
+      description: cfg.description,
+      integrityDamage: cfg.baseDmg,
+      emergencyRepairCost,
+      reducedDamage: cfg.reducedDamage,
+      inflictedModifierId: cfg.inflictedModifierId,
+      targetPlayerId: player.id,
+      targetPlayerName: player.name,
+      timestamp: Date.now(),
+    };
+
+    room.activeIncident = incident;
+    this.addLog(room, {
+      playerId: player.id,
+      playerName: player.name,
+      text: `⚠️ INCIDENTE MECÁNICO: ${cfg.title}`,
+      variant: 'hazard',
+    });
+  }
+
+  private triggerEffectRoulette(
+    room: ServerFortunariumRoom,
+    reason: string,
+    isOverdrive: boolean,
+    triggeredBy?: FortunariumPlayer
+  ) {
+    const buffIds = ALL_MODIFIER_IDS.filter(
+      (id) => FORTUNARIUM_MODIFIERS_CATALOG[id].type === 'BUFF'
+    );
+    const debuffIds = ALL_MODIFIER_IDS.filter(
+      (id) => FORTUNARIUM_MODIFIERS_CATALOG[id].type === 'DEBUFF'
+    );
+
+    // In Overdrive, negative outcomes become more likely
+    const debuffChance = isOverdrive
+      ? Math.min(0.78, 0.54 + (room.overdriveSpins || 1) * 0.06)
+      : 0.4;
+    const chooseDebuff = Math.random() < debuffChance;
+    const sourcePool = chooseDebuff ? debuffIds : buffIds;
+    const selectedModifierId =
+      sourcePool[Math.floor(Math.random() * sourcePool.length)];
+
+    // Build 8 visual candidates for the roulette strip
+    const candidates: FortunariumModifierId[] = [];
+    for (let i = 0; i < 7; i++) {
+      const pool = i % 2 === 0 ? buffIds : debuffIds;
+      candidates.push(pool[Math.floor(Math.random() * pool.length)]);
+    }
+    candidates.push(selectedModifierId);
+
+    const targetPlayer =
+      triggeredBy ||
+      room.players.find((p) => p.id === room.currentTurnPlayerId) ||
+      room.players[0];
+
+    const appliedMod = this.applyTemporaryModifier(
+      room,
+      selectedModifierId,
+      targetPlayer
+    );
+
+    room.activeRoulette = {
+      id: `roul_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      triggeredByReason: reason,
+      isOverdrive,
+      candidates,
+      selectedModifierId,
+      targetPlayerId: appliedMod?.targetPlayerId,
+      targetPlayerName: appliedMod?.targetPlayerName,
+      timestamp: Date.now(),
+    };
+
+    const modDef = FORTUNARIUM_MODIFIERS_CATALOG[selectedModifierId];
+    this.addLog(room, {
+      playerId: targetPlayer?.id,
+      playerName: targetPlayer?.name,
+      text: `🎡 Ruleta de Efectos (${reason}): «${modDef.name}» anotado en la hoja (${modDef.defaultSpins} giros).`,
+      variant: modDef.type === 'BUFF' ? 'win' : 'hazard',
+    });
+  }
+
   private applyTemporaryModifier(
     room: ServerFortunariumRoom,
-    modifierId: FortunariumModifierId
+    modifierId: FortunariumModifierId,
+    targetPlayer?: FortunariumPlayer
   ) {
     const def = FORTUNARIUM_MODIFIERS_CATALOG[modifierId];
-    if (!def) return;
+    if (!def) return null;
+
+    // Player-specific modifiers attach to a player in multiplayer
+    const playerTargetedMods: FortunariumModifierId[] = [
+      'mano_negra',
+      'mal_contacto',
+      'motor_fino',
+      'ojo_dorado',
+    ];
+    const isPlayerTargeted =
+      playerTargetedMods.includes(modifierId) && targetPlayer !== undefined;
+
     const existingIdx = room.activeModifiers.findIndex(
       (m) => m.modifierId === modifierId
     );
     if (existingIdx >= 0) {
       room.activeModifiers[existingIdx].spinsRemaining = def.defaultSpins;
       room.activeModifiers[existingIdx].appliedAtSpin = room.totalSpinsInMatch;
+      if (isPlayerTargeted && targetPlayer) {
+        room.activeModifiers[existingIdx].targetPlayerId = targetPlayer.id;
+        room.activeModifiers[existingIdx].targetPlayerName = targetPlayer.name;
+      }
+      return room.activeModifiers[existingIdx];
     } else {
-      room.activeModifiers.unshift({
+      const newMod = {
         id: `mod_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
         modifierId,
         name: def.name,
         type: def.type,
         effect: def.effect,
         spinsRemaining: def.defaultSpins,
+        durationType: def.durationType || 'SPINS',
+        targetPlayerId: isPlayerTargeted && targetPlayer ? targetPlayer.id : undefined,
+        targetPlayerName: isPlayerTargeted && targetPlayer ? targetPlayer.name : undefined,
         appliedAtSpin: room.totalSpinsInMatch,
-      });
+      };
+      room.activeModifiers.unshift(newMod);
       if (room.activeModifiers.length > 4) {
         room.activeModifiers.length = 4;
       }
+      return newMod;
     }
   }
 
@@ -1250,6 +1714,15 @@ export class FortunariumServer {
   // In infinite mode (`totalRounds === null`), it always offers 3 upgrades and continues.
   private sealCurrentQuota(room: ServerFortunariumRoom, triggeredBy?: FortunariumPlayer) {
     room.quotaProgress = room.money;
+    const overdriveBonusKeys = (room.overdriveSpins || 0) >= 3 ? 1 : 0;
+    const hadOverdrive = room.overdriveSpins || 0;
+    room.overdriveSpins = 0;
+    room.activeIncident = null;
+    room.activeRoulette = null;
+
+    if (overdriveBonusKeys > 0) {
+      room.keys += overdriveBonusKeys;
+    }
 
     if (room.totalRounds !== null && room.round >= room.totalRounds) {
       room.phase = 'VICTORY';
@@ -1266,7 +1739,9 @@ export class FortunariumServer {
     this.addLog(room, {
       playerId: triggeredBy?.id,
       playerName: triggeredBy?.name,
-      text: `¡Cuota ${room.round} sellada con ${room.money} CR! Conserváis todo el dinero. Elegid 1 de las 3 mejoras.`,
+      text: `¡Cuota ${room.round} sellada con ${room.money} CR${
+        hadOverdrive > 0 ? ` tras +${hadOverdrive} giro(s) en Sobrecarga` : ''
+      }${overdriveBonusKeys > 0 ? ' (+1 Llave por temeridad)' : ''}! Conserváis todo el dinero.`,
       variant: 'round',
     });
   }
@@ -1337,8 +1812,13 @@ export class FortunariumServer {
     room.offeredUpgradeIds = [];
     room.upgradeVotes = {};
     room.lastInstalledUpgradeId = null;
+    room.upgradeHistory = [];
+    room.overdriveSpins = 0;
+    room.spinsSinceLastIncident = 0;
     room.activeModifiers = [];
     room.activeEvent = null;
+    room.activeIncident = null;
+    room.activeRoulette = null;
     room.readyForNextRoundPlayerIds = [];
     room.defeatCause = null;
     room.endReason = null;

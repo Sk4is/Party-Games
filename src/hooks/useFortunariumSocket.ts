@@ -10,6 +10,7 @@ import {
   FortunariumRemoteCursor,
   FortunariumDevScenario,
   FortunariumModifierId,
+  FortunariumIncidentType,
 } from '../types/fortunarium';
 import {
   createOnlineRoom,
@@ -378,11 +379,44 @@ export function useFortunariumSocket({
   );
 
   const devGrantModifier = useCallback(
-    (modifierId: FortunariumModifierId) => {
-      sendMessage({ type: 'DEV_GRANT_MODIFIER', modifierId });
+    (modifierId: FortunariumModifierId, targetPlayerId?: string) => {
+      sendMessage({ type: 'DEV_GRANT_MODIFIER', modifierId, targetPlayerId });
     },
     [sendMessage]
   );
+
+  const resolveIncident = useCallback(
+    (choice: 'EMERGENCY_REPAIR' | 'ABSORB_IMPACT') => {
+      sendMessage({ type: 'RESOLVE_INCIDENT', choice });
+    },
+    [sendMessage]
+  );
+
+  const dismissRoulette = useCallback(() => {
+    sendMessage({ type: 'DISMISS_ROULETTE' });
+  }, [sendMessage]);
+
+  const devTriggerIncident = useCallback(
+    (incidentType?: FortunariumIncidentType) => {
+      sendMessage({ type: 'DEV_TRIGGER_INCIDENT', incidentType });
+    },
+    [sendMessage]
+  );
+
+  const devTriggerRoulette = useCallback(() => {
+    sendMessage({ type: 'DEV_TRIGGER_ROULETTE' });
+  }, [sendMessage]);
+
+  const devSetIntegrity = useCallback(
+    (integrity: number) => {
+      sendMessage({ type: 'DEV_SET_INTEGRITY', integrity });
+    },
+    [sendMessage]
+  );
+
+  const devForceOverdrive = useCallback(() => {
+    sendMessage({ type: 'DEV_FORCE_OVERDRIVE' });
+  }, [sendMessage]);
 
   const repairMachine = useCallback(
     (useKey?: boolean) => {
@@ -445,6 +479,12 @@ export function useFortunariumSocket({
     setBetMode,
     spinSlot,
     devGrantModifier,
+    resolveIncident,
+    dismissRoulette,
+    devTriggerIncident,
+    devTriggerRoulette,
+    devSetIntegrity,
+    devForceOverdrive,
     repairMachine,
     buyUpgrade,
     voteUpgrade,

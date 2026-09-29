@@ -154,14 +154,26 @@ export interface FortunariumSpecialEffectLog {
 
 export type FortunariumModifierId =
   | 'fiebre_cerezas'
+  | 'geometra_efecto'
+  | 'diagonal_perfecta'
+  | 'ojo_dorado'
+  | 'dinamita'
+  | 'motor_fino'
   | 'lluvia_monedas'
   | 'escudo_termico'
   | 'sobrecarga_dorada'
   | 'fortuna_desatada'
   | 'siete_suerte'
+  | 'mano_afortunada'
+  | 'motor_al_rojo'
   | 'cableado_quemado'
+  | 'iman_roto'
+  | 'rodillo_pegado'
+  | 'hacienda'
+  | 'mala_racha'
   | 'fuga_creditos'
-  | 'rodillos_oxidados';
+  | 'rodillos_oxidados'
+  | 'mano_negra';
 
 export interface FortunariumActiveModifier {
   id: string;
@@ -171,6 +183,77 @@ export interface FortunariumActiveModifier {
   effect: string;
   spinsRemaining: number;
   appliedAtSpin: number;
+  source?: string;
+  targetPlayerId?: string;
+  targetPlayerName?: string;
+  consumeOnPattern?: boolean;
+}
+
+export type FortunariumUpgradeRarity =
+  | 'COMÚN'
+  | 'POCO COMÚN'
+  | 'RARA'
+  | 'EXCEPCIONAL';
+
+export interface FortunariumInstalledUpgradeRecord {
+  upgradeId: FortunariumUpgradeId;
+  level: number;
+  installedAtQuota: number;
+  installedByPlayerName: string;
+  timestamp: number;
+}
+
+export type FortunariumIncidentType =
+  | 'fusibles_quemados'
+  | 'sobrecalentamiento'
+  | 'rodillo_atascado'
+  | 'pico_tension'
+  | 'fuga_creditos'
+  | 'lluvia_monedas'
+  | 'inspeccion_afortunada';
+
+export interface FortunariumIncidentControl {
+  id: string;
+  label: string;
+  sublabel?: string;
+  currentValue: number;
+  targetValue: number;
+  activatedByPlayerIds: string[];
+  completed: boolean;
+  variant?: 'primary' | 'danger' | 'bonus';
+}
+
+export interface FortunariumActiveIncident {
+  incidentId: string;
+  type: FortunariumIncidentType;
+  category: 'hazard' | 'positive' | 'choice';
+  title: string;
+  subtitle: string;
+  quotaTriggered: number;
+  startedAt: number;
+  jammedReelIndex?: number | null;
+  controls: FortunariumIncidentControl[];
+  resolved: boolean;
+  outcomeText?: string | null;
+  outcomeVariant?: 'positive' | 'negative' | 'neutral' | null;
+  collectedCoins?: number;
+  leakedCoins?: number;
+}
+
+export interface FortunariumActiveRoulette {
+  rouletteId: string;
+  title: string;
+  subtitle: string;
+  triggeredByPlayerName: string;
+  segments: {
+    modifierId: FortunariumModifierId;
+    label: string;
+    type: 'BUFF' | 'DEBUFF';
+  }[];
+  winningIndex: number;
+  winningModifierId: FortunariumModifierId;
+  spun: boolean;
+  completed: boolean;
 }
 
 export interface FortunariumSpinResult {
@@ -205,6 +288,9 @@ export interface FortunariumSpinResult {
   extraSpinsGained: number;
   triggeredEventId?: string | null;
   isJackpot: boolean;
+  isBigWin?: boolean;
+  overdriveSpinNumber?: number;
+  overdriveWearAdded?: number;
   summaryText: string;
   timestamp: number;
 }
@@ -275,6 +361,8 @@ export interface FortunariumRoomState {
   money: number; // Shared available credits (NEVER resets when sealing a quota!)
   quotaProgress: number; // Synchronized with shared money for threshold comparison
   quota: number; // Current money threshold target
+  overdriveSpins?: number; // Extra spins performed AFTER reaching current quota
+  overdriveMessage?: string | null; // Physical CRT machine warning during overdrive
   spinsLeft: number; // Spins in current cycle
   maxSpinsPerRound: number;
   totalSpinsInMatch: number;
@@ -295,6 +383,7 @@ export interface FortunariumRoomState {
   lastSpinResult: FortunariumSpinResult | null;
 
   upgrades: Record<FortunariumUpgradeId, number>;
+  upgradeHistory?: FortunariumInstalledUpgradeRecord[];
   offeredUpgradeIds: FortunariumUpgradeId[];
   upgradeVotes: Record<string, FortunariumUpgradeId>;
   lastInstalledUpgradeId?: FortunariumUpgradeId | null;
@@ -303,6 +392,9 @@ export interface FortunariumRoomState {
   activeModifiers: FortunariumActiveModifier[];
 
   activeEvent: FortunariumActiveEvent | null;
+  activeIncident?: FortunariumActiveIncident | null;
+  activeRoulette?: FortunariumActiveRoulette | null;
+  lastIncidentSpin?: number;
   readyForNextRoundPlayerIds: string[];
   actionLog: FortunariumActionLogEntry[];
 
@@ -395,6 +487,26 @@ export type FortunariumClientMessage =
   | {
       type: 'DEV_GRANT_MODIFIER';
       modifierId: FortunariumModifierId;
+    }
+  | {
+      type: 'DEV_FORCE_INCIDENT';
+      incidentType: FortunariumIncidentType | 'ruleta_efectos';
+    }
+  | {
+      type: 'DEV_REACH_QUOTA';
+    }
+  | {
+      type: 'INTERACT_INCIDENT';
+      incidentId: string;
+      controlId: string;
+    }
+  | {
+      type: 'SPIN_ROULETTE';
+      rouletteId: string;
+    }
+  | {
+      type: 'COMPLETE_ROULETTE';
+      rouletteId: string;
     }
   | {
       type: 'REPAIR_MACHINE';
