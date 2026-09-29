@@ -411,13 +411,26 @@ export const BASE_JACKPOT_CHANCE = 0.001;
 export const MAX_JACKPOT_CHANCE = 0.01;
 
 export function computeEffectiveJackpotChance(
-  upgrades: Record<FortunariumUpgradeId, number>,
-  betMode: FortunariumBetMode,
+  upgradesOrModifiers?:
+    | Record<FortunariumUpgradeId, number>
+    | Pick<FortunariumActiveModifier, 'modifierId'>[],
+  betMode: FortunariumBetMode = 'normal',
   activeModifiers: Pick<FortunariumActiveModifier, 'modifierId'>[] = []
 ): number {
+  let upgrades: Record<FortunariumUpgradeId, number>;
+  let effectiveModifiers: Pick<FortunariumActiveModifier, 'modifierId'>[];
+
+  if (Array.isArray(upgradesOrModifiers)) {
+    upgrades = createInitialUpgradesState();
+    effectiveModifiers = upgradesOrModifiers;
+  } else {
+    upgrades = upgradesOrModifiers || createInitialUpgradesState();
+    effectiveModifiers = activeModifiers || [];
+  }
+
   let baseChance = BASE_JACKPOT_CHANCE;
-  const hasSieteSuerte = activeModifiers.some((m) => m.modifierId === 'siete_suerte');
-  const hasFortunaDesatada = activeModifiers.some(
+  const hasSieteSuerte = effectiveModifiers.some((m) => m.modifierId === 'siete_suerte');
+  const hasFortunaDesatada = effectiveModifiers.some(
     (m) => m.modifierId === 'fortuna_desatada'
   );
 

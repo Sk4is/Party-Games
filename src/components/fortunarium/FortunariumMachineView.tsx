@@ -36,6 +36,8 @@ import {
   FortunariumSimulationReport,
   validateWorkshopPurchase,
   runCanonicalPatternUnitTests,
+  generateDeterministicTestGrid,
+  evaluateSpinGridCore,
 } from '../../utils/fortunariumEconomyEngine';
 import {
   ArrowLeft,
@@ -67,7 +69,7 @@ import { FortunariumCursorsOverlay } from './FortunariumCursorsOverlay';
 import { FortunariumRulebookModal } from './FortunariumRulebookModal';
 import { FortunariumPrizeTableModal } from './FortunariumPrizeTableModal';
 import { FortunariumAudioModal } from './FortunariumAudioModal';
-import { FortunariumGarageIntro } from './FortunariumGarageIntro';
+import { FortunariumGarageIntro, FortunariumNextQuotaPaperInfo } from './FortunariumGarageIntro';
 import { FortunariumPaperBoard } from './FortunariumPaperBoard';
 import { FortunariumSpecialSpotlight } from './FortunariumSpecialSpotlight';
 import { FortunariumEndRunModal } from './FortunariumEndRunModal';
@@ -147,11 +149,18 @@ function buildReelCarouselStrip(
   return [...finalCol, ...filler, ...startCol];
 }
 
+const FULL_GRID_15_CELLS: FortunariumCellCoord[] = [
+  { col: 0, row: 0 }, { col: 1, row: 0 }, { col: 2, row: 0 }, { col: 3, row: 0 }, { col: 4, row: 0 },
+  { col: 0, row: 1 }, { col: 1, row: 1 }, { col: 2, row: 1 }, { col: 3, row: 1 }, { col: 4, row: 1 },
+  { col: 0, row: 2 }, { col: 1, row: 2 }, { col: 2, row: 2 }, { col: 3, row: 2 }, { col: 4, row: 2 },
+];
+
 function classifyWinTier(spin: FortunariumSpinResult): FortunariumWinTier {
-  if (spin.isJackpot || spin.grossPayout >= 160) return 'JACKPOT';
-  if (spin.grossPayout >= 90) return 'HUGE';
-  if (spin.grossPayout >= 45) return 'BIG';
-  if (spin.grossPayout >= 20) return 'MEDIUM';
+  const mult = spin.grossPayout / Math.max(1, spin.spinCost);
+  if (spin.isJackpot || spin.grossPayout >= 160 || mult >= 15) return 'JACKPOT';
+  if (spin.grossPayout >= 90 || mult >= 8) return 'HUGE';
+  if (spin.grossPayout >= 40 || mult >= 4) return 'BIG';
+  if (spin.grossPayout >= 18 || mult >= 1.5) return 'MEDIUM';
   if (spin.grossPayout > 0) return 'SMALL';
   if (spin.penalties > 0 || spin.integrityDelta <= -6) return 'LOSS';
   return 'NONE';
@@ -238,17 +247,28 @@ function buildJackpotParadeSteps(spin: FortunariumSpinResult): RevealStep[] {
     {
       id: `jp_tri_inv_${spin.spinId}`,
       title: `TRIÁNGULO INVERTIDO ▼ (${symName})`,
-      subtitle: 'DESFILE JACKPOT · CLÍMAX SUPREMO (8 CASILLAS)',
+      subtitle: 'DESFILE JACKPOT · TRIÁNGULO INVERSO (8 CASILLAS)',
       integrityDelta: 0,
       cells: INVERTED_TRIANGLE_MASK_CELLS,
       variant: 'jackpot' as const,
       patternType: 'TRIANGULO_INVERTIDO' as const,
       symbolId: symId,
     },
+    // 7. Canonical Full-Grid Climax (Part D: All 15 Cells)
+    {
+      id: `jp_full_grid_${spin.spinId}`,
+      title: `PANTALLA COMPLETA · JACKPOT SUPREMO (${symName})`,
+      subtitle: 'DESFILE JACKPOT · CLÍMAX SUPREMO (15 CASILLAS)',
+      integrityDelta: 0,
+      cells: FULL_GRID_15_CELLS,
+      variant: 'jackpot' as const,
+      patternType: 'PANTALLA_COMPLETA' as const,
+      symbolId: symId,
+    },
   ];
 
-  // Progressive weights across the 13 parade steps so the climax builds naturally and sums to spin.grossPayout
-  const weights = [6, 6, 6, 4, 4, 4, 4, 4, 5, 5, 12, 18, 22]; // sum = 100
+  // Progressive weights across the 14 parade steps so the climax builds naturally and sums to spin.grossPayout
+  const weights = [5, 5, 5, 3, 3, 3, 3, 3, 4, 4, 10, 14, 18, 20]; // sum = 100
   const totalPayout = Math.max(0, spin.grossPayout);
   let allocated = 0;
 
@@ -298,16 +318,51 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   const [copiedCode, setCopiedCode] = useState(false);
   const [isAudioMuted, setIsAudioMuted] = useState(() => fortunariumAudio.getSettings().muted);
 
-  // Garage Door Intro State (Section 7: Plays once at the start of each match)
+  // Garage Door Intro State & Inter-Quota Transition (Part H)
   const [introSeenMatchId, setIntroSeenMatchId] = useState<string | null>(() =>
     roomState.totalSpinsInMatch > 0 ? roomState.matchId : null
   );
   const [forceReplayIntro, setForceReplayIntro] = useState(false);
+  const [lastSeenQuotaRound, setLastSeenQuotaRound] = useState<number>(roomState.round);
+  const [quotaSealingStampActive, setQuotaSealingStampActive] = useState(false);
+  const [simBetMode, setSimBetMode] = useState<FortunariumBetMode>(roomState.betMode);
+  const [localSandboxSpinOverride, setLocalSandboxSpinOverride] =
+    useState<FortunariumSpinResult | null>(null);
+
+  const showInterQuotaGarageDoor =
+    roomState.phase === 'PLAYING' &&
+    roomState.round > 1 &&
+    lastSeenQuotaRound < roomState.round;
+
   const showGarageIntro =
     forceReplayIntro ||
+    showInterQuotaGarageDoor ||
     (roomState.phase === 'PLAYING' &&
       roomState.totalSpinsInMatch === 0 &&
       introSeenMatchId !== roomState.matchId);
+
+  const nextQuotaPaperInfo = useMemo<FortunariumNextQuotaPaperInfo | null>(() => {
+    if (roomState.round <= 1 && roomState.totalSpinsInMatch === 0) return null;
+    return {
+      quotaNumber: roomState.round,
+      quotaTarget: roomState.quota,
+      currentCredits: roomState.money,
+      currentIntegrity: roomState.integrity,
+      repairCost: 28 + (roomState.round - 1) * 8,
+      flavorQuote:
+        roomState.round === 2
+          ? 'El bobinado aguanta bien. Pero la demanda sube. Mantened un ojo en la temperatura.'
+          : roomState.round === 3
+          ? 'Los relés crujen si forzáis la sobrecarga. No escatiméis en reparaciones básicas.'
+          : 'La caja común es vuestro pulmón. Todo lo que no gastéis en taller sigue con vosotros.',
+    };
+  }, [
+    roomState.round,
+    roomState.quota,
+    roomState.money,
+    roomState.integrity,
+    roomState.totalSpinsInMatch,
+  ]);
 
   // Upgrade Installation Physical Toast (Section 25)
   const [installedUpgradeToast, setInstalledUpgradeToast] =
@@ -509,9 +564,11 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   }, [accumulatedSpinWin, displayedAccumulatedWin]);
 
   // Master Spin & Sequential Post-Stop Presentation Choreography (Sections 19–22, 29–32)
+  const activeSpinEvent = localSandboxSpinOverride || spinEvent;
+
   useEffect(() => {
-    if (!spinEvent || spinEvent.spinId === lastHandledSpinIdRef.current) return;
-    lastHandledSpinIdRef.current = spinEvent.spinId;
+    if (!activeSpinEvent || activeSpinEvent.spinId === lastHandledSpinIdRef.current) return;
+    lastHandledSpinIdRef.current = activeSpinEvent.spinId;
 
     clearAllSpinTimers();
     setIsSpinPresentationActive(true);
@@ -525,9 +582,9 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
     setFlyingRewardAddition(null);
     setFinalOutcomeBanner(null);
 
-    // Build real symbol carousel strips from previous settled grid -> new spinEvent.grid
+    // Build real symbol carousel strips from previous settled grid -> new activeSpinEvent.grid
     const seed = Date.now() % 97;
-    const strips = spinEvent.grid.map((finalCol, colIdx) =>
+    const strips = activeSpinEvent.grid.map((finalCol, colIdx) =>
       buildReelCarouselStrip(
         colIdx,
         settledGridRef.current[colIdx] || finalCol,
@@ -538,14 +595,14 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
     setReelStrips(strips);
 
     // STAGE 1: Deduct ONLY spinCost immediately; keep integrity & voltage at pre-spin values
-    setDisplayedMoney(spinEvent.moneyAfterSpinCost);
-    setDisplayedVoltage(spinEvent.voltageMultiplierUsed);
+    setDisplayedMoney(activeSpinEvent.moneyAfterSpinCost);
+    setDisplayedVoltage(activeSpinEvent.voltageMultiplierUsed);
 
     // Animate lever down & start all 5 vertical reels spinning downward rapidly
     setLeverProgress(1);
     setReelsSpinning([true, true, true, true, true]);
     setReelsLandedBounce([false, false, false, false, false]);
-    if (spinEvent.triggerSource === 'lever') {
+    if (activeSpinEvent.triggerSource === 'lever') {
       fortunariumAudio.playLeverRelease();
     } else {
       fortunariumAudio.playHeroSpinPress();
@@ -562,7 +619,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       const stopTimer = setTimeout(() => {
         setSettledGrid((prev) => {
           const next = [...prev];
-          next[colIndex] = spinEvent.grid[colIndex];
+          next[colIndex] = activeSpinEvent.grid[colIndex];
           return next;
         });
         setReelsSpinning((prev) => {
@@ -594,17 +651,17 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
     const postStopTimer = setTimeout(() => {
       fortunariumAudio.stopReelSpinLoop();
       fortunariumAudio.playMechanicalSettle();
-      settledGridRef.current = spinEvent.grid;
-      setSettledGrid(spinEvent.grid);
+      settledGridRef.current = activeSpinEvent.grid;
+      setSettledGrid(activeSpinEvent.grid);
       setIsRevealingRewards(true);
 
       const steps: RevealStep[] = [];
-      if (spinEvent.isJackpot) {
+      if (activeSpinEvent.isJackpot) {
         // PROGRESSIVE JACKPOT BUILD-UP PARADE (Sections 15–19):
-        // Step through Horizontal 1–3, Vertical 1–5, Diagonal 1–2, X, Triangle, and Inverted Triangle
-        steps.push(...buildJackpotParadeSteps(spinEvent));
+        // Step through Horizontal 1–3, Vertical 1–5, Diagonal 1–2, X, Triangle, Inverted Triangle, and Full Grid Climax
+        steps.push(...buildJackpotParadeSteps(activeSpinEvent));
       } else {
-        for (const line of spinEvent.winLines) {
+        for (const line of activeSpinEvent.winLines) {
           steps.push({
             id: line.id,
             title: `${line.name.toUpperCase()} (${FORTUNARIUM_SYMBOLS[line.symbolId]?.name.toUpperCase() || line.symbolId.toUpperCase()})`,
@@ -624,9 +681,9 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
         }
       }
 
-      for (const fx of spinEvent.specialEffects) {
-        // Skip duplicate jackpot specialEffect card when running the 13-step Jackpot Parade
-        if (spinEvent.isJackpot && fx.variant === 'jackpot') continue;
+      for (const fx of activeSpinEvent.specialEffects) {
+        // Skip duplicate jackpot specialEffect card when running the 14-step Jackpot Parade
+        if (activeSpinEvent.isJackpot && fx.variant === 'jackpot') continue;
         steps.push({
           id: fx.id,
           title: fx.title.toUpperCase(),
@@ -646,23 +703,23 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       }
 
       setTotalRevealSteps(steps.length);
-      const tier = classifyWinTier(spinEvent);
+      const tier = classifyWinTier(activeSpinEvent);
 
       if (steps.length === 0) {
         setActivePresentedPatternId(null);
         setActiveRevealStep(null);
-        setDisplayedMoney(spinEvent.finalMoney);
-        setDisplayedIntegrity(spinEvent.finalIntegrity);
-        setDisplayedVoltage(spinEvent.voltageMultiplierAfter);
-        setDisplayedKeys(spinEvent.finalKeys);
-        setDisplayedLastSpinResult(spinEvent);
+        setDisplayedMoney(activeSpinEvent.finalMoney);
+        setDisplayedIntegrity(activeSpinEvent.finalIntegrity);
+        setDisplayedVoltage(activeSpinEvent.voltageMultiplierAfter);
+        setDisplayedKeys(activeSpinEvent.finalKeys);
+        setDisplayedLastSpinResult(activeSpinEvent);
         setFinalOutcomeBanner({
           title: 'SIN PREMIO',
-          subtitle: `TIRADA: -${spinEvent.spinCost} CR · AHORA: ${spinEvent.finalMoney} CR`,
-          spinCost: spinEvent.spinCost,
+          subtitle: `TIRADA: -${activeSpinEvent.spinCost} CR · AHORA: ${activeSpinEvent.finalMoney} CR`,
+          spinCost: activeSpinEvent.spinCost,
           grossPayout: 0,
-          netAmount: -spinEvent.spinCost,
-          finalMoney: spinEvent.finalMoney,
+          netAmount: -activeSpinEvent.spinCost,
+          finalMoney: activeSpinEvent.finalMoney,
           tier: 'NONE',
         });
 
@@ -676,8 +733,8 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
 
       // Hold each pattern for ~1.02s (820ms per step during 13-step Jackpot parade)
       // with a clean gap between steps where activePresentedPatternId resets to null
-      const stepHoldMs = spinEvent.isJackpot ? 740 : 1020;
-      const stepGapMs = spinEvent.isJackpot ? 90 : 130;
+      const stepHoldMs = activeSpinEvent.isJackpot ? 740 : 1020;
+      const stepGapMs = activeSpinEvent.isJackpot ? 90 : 130;
       const stepCadenceMs = stepHoldMs + stepGapMs;
       let runningAccumulatedWin = 0;
 
@@ -712,8 +769,8 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
             } else {
               fortunariumAudio.playSpecialSymbolCue('positive');
             }
-          } else if (spinEvent.isJackpot) {
-            // Progressive audio build-up across the 13 Jackpot parade steps
+          } else if (activeSpinEvent.isJackpot) {
+            // Progressive audio build-up across the 14 Jackpot parade steps
             fortunariumAudio.playPatternChime(idx);
             if (idx >= 10) {
               setMachineShake(true);
@@ -736,7 +793,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
             setFlyingRewardAddition({
               id: `${step.id}_fly`,
               amount: step.amount,
-              isJackpot: spinEvent.isJackpot || step.variant === 'jackpot',
+              isJackpot: activeSpinEvent.isJackpot || step.variant === 'jackpot',
             });
             runningAccumulatedWin = Math.max(0, runningAccumulatedWin + step.amount);
             setAccumulatedSpinWin(runningAccumulatedWin);
@@ -762,45 +819,46 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
         setActivePresentedPatternId(null);
         setActiveRevealStep(null);
         setFlyingRewardAddition(null);
-        setAccumulatedSpinWin(Math.max(0, spinEvent.grossPayout - spinEvent.penalties));
+        setAccumulatedSpinWin(Math.max(0, activeSpinEvent.grossPayout - activeSpinEvent.penalties));
         // Transfer final accumulated total into the machine's authoritative money display
-        setDisplayedMoney(spinEvent.finalMoney);
-        setDisplayedIntegrity(spinEvent.finalIntegrity);
-        setDisplayedVoltage(spinEvent.voltageMultiplierAfter);
-        setDisplayedKeys(spinEvent.finalKeys);
-        setDisplayedLastSpinResult(spinEvent);
+        setDisplayedMoney(activeSpinEvent.finalMoney);
+        setDisplayedIntegrity(activeSpinEvent.finalIntegrity);
+        setDisplayedVoltage(activeSpinEvent.voltageMultiplierAfter);
+        setDisplayedKeys(activeSpinEvent.finalKeys);
+        setDisplayedLastSpinResult(activeSpinEvent);
 
         fortunariumAudio.playWinTierSting(tier);
 
-        const netDelta = spinEvent.netMoneyDelta;
-        const bannerTitle = spinEvent.isJackpot
-          ? `¡JACKPOT SUPREMO! TOTAL GANADO: +${spinEvent.grossPayout} CR`
-          : spinEvent.grossPayout > 0
-          ? `TOTAL GANADO: +${spinEvent.grossPayout} CR`
+        const netDelta = activeSpinEvent.netMoneyDelta;
+        const bannerTitle = activeSpinEvent.isJackpot
+          ? `¡JACKPOT SUPREMO! TOTAL GANADO: +${activeSpinEvent.grossPayout} CR`
+          : activeSpinEvent.grossPayout > 0
+          ? `TOTAL GANADO: +${activeSpinEvent.grossPayout} CR`
           : `AVERÍA EN LOS RODILLOS (${netDelta} CR)`;
 
         setFinalOutcomeBanner({
           title: bannerTitle,
-          subtitle: `TIRADA: -${spinEvent.spinCost} CR · PREMIO: +${spinEvent.grossPayout} CR${
-            spinEvent.penalties > 0 ? ` · PENALIZACIÓN: -${spinEvent.penalties} CR` : ''
-          } · CAJA COMÚN: ${spinEvent.finalMoney} CR`,
-          spinCost: spinEvent.spinCost,
-          grossPayout: spinEvent.grossPayout,
+          subtitle: `TIRADA: -${activeSpinEvent.spinCost} CR · PREMIO: +${activeSpinEvent.grossPayout} CR${
+            activeSpinEvent.penalties > 0 ? ` · PENALIZACIÓN: -${activeSpinEvent.penalties} CR` : ''
+          } · CAJA COMÚN: ${activeSpinEvent.finalMoney} CR`,
+          spinCost: activeSpinEvent.spinCost,
+          grossPayout: activeSpinEvent.grossPayout,
           netAmount: netDelta,
-          finalMoney: spinEvent.finalMoney,
+          finalMoney: activeSpinEvent.finalMoney,
           tier,
         });
 
         const finishTimer = setTimeout(() => {
           setIsRevealingRewards(false);
           setIsSpinPresentationActive(false);
+          setLocalSandboxSpinOverride(null);
         }, 1450);
         timersRef.current.push(finishTimer);
       }, summaryDelay);
       timersRef.current.push(summaryTimer);
     }, postStopDelay);
     timersRef.current.push(postStopTimer);
-  }, [spinEvent, clearAllSpinTimers]);
+  }, [activeSpinEvent, clearAllSpinTimers]);
 
   // Derived gameplay state
   const localPlayer = roomState.players.find((p) => p.id === localPlayerId);
@@ -825,8 +883,13 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   );
 
   const effectiveJackpotChance = useMemo(
-    () => computeEffectiveJackpotChance(roomState.activeModifiers || []),
-    [roomState.activeModifiers]
+    () =>
+      computeEffectiveJackpotChance(
+        roomState.upgrades,
+        roomState.betMode,
+        roomState.activeModifiers || []
+      ),
+    [roomState.upgrades, roomState.betMode, roomState.activeModifiers]
   );
 
   const canSpin =
@@ -961,6 +1024,86 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       onSpinSlot(forceScenario, triggerSource);
     },
     [roomState.phase, isBusy, isMyTurn, roomState.money, currentSpinCost, onSpinSlot]
+  );
+
+  // Local Client-Only Sandbox Spin Runner (Part C: Pure memory inspection, zero WebSocket traffic)
+  const handleRunLocalSandboxSpin = useCallback(
+    (scenarioId: string) => {
+      setShowDevModal(false);
+
+      const sandboxGrid = generateDeterministicTestGrid(
+        scenarioId as FortunariumDevScenario
+      );
+      const core = evaluateSpinGridCore({
+        grid: sandboxGrid,
+        betMode: simBetMode,
+        upgrades: roomState.upgrades,
+        currentVoltage: displayedVoltage,
+        round: roomState.round,
+        allowMysteryEvents: false,
+        enableJackpotRoll: scenarioId === 'jackpot' || scenarioId === 'pantalla_completa',
+        forceJackpot: scenarioId === 'jackpot' || scenarioId === 'pantalla_completa',
+      });
+
+      const sandboxSpin: FortunariumSpinResult = {
+        spinId: `sandbox_${Date.now()}`,
+        stateVersion: roomState.stateVersion,
+        playerId: localPlayerId,
+        playerName: `${localPlayer?.name || 'Operador'} (Sandbox)`,
+        initiatedByPlayerId: localPlayerId,
+        triggerSource: 'button',
+        betMode: simBetMode,
+        spinCost: currentSpinCost,
+        moneyBeforeSpin: roomState.money,
+        moneyAfterSpinCost: Math.max(0, roomState.money - currentSpinCost),
+        finalMoney: Math.max(
+          0,
+          roomState.money - currentSpinCost + core.grossPayout - core.penalties
+        ),
+        quotaProgressBefore: roomState.quotaProgress,
+        finalQuotaProgress: roomState.quotaProgress,
+        grid: sandboxGrid,
+        winLines: core.winLines,
+        specialEffects: core.specialEffects,
+        winningCells: core.winningCells,
+        hazardCells: core.hazardCells,
+        grossPayout: core.grossPayout,
+        jackpotPayout: core.jackpotPayout,
+        penalties: core.penalties,
+        netMoneyDelta: core.grossPayout - core.penalties - currentSpinCost,
+        integrityDelta: core.integrityDelta,
+        finalIntegrity: Math.max(
+          0,
+          Math.min(100, roomState.integrity + core.integrityDelta)
+        ),
+        voltageMultiplierUsed: core.voltageMultiplierUsed,
+        voltageMultiplierAfter: core.voltageMultiplierAfter,
+        keysGained: core.keysGained,
+        finalKeys: roomState.keys + core.keysGained,
+        extraSpinsGained: core.extraSpinsGained,
+        isJackpot: core.isJackpot,
+        summaryText: `[SANDBOX AISLADO] ${
+          core.grossPayout > 0 ? `+${core.grossPayout} CR` : 'Sin premio'
+        }`,
+        timestamp: Date.now(),
+      };
+
+      setLocalSandboxSpinOverride(sandboxSpin);
+    },
+    [
+      roomState.upgrades,
+      simBetMode,
+      displayedVoltage,
+      roomState.round,
+      roomState.stateVersion,
+      localPlayerId,
+      localPlayer?.name,
+      currentSpinCost,
+      roomState.money,
+      roomState.quotaProgress,
+      roomState.integrity,
+      roomState.keys,
+    ]
   );
 
   // ==========================================================================
@@ -1124,12 +1267,15 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
         <div className="absolute bottom-0 inset-x-0 h-28 bg-gradient-to-t from-[#050b10] to-transparent" />
       </div>
 
-      {/* GARAGE SHUTTER OPENING INTRO (Section 7: Plays once at start of match) */}
+      {/* GARAGE SHUTTER OPENING INTRO (Section 7: Plays once at start of match + between quotas) */}
       {showGarageIntro && (
         <FortunariumGarageIntro
           matchId={roomState.matchId}
+          quotaInfo={nextQuotaPaperInfo}
+          initialSlideDown={showInterQuotaGarageDoor}
           onComplete={() => {
             setIntroSeenMatchId(roomState.matchId);
+            setLastSeenQuotaRound(roomState.round);
             setForceReplayIntro(false);
           }}
         />
@@ -1305,7 +1451,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
         {/* Centered Machine Anchor Wrapper (Visual center = 50vw; Paper note is absolute outside left) */}
         <div
           className={`relative w-full max-w-[930px] h-full max-h-[810px] mx-auto flex items-center justify-center transition-transform duration-150 ${
-            machineShake ? 'translate-x-1.5 -translate-y-1 scale-[1.01]' : ''
+            machineShake ? '-translate-y-0.5 scale-[1.008]' : ''
           }`}
         >
           {/* LEFT-SIDE PHYSICAL TAPED PAPER OVERLAY (Sections 1–4: NEVER shifts machine centering) */}
@@ -1650,8 +1796,12 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        fortunariumAudio.playButtonClick();
-                        onPayQuotaEarly();
+                        fortunariumAudio.playQuotaStamp();
+                        setQuotaSealingStampActive(true);
+                        setTimeout(() => {
+                          setQuotaSealingStampActive(false);
+                          onPayQuotaEarly();
+                        }, 750);
                       }}
                       className="px-2 py-0.5 rounded bg-[#55a630] hover:bg-[#80b918] border border-[#d9f99d] text-stone-950 font-fortunarium text-[10px] sm:text-[11px] tracking-wider shadow-[0_2px_0_#1e3a10] cursor-pointer animate-pulse shrink-0"
                     >
@@ -1957,13 +2107,13 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                                   key={rowIdx}
                                   className={`relative w-full h-full p-1.5 sm:p-2.5 flex items-center justify-center transition-all duration-200 ${
                                     isWinCell
-                                      ? 'bg-amber-300/45 ring-4 ring-inset ring-amber-400 shadow-[inset_0_0_25px_rgba(245,158,11,0.75)] z-10'
+                                      ? 'bg-amber-400/20 ring-2 ring-inset ring-amber-300/80 shadow-[inset_0_0_18px_rgba(250,204,21,0.45)] z-10 rounded-lg'
                                       : isSpecialCell
-                                      ? 'bg-cyan-400/35 ring-4 ring-inset ring-cyan-300 shadow-[inset_0_0_22px_rgba(34,211,238,0.75)] z-10'
+                                      ? 'bg-cyan-400/20 ring-2 ring-inset ring-cyan-300/80 shadow-[inset_0_0_16px_rgba(34,211,238,0.45)] z-10 rounded-lg'
                                       : isHazardCell
-                                      ? 'bg-rose-500/45 ring-4 ring-inset ring-rose-500 shadow-[inset_0_0_25px_rgba(244,63,94,0.85)] z-10'
+                                      ? 'bg-rose-500/25 ring-2 ring-inset ring-rose-500/80 shadow-[inset_0_0_18px_rgba(244,63,94,0.5)] z-10 rounded-lg'
                                       : isDimmedCell
-                                      ? 'opacity-35 grayscale-[0.4] scale-[0.95]'
+                                      ? 'opacity-35 grayscale-[0.4] scale-[0.96]'
                                       : ''
                                   }`}
                                 >
@@ -2027,6 +2177,9 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                     const isHazard = activeRevealStep.variant === 'hazard';
                     const strokeColor = isHazard ? '#fb7185' : '#fde047';
                     const glowColor = isHazard ? 'rgba(244,63,94,0.9)' : 'rgba(245,158,11,0.95)';
+                    const isFullGrid =
+                      activeRevealStep.patternType === 'PANTALLA_COMPLETA' ||
+                      activeRevealStep.cells.length === 15;
                     const isTriangle =
                       activeRevealStep.patternType === 'TRIANGULO' ||
                       activeRevealStep.patternType === 'TRIANGULO_INVERTIDO';
@@ -2057,17 +2210,37 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                             </filter>
                           </defs>
 
-                          {/* Geometric Line, X Cross, or Triangle Outline */}
-                          {isTriangle ? (
+                          {/* Clean, Elegant Geometric Overlays (Zero intrusive dark circles over symbols) */}
+                          {isFullGrid ? (
+                            <>
+                              <rect
+                                x="12"
+                                y="12"
+                                width="476"
+                                height="276"
+                                rx="16"
+                                fill="rgba(253,224,71,0.08)"
+                                stroke={strokeColor}
+                                strokeWidth="4"
+                                filter="url(#fortunariumPatternGlow)"
+                              />
+                              <path
+                                d="M 28 12 L 12 12 L 12 28 M 472 12 L 488 12 L 488 28 M 12 272 L 12 288 L 28 288 M 488 272 L 488 288 L 472 288"
+                                stroke="#fef08a"
+                                strokeWidth="3.5"
+                                fill="none"
+                              />
+                            </>
+                          ) : isTriangle ? (
                             <polygon
                               points={
                                 activeRevealStep.patternType === 'TRIANGULO'
-                                  ? '250,50 450,250 50,250'
-                                  : '50,50 450,50 250,250'
+                                  ? '250,45 455,255 45,255'
+                                  : '45,45 455,45 250,255'
                               }
-                              fill="rgba(253,224,71,0.14)"
+                              fill="rgba(253,224,71,0.07)"
                               stroke={strokeColor}
-                              strokeWidth="8"
+                              strokeWidth="4"
                               strokeLinejoin="round"
                               filter="url(#fortunariumPatternGlow)"
                             />
@@ -2077,7 +2250,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                                 points="150,50 250,150 350,250"
                                 fill="none"
                                 stroke={strokeColor}
-                                strokeWidth="9"
+                                strokeWidth="4.5"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 filter="url(#fortunariumPatternGlow)"
@@ -2086,7 +2259,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                                 points="350,50 250,150 150,250"
                                 fill="none"
                                 stroke={strokeColor}
-                                strokeWidth="9"
+                                strokeWidth="4.5"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 filter="url(#fortunariumPatternGlow)"
@@ -2098,27 +2271,13 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                                 points={pts.map((p) => `${p.x},${p.y}`).join(' ')}
                                 fill="none"
                                 stroke={strokeColor}
-                                strokeWidth="9"
+                                strokeWidth="4"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 filter="url(#fortunariumPatternGlow)"
                               />
                             )
                           )}
-
-                          {/* Node Connectors at each winning cell center */}
-                          {pts.map((p, idx) => (
-                            <circle
-                              key={idx}
-                              cx={p.x}
-                              cy={p.y}
-                              r="11"
-                              fill="#090d14"
-                              stroke={strokeColor}
-                              strokeWidth="5"
-                              filter="url(#fortunariumPatternGlow)"
-                            />
-                          ))}
                         </svg>
 
                         {/* Floating Pattern Callout Badge over Pattern Centroid */}
@@ -2171,6 +2330,91 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   activeEffect={activeRevealStep?.specialEffect || null}
                   installedUpgradeToast={installedUpgradeToast}
                 />
+
+                {/* PART G: CENTRAL CELEBRATION FOR BIG WINS, HUGE WINS, AND JACKPOT */}
+                {finalOutcomeBanner &&
+                  (finalOutcomeBanner.tier === 'BIG' ||
+                    finalOutcomeBanner.tier === 'HUGE' ||
+                    finalOutcomeBanner.tier === 'JACKPOT') && (
+                    <div className="pointer-events-none absolute inset-0 z-35 flex flex-col items-center justify-center p-4">
+                      {/* Golden / Emerald radial ambient burst */}
+                      <div
+                        className="absolute inset-0 rounded-2xl transition-opacity duration-300"
+                        style={{
+                          background:
+                            finalOutcomeBanner.tier === 'JACKPOT'
+                              ? 'radial-gradient(circle at 50% 50%, rgba(251,191,36,0.4) 0%, rgba(217,119,6,0.2) 45%, rgba(0,0,0,0.7) 85%)'
+                              : finalOutcomeBanner.tier === 'HUGE'
+                              ? 'radial-gradient(circle at 50% 50%, rgba(34,197,94,0.35) 0%, rgba(16,185,129,0.18) 45%, rgba(0,0,0,0.6) 85%)'
+                              : 'radial-gradient(circle at 50% 50%, rgba(250,204,21,0.28) 0%, rgba(0,0,0,0.5) 75%)',
+                        }}
+                      />
+
+                      {/* Central Celebration Plaque */}
+                      <div className="relative px-6 py-4 sm:px-8 sm:py-5 rounded-2xl bg-gradient-to-b from-[#1c222c]/98 to-[#0b0e14]/98 border-[3px] border-amber-400 shadow-[0_16px_40px_rgba(0,0,0,0.95),0_0_35px_rgba(245,158,11,0.55)] flex flex-col items-center text-center max-w-sm sm:max-w-md animate-fort-pop">
+                        <span className="absolute top-2 left-2 w-2 h-2 rounded-full bg-amber-400 border border-black" />
+                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400 border border-black" />
+                        <span className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-amber-400 border border-black" />
+                        <span className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-amber-400 border border-black" />
+
+                        <div className="text-[10px] sm:text-xs font-mono font-black uppercase tracking-[0.25em] text-amber-300 mb-1 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                          {finalOutcomeBanner.tier === 'JACKPOT'
+                            ? '¡JACKPOT FORTUNARIUM!'
+                            : finalOutcomeBanner.tier === 'HUGE'
+                            ? '¡PREMIO MASIVO!'
+                            : '¡GRAN PREMIO!'}
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                        </div>
+
+                        <div className="font-mono font-black text-3xl sm:text-5xl text-[#7ae582] tabular-nums tracking-tight drop-shadow-[0_0_16px_rgba(122,229,130,0.95)] leading-none my-1">
+                          +{finalOutcomeBanner.grossPayout} <span className="text-lg sm:text-2xl text-amber-300">CR</span>
+                        </div>
+
+                        <div className="text-xs sm:text-sm font-fortunarium text-amber-100 tracking-wide mt-1 drop-shadow">
+                          {finalOutcomeBanner.title}
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-mono text-amber-300/80 mt-0.5">
+                          {finalOutcomeBanner.subtitle}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* PART H: CUOTA SELLADA MECHANICAL STAMP OVERLAY */}
+                {quotaSealingStampActive && (
+                  <div className="pointer-events-none absolute inset-0 z-40 flex flex-col items-center justify-center p-4 bg-black/65 backdrop-blur-xs animate-fort-pop">
+                    <div className="relative px-7 py-5 sm:px-9 sm:py-6 rounded-2xl bg-gradient-to-b from-[#251811] via-[#1a110a] to-[#0e0906] border-[4px] border-[#d97706] shadow-[0_20px_50px_rgba(0,0,0,0.95),0_0_40px_rgba(217,119,6,0.6)] flex flex-col items-center text-center max-w-sm sm:max-w-md">
+                      <span className="absolute top-2 left-2 w-2.5 h-2.5 rounded-full bg-[#78350f] border border-black" />
+                      <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#78350f] border border-black" />
+                      <span className="absolute bottom-2 left-2 w-2.5 h-2.5 rounded-full bg-[#78350f] border border-black" />
+                      <span className="absolute bottom-2 right-2 w-2.5 h-2.5 rounded-full bg-[#78350f] border border-black" />
+
+                      <div className="inline-block px-4 py-1.5 rounded-lg bg-rose-950/90 border-2 border-rose-500 text-rose-200 font-fortunarium text-lg sm:text-2xl tracking-[0.2em] uppercase -rotate-2 shadow-[0_4px_14px_rgba(225,29,72,0.65)] mb-3">
+                        ★ CUOTA SELLADA ★
+                      </div>
+
+                      <div className="w-full divide-y divide-amber-900/40 text-xs font-mono">
+                        <div className="py-1 flex justify-between text-amber-200">
+                          <span>Cuota Superada:</span>
+                          <span className="font-black text-emerald-400">Cuota {roomState.round} ({roomState.quota} CR) ✓</span>
+                        </div>
+                        <div className="py-1 flex justify-between text-amber-200">
+                          <span>Caja Conservada:</span>
+                          <span className="font-black text-amber-300 tabular-nums">{displayedMoney} CR (100% Caja)</span>
+                        </div>
+                        <div className="py-1 flex justify-between text-amber-200">
+                          <span>Integridad Chasis:</span>
+                          <span className="font-black text-[#7ae582] tabular-nums">{displayedIntegrity}% / {roomState.maxIntegrity}%</span>
+                        </div>
+                        <div className="py-1 flex justify-between text-amber-200">
+                          <span>Estado Operativo:</span>
+                          <span className="font-black text-sky-300">Pasando a Taller Mecánico</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ============================================================= */}
@@ -2253,141 +2497,147 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
             </div>
 
             {/* --------------------------------------------------------------- */}
-            {/* CABINET SECTION D: ARCADE CONTROL PANEL DECK (SECTIONS 13 & 15) */}
+            {/* CABINET SECTION D: ARCADE CONTROL PANEL DECK (PART A: FIXED GEOMETRY) */}
             {/* --------------------------------------------------------------- */}
-            <div className="relative z-10 rounded-2xl bg-gradient-to-b from-[#2f2219] via-[#211710] to-[#140d08] border-[3px] border-[#b98532] p-2.5 sm:p-3 shadow-[0_10px_25px_rgba(0,0,0,0.85),inset_0_2px_0_rgba(255,224,163,0.2)] flex flex-wrap items-center justify-between gap-2 shrink-0">
-              {/* Left Controls: APUESTA MÍN / - / CRT COST WINDOW / + / APUESTA MÁX */}
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <button
-                  type="button"
-                  disabled={isBusy || !isMyTurn || roomState.betMode === 'normal'}
-                  onClick={() => {
-                    fortunariumAudio.playButtonClick();
-                    onSetBetMode('normal');
-                  }}
-                  className={`fort-arcade-btn px-2.5 py-2 rounded-lg border-2 text-[11px] font-fortunarium tracking-wider cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed ${
-                    roomState.betMode === 'normal'
-                      ? 'bg-[#d99b26] text-stone-950 border-[#fef08a]'
-                      : 'bg-[#1b353e] hover:bg-[#244550] text-[#f3ead3] border-[#8c6b32]'
-                  }`}
-                >
-                  APUESTA MÍN
-                </button>
+            <div className="relative z-10 rounded-2xl bg-gradient-to-b from-[#2f2219] via-[#211710] to-[#140d08] border-[3px] border-[#b98532] p-2.5 sm:p-3 shadow-[0_10px_25px_rgba(0,0,0,0.85),inset_0_2px_0_rgba(255,224,163,0.2)] grid grid-cols-[1fr_auto] gap-2.5 sm:gap-3 items-stretch shrink-0">
+              {/* Left Column: Fixed Two-Row Control Deck */}
+              <div className="flex flex-col justify-between gap-2 min-w-0">
+                {/* Row 1: Bet Controls with permanently reserved physical widths */}
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <button
+                    type="button"
+                    disabled={isBusy || !isMyTurn || roomState.betMode === 'normal'}
+                    onClick={() => {
+                      fortunariumAudio.playButtonClick();
+                      onSetBetMode('normal');
+                    }}
+                    className={`fort-arcade-btn w-20 sm:w-26 h-9 sm:h-10 rounded-lg border-2 text-[10px] sm:text-[11px] font-fortunarium tracking-wider cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed shrink-0 whitespace-nowrap text-center ${
+                      roomState.betMode === 'normal'
+                        ? 'bg-[#d99b26] text-stone-950 border-[#fef08a]'
+                        : 'bg-[#1b353e] hover:bg-[#244550] text-[#f3ead3] border-[#8c6b32]'
+                    }`}
+                  >
+                    AP. MÍN
+                  </button>
 
-                <button
-                  type="button"
-                  disabled={isBusy || !isMyTurn || roomState.betMode === 'normal'}
-                  onClick={() => handleStepBetMode(-1)}
-                  className="fort-arcade-btn w-9 h-9 rounded-lg bg-[#1b353e] hover:bg-[#244550] disabled:opacity-40 border-2 border-[#8c6b32] text-[#f4d06f] flex items-center justify-center font-black cursor-pointer disabled:cursor-not-allowed"
-                  title="Reducir modo de apuesta"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
+                  <button
+                    type="button"
+                    disabled={isBusy || !isMyTurn || roomState.betMode === 'normal'}
+                    onClick={() => handleStepBetMode(-1)}
+                    className="fort-arcade-btn w-8 sm:w-9 h-9 sm:h-10 rounded-lg bg-[#1b353e] hover:bg-[#244550] disabled:opacity-40 border-2 border-[#8c6b32] text-[#f4d06f] flex items-center justify-center font-black cursor-pointer disabled:cursor-not-allowed shrink-0"
+                    title="Reducir modo de apuesta"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
 
-                <div className="fort-crt-display px-3 py-1 rounded-lg border-2 border-[#8c6b32] text-center min-w-[134px]">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-[#e9c46a]">
-                    COSTE TIRADA ({FORTUNARIUM_BET_MODES[roomState.betMode].shortLabel})
+                  {/* Center Fixed Cost Window: exactly the same width & height for all bet modes */}
+                  <div className="fort-crt-display px-2 py-0.5 rounded-lg border-2 border-[#8c6b32] text-center w-32 sm:w-38 h-9 sm:h-10 flex flex-col justify-center shrink-0 overflow-hidden">
+                    <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-[#e9c46a] truncate whitespace-nowrap">
+                      {FORTUNARIUM_BET_MODES[roomState.betMode].shortLabel}
+                    </div>
+                    <div className="text-xs sm:text-sm font-mono font-black text-[#7ae582] tabular-nums leading-tight truncate whitespace-nowrap">
+                      {currentSpinCost} CR
+                    </div>
                   </div>
-                  <div className="text-xs sm:text-sm font-mono font-black text-[#7ae582] tabular-nums">
-                    {currentSpinCost} CR
-                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isBusy || !isMyTurn || roomState.betMode === 'sobrecarga'}
+                    onClick={() => handleStepBetMode(1)}
+                    className="fort-arcade-btn w-8 sm:w-9 h-9 sm:h-10 rounded-lg bg-[#1b353e] hover:bg-[#244550] disabled:opacity-40 border-2 border-[#8c6b32] text-[#f4d06f] flex items-center justify-center font-black cursor-pointer disabled:cursor-not-allowed shrink-0"
+                    title="Aumentar modo de apuesta"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isBusy || !isMyTurn || roomState.betMode === 'sobrecarga'}
+                    onClick={() => {
+                      fortunariumAudio.playButtonClick();
+                      onSetBetMode('sobrecarga');
+                    }}
+                    className={`fort-arcade-btn w-20 sm:w-26 h-9 sm:h-10 rounded-lg border-2 text-[10px] sm:text-[11px] font-fortunarium tracking-wider cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed shrink-0 whitespace-nowrap text-center ${
+                      roomState.betMode === 'sobrecarga'
+                        ? 'bg-[#b82d10] text-[#fff3d6] border-[#fde047]'
+                        : 'bg-[#1b353e] hover:bg-[#244550] text-[#f3ead3] border-[#8c6b32]'
+                    }`}
+                  >
+                    AP. MÁX
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={isBusy || !isMyTurn || roomState.betMode === 'sobrecarga'}
-                  onClick={() => handleStepBetMode(1)}
-                  className="fort-arcade-btn w-9 h-9 rounded-lg bg-[#1b353e] hover:bg-[#244550] disabled:opacity-40 border-2 border-[#8c6b32] text-[#f4d06f] flex items-center justify-center font-black cursor-pointer disabled:cursor-not-allowed"
-                  title="Aumentar modo de apuesta"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+                {/* Row 2: Physical Utility Switches: REPARAR & TALLER (permanent reserved slots) */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={
+                      isBusy ||
+                      displayedIntegrity >= roomState.maxIntegrity ||
+                      !repairValidation.allowed
+                    }
+                    onClick={() => {
+                      fortunariumAudio.playButtonClick();
+                      onRepairMachine(false);
+                    }}
+                    className="fort-arcade-btn px-3 py-1.5 h-9 sm:h-10 rounded-lg bg-[#1b4332] hover:bg-[#2d6a4f] disabled:opacity-45 border-2 border-[#7ae582]/70 text-[#e6f5ed] text-xs font-black flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed w-36 sm:w-44 shrink-0"
+                    title={
+                      displayedIntegrity >= roomState.maxIntegrity
+                        ? 'Integridad al 100%'
+                        : !repairValidation.allowed
+                        ? repairValidation.reason || 'No permitido'
+                        : `Reparar chasis por ${repairCost} CR`
+                    }
+                  >
+                    <Shield className="w-4 h-4 text-[#7ae582] shrink-0" />
+                    <div className="text-left leading-tight min-w-0 truncate">
+                      <div className="text-[10px] font-fortunarium tracking-wide uppercase truncate">
+                        REPARAR
+                      </div>
+                      <div className="font-mono text-[11px] text-[#b7e4c7] tabular-nums truncate">
+                        {repairValidation.code === 'SPIN_RESERVE_REQUIRED'
+                          ? `RESERVA ${repairValidation.minSpinReserve} CR`
+                          : `${repairCost} CR`}
+                      </div>
+                    </div>
+                  </button>
 
-                <button
-                  type="button"
-                  disabled={isBusy || !isMyTurn || roomState.betMode === 'sobrecarga'}
-                  onClick={() => {
-                    fortunariumAudio.playButtonClick();
-                    onSetBetMode('sobrecarga');
-                  }}
-                  className={`fort-arcade-btn px-2.5 py-2 rounded-lg border-2 text-[11px] font-fortunarium tracking-wider cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed ${
-                    roomState.betMode === 'sobrecarga'
-                      ? 'bg-[#b82d10] text-[#fff3d6] border-[#fde047]'
-                      : 'bg-[#1b353e] hover:bg-[#244550] text-[#f3ead3] border-[#8c6b32]'
-                  }`}
-                >
-                  APUESTA MÁX
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fortunariumAudio.playButtonClick();
+                      setShowWorkshopModal(true);
+                    }}
+                    className="fort-arcade-btn px-3 py-1.5 h-9 sm:h-10 rounded-lg bg-[#8c3b19] hover:bg-[#a8471f] border-2 border-[#f2b24c] text-[#fff3d6] text-xs font-black flex items-center gap-1.5 cursor-pointer w-28 sm:w-34 shrink-0"
+                  >
+                    <Wrench className="w-4 h-4 text-[#f4d06f] shrink-0" />
+                    <div className="text-left leading-tight min-w-0 truncate">
+                      <div className="text-[10px] font-fortunarium tracking-wide uppercase truncate">
+                        TALLER
+                      </div>
+                      <div className="font-mono text-[11px] text-[#f4d06f] tabular-nums truncate">
+                        {installedUpgrades.length} MEJ.
+                      </div>
+                    </div>
+                  </button>
+                </div>
               </div>
 
-              {/* Center Primary Physical Arcade Plunger Button: GIRAR ONLY (Section 13) */}
-              <button
-                type="button"
-                disabled={!canSpin}
-                onClick={() => handleTriggerSpin(undefined, 'button')}
-                className={`flex-1 min-w-[180px] max-w-[290px] py-3 px-6 rounded-2xl flex items-center justify-center ${
-                  canSpin
-                    ? 'fort-girar-plunger text-[#fff7e6] cursor-pointer'
-                    : 'bg-[#2b2623] border-[3px] border-[#574d47] text-[#78716c] cursor-not-allowed opacity-75 shadow-[0_4px_0_#141210]'
-                }`}
-              >
-                <span className="font-fortunarium text-2xl sm:text-3xl tracking-widest leading-none drop-shadow-[0_2px_0_rgba(0,0,0,0.65)]">
-                  GIRAR
-                </span>
-              </button>
-
-              {/* Right Physical Utility Switches on Deck: REPARAR & TALLER */}
-              <div className="flex items-center gap-2">
+              {/* Right Column: Permanent Reserved Slot for GIRAR Arcade Plunger Button */}
+              <div className="w-36 sm:w-48 md:w-56 flex shrink-0">
                 <button
                   type="button"
-                  disabled={
-                    isBusy ||
-                    displayedIntegrity >= roomState.maxIntegrity ||
-                    !repairValidation.allowed
-                  }
-                  onClick={() => {
-                    fortunariumAudio.playButtonClick();
-                    onRepairMachine(false);
-                  }}
-                  className="fort-arcade-btn px-3 py-1.5 rounded-lg bg-[#1b4332] hover:bg-[#2d6a4f] disabled:opacity-45 border-2 border-[#7ae582]/70 text-[#e6f5ed] text-xs font-black flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
-                  title={
-                    displayedIntegrity >= roomState.maxIntegrity
-                      ? 'Integridad al 100%'
-                      : !repairValidation.allowed
-                      ? repairValidation.reason || 'No permitido'
-                      : `Reparar chasis por ${repairCost} CR`
-                  }
+                  disabled={!canSpin}
+                  onClick={() => handleTriggerSpin(undefined, 'button')}
+                  className={`w-full h-full min-h-[82px] py-3 px-4 rounded-2xl flex items-center justify-center transition-all ${
+                    canSpin
+                      ? 'fort-girar-plunger text-[#fff7e6] cursor-pointer'
+                      : 'bg-[#2b2623] border-[3px] border-[#574d47] text-[#78716c] cursor-not-allowed opacity-75 shadow-[0_4px_0_#141210]'
+                  }`}
                 >
-                  <Shield className="w-4 h-4 text-[#7ae582]" />
-                  <div className="text-left leading-tight">
-                    <div className="text-[10px] font-fortunarium tracking-wide uppercase">
-                      REPARAR
-                    </div>
-                    <div className="font-mono text-[11px] text-[#b7e4c7] tabular-nums">
-                      {repairValidation.code === 'SPIN_RESERVE_REQUIRED'
-                        ? `RESERVA ${repairValidation.minSpinReserve} CR`
-                        : `${repairCost} CR`}
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    fortunariumAudio.playButtonClick();
-                    setShowWorkshopModal(true);
-                  }}
-                  className="fort-arcade-btn px-3 py-1.5 rounded-lg bg-[#8c3b19] hover:bg-[#a8471f] border-2 border-[#f2b24c] text-[#fff3d6] text-xs font-black flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Wrench className="w-4 h-4 text-[#f4d06f]" />
-                  <div className="text-left leading-tight">
-                    <div className="text-[10px] font-fortunarium tracking-wide uppercase">
-                      TALLER
-                    </div>
-                    <div className="font-mono text-[11px] text-[#f4d06f] tabular-nums">
-                      {installedUpgrades.length} MEJ.
-                    </div>
-                  </div>
+                  <span className="font-fortunarium text-2xl sm:text-3xl tracking-widest leading-none drop-shadow-[0_2px_0_rgba(0,0,0,0.65)] select-none">
+                    GIRAR
+                  </span>
                 </button>
               </div>
             </div>
@@ -3078,6 +3328,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                     { id: 'special_moneda', label: '🪙 Moneda' },
                     { id: 'special_interrogacion', label: '❓ Interrogación' },
                     { id: 'jackpot', label: '🏆 Jackpot' },
+                    { id: 'pantalla_completa', label: '🌟 Pantalla Completa (15)' },
                     { id: 'force_bankruptcy', label: '💸 Forzar Bancarrota' },
                     { id: 'force_integrity_zero', label: '🔧 Forzar Avería 0%' },
                   ] as const
@@ -3086,8 +3337,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                     key={sc.id}
                     type="button"
                     onClick={() => {
-                      setShowDevModal(false);
-                      handleTriggerSpin(sc.id, 'button');
+                      handleRunLocalSandboxSpin(sc.id);
                     }}
                     className="px-2.5 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-700 text-[11px] font-mono font-bold text-amber-300 cursor-pointer"
                   >
@@ -3248,6 +3498,19 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
         isOpen={showAudioModal}
         onClose={() => setShowAudioModal(false)}
       />
+
+      {/* GARAGE DOOR INTRO & INTER-QUOTA TRANSITION (PART B & PART H) */}
+      {showGarageIntro && (
+        <FortunariumGarageIntro
+          onComplete={() => {
+            setIntroSeenMatchId(roomState.matchId);
+            setForceReplayIntro(false);
+            setLastSeenQuotaRound(roomState.round);
+          }}
+          nextQuotaInfo={nextQuotaPaperInfo}
+          initialSlideDown={showInterQuotaGarageDoor}
+        />
+      )}
     </div>
   );
 };

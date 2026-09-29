@@ -108,7 +108,8 @@ export type FortunariumPatternType =
   | 'DIAGONAL'
   | 'X'
   | 'TRIANGULO'
-  | 'TRIANGULO_INVERTIDO';
+  | 'TRIANGULO_INVERTIDO'
+  | 'PANTALLA_COMPLETA';
 
 export interface FortunariumWildSubstitution {
   col: number;
@@ -350,6 +351,7 @@ export type FortunariumDevScenario =
   | 'special_moneda'
   | 'special_interrogacion'
   | 'jackpot'
+  | 'pantalla_completa'
   | 'single_pattern'
   | 'force_bankruptcy'
   | 'force_integrity_zero';

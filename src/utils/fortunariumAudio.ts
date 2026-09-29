@@ -352,6 +352,10 @@ class FortunariumAudioEngine {
     osc.stop(now + 0.028);
   }
 
+  public playReelStopClack(colIndex = 0) {
+    this.playReelLockClack(colIndex);
+  }
+
   // 4. Heavy Column Lock CLACK (MÁQUINA channel)
   public playReelLockClack(colIndex: number) {
     const vol = this.getChannelGain('machine');
@@ -619,6 +623,43 @@ class FortunariumAudioEngine {
     oscLatch.stop(latchTime + 0.16);
   }
 
+  // 10b. Garage Shutter Close Impact
+  public playGarageDoorClose() {
+    const vol = this.getChannelGain('machine');
+    if (vol <= 0.001) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    for (let i = 0; i < 6; i++) {
+      const t = now + i * 0.06;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(140 - i * 12, t);
+      osc.frequency.exponentialRampToValueAtTime(55, t + 0.045);
+      gain.gain.setValueAtTime(0.14 * vol, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.055);
+    }
+
+    const impactTime = now + 0.38;
+    const oscImpact = ctx.createOscillator();
+    const gainImpact = ctx.createGain();
+    oscImpact.type = 'triangle';
+    oscImpact.frequency.setValueAtTime(95, impactTime);
+    oscImpact.frequency.exponentialRampToValueAtTime(32, impactTime + 0.12);
+    gainImpact.gain.setValueAtTime(0.24 * vol, impactTime);
+    gainImpact.gain.exponentialRampToValueAtTime(0.001, impactTime + 0.13);
+    oscImpact.connect(gainImpact);
+    gainImpact.connect(ctx.destination);
+    oscImpact.start(impactTime);
+    oscImpact.stop(impactTime + 0.14);
+  }
+
   // 11. Machine Power-On Ignition (MÁQUINA channel)
   public playMachinePowerOn() {
     const vol = this.getChannelGain('machine');
@@ -656,6 +697,41 @@ class FortunariumAudioEngine {
       o.start(t);
       o.stop(t + 0.24);
     });
+  }
+
+  // 11c. Heavy Rubber Stamp / Quota Seal CLACK (EFECTOS + MÁQUINA)
+  public playQuotaStamp() {
+    const vol = this.getChannelGain('effects');
+    if (vol <= 0.001) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // Heavy mechanical slap
+    const slap = ctx.createOscillator();
+    const slapGain = ctx.createGain();
+    slap.type = 'triangle';
+    slap.frequency.setValueAtTime(240, now);
+    slap.frequency.exponentialRampToValueAtTime(45, now + 0.12);
+    slapGain.gain.setValueAtTime(0.38 * vol, now);
+    slapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    slap.connect(slapGain);
+    slapGain.connect(ctx.destination);
+    slap.start(now);
+    slap.stop(now + 0.15);
+
+    // Resonant metallic ring
+    const ring = ctx.createOscillator();
+    const ringGain = ctx.createGain();
+    ring.type = 'sine';
+    ring.frequency.setValueAtTime(880, now + 0.02);
+    ring.frequency.exponentialRampToValueAtTime(440, now + 0.35);
+    ringGain.gain.setValueAtTime(0.18 * vol, now + 0.02);
+    ringGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+    ring.connect(ringGain);
+    ringGain.connect(ctx.destination);
+    ring.start(now + 0.02);
+    ring.stop(now + 0.4);
   }
 
   // 12. Bet Selector Mechanical Switch (INTERFAZ + MÁQUINA)

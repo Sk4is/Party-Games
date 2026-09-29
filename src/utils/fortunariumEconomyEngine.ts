@@ -318,13 +318,14 @@ export function generateDeterministicTestGrid(
         ['cereza', 'limon', 'naranja'],
       ];
 
+    case 'pantalla_completa':
     case 'jackpot':
       return [
-        ['siete', 'cereza', 'uvas'],
-        ['siete', 'limon', 'trebol'],
-        ['siete', 'naranja', 'campana'],
-        ['siete', 'ciruela', 'herradura'],
-        ['siete', 'estrella', 'diamante'],
+        ['siete', 'siete', 'siete'],
+        ['siete', 'siete', 'siete'],
+        ['siete', 'siete', 'siete'],
+        ['siete', 'siete', 'siete'],
+        ['siete', 'siete', 'siete'],
       ];
   }
 }
@@ -832,6 +833,29 @@ export function evaluateSpinGridCore(params: {
     });
   }
 
+  // 3E. CANONICAL FULL GRID JACKPOT PATTERN (PART D: ALL 15 CELLS)
+  // All 15 cells (3 rows x 5 columns) must contain identical compatible symbols resolving to the same base symbol.
+  const all15GridCells: FortunariumCellCoord[] = [];
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 5; c++) {
+      all15GridCells.push({ col: c, row: r });
+    }
+  }
+  const fullGridMatch = resolveCompatibleSymbolGroup(all15GridCells, board);
+  let isFullGridJackpot = false;
+  if (fullGridMatch) {
+    isFullGridJackpot = true;
+    registerPatternWin({
+      patternType: 'PANTALLA_COMPLETA',
+      patternCategory: 'SHAPE',
+      displayName: 'PANTALLA COMPLETA / JACKPOT',
+      basePatternMult: 12.0,
+      symbolId: fullGridMatch.symbolId,
+      wildCount: fullGridMatch.wildCount,
+      cells: all15GridCells,
+    });
+  }
+
   // 4. Sum line & shape pattern payouts and apply symbol-specific line perks
   let grossPayout = 0;
   let integrityDelta = -(
@@ -1045,11 +1069,16 @@ export function evaluateSpinGridCore(params: {
     });
   }
 
-  // 9. DEDICATED SERVER-AUTHORITATIVE JACKPOT ROLL (SECTIONS 22–26)
-  // Base probability = 0.1% (1 / 1000) per completed paid spin, modified by active buffs up to 1.0% cap
+  // 9. DEDICATED SERVER-AUTHORITATIVE JACKPOT ROLL (SECTIONS 22–26 & PART D)
   let isJackpot = false;
   let jackpotPayout = 0;
-  if (enableJackpotRoll) {
+  if (isFullGridJackpot) {
+    isJackpot = true;
+    const fullGridW = winLines.find((w) => w.patternType === 'PANTALLA_COMPLETA');
+    jackpotPayout = fullGridW ? fullGridW.payout : Math.round(520 * totalBetAndVoltageMult);
+    // Controlled authoritative settlement: full-grid jackpot payout governs total reward
+    grossPayout = jackpotPayout;
+  } else if (enableJackpotRoll) {
     const jackpotChance = computeEffectiveJackpotChance(
       upgrades,
       betMode,
@@ -2049,6 +2078,23 @@ export function runCanonicalPatternUnitTests(): {
       name: 'Buffs de Jackpot (0,10% base / 0,25% / 0,50% / tope 1,00%)',
       passed: ok,
       details: `base=${(base * 100).toFixed(2)}%, fortuna=${(withFortuna * 100).toFixed(2)}%, siete=${(withSiete * 100).toFixed(2)}%, cap=${(maxStacked * 100).toFixed(2)}%`,
+    });
+  }
+
+  // Test 23: Canonical Full Grid Jackpot (15 matching cells)
+  {
+    const fullGrid = evalBoard([
+      ['siete', 'siete', 'siete', 'siete', 'siete'],
+      ['siete', 'siete', 'siete', 'siete', 'siete'],
+      ['siete', 'siete', 'siete', 'siete', 'siete'],
+    ]);
+    const hasFull = fullGrid.winLines.some((w) => w.patternType === 'PANTALLA_COMPLETA');
+    const ok = hasFull && fullGrid.isJackpot && fullGrid.winningCells.length === 15;
+    results.push({
+      id: 'T23',
+      name: 'Pantalla Completa / Jackpot canónico (15 casillas idénticas)',
+      passed: ok,
+      details: `Jackpot=${fullGrid.isJackpot}, Líneas=${fullGrid.winLines.length}, Celdas=${fullGrid.winningCells.length}`,
     });
   }
 
