@@ -34,30 +34,30 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
       onClick={onClose}
     >
       <div
-        className="w-full max-w-4xl rounded-3xl bg-stone-950 border border-amber-500/50 p-4 sm:p-6 shadow-2xl flex flex-col gap-4 my-auto text-amber-50 max-h-[90dvh]"
+        className="w-full max-w-4xl rounded-2xl bg-[#132a34] border-[3px] border-[#b98532] p-4 sm:p-6 shadow-[0_24px_60px_rgba(0,0,0,0.9),inset_0_2px_0_rgba(255,255,255,0.12)] flex flex-col gap-4 my-auto text-amber-50 max-h-[90dvh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-[#8c6b32] pb-3">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">
-              Referencia Oficial de la Máquina · Voltaje actual x{currentVoltage.toFixed(2)}
+            <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-[#f4d06f]">
+              PLACA TÉCNICA DE PAGOS · VOLTAJE ACTUAL x{currentVoltage.toFixed(2)}
             </span>
-            <h2 className="text-2xl sm:text-3xl font-fortunarium text-amber-300 tracking-wide">
+            <h2 className="text-2xl sm:text-3xl font-fortunarium text-[#fff3d6] tracking-wide">
               TABLA DE PREMIOS
             </h2>
           </div>
 
           {/* Category Tabs */}
           <div className="flex items-center gap-2">
-            <div className="flex p-1 rounded-xl bg-stone-900 border border-stone-800">
+            <div className="flex p-1 rounded-lg bg-[#0a181f] border-2 border-[#6e5223]">
               <button
                 type="button"
                 onClick={() => switchTab('normales')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   activeTab === 'normales'
-                    ? 'bg-amber-500 text-stone-950 shadow font-black'
-                    : 'text-stone-300 hover:text-white'
+                    ? 'bg-[#d99b26] text-stone-950 shadow font-black border border-[#fef08a]'
+                    : 'text-[#d9e5e3] hover:text-white'
                 }`}
               >
                 <Trophy className="w-3.5 h-3.5" />
@@ -66,10 +66,10 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
               <button
                 type="button"
                 onClick={() => switchTab('especiales')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   activeTab === 'especiales'
-                    ? 'bg-amber-500 text-stone-950 shadow font-black'
-                    : 'text-stone-300 hover:text-white'
+                    ? 'bg-[#d99b26] text-stone-950 shadow font-black border border-[#fef08a]'
+                    : 'text-[#d9e5e3] hover:text-white'
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
@@ -78,10 +78,10 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
               <button
                 type="button"
                 onClick={() => switchTab('patrones')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   activeTab === 'patrones'
-                    ? 'bg-amber-500 text-stone-950 shadow font-black'
-                    : 'text-stone-300 hover:text-white'
+                    ? 'bg-[#d99b26] text-stone-950 shadow font-black border border-[#fef08a]'
+                    : 'text-[#d9e5e3] hover:text-white'
                 }`}
               >
                 <Grid className="w-3.5 h-3.5" />
@@ -92,7 +92,7 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 cursor-pointer"
+              className="fort-arcade-btn p-2 rounded-lg bg-[#2b1a14] hover:bg-[#3d251d] border-2 border-[#b98532] text-[#f4d06f] cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -122,14 +122,14 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                   return (
                     <div
                       key={sym.id}
-                      className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2.5 transition-all ${
+                      className={`p-3.5 rounded-xl border-2 flex flex-col justify-between gap-2.5 transition-all shadow-[inset_0_2px_0_rgba(255,255,255,0.1)] ${
                         isTopTier
-                          ? 'bg-gradient-to-b from-amber-500/15 via-stone-900 to-stone-950 border-amber-500/45 shadow-lg'
-                          : 'bg-stone-900/90 border-stone-800'
+                          ? 'bg-gradient-to-b from-[#2b2012] via-[#1c3842] to-[#132933] border-[#d99b26] shadow-lg'
+                          : 'bg-[#193640] border-[#8c6b32]'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-14 h-14 rounded-2xl bg-stone-950 border border-amber-500/25 p-1.5 flex items-center justify-center shrink-0 shadow-inner">
+                        <div className="w-14 h-14 rounded-xl bg-[#f4ead2] border-2 border-[#8c6b32] p-1.5 flex items-center justify-center shrink-0 shadow-inner">
                           <img
                             src={sym.asset}
                             alt={sym.name}
@@ -138,22 +138,22 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-1">
-                            <span className="text-base font-fortunarium text-white tracking-wide truncate">
+                            <span className="text-base font-fortunarium text-[#fff3d6] tracking-wide truncate">
                               {sym.name.toUpperCase()}
                             </span>
-                            <span className="text-[10px] font-mono font-bold text-stone-400">
+                            <span className="text-[10px] font-mono font-bold text-[#c2d6d3]">
                               #{index + 1}
                             </span>
                           </div>
                           <span
                             className={`text-[10px] font-bold uppercase tracking-wider ${
                               sym.tier >= 4
-                                ? 'text-amber-300'
+                                ? 'text-[#f4d06f]'
                                 : sym.tier === 3
                                 ? 'text-sky-300'
                                 : sym.tier === 2
-                                ? 'text-emerald-300'
-                                : 'text-stone-400'
+                                ? 'text-[#7ae582]'
+                                : 'text-[#c2d6d3]'
                             }`}
                           >
                             {sym.tier >= 4
@@ -168,22 +168,22 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                       </div>
 
                       {/* 3x / 4x / 5x Payout Table */}
-                      <div className="p-2.5 rounded-xl bg-stone-950/90 border border-stone-800/90 grid grid-cols-3 gap-1 text-center font-mono">
+                      <div className="p-2.5 rounded-lg bg-[#081318] border border-[#6e5223] grid grid-cols-3 gap-1 text-center font-mono">
                         <div>
-                          <span className="text-[10px] text-stone-400 block">3×</span>
+                          <span className="text-[10px] text-[#9eb8b4] block">3×</span>
                           <span className="text-xs sm:text-sm font-black text-amber-200 tabular-nums">
                             {sym.basePayout3} CR
                           </span>
                         </div>
-                        <div className="border-x border-stone-800">
-                          <span className="text-[10px] text-stone-400 block">4×</span>
+                        <div className="border-x border-[#3b525c]">
+                          <span className="text-[10px] text-[#9eb8b4] block">4×</span>
                           <span className="text-xs sm:text-sm font-black text-amber-300 tabular-nums">
                             {sym.basePayout4} CR
                           </span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-stone-400 block">5×</span>
-                          <span className="text-xs sm:text-sm font-black text-yellow-400 tabular-nums">
+                          <span className="text-[10px] text-[#9eb8b4] block">5×</span>
+                          <span className="text-xs sm:text-sm font-black text-[#f4d06f] tabular-nums">
                             {sym.basePayout5} CR
                           </span>
                         </div>
@@ -191,7 +191,7 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
 
                       {/* Only show specialProperty if relevant */}
                       {sym.specialProperty && (
-                        <div className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-[11px] font-medium text-amber-200 leading-tight">
+                        <div className="px-2.5 py-1.5 rounded-md bg-[#2b1d0e] border border-[#b98532] text-[11px] font-medium text-[#f4d06f] leading-tight">
                           {sym.specialProperty}
                         </div>
                       )}

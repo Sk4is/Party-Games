@@ -68,21 +68,21 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
   };
 
   return (
-    <div className="fortunarium-root font-fortunarium min-h-screen w-full bg-[#09060e] text-amber-50 flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-y-auto select-none relative">
-      {/* Warm brass & crimson casino ambient spotlight */}
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(245,158,11,0.14),transparent_65%),radial-gradient(ellipse_at_bottom_right,rgba(225,29,72,0.12),transparent_60%)] pointer-events-none" />
+    <div className="fortunarium-root font-fortunarium min-h-screen w-full bg-[#0b1c24] text-amber-50 flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-y-auto select-none relative">
+      {/* Warm workshop pegboard & incandescent overhead lamp */}
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(224,122,46,0.18),transparent_65%),radial-gradient(ellipse_at_bottom_right,rgba(33,93,104,0.35),transparent_60%)] pointer-events-none" />
 
       {/* Top Navigation Bar */}
-      <header className="relative z-10 w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-amber-500/20">
+      <header className="relative z-10 w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3 pb-4 border-b-2 border-[#b98532]/60">
         <button
           type="button"
           onClick={() => {
             fortunariumAudio.playButtonClick();
             onLeaveRoom();
           }}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-amber-500/30 text-amber-200 text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-95"
+          className="fort-arcade-btn inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#261714] hover:bg-[#3d1c18] border-2 border-[#b98532] text-[#f5deb3] text-xs sm:text-sm font-bold transition-all cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4 text-amber-400" />
+          <ArrowLeft className="w-4 h-4 text-[#e89b3c]" />
           <span>Salir al Menú</span>
         </button>
 
@@ -93,9 +93,9 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
               fortunariumAudio.playButtonClick();
               setShowRulebook(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-amber-500/35 text-amber-200 text-xs font-black transition-all cursor-pointer active:scale-95"
+            className="fort-arcade-btn inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#193842] hover:bg-[#224956] border-2 border-[#b98532] text-[#f5e6c4] text-xs font-black transition-all cursor-pointer"
           >
-            <BookOpen className="w-4 h-4 text-amber-400" />
+            <BookOpen className="w-4 h-4 text-[#f4d06f]" />
             <span>Manual</span>
           </button>
 
@@ -105,9 +105,9 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
               fortunariumAudio.playButtonClick();
               setShowPrizeTable(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-amber-500/35 text-amber-200 text-xs font-black transition-all cursor-pointer active:scale-95"
+            className="fort-arcade-btn inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#193842] hover:bg-[#224956] border-2 border-[#b98532] text-[#f5e6c4] text-xs font-black transition-all cursor-pointer"
           >
-            <Trophy className="w-4 h-4 text-amber-400" />
+            <Trophy className="w-4 h-4 text-[#f4d06f]" />
             <span>Premios</span>
           </button>
 
@@ -117,9 +117,9 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
               fortunariumAudio.playButtonClick();
               setShowAudioModal(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-amber-500/35 text-amber-200 text-xs font-black transition-all cursor-pointer active:scale-95"
+            className="fort-arcade-btn inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#193842] hover:bg-[#224956] border-2 border-[#b98532] text-[#f5e6c4] text-xs font-black transition-all cursor-pointer"
           >
-            <Volume2 className="w-4 h-4 text-amber-400" />
+            <Volume2 className="w-4 h-4 text-[#f4d06f]" />
             <span>Sonido</span>
           </button>
         </div>
@@ -130,41 +130,43 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
         {/* Left Column: Lobby Logo + Room Code + Cursor Color + Players (5 cols) */}
         <div className="lg:col-span-5 flex flex-col gap-5">
           {/* Room Header & Lobby Logo Card */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-stone-950/90 border border-amber-500/35 shadow-2xl flex flex-col gap-4">
+          <div className="fort-cabinet-metal p-5 sm:p-6 rounded-2xl border-[4px] border-[#b98532] flex flex-col gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-b from-amber-500/25 to-stone-900 border border-amber-400/50 flex items-center justify-center shrink-0 shadow-[0_0_25px_rgba(245,158,11,0.25)]">
-                <span className="text-5xl leading-none select-none" role="img" aria-label="Slot Machine">
+              <div className="w-20 h-20 rounded-xl bg-gradient-to-b from-[#401b13] to-[#1a0a07] border-2 border-[#b98532] flex items-center justify-center shrink-0 shadow-inner">
+                <span className="text-5xl leading-none select-none" role="img" aria-label="Arcade Machine">
                   🎰
                 </span>
               </div>
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400 flex items-center gap-1">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#f4d06f] flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
-                  Tragaperras de 1 a 4 Jugadores
+                  Máquina Electromecánica · 1 a 4 Operadores
                 </span>
-                <h1 className="text-2xl sm:text-3xl font-fortunarium text-amber-300 tracking-wider mt-0.5">
-                  FORTUNARIUM
-                </h1>
-                <p className="text-xs text-stone-300 mt-1 leading-relaxed">
-                  Una sola máquina física compartida en tiempo real. Superad la cuota de cada ciclo en solitario o con amigos.
+                <div className="inline-block mt-1 px-2.5 py-0.5 rounded bg-gradient-to-b from-[#f3ead3] to-[#d5c295] border-2 border-[#5c3d12] shadow-[0_2px_0_#241504] -rotate-[0.6deg]">
+                  <h1 className="text-2xl sm:text-3xl font-fortunarium text-[#7c2212] tracking-wider leading-none">
+                    FORTUNARIUM
+                  </h1>
+                </div>
+                <p className="text-xs text-[#e2ece9] mt-1.5 leading-relaxed">
+                  Un ingenio mecánico de taller compartido en tiempo real. Superad la cuota de cada ciclo en solitario o con amigos.
                 </p>
               </div>
             </div>
 
             {/* Room Code Box */}
-            <div className="p-3.5 rounded-2xl bg-stone-900/95 border border-amber-500/30 flex items-center justify-between gap-3">
+            <div className="fort-crt-display fort-dot-matrix p-3.5 rounded-xl border-2 border-[#8c6b32] flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">
-                  Código de Sala
+                <div className="text-[10px] uppercase tracking-wider text-[#e9c46a] font-semibold">
+                  Código de Sala (CRT)
                 </div>
-                <div className="text-2xl font-mono font-black tracking-[0.22em] text-amber-300">
+                <div className="text-2xl font-mono font-black tracking-[0.22em] text-[#7ae582]">
                   {roomState.roomCode}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={handleCopyCode}
-                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-500/20 active:scale-95"
+                className="fort-arcade-btn px-4 py-2.5 rounded-lg bg-[#d99b26] hover:bg-[#f4d06f] border border-[#fef08a] text-stone-950 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 {copied ? (
                   <>
@@ -313,7 +315,7 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                     fortunariumAudio.playButtonClick();
                     onStartGame();
                   }}
-                  className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 hover:from-amber-400 hover:to-yellow-400 disabled:from-stone-800 disabled:to-stone-800 disabled:text-stone-500 text-stone-950 font-black text-sm uppercase tracking-wider shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
+                  className="fort-girar-plunger w-full py-3.5 px-5 rounded-xl disabled:opacity-50 text-[#fff7e6] font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed"
                 >
                   <Play className="w-4 h-4 fill-current" />
                   <span>
@@ -323,8 +325,8 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                   </span>
                 </button>
               ) : (
-                <div className="w-full py-3 px-4 rounded-2xl bg-stone-900 border border-stone-800 text-center text-xs font-semibold text-amber-300/90">
-                  Esperando a que el anfitrión inicie la máquina...
+                <div className="w-full py-3 px-4 rounded-xl bg-[#0d1d24] border-2 border-[#8c6b32] text-center text-xs font-semibold text-[#f4d06f]">
+                  Esperando a que el anfitrión accione el interruptor...
                 </div>
               )}
             </div>
@@ -334,7 +336,7 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
         {/* Right Column: Configuration & Ordered Symbol Guide (7 cols) */}
         <div className="lg:col-span-7 flex flex-col gap-5">
           {/* Machine Rules & Settings */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-stone-950/90 border border-amber-500/30 shadow-xl flex flex-col gap-4">
+          <div className="fort-cabinet-metal p-5 sm:p-6 rounded-2xl border-[4px] border-[#b98532] flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Settings className="w-5 h-5 text-amber-400" />

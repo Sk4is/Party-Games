@@ -136,20 +136,20 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
       onClick={onClose}
     >
       <div
-        className="w-full max-w-5xl rounded-3xl bg-stone-950 border border-amber-500/50 shadow-2xl flex flex-col max-h-[90dvh] my-auto text-amber-50 overflow-hidden"
+        className="w-full max-w-5xl rounded-2xl bg-[#132a34] border-[3px] border-[#b98532] shadow-[0_24px_60px_rgba(0,0,0,0.9),inset_0_2px_0_rgba(255,255,255,0.12)] flex flex-col max-h-[90dvh] my-auto text-amber-50 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Book Header */}
-        <div className="px-4 sm:px-6 py-3.5 bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 border-b border-amber-500/30 flex items-center justify-between gap-3">
+        <div className="px-4 sm:px-6 py-3.5 bg-gradient-to-r from-[#0e2028] via-[#193640] to-[#0e2028] border-b-2 border-[#8c6b32] flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-[#2b1d0e] border-2 border-[#b98532] flex items-center justify-center text-[#f4d06f] shrink-0">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400 block">
-                Enciclopedia Interactiva en Partida
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#f4d06f] block">
+                MANUAL DE TALLER Y OPERACIÓN · EDICIÓN ELECTROMECÁNICA
               </span>
-              <h2 className="text-xl sm:text-2xl font-fortunarium text-amber-300 tracking-wide">
+              <h2 className="text-xl sm:text-2xl font-fortunarium text-[#fff3d6] tracking-wide">
                 MANUAL DEL FORTUNARIUM
               </h2>
             </div>
@@ -158,7 +158,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-700 text-stone-300 cursor-pointer"
+            className="fort-arcade-btn p-2 rounded-lg bg-[#2b1a14] hover:bg-[#3d251d] border-2 border-[#b98532] text-[#f4d06f] cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -167,7 +167,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
         {/* Body: Sidebar Chapters + Illustrated Page */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 min-h-0 overflow-hidden">
           {/* Left Index (3 cols on desktop, horizontal scroll on mobile) */}
-          <nav className="md:col-span-4 lg:col-span-3 bg-stone-900/70 border-b md:border-b-0 md:border-r border-stone-800 p-2.5 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar">
+          <nav className="md:col-span-4 lg:col-span-3 bg-[#0d1d24] border-b md:border-b-0 md:border-r-2 border-[#8c6b32] p-2.5 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar">
             {SECTIONS.map((sec) => {
               const Icon = sec.icon;
               const isSelected = sec.id === activeId;
@@ -176,17 +176,17 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                   key={sec.id}
                   type="button"
                   onClick={() => selectSection(sec.id)}
-                  className={`px-3 py-2 rounded-xl text-left flex items-center gap-2.5 shrink-0 transition-all cursor-pointer ${
+                  className={`px-3 py-2 rounded-lg text-left flex items-center gap-2.5 shrink-0 transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-amber-500 text-stone-950 font-black shadow-md'
-                      : 'text-stone-300 hover:bg-stone-800/80 hover:text-white font-semibold'
+                      ? 'bg-[#d99b26] text-stone-950 font-black border border-[#fef08a] shadow-md'
+                      : 'text-[#d9e5e3] hover:bg-[#193640] hover:text-white font-semibold border border-transparent'
                   }`}
                 >
                   <span
                     className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
                       isSelected
                         ? 'bg-stone-950/20 text-stone-950'
-                        : 'bg-stone-950 text-amber-400'
+                        : 'bg-[#081318] text-[#f4d06f] border border-[#6e5223]'
                     }`}
                   >
                     {sec.num}

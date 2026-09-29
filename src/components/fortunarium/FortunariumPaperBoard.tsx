@@ -28,39 +28,49 @@ export const FortunariumPaperBoard: React.FC<FortunariumPaperBoardProps> = ({
 
   const renderPaperSheet = (isModal = false) => (
     <div
-      className={`fortunarium-root font-fortunarium relative rounded-md px-3.5 py-3 text-[#261d13] shadow-[0_14px_32px_rgba(0,0,0,0.75),inset_0_0_24px_rgba(180,145,95,0.28)] border border-[#c5ae87] ${
-        isModal ? 'w-72' : 'w-52 -rotate-1'
+      className={`fortunarium-root font-fortunarium relative rounded-sm px-3.5 py-3.5 text-[#241b11] shadow-[0_16px_34px_rgba(0,0,0,0.82),inset_0_0_28px_rgba(166,128,76,0.34)] border-2 border-[#b89f74] ${
+        isModal ? 'w-72' : 'w-54 -rotate-[1.5deg]'
       }`}
       style={{
         background:
-          'linear-gradient(165deg, #f6eedc 0%, #eadbc0 58%, #dfc9a3 100%)',
+          'radial-gradient(circle at 82% 18%, rgba(138, 102, 56, 0.16) 0%, transparent 45%), linear-gradient(168deg, #f5ecd7 0%, #e9d7b6 56%, #dcc297 100%)',
       }}
     >
+      {/* Subtle folded corner & workshop smudge */}
+      <div className="absolute bottom-0 right-0 w-4 h-4 bg-gradient-to-tl from-[#a88c5e] via-[#cbb183] to-transparent pointer-events-none opacity-80" />
+
       {/* Top-Left Masking Tape Strip */}
       <div
-        className="absolute -top-2.5 left-3 w-14 h-4 -rotate-6 pointer-events-none shadow-xs border border-[#d6c39a]/70"
+        className="absolute -top-2.5 left-2.5 w-15 h-4 -rotate-6 pointer-events-none shadow-xs border border-[#cbb486]/80"
         style={{
-          background: 'rgba(236, 220, 182, 0.85)',
+          background: 'rgba(239, 224, 184, 0.88)',
         }}
       />
       {/* Top-Right Masking Tape Strip */}
       <div
-        className="absolute -top-2 right-3 w-12 h-4 rotate-6 pointer-events-none shadow-xs border border-[#d6c39a]/70"
+        className="absolute -top-2 right-2.5 w-13 h-4 rotate-7 pointer-events-none shadow-xs border border-[#cbb486]/80"
         style={{
-          background: 'rgba(236, 220, 182, 0.85)',
+          background: 'rgba(239, 224, 184, 0.88)',
         }}
       />
 
-      {/* Brass Thumbtack at Top Center */}
-      <div className="mx-auto -mt-1 mb-1.5 w-3 h-3 rounded-full bg-gradient-to-br from-amber-300 via-amber-500 to-amber-800 border border-amber-950 shadow" />
+      {/* Brass Thumbtack / Pin at Top Center */}
+      <div className="mx-auto -mt-1.5 mb-1.5 w-3.5 h-3.5 rounded-full bg-gradient-to-br from-[#fef08a] via-[#d99b26] to-[#613f11] border border-[#2b1a06] shadow-[0_2px_4px_rgba(0,0,0,0.6)] flex items-center justify-center">
+        <div className="w-1 h-1 rounded-full bg-[#fffbeb]/70" />
+      </div>
 
-      {/* Header */}
-      <div className="border-b-2 border-dashed border-[#8c7352]/60 pb-1.5 mb-2 flex items-center justify-between">
-        <span className="font-fortunarium text-xs tracking-wider text-[#3b2b1a] uppercase">
-          NOTAS DE LA MÁQUINA
-        </span>
+      {/* Stamped Maintenance Header */}
+      <div className="border-b-2 border-dashed border-[#7c6342]/70 pb-1.5 mb-2 flex items-center justify-between">
+        <div>
+          <span className="block font-mono text-[8px] font-black tracking-widest text-[#7a2e1d] uppercase">
+            HOJA DE REVISIÓN #84
+          </span>
+          <span className="font-fortunarium text-xs tracking-wider text-[#2e2012] uppercase">
+            NOTAS DE LA MÁQUINA
+          </span>
+        </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#3b2b1a]/12 text-[#4a3620] tabular-nums">
+          <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-xs bg-[#3b2b1a]/15 border border-[#7c6342]/50 text-[#3b2b1a] tabular-nums">
             {activeModifiers.length}/4
           </span>
           {isModal && (
@@ -77,14 +87,14 @@ export const FortunariumPaperBoard: React.FC<FortunariumPaperBoardProps> = ({
 
       {/* Active Temporary Modifiers List (Max 3 data points per item: Name, Short Value, Spins) */}
       {activeModifiers.length === 0 ? (
-        <div className="py-2 text-center">
-          <p className="text-[11px] italic text-[#5c4730] leading-snug">
-            Sin efectos activos.
+        <div className="py-2.5 px-2 text-center border border-dashed border-[#8c7352]/45 rounded-xs bg-[#efe2c6]/45">
+          <p className="text-[11px] font-mono font-bold italic text-[#5c4730] leading-snug">
+            — Sin anomalías ni parches activos —
           </p>
         </div>
       ) : (
         <div className="space-y-1.5">
-          {activeModifiers.map((mod) => {
+          {activeModifiers.map((mod, idx) => {
             const isBuff = mod.type === 'BUFF';
             const isJackpotBuff =
               mod.id === 'fortuna_desatada' || mod.id === 'siete_suerte';
@@ -97,19 +107,21 @@ export const FortunariumPaperBoard: React.FC<FortunariumPaperBoardProps> = ({
                     ? `${mod.name}: Prob. Base 0.25% → Actual ${currentJackpotPct}% (Máx 1.00%) · ${mod.spinsRemaining} tiradas restantes`
                     : `${mod.name}: ${mod.effect} (${mod.spinsRemaining} tiradas restantes)`
                 }
-                className={`animate-fort-note-slap relative rounded px-2 py-1.5 border text-left shadow-xs ${
+                className={`animate-fort-note-slap relative rounded-xs px-2 py-1.5 border-l-4 border text-left shadow-xs ${
+                  idx % 2 === 0 ? 'rotate-[0.4deg]' : '-rotate-[0.4deg]'
+                } ${
                   isJackpotBuff
-                    ? 'bg-amber-100 border-amber-600/65 text-amber-950'
+                    ? 'bg-[#fef3c7] border-[#b45309] text-[#451a03]'
                     : isBuff
-                    ? 'bg-[#e7f5e8] border-[#2e7d32]/45 text-[#143d18]'
-                    : 'bg-[#fbe7e7] border-[#b71c1c]/45 text-[#4a1212]'
+                    ? 'bg-[#e3f2e4] border-[#1b5e20] text-[#113314]'
+                    : 'bg-[#fae1e1] border-[#991b1b] text-[#450a0a]'
                 }`}
               >
                 <div className="flex items-center justify-between gap-1">
                   <span className="font-fortunarium text-[11px] tracking-wide leading-tight truncate">
                     {mod.name}
                   </span>
-                  <span className="text-[9px] font-mono font-extrabold tabular-nums shrink-0 px-1 py-0.2 rounded bg-black/10">
+                  <span className="text-[9px] font-mono font-extrabold tabular-nums shrink-0 px-1 py-0.2 rounded-xs bg-black/12 border border-black/15">
                     {mod.spinsRemaining}T
                   </span>
                 </div>
@@ -135,10 +147,10 @@ export const FortunariumPaperBoard: React.FC<FortunariumPaperBoardProps> = ({
             setMobileOpen(false);
             onOpenWorkshop();
           }}
-          className="mt-2 w-full pt-1.5 border-t border-[#8c7352]/40 flex items-center justify-between text-[10px] font-mono font-bold text-[#4a3620] hover:text-[#1e140a] cursor-pointer transition"
+          className="mt-2.5 w-full pt-1.5 border-t-2 border-dashed border-[#7c6342]/55 flex items-center justify-between text-[10px] font-mono font-black text-[#3b2712] hover:text-[#140d06] cursor-pointer transition"
         >
-          <span>PIEZAS CHASIS:</span>
-          <span className="px-1.5 py-0.5 rounded bg-[#3b2b1a]/15 tabular-nums">
+          <span>PIEZAS INSTALADAS:</span>
+          <span className="px-1.5 py-0.5 rounded-xs bg-[#3b2b1a]/15 border border-[#7c6342]/50 tabular-nums">
             {installedUpgradesCount} 🔧
           </span>
         </button>
