@@ -2336,7 +2336,7 @@ export function runCanonicalPatternUnitTests(): {
       id: 'T22',
       name: 'Buffs de Jackpot (0,10% base / 0,25% / 0,50% / tope 1,00%)',
       passed: ok,
-      details: `base=${(base * 100).toFixed(2)}%, fortuna=${(withFortuna * 100).toFixed(2)}%, siete=${(withSiete * 100).toFixed(2)}%, cap=${(maxStacked * 100).toFixed(2)}%`,
+      details: `base=${(base * 100).toFixed(2)}%, fortuna=${(withFortuna * 100).toFixed(2)}%, mono=${(withSiete * 100).toFixed(2)}%, cap=${(maxStacked * 100).toFixed(2)}%`,
     });
   }
 

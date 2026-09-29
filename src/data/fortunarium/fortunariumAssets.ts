@@ -240,7 +240,7 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
   },
   siete: {
     id: 'siete',
-    name: 'Siete',
+    name: 'MONO',
     category: 'normal',
     tier: 5,
     asset: FORTUNARIUM_SYMBOL_ASSETS.siete,
@@ -249,8 +249,8 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     basePayout4: 1170,
     basePayout5: 3120,
     weight: 3,
-    shortDesc: 'El emblema supremo del Fortunarium (rareza máxima).',
-    specialProperty: 'Sinergia con «Siete Dorado» (+25% valor base y prob. Jackpot)',
+    shortDesc: 'MONO — El símbolo normal más valioso de Fortunarium.',
+    specialProperty: 'Sinergia con «Mono Dorado» (+25% valor base y prob. Jackpot)',
     badgeColor: '#f43f5e',
   },
 
@@ -743,12 +743,12 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   },
   siete_dorado: {
     id: 'siete_dorado',
-    name: 'Siete Dorado',
+    name: 'Mono Dorado',
     rarity: 'EXCEPCIONAL',
     synergyTags: ['high_value', 'geometry'],
     description:
-      'El valor base de Siete y Corona sube un +25% por nivel y mejora un +12% la probabilidad de Jackpot.',
-    effectSummary: '+25% valor Siete/Corona · +12% prob. Jackpot / nv.',
+      'El valor base de MONO y Corona sube un +25% por nivel y mejora un +12% la probabilidad de Jackpot.',
+    effectSummary: '+25% valor MONO/Corona · +12% prob. Jackpot / nv.',
     baseCostMoney: 95,
     costMultiplierPerLevel: 1.35,
     keyCost: 2,
@@ -950,9 +950,9 @@ export const FORTUNARIUM_MODIFIERS_CATALOG: Record<
   },
   siete_suerte: {
     id: 'siete_suerte',
-    name: 'SIETE DE LA SUERTE',
+    name: 'MONO DE LA SUERTE',
     type: 'BUFF',
-    effect: '+ Probabilidad de Jackpot y más Sietes.',
+    effect: '+ Probabilidad de Jackpot y más MONOS.',
     defaultSpins: 3,
     jackpotBaseOverride: 0.005,
   },
@@ -1432,12 +1432,12 @@ export function getUpgradeLevelDetails(
         maxLevel: meta.maxLevel,
         isMax,
         compactLines: [
-          `+${effectiveLv * 25}% valor base Siete/Corona`,
+          `+${effectiveLv * 25}% valor base MONO/Corona`,
           `+${effectiveLv * 12}% bono prob. Jackpot`,
         ],
         detailedLines: [
           {
-            label: 'Valor Base Siete (7) y Corona',
+            label: 'Valor Base MONO y Corona',
             currentValue: lv > 0 ? `+${lv * 25}%` : 'Base (0%)',
             nextValue: !isMax ? `+${nextLv * 25}%` : undefined,
           },
@@ -1732,7 +1732,7 @@ export function computeLiveSymbolStats(
       activeUpgradeSources.push(`Imán de Diamantes Nv.${upgrades.iman_diamante}`);
     }
     if ((id === 'siete' || id === 'corona') && (upgrades.siete_dorado || 0) > 0) {
-      activeUpgradeSources.push(`Siete Dorado Nv.${upgrades.siete_dorado}`);
+      activeUpgradeSources.push(`Mono Dorado Nv.${upgrades.siete_dorado}`);
     }
     if ((id === 'uvas' || id === 'trebol') && (upgrades.prensa_uvas || 0) > 0) {
       activeUpgradeSources.push(`Reserva de la Viña Nv.${upgrades.prensa_uvas}`);

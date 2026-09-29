@@ -287,6 +287,8 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                   const formattedProb =
                     probPct < 1 ? `${probPct.toFixed(2)}%` : `${probPct.toFixed(1)}%`;
 
+                  const isMono = sym.id === 'siete';
+
                   return (
                     <div
                       key={sym.id}
@@ -305,9 +307,13 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                             className="w-full h-full object-contain"
                           />
                         </div>
-                        <div className="min-w-0 flex flex-col">
+                        <div className="min-w-0 flex flex-col justify-center">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-fortunarium text-base sm:text-lg text-white tracking-wide truncate">
+                            <span
+                              className={`font-fortunarium text-base sm:text-lg tracking-wide truncate leading-tight ${
+                                isMono ? 'fort-mono-rainbow font-black' : 'text-white'
+                              }`}
+                            >
                               {sym.name.toUpperCase()}
                             </span>
                             {hasUpgradeBoost && (
@@ -316,10 +322,20 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                               </span>
                             )}
                           </div>
-                          {showLiveMode && sym.activeUpgradeSources.length > 0 && (
-                            <span className="text-[11px] font-mono font-bold text-[#FF2A6D] truncate">
-                              🔧 {sym.activeUpgradeSources.join(' · ')}
+                          {isMono ? (
+                            <span className="text-[10px] font-mono font-bold text-amber-300/90 tracking-wider uppercase truncate leading-tight">
+                              ★ SÍMBOLO NORMAL MÁS VALIOSO
+                              {showLiveMode && sym.activeUpgradeSources.length > 0
+                                ? ` · 🔧 ${sym.activeUpgradeSources.join(' · ')}`
+                                : ''}
                             </span>
+                          ) : (
+                            showLiveMode &&
+                            sym.activeUpgradeSources.length > 0 && (
+                              <span className="text-[11px] font-mono font-bold text-[#FF2A6D] truncate leading-tight">
+                                🔧 {sym.activeUpgradeSources.join(' · ')}
+                              </span>
+                            )
                           )}
                         </div>
                       </div>

@@ -1548,11 +1548,50 @@ body,
   will-change: width;
 }
 
+/* MONO Premium Rainbow Gradient Label */
+@keyframes fort-mono-rainbow-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 300% 50%;
+  }
+}
+
+.fort-mono-rainbow,
+.fort-mono-rainbow-static {
+  background: linear-gradient(
+    90deg,
+    #ff2a6d,
+    #ff9f1c,
+    #ffe600,
+    #4cff7a,
+    #00e5ff,
+    #6c63ff,
+    #d946ef,
+    #ff2a6d
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 5px rgba(255, 230, 0, 0.16));
+}
+
+.fort-mono-rainbow {
+  animation: fort-mono-rainbow-flow 5s linear infinite;
+}
+
 /* Accessibility: Respect user reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   .fam2play-wordmark {
     animation: hero-title-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
     background-position: 40% 50% !important;
+  }
+  .fort-mono-rainbow {
+    animation: none !important;
+    background-position: 25% 50% !important;
   }
   .animate-home-blob-amber,
   .animate-home-blob-rose,

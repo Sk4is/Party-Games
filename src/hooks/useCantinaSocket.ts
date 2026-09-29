@@ -193,10 +193,18 @@ export function useCantinaSocket({
     isManuallyClosedRef.current = false;
 
     const wsUrl = getGameWsUrl('/ws/cantina');
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+    } catch (err) {
+      console.warn('[useCantinaSocket] Failed to instantiate WebSocket:', err);
+      setConnectionStatus('disconnected');
+      return;
+    }
 
     ws.onopen = () => {
+      if (wsRef.current !== ws) return;
       setConnectionStatus('connected');
       reconnectAttemptsRef.current = 0;
 
@@ -211,7 +219,7 @@ export function useCantinaSocket({
           color: playerRef.current.color,
         },
       };
-      ws.send(JSON.stringify(joinMsg));
+      safeSendWebSocket(ws, joinMsg as unknown as Record<string, unknown>);
 
       // Flush queue
       while (messageQueueRef.current.length > 0) {
@@ -223,8 +231,8 @@ export function useCantinaSocket({
 
       // Ping keepalive every 15 seconds
       pingIntervalRef.current = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'PING' }));
+        if (wsRef.current === ws && ws.readyState === WebSocket.OPEN) {
+          safeSendWebSocket(ws, { type: 'PING' });
         }
       }, 15000);
     };

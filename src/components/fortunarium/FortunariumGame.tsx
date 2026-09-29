@@ -274,7 +274,7 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
             <div className="w-11 h-11 rounded-xl fort-crt-panel p-1.5 flex items-center justify-center shrink-0">
               <img
                 src={FORTUNARIUM_SYMBOL_ASSETS.siete}
-                alt="Siete"
+                alt="MONO"
                 className="w-full h-full object-contain"
               />
             </div>

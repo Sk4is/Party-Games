@@ -316,11 +316,13 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {activeId === 'simbolos' && (
                 <div className="flex flex-col gap-3">
                   <p className="text-xs sm:text-sm text-cyan-100">
-                    Existen <strong className="text-[#FF2A6D]">{NORMAL_SYMBOLS_BY_VALUE_DESC.length} símbolos normales canónicos</strong> ordenados de mayor a menor Valor Base. Cada patrón multiplica el <strong className="text-amber-300">Valor Base</strong> del símbolo:
+                    Existen <strong className="text-[#FF2A6D]">{NORMAL_SYMBOLS_BY_VALUE_DESC.length} símbolos normales canónicos</strong> ordenados de mayor a menor Valor Base. Cada patrón multiplica el <strong className="text-amber-300">Valor Base</strong> del símbolo.{' '}
+                    <strong className="text-white">MONO — El símbolo normal más valioso de Fortunarium.</strong>
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                     {NORMAL_SYMBOLS_BY_VALUE_DESC.map((id) => {
                       const s = FORTUNARIUM_SYMBOLS[id];
+                      const isMono = id === 'siete';
                       return (
                         <div
                           key={id}
@@ -332,12 +334,21 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                             className="w-11 h-11 object-contain shrink-0"
                           />
                           <div className="min-w-0">
-                            <div className="text-sm font-fortunarium text-white tracking-wide truncate">
+                            <div
+                              className={`text-sm font-fortunarium tracking-wide truncate ${
+                                isMono ? 'fort-mono-rainbow-static font-black' : 'text-white'
+                              }`}
+                            >
                               {s.name.toUpperCase()}
                             </div>
                             <div className="text-xs font-mono font-black text-amber-300 tabular-nums mt-0.5">
                               Valor Base: {s.baseSymbolValue} CR
                             </div>
+                            {isMono && (
+                              <div className="text-[10px] font-mono font-bold text-amber-200/90 truncate mt-0.5">
+                                MONO — El símbolo normal más valioso de Fortunarium.
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -618,7 +629,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                         • <strong>3+ Rayos:</strong> Además de subir el Voltaje, otorgan <strong>+1 Tirada Extra</strong> inmediata.
                       </p>
                       <p className="text-amber-200">
-                        • <strong>Fortuna Desatada / Siete de la Suerte:</strong> Buffs de probabilidad de <strong>JACKPOT SUPREMO</strong> (base 0.25% → hasta un tope máximo del 1.00% durante las tiradas indicadas).
+                        • <strong>Fortuna Desatada / Mono de la Suerte:</strong> Buffs de probabilidad de <strong>JACKPOT SUPREMO</strong> (base 0.25% → hasta un tope máximo del 1.00% durante las tiradas indicadas).
                       </p>
                     </div>
                     <div className="p-3.5 rounded-2xl bg-rose-950/35 border border-rose-500/45 flex flex-col gap-2">
