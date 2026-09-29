@@ -26,7 +26,7 @@ export const FortunariumGarageIntro: React.FC<FortunariumGarageIntroProps> = ({
   // progress: 0 = fully closed (door down), 1 = fully open (door raised up)
   const [progress, setProgress] = useState<number>(initialSlideDown ? 1 : 0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [phase, setPhase] = useState<'closing' | 'interactive' | 'auto_completing' | 'powering' | 'done'>(
+  const [phase, setPhase] = useState<'closing' | 'interactive' | 'auto_completing' | 'done'>(
     initialSlideDown ? 'closing' : 'interactive'
   );
   
@@ -60,26 +60,20 @@ export const FortunariumGarageIntro: React.FC<FortunariumGarageIntroProps> = ({
   }, [matchId, quotaInfo?.quotaNumber, initialSlideDown]);
 
   const triggerFullOpen = useCallback(() => {
-    if (phase === 'auto_completing' || phase === 'powering' || phase === 'done') return;
+    if (phase === 'auto_completing' || phase === 'done') return;
     setPhase('auto_completing');
     setIsDragging(false);
     dragStartYRef.current = null;
     fortunariumAudio.playGarageDoorOpen();
     setProgress(1);
 
-    const t1 = setTimeout(() => {
-      setPhase('powering');
-      fortunariumAudio.playMachinePowerOn();
-    }, 480);
-
-    const t2 = setTimeout(() => {
+    const t = setTimeout(() => {
       setPhase('done');
       onComplete();
-    }, 1100);
+    }, 450);
 
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
+      clearTimeout(t);
     };
   }, [phase, onComplete]);
 
@@ -170,16 +164,6 @@ export const FortunariumGarageIntro: React.FC<FortunariumGarageIntroProps> = ({
       className="fortunarium-root font-fortunarium fixed inset-0 z-50 pointer-events-auto overflow-hidden select-none"
       aria-label="Compuerta manual del taller Fortunarium"
     >
-      {/* Warm cabinet ignition glow behind the shutter as it rises */}
-      <div
-        className="absolute inset-0 pointer-events-none transition-opacity duration-300"
-        style={{
-          opacity: Math.min(1, progress * 1.3),
-          background:
-            'radial-gradient(circle at 50% 50%, rgba(251,191,36,0.28) 0%, rgba(6,182,212,0.12) 45%, rgba(2,6,23,0.5) 85%)',
-        }}
-      />
-
       {/* Heavy Corrugated Steel Garage Shutter */}
       <div
         onPointerDown={handlePointerDown}

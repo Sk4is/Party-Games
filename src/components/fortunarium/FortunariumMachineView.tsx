@@ -37,6 +37,7 @@ import {
   validateWorkshopPurchase,
   runCanonicalPatternUnitTests,
   generateDeterministicTestGrid,
+  generateAuthoritativeGrid,
   evaluateSpinGridCore,
 } from '../../utils/fortunariumEconomyEngine';
 import {
@@ -326,8 +327,22 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   const [lastSeenQuotaRound, setLastSeenQuotaRound] = useState<number>(roomState.round);
   const [quotaSealingStampActive, setQuotaSealingStampActive] = useState(false);
   const [simBetMode, setSimBetMode] = useState<FortunariumBetMode>(roomState.betMode);
-  const [localSandboxSpinOverride, setLocalSandboxSpinOverride] =
-    useState<FortunariumSpinResult | null>(null);
+  // Simulator State: 100% isolated non-destructive sandbox (zero mutation to real match)
+  const [simSelectedScenario, setSimSelectedScenario] = useState<string | null>(null);
+  const [simGrid, setSimGrid] = useState<FortunariumSymbolId[][]>(() => roomState.grid);
+  const [simResult, setSimResult] = useState<{
+    scenarioName: string;
+    grid: FortunariumSymbolId[][];
+    spinCost: number;
+    grossPayout: number;
+    penalties: number;
+    netDelta: number;
+    winLines: any[];
+    specialEffects: any[];
+    winningCells: Set<string>;
+    hazardCells: Set<string>;
+    isJackpot: boolean;
+  } | null>(null);
 
   const showInterQuotaGarageDoor =
     roomState.phase === 'PLAYING' &&
@@ -564,7 +579,8 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   }, [accumulatedSpinWin, displayedAccumulatedWin]);
 
   // Master Spin & Sequential Post-Stop Presentation Choreography (Sections 19–22, 29–32)
-  const activeSpinEvent = localSandboxSpinOverride || spinEvent;
+  // Strictly authoritative: only real server spin events animate the real cabinet
+  const activeSpinEvent = spinEvent;
 
   useEffect(() => {
     if (!activeSpinEvent || activeSpinEvent.spinId === lastHandledSpinIdRef.current) return;
@@ -851,7 +867,6 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
         const finishTimer = setTimeout(() => {
           setIsRevealingRewards(false);
           setIsSpinPresentationActive(false);
-          setLocalSandboxSpinOverride(null);
         }, 1450);
         timersRef.current.push(finishTimer);
       }, summaryDelay);
@@ -1026,83 +1041,64 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
     [roomState.phase, isBusy, isMyTurn, roomState.money, currentSpinCost, onSpinSlot]
   );
 
-  // Local Client-Only Sandbox Spin Runner (Part C: Pure memory inspection, zero WebSocket traffic)
-  const handleRunLocalSandboxSpin = useCallback(
-    (scenarioId: string) => {
-      setShowDevModal(false);
+  // Completely Non-Destructive Isolated Simulator (Zero mutation to real match, zero WebSocket traffic)
+  const handleRunSimulation = useCallback(
+    (scenarioId?: string) => {
+      const cost = calculateEffectiveSpinCost(simBetMode, roomState.upgrades);
+      const grid = scenarioId
+        ? generateDeterministicTestGrid(scenarioId as FortunariumDevScenario)
+        : generateAuthoritativeGrid(roomState.upgrades, simBetMode, roomState.activeModifiers);
 
-      const sandboxGrid = generateDeterministicTestGrid(
-        scenarioId as FortunariumDevScenario
-      );
       const core = evaluateSpinGridCore({
-        grid: sandboxGrid,
+        grid,
         betMode: simBetMode,
         upgrades: roomState.upgrades,
         currentVoltage: displayedVoltage,
         round: roomState.round,
+        activeModifiers: roomState.activeModifiers,
         allowMysteryEvents: false,
-        enableJackpotRoll: scenarioId === 'jackpot' || scenarioId === 'pantalla_completa',
         forceJackpot: scenarioId === 'jackpot' || scenarioId === 'pantalla_completa',
+        enableJackpotRoll: !scenarioId || scenarioId === 'jackpot' || scenarioId === 'pantalla_completa',
       });
 
-      const sandboxSpin: FortunariumSpinResult = {
-        spinId: `sandbox_${Date.now()}`,
-        stateVersion: roomState.stateVersion,
-        playerId: localPlayerId,
-        playerName: `${localPlayer?.name || 'Operador'} (Sandbox)`,
-        initiatedByPlayerId: localPlayerId,
-        triggerSource: 'button',
-        betMode: simBetMode,
-        spinCost: currentSpinCost,
-        moneyBeforeSpin: roomState.money,
-        moneyAfterSpinCost: Math.max(0, roomState.money - currentSpinCost),
-        finalMoney: Math.max(
-          0,
-          roomState.money - currentSpinCost + core.grossPayout - core.penalties
-        ),
-        quotaProgressBefore: roomState.quotaProgress,
-        finalQuotaProgress: roomState.quotaProgress,
-        grid: sandboxGrid,
+      const winningCellsSet = new Set<string>();
+      for (const line of core.winLines) {
+        for (const cell of line.cells) {
+          winningCellsSet.add(`${cell.col},${cell.row}`);
+        }
+      }
+      const hazardCellsSet = new Set<string>();
+      for (const fx of core.specialEffects) {
+        if (fx.variant === 'negative') {
+          for (const cell of fx.cells || []) {
+            hazardCellsSet.add(`${cell.col},${cell.row}`);
+          }
+        }
+      }
+
+      setSimSelectedScenario(scenarioId || 'aleatorio');
+      setSimGrid(grid);
+      setSimResult({
+        scenarioName: scenarioId ? scenarioId : 'Tirada Aleatoria Simulada',
+        grid,
+        spinCost: cost,
+        grossPayout: core.grossPayout,
+        penalties: core.penalties,
+        netDelta: core.grossPayout - core.penalties - cost,
         winLines: core.winLines,
         specialEffects: core.specialEffects,
-        winningCells: core.winningCells,
-        hazardCells: core.hazardCells,
-        grossPayout: core.grossPayout,
-        jackpotPayout: core.jackpotPayout,
-        penalties: core.penalties,
-        netMoneyDelta: core.grossPayout - core.penalties - currentSpinCost,
-        integrityDelta: core.integrityDelta,
-        finalIntegrity: Math.max(
-          0,
-          Math.min(100, roomState.integrity + core.integrityDelta)
-        ),
-        voltageMultiplierUsed: core.voltageMultiplierUsed,
-        voltageMultiplierAfter: core.voltageMultiplierAfter,
-        keysGained: core.keysGained,
-        finalKeys: roomState.keys + core.keysGained,
-        extraSpinsGained: core.extraSpinsGained,
+        winningCells: winningCellsSet,
+        hazardCells: hazardCellsSet,
         isJackpot: core.isJackpot,
-        summaryText: `[SANDBOX AISLADO] ${
-          core.grossPayout > 0 ? `+${core.grossPayout} CR` : 'Sin premio'
-        }`,
-        timestamp: Date.now(),
-      };
-
-      setLocalSandboxSpinOverride(sandboxSpin);
+      });
+      fortunariumAudio.playButtonClick();
     },
     [
-      roomState.upgrades,
       simBetMode,
+      roomState.upgrades,
       displayedVoltage,
       roomState.round,
-      roomState.stateVersion,
-      localPlayerId,
-      localPlayer?.name,
-      currentSpinCost,
-      roomState.money,
-      roomState.quotaProgress,
-      roomState.integrity,
-      roomState.keys,
+      roomState.activeModifiers,
     ]
   );
 
@@ -1191,6 +1187,9 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
         !showExitConfirmModal &&
         !showDevModal
       ) {
+        if (e.target instanceof HTMLElement && (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT')) {
+          return;
+        }
         e.preventDefault();
         handleTriggerSpin();
       }
@@ -1333,20 +1332,18 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
 
         {/* Right Group: Manual, Premios, Taller, Sonido, Equipo (+ Dev Lab) */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {Boolean(import.meta.env?.DEV) && (
-            <button
-              type="button"
-              onClick={() => {
-                fortunariumAudio.playButtonClick();
-                setShowDevModal(true);
-              }}
-              className="px-2.5 py-1 rounded-lg bg-[#3b1736] hover:bg-[#521f4b] border-2 border-fuchsia-400/70 text-fuchsia-200 text-xs font-black flex items-center gap-1 cursor-pointer shadow-[0_2px_0_#1a0717]"
-              title="Simulador de Economía y Patrones (DEV)"
-            >
-              <FlaskConical className="w-3.5 h-3.5 text-fuchsia-300" />
-              <span className="hidden xl:inline">SIMULADOR</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              fortunariumAudio.playButtonClick();
+              setShowDevModal(true);
+            }}
+            className="px-2.5 py-1 rounded-lg bg-[#3b1736] hover:bg-[#521f4b] border-2 border-fuchsia-400/70 text-fuchsia-200 text-xs font-black flex items-center gap-1 cursor-pointer shadow-[0_2px_0_#1a0717]"
+            title="Simulador de Economía y Patrones (Sandbox Aislado)"
+          >
+            <FlaskConical className="w-3.5 h-3.5 text-fuchsia-300" />
+            <span className="hidden xl:inline">SIMULADOR</span>
+          </button>
 
           <button
             type="button"
@@ -1458,6 +1455,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
           <FortunariumPaperBoard
             activeModifiers={roomState.activeModifiers || []}
             installedUpgradesCount={installedUpgrades.length}
+            installedUpgrades={installedUpgrades}
             effectiveJackpotChance={effectiveJackpotChance}
             onOpenWorkshop={() => setShowWorkshopModal(true)}
           />
@@ -3259,49 +3257,226 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       {/* ===================================================================== */}
       {/* 9. DEV-ONLY PROBABILITY, PATTERNS & MONTE CARLO SIMULATOR (SEC. 42)   */}
       {/* ===================================================================== */}
-      {Boolean(import.meta.env?.DEV) && showDevModal && (
+      {showDevModal && (
         <div
-          className="fixed inset-0 z-[90] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-[90] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
           onClick={() => setShowDevModal(false)}
         >
           <div
-            className="w-full max-w-4xl rounded-3xl bg-stone-950 border-2 border-fuchsia-500/60 p-5 sm:p-6 shadow-2xl flex flex-col gap-4 my-auto max-h-[90dvh] overflow-y-auto"
+            className="w-full max-w-4xl rounded-3xl bg-stone-950 border-2 border-fuchsia-500/60 p-4 sm:p-6 shadow-2xl flex flex-col gap-4 my-auto max-h-[92dvh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-stone-800 pb-3">
               <div>
                 <span className="text-[10px] font-mono font-bold uppercase text-fuchsia-400">
-                  DEV-ONLY VERIFICATION SUITE
+                  ENTORNO DE PRUEBAS 100% AISLADO · SANDBOX
                 </span>
-                <h3 className="text-xl font-fortunarium text-white tracking-wide">
+                <h3 className="text-xl sm:text-2xl font-fortunarium text-white tracking-wide">
                   SIMULADOR DE PATRONES Y ECONOMÍA (FORTUNARIUM)
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowDevModal(false)}
-                className="p-2 rounded-xl bg-stone-900 text-stone-300 cursor-pointer"
+                className="p-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-white cursor-pointer"
+                title="Cerrar Simulador"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Deterministic Pattern & Special Symbol Test Triggers (Section 33 / 42) */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                  Disparar Tableros Deterministas de Prueba:
+            {/* Non-Destructive Isolation Guarantee Banner */}
+            <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-xs font-mono text-emerald-200 flex items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="font-bold text-emerald-300 uppercase tracking-wide">
+                  ✓ SANDBOX COMPLETAMENTE AISLADA (CERO MUTACIÓN REAL)
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDevModal(false);
-                    setForceReplayIntro(true);
-                  }}
-                  className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-[11px] font-mono font-bold text-amber-200 cursor-pointer"
-                >
-                  🎬 Reproducir Intro Compuerta
-                </button>
+                <div className="text-[11px] text-emerald-100/90 leading-relaxed">
+                  Las simulaciones operan únicamente en memoria de prueba. No modifican créditos reales ({roomState.money} CR), cuota ({roomState.quota} CR), estadísticas ni progreso del chasis.
+                </div>
+              </div>
+              <span className="px-2 py-1 rounded bg-stone-900 border border-emerald-500/50 text-[10px] font-black text-emerald-300 shrink-0">
+                CAJA REAL INTACTA
+              </span>
+            </div>
+
+            {/* DEDICATED VISUAL SIMULATION SANDBOX WINDOW */}
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-stone-900/90 border border-stone-800 flex flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-fuchsia-500/20 border border-fuchsia-400/40 text-[10px] font-mono font-black text-fuchsia-300 uppercase">
+                    SIMULACIÓN ACTUAL
+                  </span>
+                  <span className="text-xs sm:text-sm font-fortunarium text-amber-200">
+                    {simResult ? simResult.scenarioName : 'Tablero Inicial (Listo para simular)'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 font-mono text-xs tabular-nums">
+                  <span className="px-2.5 py-1 rounded-lg bg-stone-950 border border-stone-700 text-stone-300">
+                    Coste Hipotético:{' '}
+                    <strong className="text-amber-400">
+                      -{simResult ? simResult.spinCost : calculateEffectiveSpinCost(simBetMode, roomState.upgrades)} CR
+                    </strong>
+                  </span>
+                  <span
+                    className={`px-2.5 py-1 rounded-lg bg-stone-950 border ${
+                      (simResult?.grossPayout || 0) > 0
+                        ? 'border-emerald-500/50 text-emerald-300'
+                        : 'border-stone-700 text-stone-400'
+                    }`}
+                  >
+                    Premio Simulado:{' '}
+                    <strong>
+                      +{(simResult?.grossPayout || 0)} CR
+                    </strong>
+                  </span>
+                  <span
+                    className={`px-2.5 py-1 rounded-lg bg-stone-950 border font-bold ${
+                      (simResult?.netDelta || 0) >= 0
+                        ? 'border-emerald-500/50 text-emerald-400'
+                        : 'border-rose-500/50 text-rose-400'
+                    }`}
+                  >
+                    Neto Simulado:{' '}
+                    <strong>
+                      {simResult ? (simResult.netDelta >= 0 ? `+${simResult.netDelta}` : simResult.netDelta) : 0} CR
+                    </strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* 5x3 Simulated Reel Grid */}
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-2 p-2.5 sm:p-3 rounded-2xl bg-stone-950 border-2 border-stone-800 max-w-xl mx-auto w-full">
+                {Array.from({ length: 3 }).map((_, rIdx) =>
+                  Array.from({ length: 5 }).map((_, cIdx) => {
+                    const symId = simGrid[cIdx]?.[rIdx] || 'cereza';
+                    const symMeta = FORTUNARIUM_SYMBOLS[symId];
+                    const isWinning = simResult?.winningCells.has(`${cIdx},${rIdx}`);
+                    const isHazard = simResult?.hazardCells.has(`${cIdx},${rIdx}`);
+                    return (
+                      <div
+                        key={`${cIdx}_${rIdx}`}
+                        className={`relative aspect-square rounded-xl p-1 flex items-center justify-center transition-all ${
+                          isWinning
+                            ? 'bg-amber-500/25 border-2 border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.6)] scale-[1.03]'
+                            : isHazard
+                            ? 'bg-rose-500/25 border-2 border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]'
+                            : 'bg-stone-900 border border-stone-800'
+                        }`}
+                        title={`${symMeta?.name || symId} (${cIdx + 1}, ${rIdx + 1})`}
+                      >
+                        {symMeta?.asset ? (
+                          <img
+                            src={symMeta.asset}
+                            alt={symMeta.name}
+                            className="w-full h-full object-contain pointer-events-none select-none"
+                          />
+                        ) : (
+                          <span className="text-xl">🎰</span>
+                        )}
+                        {isWinning && (
+                          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 shadow" />
+                        )}
+                        {isHazard && (
+                          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 shadow" />
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Detected Patterns & Special Effects in Sandbox */}
+              <div className="flex flex-col gap-1.5 pt-1 text-xs font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-stone-400 font-bold uppercase text-[10px]">
+                    Patrones Detectados en Sandbox ({simResult?.winLines.length || 0}):
+                  </span>
+                  {simResult?.isJackpot && (
+                    <span className="px-2 py-0.5 rounded bg-yellow-400 text-stone-950 font-black text-[10px] animate-pulse">
+                      ¡JACKPOT SIMULADO!
+                    </span>
+                  )}
+                </div>
+
+                {simResult?.winLines && simResult.winLines.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {simResult.winLines.map((line, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-1 rounded bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[11px] font-bold"
+                      >
+                        {line.patternType} ({FORTUNARIUM_SYMBOLS[line.symbolId]?.name || line.symbolId}) → +{line.payout} CR
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-stone-500 italic">
+                    — Sin líneas ganadoras en esta tirada simulada —
+                  </div>
+                )}
+
+                {simResult?.specialEffects && simResult.specialEffects.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1 border-t border-stone-800">
+                    {simResult.specialEffects.map((fx, idx) => (
+                      <span
+                        key={idx}
+                        className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
+                          fx.isPenalty
+                            ? 'bg-rose-950/80 border-rose-500/50 text-rose-200'
+                            : 'bg-sky-950/80 border-sky-500/50 text-sky-200'
+                        }`}
+                      >
+                        {fx.description}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Sandbox Controls: Bet Mode & Random Simulated Spin */}
+            <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono font-bold uppercase text-stone-300">
+                  Modo de Apuesta en Simulación:
+                </span>
+                <div className="flex items-center gap-1">
+                  {(['normal', 'doble', 'sobrecarga'] as FortunariumBetMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => {
+                        setSimBetMode(mode);
+                        fortunariumAudio.playButtonClick();
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold cursor-pointer transition ${
+                        simBetMode === mode
+                          ? 'bg-amber-400 text-stone-950 shadow'
+                          : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+                      }`}
+                    >
+                      {mode.toUpperCase()} ({calculateEffectiveSpinCost(mode, roomState.upgrades)} CR)
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleRunSimulation()}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-amber-500 hover:from-fuchsia-500 hover:to-amber-400 text-stone-950 font-fortunarium text-xs font-black tracking-wider shadow-lg cursor-pointer transition active:scale-95"
+              >
+                🎲 TIRADA ALEATORIA SIMULADA
+              </button>
+            </div>
+
+            {/* Deterministic Pattern & Special Symbol Test Scenarios */}
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                Escenarios Deterministas de Prueba (Haz clic para simular al instante sin salir):
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5">
@@ -3329,56 +3504,27 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                     { id: 'special_interrogacion', label: '❓ Interrogación' },
                     { id: 'jackpot', label: '🏆 Jackpot' },
                     { id: 'pantalla_completa', label: '🌟 Pantalla Completa (15)' },
-                    { id: 'force_bankruptcy', label: '💸 Forzar Bancarrota' },
-                    { id: 'force_integrity_zero', label: '🔧 Forzar Avería 0%' },
+                    { id: 'force_bankruptcy', label: '💸 Bancarrota Sim.' },
+                    { id: 'force_integrity_zero', label: '🔧 Avería 0% Sim.' },
                   ] as const
                 ).map((sc) => (
                   <button
                     key={sc.id}
                     type="button"
-                    onClick={() => {
-                      handleRunLocalSandboxSpin(sc.id);
-                    }}
-                    className="px-2.5 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-700 text-[11px] font-mono font-bold text-amber-300 cursor-pointer"
+                    onClick={() => handleRunSimulation(sc.id)}
+                    className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono font-bold cursor-pointer transition ${
+                      simSelectedScenario === sc.id
+                        ? 'bg-amber-400 text-stone-950 border-amber-300 shadow'
+                        : 'bg-stone-900 hover:bg-stone-800 border-stone-700 text-amber-200'
+                    }`}
                   >
                     {sc.label}
                   </button>
                 ))}
               </div>
-
-              {onDevGrantModifier && (
-                <div className="pt-2 border-t border-stone-800 flex flex-col gap-1.5">
-                  <div className="text-xs font-bold uppercase tracking-wider text-emerald-300">
-                    Pegar Nota Temporal (Buff / Debuff) en el Tablón de Papel:
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {ALL_MODIFIER_IDS.map((modId) => {
-                      const mod = FORTUNARIUM_MODIFIERS_CATALOG[modId];
-                      return (
-                        <button
-                          key={modId}
-                          type="button"
-                          onClick={() => {
-                            onDevGrantModifier(modId);
-                            setShowDevModal(false);
-                          }}
-                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono font-bold cursor-pointer ${
-                            mod.type === 'BUFF'
-                              ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200 hover:bg-emerald-900'
-                              : 'bg-rose-950/80 border-rose-500/50 text-rose-200 hover:bg-rose-900'
-                          }`}
-                        >
-                          {mod.type === 'BUFF' ? 'BUFF:' : 'DEBUFF:'} {mod.name} (
-                          {mod.defaultSpins}T)
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Automated 15-Case Canonical Pattern Engine Unit Tests (Section 61) */}
+            {/* Automated Canonical Unit Tests */}
             <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-black uppercase text-emerald-400">
@@ -3412,28 +3558,39 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-stone-800">
+            {/* Monte Carlo Mass Simulations */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-800">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSimReport(
+                      runFortunariumSimulation(10000, simBetMode, roomState.upgrades)
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-mono text-xs font-black cursor-pointer"
+                >
+                  Simular 10.000 Tiradas
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSimReport(
+                      runFortunariumSimulation(100000, simBetMode, roomState.upgrades)
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-mono text-xs font-black cursor-pointer"
+                >
+                  Simular 100.000 Tiradas
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() =>
-                  setSimReport(
-                    runFortunariumSimulation(10000, roomState.betMode, roomState.upgrades)
-                  )
-                }
-                className="px-3.5 py-2 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-mono text-xs font-black cursor-pointer"
+                onClick={() => setShowDevModal(false)}
+                className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-mono text-xs font-bold cursor-pointer"
               >
-                Simular 10.000 Tiradas
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setSimReport(
-                    runFortunariumSimulation(100000, roomState.betMode, roomState.upgrades)
-                  )
-                }
-                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-mono text-xs font-black cursor-pointer"
-              >
-                Simular 100.000 Tiradas + 1.500 Partidas
+                Cerrar Simulador
               </button>
             </div>
 
@@ -3498,19 +3655,6 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
         isOpen={showAudioModal}
         onClose={() => setShowAudioModal(false)}
       />
-
-      {/* GARAGE DOOR INTRO & INTER-QUOTA TRANSITION (PART B & PART H) */}
-      {showGarageIntro && (
-        <FortunariumGarageIntro
-          onComplete={() => {
-            setIntroSeenMatchId(roomState.matchId);
-            setForceReplayIntro(false);
-            setLastSeenQuotaRound(roomState.round);
-          }}
-          nextQuotaInfo={nextQuotaPaperInfo}
-          initialSlideDown={showInterQuotaGarageDoor}
-        />
-      )}
     </div>
   );
 };
