@@ -166,6 +166,13 @@ export function useFortunariumSocket({
               return;
             }
             latestStateVersionRef.current = msg.state.stateVersion || 0;
+            if (
+              msg.state.phase === 'LOBBY' ||
+              msg.state.totalSpinsInMatch === 0 ||
+              !msg.state.lastSpinResult
+            ) {
+              setSpinEvent(null);
+            }
             setRoomState(msg.state);
             lastActiveRoomRef.current = { code: msg.state.roomCode };
             sessionRecovery.saveActiveSession({
@@ -316,6 +323,7 @@ export function useFortunariumSocket({
       wsRef.current.close();
     }
     wsRef.current = null;
+    setSpinEvent(null);
     setRoomState(null);
     setConnectionStatus('idle');
   }, [clearPingTimer, clearReconnectTimer]);
@@ -361,6 +369,7 @@ export function useFortunariumSocket({
   );
 
   const startGame = useCallback(() => {
+    setSpinEvent(null);
     sendMessage({ type: 'START_GAME' });
   }, [sendMessage]);
 
@@ -455,10 +464,12 @@ export function useFortunariumSocket({
   }, [sendMessage]);
 
   const restartMatch = useCallback(() => {
+    setSpinEvent(null);
     sendMessage({ type: 'RESTART_MATCH' });
   }, [sendMessage]);
 
   const returnToLobby = useCallback(() => {
+    setSpinEvent(null);
     sendMessage({ type: 'RETURN_TO_LOBBY' });
   }, [sendMessage]);
 

@@ -1390,7 +1390,14 @@ export class FortunariumServer {
       }
 
       case 'RESTART_MATCH': {
-        if (!player.isHost && room.players.filter((p) => p.isConnected).length > 1) return;
+        const isEndPhase = room.phase === 'VICTORY' || room.phase === 'DEFEAT';
+        if (
+          !isEndPhase &&
+          !player.isHost &&
+          room.players.filter((p) => p.isConnected).length > 1
+        ) {
+          return;
+        }
         this.startNewMatch(room);
         break;
       }

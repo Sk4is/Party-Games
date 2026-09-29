@@ -1008,6 +1008,77 @@ body,
   animation: fort-total-light-sweep 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Stronger machine-integrated CRT celebration for GOOD WINS (BIG tier) */
+@keyframes fort-good-win-crt-sweep {
+  0% {
+    transform: scale(0.97);
+    filter: brightness(1);
+  }
+  30% {
+    transform: scale(1.025);
+    filter: brightness(1.28) drop-shadow(0 0 18px rgba(250, 204, 21, 0.75));
+  }
+  65% {
+    transform: scale(1.01);
+    filter: brightness(1.15) drop-shadow(0 0 14px rgba(34, 211, 238, 0.7));
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+.animate-fort-good-win-crt {
+  animation: fort-good-win-crt-sweep 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 5.0s Exceptional Win Center Celebration Sequence (0.0-0.5s enter, 0.5-4.2s hold, 4.2-5.0s exit) */
+@keyframes fort-exceptional-celebration-lifecycle {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(10px);
+    filter: blur(6px) brightness(1.4);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1.04) translateY(0px);
+    filter: blur(0px) brightness(1.22);
+  }
+  16% {
+    opacity: 1;
+    transform: scale(1) translateY(0px);
+    filter: blur(0px) brightness(1.05);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02) translateY(-2px);
+    filter: blur(0px) brightness(1.14);
+  }
+  84% {
+    opacity: 1;
+    transform: scale(1) translateY(0px);
+    filter: blur(0px) brightness(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.92) translateY(-8px);
+    filter: blur(4px) brightness(0.9);
+  }
+}
+
+.animate-fort-exceptional-5s {
+  animation: fort-exceptional-celebration-lifecycle 5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes fort-crt-scanline-sweep {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(420%);
+  }
+}
+
 /* =========================================================================
    FORTUNARIUM CYBERPUNK JAPANESE ARCADE / CRT MACHINE VISUAL SYSTEM
    ========================================================================= */
@@ -1017,18 +1088,18 @@ body,
   position: relative;
   background-color: #040a10;
   background-image:
-    radial-gradient(ellipse at 50% 45%, rgba(6, 182, 212, 0.11) 0%, rgba(3, 8, 14, 0.97) 82%),
+    radial-gradient(ellipse at 50% 45%, rgba(6, 182, 212, 0.12) 0%, rgba(3, 8, 14, 0.97) 82%),
     repeating-linear-gradient(
       180deg,
       rgba(0, 0, 0, 0.34) 0px,
       rgba(0, 0, 0, 0.34) 2px,
-      rgba(34, 211, 238, 0.03) 2px,
-      rgba(34, 211, 238, 0.03) 4px
+      rgba(34, 211, 238, 0.035) 2px,
+      rgba(34, 211, 238, 0.035) 4px
     );
   box-shadow:
     inset 0 4px 18px rgba(0, 0, 0, 0.95),
-    inset 0 0 20px rgba(6, 182, 212, 0.12),
-    0 1px 0 rgba(34, 211, 238, 0.16);
+    inset 0 0 20px rgba(6, 182, 212, 0.13),
+    0 1px 0 rgba(34, 211, 238, 0.18);
 }
 
 /* Unified 3x5 Main CRT Slot Screen */
@@ -1036,11 +1107,29 @@ body,
   position: relative;
   background-color: #030912;
   background-image:
-    radial-gradient(ellipse at 50% 48%, rgba(14, 165, 233, 0.16) 0%, rgba(5, 15, 26, 0.94) 66%, rgba(2, 5, 11, 0.99) 100%);
+    radial-gradient(ellipse at 50% 48%, rgba(14, 165, 233, 0.17) 0%, rgba(5, 15, 26, 0.94) 66%, rgba(2, 5, 11, 0.99) 100%);
   box-shadow:
     inset 0 0 48px rgba(0, 0, 0, 0.96),
-    inset 0 0 22px rgba(34, 211, 238, 0.18),
-    0 0 26px rgba(6, 182, 212, 0.16);
+    inset 0 0 24px rgba(34, 211, 238, 0.2),
+    0 0 28px rgba(6, 182, 212, 0.18);
+}
+
+/* Subtle moving phosphor refresh beam across the 3x5 CRT monitor */
+.fort-crt-slot-screen::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 24%;
+  pointer-events: none;
+  z-index: 21;
+  background: linear-gradient(
+    180deg,
+    rgba(34, 211, 238, 0) 0%,
+    rgba(34, 211, 238, 0.045) 50%,
+    rgba(34, 211, 238, 0) 100%
+  );
+  animation: fort-crt-scanline-sweep 6.5s linear infinite;
 }
 
 /* Subtle horizontal CRT scanlines, phosphor grid & faint glass reflection over the 3x5 display */
@@ -1052,7 +1141,7 @@ body,
   z-index: 22;
   border-radius: inherit;
   background:
-    linear-gradient(125deg, rgba(255, 255, 255, 0.045) 0%, transparent 30%, transparent 72%, rgba(236, 72, 153, 0.03) 100%),
+    linear-gradient(125deg, rgba(255, 255, 255, 0.05) 0%, transparent 30%, transparent 72%, rgba(236, 72, 153, 0.035) 100%),
     repeating-linear-gradient(
       to bottom,
       rgba(0, 0, 0, 0) 0px,
@@ -1076,6 +1165,23 @@ body,
     inset 0 12px 24px rgba(0, 0, 0, 0.88),
     inset 0 -12px 24px rgba(0, 0, 0, 0.88),
     inset 0 0 14px rgba(6, 182, 212, 0.09);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.fort-crt-reel-channel-spinning {
+  border-color: rgba(34, 211, 238, 0.48);
+  box-shadow:
+    inset 0 14px 26px rgba(0, 0, 0, 0.92),
+    inset 0 -14px 26px rgba(0, 0, 0, 0.92),
+    inset 0 0 22px rgba(34, 211, 238, 0.22),
+    0 0 12px rgba(6, 182, 212, 0.18);
+}
+
+.fort-crt-reel-channel-locked {
+  border-color: rgba(103, 232, 249, 0.78);
+  box-shadow:
+    inset 0 0 26px rgba(34, 211, 238, 0.35),
+    0 0 16px rgba(34, 211, 238, 0.38);
 }
 
 /* Pixel-matrix subtle cyan dot background for electronic sub-counters */
@@ -1112,63 +1218,93 @@ body,
 
 /* Tactile cyberpunk hardware push-button */
 .fort-arcade-btn {
+  position: relative;
   box-shadow:
-    0 4px 0 #05080f,
-    0 6px 14px rgba(0, 0, 0, 0.75),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  transition: transform 120ms cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 120ms ease, border-color 140ms ease, filter 140ms ease;
+    0 4px 0 #03060b,
+    0 7px 14px rgba(0, 0, 0, 0.82),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.55);
+  transition:
+    transform 100ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    box-shadow 100ms ease,
+    border-color 140ms ease,
+    filter 140ms ease,
+    background-color 140ms ease;
 }
 .fort-arcade-btn:hover:not(:disabled) {
-  filter: brightness(1.1);
+  filter: brightness(1.14);
+  box-shadow:
+    0 4px 0 #03060b,
+    0 0 14px rgba(34, 211, 238, 0.28),
+    0 7px 14px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.5);
 }
 .fort-arcade-btn:active:not(:disabled) {
-  transform: translateY(2px) scale(0.985);
+  transform: translateY(3px) scale(0.985);
   box-shadow:
-    0 1px 0 #05080f,
-    0 2px 6px rgba(0, 0, 0, 0.7),
-    inset 0 1px 2px rgba(0, 0, 0, 0.45);
+    0 1px 0 #03060b,
+    0 2px 5px rgba(0, 0, 0, 0.75),
+    inset 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 /* System Control Rail Header Button */
 .fort-sys-header-btn {
   height: 32px;
   box-shadow:
-    0 2px 0 #03060c,
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: transform 120ms ease, border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+    0 3px 0 #02050a,
+    0 4px 10px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition:
+    transform 100ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease,
+    filter 140ms ease;
+}
+.fort-sys-header-btn:hover:not(:disabled) {
+  filter: brightness(1.12);
 }
 .fort-sys-header-btn:active:not(:disabled) {
-  transform: translateY(1px) scale(0.98);
+  transform: translateY(2px) scale(0.985);
+  box-shadow:
+    0 1px 0 #02050a,
+    inset 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
 /* Massive tactile GIRAR neon red/magenta arcade plunger button */
 .fort-girar-plunger {
-  background: linear-gradient(180deg, #ff2a6d 0%, #e11d48 52%, #9f1239 100%);
-  border: 3px solid #fda4af;
+  position: relative;
+  background: linear-gradient(180deg, #ff3377 0%, #e11d48 48%, #9f1239 100%);
+  border: 3px solid #fecdd3;
   box-shadow:
-    0 6px 0 #3b0414,
-    0 0 28px rgba(244, 63, 94, 0.55),
-    0 12px 24px rgba(0, 0, 0, 0.85),
-    inset 0 3px 3px rgba(255, 228, 230, 0.62),
-    inset 0 -4px 8px rgba(76, 5, 25, 0.85);
-  transition: transform 110ms cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 110ms ease, filter 130ms ease;
+    0 7px 0 #3b0414,
+    0 0 30px rgba(244, 63, 94, 0.6),
+    0 14px 26px rgba(0, 0, 0, 0.9),
+    inset 0 3px 4px rgba(255, 241, 242, 0.72),
+    inset 0 -5px 10px rgba(76, 5, 25, 0.9);
+  transition:
+    transform 95ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    box-shadow 95ms ease,
+    filter 130ms ease;
 }
 .fort-girar-plunger:hover:not(:disabled) {
-  filter: brightness(1.12);
+  filter: brightness(1.14);
   box-shadow:
-    0 6px 0 #3b0414,
-    0 0 36px rgba(244, 63, 94, 0.8),
-    0 12px 24px rgba(0, 0, 0, 0.85),
-    inset 0 3px 3px rgba(255, 228, 230, 0.75),
-    inset 0 -4px 8px rgba(76, 5, 25, 0.85);
+    0 7px 0 #3b0414,
+    0 0 42px rgba(244, 63, 94, 0.88),
+    0 0 18px rgba(34, 211, 238, 0.35),
+    0 14px 26px rgba(0, 0, 0, 0.9),
+    inset 0 3px 5px rgba(255, 241, 242, 0.85),
+    inset 0 -5px 10px rgba(76, 5, 25, 0.85);
 }
 .fort-girar-plunger:active:not(:disabled) {
-  transform: translateY(4px) scale(0.985);
+  transform: translateY(5px) scale(0.982);
   box-shadow:
     0 2px 0 #3b0414,
-    0 0 20px rgba(244, 63, 94, 0.65),
-    0 4px 10px rgba(0, 0, 0, 0.75),
-    inset 0 2px 5px rgba(0, 0, 0, 0.5);
+    0 0 22px rgba(244, 63, 94, 0.72),
+    0 4px 10px rgba(0, 0, 0, 0.8),
+    inset 0 3px 7px rgba(0, 0, 0, 0.55);
 }
 
 /* Accessibility: Respect user reduced motion preference */
