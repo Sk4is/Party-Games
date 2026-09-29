@@ -11,6 +11,7 @@ import {
   FortunariumWinTier,
   FortunariumDevScenario,
   FortunariumModifierId,
+  FortunariumIncidentType,
   FortunariumSpecialEffectLog,
   FortunariumWildSubstitution,
   FortunariumPatternType,
@@ -88,7 +89,13 @@ interface FortunariumMachineViewProps {
     forceScenario?: FortunariumDevScenario,
     triggerSource?: 'button' | 'lever'
   ) => void;
-  onDevGrantModifier?: (modifierId: FortunariumModifierId) => void;
+  onDevGrantModifier?: (modifierId: FortunariumModifierId, targetPlayerId?: string) => void;
+  onResolveIncident?: (choice: 'EMERGENCY_REPAIR' | 'ABSORB_IMPACT') => void;
+  onDismissRoulette?: () => void;
+  onDevTriggerIncident?: (incidentType?: FortunariumIncidentType) => void;
+  onDevTriggerRoulette?: () => void;
+  onDevSetIntegrity?: (integrity: number) => void;
+  onDevForceOverdrive?: () => void;
   onRepairMachine: (useKey?: boolean) => void;
   onBuyUpgrade: (upgradeId: FortunariumUpgradeId, useKey?: boolean) => void;
   onVoteUpgrade: (upgradeId: FortunariumUpgradeId) => void;
@@ -298,6 +305,12 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   onSetBetMode,
   onSpinSlot,
   onDevGrantModifier,
+  onResolveIncident,
+  onDismissRoulette,
+  onDevTriggerIncident,
+  onDevTriggerRoulette,
+  onDevSetIntegrity,
+  onDevForceOverdrive,
   onRepairMachine,
   onBuyUpgrade,
   onVoteUpgrade,
@@ -2901,6 +2914,128 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       `}</style>
 
       {/* ===================================================================== */}
+      {/* 2B. INTERACTIVE MACHINE INCIDENT OVERLAY (`roomState.activeIncident`) */}
+      {/* ===================================================================== */}
+      {roomState.activeIncident && !isBusy && (
+        <div className="fixed inset-0 z-[76] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-[#1c0c0b] border-[3px] border-amber-500 p-5 sm:p-6 shadow-[0_24px_60px_rgba(0,0,0,0.95),0_0_32px_rgba(245,158,11,0.3)] flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="px-3 py-1 rounded bg-rose-950 border border-rose-500/70 text-xs font-mono font-black text-rose-200 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                INCIDENTE MECÁNICO EN VIVO
+              </span>
+              {roomState.activeIncident.targetPlayerName && (
+                <span className="text-xs font-mono font-bold text-amber-300">
+                  Operador: {roomState.activeIncident.targetPlayerName}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-fortunarium text-amber-300 tracking-wide">
+                {roomState.activeIncident.title}
+              </h2>
+              <p className="text-xs sm:text-sm text-stone-200 mt-1.5 leading-relaxed">
+                {roomState.activeIncident.description}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  fortunariumAudio.playButtonClick();
+                  onResolveIncident?.('EMERGENCY_REPAIR');
+                }}
+                className="fort-arcade-btn p-3.5 rounded-xl bg-emerald-950/90 hover:bg-emerald-900 border-2 border-emerald-400 text-left flex flex-col justify-between gap-2 cursor-pointer"
+              >
+                <div className="text-sm font-black text-emerald-200">
+                  🔧 Reparación de Emergencia
+                </div>
+                <div className="text-xs text-emerald-100/90">
+                  Contiene la avería al instante ({roomState.activeIncident.emergencyRepairCost} CR o 1 🔑 si falta saldo) y reduce el impacto a -{roomState.activeIncident.reducedDamage}% INT.
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  fortunariumAudio.playButtonClick();
+                  onResolveIncident?.('ABSORB_IMPACT');
+                }}
+                className="fort-arcade-btn p-3.5 rounded-xl bg-rose-950/90 hover:bg-rose-900 border-2 border-rose-500 text-left flex flex-col justify-between gap-2 cursor-pointer"
+              >
+                <div className="text-sm font-black text-rose-200">
+                  ⚡ Absorber Descarga
+                </div>
+                <div className="text-xs text-rose-100/90">
+                  No gasta créditos, pero el chasis sufre -{roomState.activeIncident.integrityDamage}% Integridad
+                  {roomState.activeIncident.inflictedModifierId
+                    ? ` y aplica «${FORTUNARIUM_MODIFIERS_CATALOG[roomState.activeIncident.inflictedModifierId]?.name || roomState.activeIncident.inflictedModifierId}»`
+                    : ''}
+                  .
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 2C. EFFECT ROULETTE OVERLAY (`roomState.activeRoulette`)              */}
+      {/* ===================================================================== */}
+      {roomState.activeRoulette && !isBusy && (
+        <div className="fixed inset-0 z-[76] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-[#132a34] border-[3px] border-[#b98532] p-5 sm:p-6 shadow-[0_24px_60px_rgba(0,0,0,0.95)] flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="px-3 py-1 rounded bg-[#0d1d24] border border-[#b98532] text-xs font-mono font-black text-[#f4d06f] uppercase tracking-wider">
+                🎡 RULETA DE EFECTOS · {roomState.activeRoulette.triggeredByReason}
+              </span>
+            </div>
+
+            {(() => {
+              const modDef =
+                FORTUNARIUM_MODIFIERS_CATALOG[roomState.activeRoulette.selectedModifierId];
+              const isBuff = modDef?.type === 'BUFF';
+              return (
+                <div
+                  className={`p-4 rounded-xl border-2 flex flex-col gap-2 ${
+                    isBuff
+                      ? 'bg-emerald-950/70 border-emerald-400 text-emerald-100'
+                      : 'bg-rose-950/70 border-rose-500 text-rose-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-black uppercase tracking-wider">
+                      {isBuff ? '✨ BONIFICADOR TEMPORAL' : '⚠️ PENALIZADOR TEMPORAL'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-black/40 text-xs font-mono font-bold">
+                      {modDef?.defaultSpins || 3} GIROS
+                    </span>
+                  </div>
+                  <div className="text-2xl font-fortunarium tracking-wide text-white">
+                    {modDef?.name || roomState.activeRoulette.selectedModifierId}
+                  </div>
+                  <p className="text-xs sm:text-sm leading-relaxed">{modDef?.effect}</p>
+                </div>
+              );
+            })()}
+
+            <button
+              type="button"
+              onClick={() => {
+                fortunariumAudio.playButtonClick();
+                onDismissRoulette?.();
+              }}
+              className="fort-arcade-btn w-full py-3 rounded-xl bg-[#d99b26] hover:bg-[#f4d06f] border-2 border-[#fef08a] text-stone-950 font-black text-xs uppercase tracking-wider cursor-pointer"
+            >
+              Anotar en Hoja de Máquina y Continuar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
       {/* 3. INTERACTIVE MYSTERY EVENT MODAL (`EVENT_CHOICE`)                   */}
       {/* ===================================================================== */}
       {roomState.phase === 'EVENT_CHOICE' && roomState.activeEvent && !isBusy && (
@@ -3802,7 +3937,7 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
 
             {/* Monte Carlo Mass Simulations */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-800">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() =>
@@ -3825,6 +3960,64 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                 >
                   Simular 100.000 Tiradas
                 </button>
+                {onDevTriggerIncident && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDevTriggerIncident();
+                      setShowDevModal(false);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-rose-900/80 hover:bg-rose-800 border border-rose-500/50 text-rose-100 font-mono text-xs font-bold cursor-pointer"
+                  >
+                    ⚡ Probar Incidente
+                  </button>
+                )}
+                {onDevTriggerRoulette && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDevTriggerRoulette();
+                      setShowDevModal(false);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-cyan-900/80 hover:bg-cyan-800 border border-cyan-500/50 text-cyan-100 font-mono text-xs font-bold cursor-pointer"
+                  >
+                    🎡 Probar Ruleta
+                  </button>
+                )}
+                {onDevForceOverdrive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDevForceOverdrive();
+                      setShowDevModal(false);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-amber-900/80 hover:bg-amber-800 border border-amber-500/50 text-amber-100 font-mono text-xs font-bold cursor-pointer"
+                  >
+                    🔥 Forzar Sobrecarga Cuota
+                  </button>
+                )}
+                {onDevSetIntegrity && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDevSetIntegrity(25);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 font-mono text-xs font-bold cursor-pointer"
+                  >
+                    🔧 INT 25%
+                  </button>
+                )}
+                {onDevGrantModifier && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDevGrantModifier('fiebre_cerezas', localPlayerId);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-emerald-900/80 hover:bg-emerald-800 border border-emerald-500/50 text-emerald-100 font-mono text-xs font-bold cursor-pointer"
+                  >
+                    🍒 +Fiebre Cerezas
+                  </button>
+                )}
               </div>
 
               <button

@@ -166,14 +166,24 @@ export type FortunariumModifierId =
   | 'siete_suerte'
   | 'mano_afortunada'
   | 'motor_al_rojo'
+  | 'recalentamiento'
   | 'cableado_quemado'
   | 'iman_roto'
   | 'rodillo_pegado'
+  | 'apuesta_forzada'
+  | 'mal_contacto'
   | 'hacienda'
   | 'mala_racha'
   | 'fuga_creditos'
   | 'rodillos_oxidados'
   | 'mano_negra';
+
+export interface FortunariumVoltageModifier {
+  id: string;
+  source: string;
+  multiplier: number;
+  remainingSpins: number;
+}
 
 export interface FortunariumActiveModifier {
   id: string;
@@ -182,6 +192,7 @@ export interface FortunariumActiveModifier {
   type: 'BUFF' | 'DEBUFF';
   effect: string;
   spinsRemaining: number;
+  durationType?: 'SPINS' | 'UNTIL_TRIGGER';
   appliedAtSpin: number;
   source?: string;
   targetPlayerId?: string;
@@ -198,19 +209,21 @@ export type FortunariumUpgradeRarity =
 export interface FortunariumInstalledUpgradeRecord {
   upgradeId: FortunariumUpgradeId;
   level: number;
-  installedAtQuota: number;
-  installedByPlayerName: string;
+  round?: number;
+  installedAtQuota?: number;
+  installedBy?: string;
+  installedByPlayerName?: string;
   timestamp: number;
 }
 
 export type FortunariumIncidentType =
-  | 'fusibles_quemados'
+  | 'chispazo'
   | 'sobrecalentamiento'
-  | 'rodillo_atascado'
-  | 'pico_tension'
-  | 'fuga_creditos'
-  | 'lluvia_monedas'
-  | 'inspeccion_afortunada';
+  | 'atasco_engranajes'
+  | 'fuga_aceite'
+  | 'cortocircuito'
+  | 'vibracion_critica'
+  | 'ruleta_averiada';
 
 export interface FortunariumIncidentControl {
   id: string;
@@ -224,37 +237,43 @@ export interface FortunariumIncidentControl {
 }
 
 export interface FortunariumActiveIncident {
-  incidentId: string;
+  id?: string;
+  incidentId?: string;
   type: FortunariumIncidentType;
-  category: 'hazard' | 'positive' | 'choice';
+  category?: 'hazard' | 'positive' | 'choice';
   title: string;
-  subtitle: string;
-  quotaTriggered: number;
-  startedAt: number;
+  subtitle?: string;
+  description?: string;
+  integrityDamage: number;
+  emergencyRepairCost: number;
+  reducedDamage: number;
+  inflictedModifierId?: FortunariumModifierId;
+  targetPlayerId?: string;
+  targetPlayerName?: string;
+  quotaTriggered?: number;
+  startedAt?: number;
+  timestamp?: number;
   jammedReelIndex?: number | null;
-  controls: FortunariumIncidentControl[];
-  resolved: boolean;
+  controls?: FortunariumIncidentControl[];
+  resolved?: boolean;
   outcomeText?: string | null;
   outcomeVariant?: 'positive' | 'negative' | 'neutral' | null;
   collectedCoins?: number;
   leakedCoins?: number;
 }
 
-export interface FortunariumActiveRoulette {
-  rouletteId: string;
-  title: string;
-  subtitle: string;
-  triggeredByPlayerName: string;
-  segments: {
-    modifierId: FortunariumModifierId;
-    label: string;
-    type: 'BUFF' | 'DEBUFF';
-  }[];
-  winningIndex: number;
-  winningModifierId: FortunariumModifierId;
-  spun: boolean;
-  completed: boolean;
+export interface FortunariumEffectRouletteState {
+  id: string;
+  triggeredByReason: string;
+  isOverdrive: boolean;
+  candidates: FortunariumModifierId[];
+  selectedModifierId: FortunariumModifierId;
+  targetPlayerId?: string;
+  targetPlayerName?: string;
+  timestamp: number;
 }
+
+export type FortunariumActiveRoulette = FortunariumEffectRouletteState;
 
 export interface FortunariumSpinResult {
   spinId: string;
@@ -283,6 +302,8 @@ export interface FortunariumSpinResult {
   finalIntegrity: number;
   voltageMultiplierUsed: number;
   voltageMultiplierAfter: number;
+  activeVoltageModifierUsed?: FortunariumVoltageModifier | null;
+  activeVoltageModifierAfter?: FortunariumVoltageModifier | null;
   keysGained: number;
   finalKeys: number;
   extraSpinsGained: number;
@@ -443,6 +464,7 @@ export type FortunariumDevScenario =
   | 'special_moneda'
   | 'special_interrogacion'
   | 'jackpot'
+  | 'big_win'
   | 'pantalla_completa'
   | 'single_pattern'
   | 'force_bankruptcy'
@@ -487,6 +509,28 @@ export type FortunariumClientMessage =
   | {
       type: 'DEV_GRANT_MODIFIER';
       modifierId: FortunariumModifierId;
+      targetPlayerId?: string;
+    }
+  | {
+      type: 'RESOLVE_INCIDENT';
+      choice: 'EMERGENCY_REPAIR' | 'ABSORB_IMPACT';
+    }
+  | {
+      type: 'DISMISS_ROULETTE';
+    }
+  | {
+      type: 'DEV_TRIGGER_INCIDENT';
+      incidentType?: FortunariumIncidentType;
+    }
+  | {
+      type: 'DEV_TRIGGER_ROULETTE';
+    }
+  | {
+      type: 'DEV_SET_INTEGRITY';
+      integrity: number;
+    }
+  | {
+      type: 'DEV_FORCE_OVERDRIVE';
     }
   | {
       type: 'DEV_FORCE_INCIDENT';

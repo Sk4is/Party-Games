@@ -3,6 +3,7 @@ import {
   NormalSymbolId,
   SpecialSymbolId,
   FortunariumUpgradeId,
+  FortunariumUpgradeRarity,
   FortunariumBetMode,
   FortunariumPatternType,
   FortunariumCellCoord,
@@ -622,6 +623,8 @@ export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
 export interface FortunariumUpgradeCatalogItem {
   id: FortunariumUpgradeId;
   name: string;
+  rarity: FortunariumUpgradeRarity;
+  synergyTags: ('fruit' | 'high_value' | 'geometry' | 'repair' | 'voltage' | 'economy')[];
   description: string;
   effectSummary: string;
   baseCostMoney: number;
@@ -638,6 +641,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   cosecha_roja: {
     id: 'cosecha_roja',
     name: 'Cosecha Roja',
+    rarity: 'COMÚN',
+    synergyTags: ['fruit', 'economy'],
     description: 'Aumenta los pagos de Cereza y Ciruela un +35% por nivel.',
     effectSummary: '+35% pago de Cereza y Ciruela',
     baseCostMoney: 55,
@@ -649,6 +654,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   huerto_citrico: {
     id: 'huerto_citrico',
     name: 'Huerto Cítrico',
+    rarity: 'COMÚN',
+    synergyTags: ['fruit', 'economy'],
     description:
       'Limón y Naranja aparecen un +18% más a menudo y pagan un +25% adicional por nivel.',
     effectSummary: '+18% frecuencia y +25% pago en Limón/Naranja',
@@ -661,6 +668,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   campana_bronce: {
     id: 'campana_bronce',
     name: 'Campana de Bronce',
+    rarity: 'POCO COMÚN',
+    synergyTags: ['high_value', 'economy'],
     description:
       'Campana y Herradura pagan +45% más en patrones y +20% más de frecuencia por nivel.',
     effectSummary: '+45% pago y +20% frecuencia Campana/Herradura',
@@ -673,6 +682,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   iman_diamante: {
     id: 'iman_diamante',
     name: 'Imán de Diamante',
+    rarity: 'RARA',
+    synergyTags: ['high_value', 'geometry'],
     description:
       'Diamante y Estrella aparecen un +30% más a menudo, pero el coste de tirada sube +5%.',
     effectSummary: '+30% peso Diamante/Estrella · +5% coste tirada',
@@ -685,6 +696,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   siete_dorado: {
     id: 'siete_dorado',
     name: 'Siete Dorado',
+    rarity: 'EXCEPCIONAL',
+    synergyTags: ['high_value', 'geometry'],
     description:
       'Los pagos de Siete y Corona aumentan un +45% por nivel y mejora un +25% la probabilidad de Jackpot.',
     effectSummary: '+45% pago Siete/Corona · +25% prob. Jackpot',
@@ -697,6 +710,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   geometra: {
     id: 'geometra',
     name: 'Geómetra',
+    rarity: 'RARA',
+    synergyTags: ['geometry', 'high_value'],
     description:
       'Aumenta los multiplicadores de patrones Vertical, Diagonal, X y Triángulos un +30% por nivel.',
     effectSummary: '+30% en patrones Vertical, Diagonal, X y Triángulos',
@@ -709,6 +724,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   mano_tahur: {
     id: 'mano_tahur',
     name: 'Mano del Tahúr',
+    rarity: 'RARA',
+    synergyTags: ['geometry', 'economy'],
     description:
       'El Comodín aparece un +50% más a menudo y el Trébol un +25% más a menudo.',
     effectSummary: '+50% frecuencia Comodín · +25% Trébol',
@@ -721,6 +738,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   mecanico_jefe: {
     id: 'mecanico_jefe',
     name: 'Mecánico',
+    rarity: 'COMÚN',
+    synergyTags: ['repair', 'economy'],
     description:
       'La Llave aparece un +40% más a menudo y cada reparación restaura +10% extra de Integridad.',
     effectSummary: '+40% frecuencia Llave · +10% reparación',
@@ -733,6 +752,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   cableado_ilegal: {
     id: 'cableado_ilegal',
     name: 'Cableado Ilegal',
+    rarity: 'POCO COMÚN',
+    synergyTags: ['voltage', 'high_value'],
     description:
       'El Rayo aparece un +50% más a menudo y da +0.15x extra de Voltaje, pero añade +1% de desgaste por tirada.',
     effectSummary: '+50% Rayo y más Voltaje · +1% desgaste',
@@ -745,6 +766,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   prensa_uvas: {
     id: 'prensa_uvas',
     name: 'Reserva de la Viña',
+    rarity: 'POCO COMÚN',
+    synergyTags: ['fruit', 'economy'],
     description:
       'Uvas y Trébol pagan +35% más por nivel y las Monedas dan +10 CR extra.',
     effectSummary: '+35% pago Uvas/Trébol · +10 CR por Moneda',
@@ -757,6 +780,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   artificiero: {
     id: 'artificiero',
     name: 'Artificiero Automático',
+    rarity: 'POCO COMÚN',
+    synergyTags: ['repair', 'economy'],
     description:
       'Desactiva automáticamente 1 Bomba por tirada por nivel y otorga +35 CR al neutralizarla.',
     effectSummary: 'Desactiva 1 Bomba/nivel (+35 CR)',
@@ -769,6 +794,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   motor_extra: {
     id: 'motor_extra',
     name: 'Reserva de Manivela',
+    rarity: 'EXCEPCIONAL',
+    synergyTags: ['repair', 'economy'],
     description:
       'Aumenta +15% la Integridad máxima por nivel y reduce en -1 CR el coste base de cada tirada.',
     effectSummary: '-1 CR coste tirada · +15% Integridad máx.',
@@ -790,6 +817,8 @@ export interface FortunariumModifierCatalogItem {
   type: 'BUFF' | 'DEBUFF';
   effect: string;
   defaultSpins: number;
+  durationType?: 'SPINS' | 'UNTIL_TRIGGER';
+  isPlayerTargeted?: boolean;
   jackpotBaseOverride?: number;
 }
 
@@ -801,8 +830,46 @@ export const FORTUNARIUM_MODIFIERS_CATALOG: Record<
     id: 'fiebre_cerezas',
     name: 'FIEBRE DE CEREZAS',
     type: 'BUFF',
-    effect: 'Las Cerezas pagan ×2.',
+    effect: 'Las Cerezas aparecen más y pagan ×2.',
     defaultSpins: 3,
+  },
+  geometra_efecto: {
+    id: 'geometra_efecto',
+    name: 'GEÓMETRA EN RACHA',
+    type: 'BUFF',
+    effect: 'Patrones no horizontales pagan +40% adicional.',
+    defaultSpins: 3,
+  },
+  diagonal_perfecta: {
+    id: 'diagonal_perfecta',
+    name: 'DIAGONAL PERFECTA',
+    type: 'BUFF',
+    effect: 'Las líneas diagonales pagan ×1.75.',
+    defaultSpins: 3,
+  },
+  ojo_dorado: {
+    id: 'ojo_dorado',
+    name: 'OJO DORADO',
+    type: 'BUFF',
+    effect: 'El próximo patrón X o Triángulo paga ×2.',
+    defaultSpins: 4,
+    durationType: 'UNTIL_TRIGGER',
+    isPlayerTargeted: true,
+  },
+  dinamita: {
+    id: 'dinamita',
+    name: 'DINAMITA CONTROLADA',
+    type: 'BUFF',
+    effect: 'Cada Bomba detona hacia fuera pero suelta +30 CR.',
+    defaultSpins: 3,
+  },
+  motor_fino: {
+    id: 'motor_fino',
+    name: 'MOTOR FINO',
+    type: 'BUFF',
+    effect: 'Anula el desgaste base del giro.',
+    defaultSpins: 3,
+    isPlayerTargeted: true,
   },
   lluvia_monedas: {
     id: 'lluvia_monedas',
@@ -829,7 +896,7 @@ export const FORTUNARIUM_MODIFIERS_CATALOG: Record<
     id: 'fortuna_desatada',
     name: 'FORTUNA DESATADA',
     type: 'BUFF',
-    effect: '+ Probabilidad de Jackpot',
+    effect: '+ Probabilidad de Jackpot y más Comodines.',
     defaultSpins: 4,
     jackpotBaseOverride: 0.0025,
   },
@@ -837,16 +904,81 @@ export const FORTUNARIUM_MODIFIERS_CATALOG: Record<
     id: 'siete_suerte',
     name: 'SIETE DE LA SUERTE',
     type: 'BUFF',
-    effect: '+ Probabilidad de Jackpot',
+    effect: '+ Probabilidad de Jackpot y más Sietes.',
     defaultSpins: 3,
     jackpotBaseOverride: 0.005,
+  },
+  mano_afortunada: {
+    id: 'mano_afortunada',
+    name: 'MANO AFORTUNADA',
+    type: 'BUFF',
+    effect: 'Tus giros pagan +25% en todos los patrones.',
+    defaultSpins: 3,
+    isPlayerTargeted: true,
+  },
+  motor_al_rojo: {
+    id: 'motor_al_rojo',
+    name: 'MOTOR AL ROJO',
+    type: 'DEBUFF',
+    effect: 'Cada giro añade +2% de desgaste térmico.',
+    defaultSpins: 3,
+  },
+  recalentamiento: {
+    id: 'recalentamiento',
+    name: 'RECALENTAMIENTO',
+    type: 'DEBUFF',
+    effect: 'Las reparaciones cuestan +30% más créditos.',
+    defaultSpins: 3,
   },
   cableado_quemado: {
     id: 'cableado_quemado',
     name: 'CABLEADO QUEMADO',
     type: 'DEBUFF',
     effect: 'Cada tirada provoca +3% de daño adicional al chasis.',
-    defaultSpins: 5,
+    defaultSpins: 4,
+  },
+  iman_roto: {
+    id: 'iman_roto',
+    name: 'IMÁN DESMAGNETIZADO',
+    type: 'DEBUFF',
+    effect: 'Diamante y Estrella aparecen menos y pagan -35%.',
+    defaultSpins: 3,
+  },
+  rodillo_pegado: {
+    id: 'rodillo_pegado',
+    name: 'RODILLO PEGADO',
+    type: 'DEBUFF',
+    effect: 'Las líneas horizontales pagan -20%.',
+    defaultSpins: 3,
+  },
+  apuesta_forzada: {
+    id: 'apuesta_forzada',
+    name: 'APUESTA FORZADA',
+    type: 'DEBUFF',
+    effect: 'Fuerza apuesta Doble si hay saldo suficiente.',
+    defaultSpins: 2,
+  },
+  mal_contacto: {
+    id: 'mal_contacto',
+    name: 'MAL CONTACTO',
+    type: 'DEBUFF',
+    effect: 'Tus giros cuestan +4 CR adicionales.',
+    defaultSpins: 3,
+    isPlayerTargeted: true,
+  },
+  hacienda: {
+    id: 'hacienda',
+    name: 'INSPECCIÓN DE TASAS',
+    type: 'DEBUFF',
+    effect: 'Retiene un 15% de comisión sobre premios brutos ≥40 CR.',
+    defaultSpins: 3,
+  },
+  mala_racha: {
+    id: 'mala_racha',
+    name: 'MALA RACHA',
+    type: 'DEBUFF',
+    effect: 'Aumenta la aparición de Calaveras y Bombas.',
+    defaultSpins: 3,
   },
   fuga_creditos: {
     id: 'fuga_creditos',
@@ -859,22 +991,22 @@ export const FORTUNARIUM_MODIFIERS_CATALOG: Record<
     id: 'rodillos_oxidados',
     name: 'RODILLOS OXIDADOS',
     type: 'DEBUFF',
-    effect: 'Reduce el pago de líneas un -20%.',
+    effect: 'Reduce el pago de líneas horizontales un -20%.',
     defaultSpins: 3,
+  },
+  mano_negra: {
+    id: 'mano_negra',
+    name: 'MANO NEGRA',
+    type: 'DEBUFF',
+    effect: 'Tus giros sufren +3% de desgaste y atraen peligros.',
+    defaultSpins: 3,
+    isPlayerTargeted: true,
   },
 };
 
-export const ALL_MODIFIER_IDS: FortunariumModifierId[] = [
-  'fiebre_cerezas',
-  'lluvia_monedas',
-  'escudo_termico',
-  'sobrecarga_dorada',
-  'fortuna_desatada',
-  'siete_suerte',
-  'cableado_quemado',
-  'fuga_creditos',
-  'rodillos_oxidados',
-];
+export const ALL_MODIFIER_IDS: FortunariumModifierId[] = Object.keys(
+  FORTUNARIUM_MODIFIERS_CATALOG
+) as FortunariumModifierId[];
 
 export function createInitialUpgradesState(): Record<FortunariumUpgradeId, number> {
   return {
