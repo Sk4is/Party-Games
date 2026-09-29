@@ -31,14 +31,36 @@ export type FortunariumPhase =
   | 'VICTORY'
   | 'DEFEAT';
 
+export type FortunariumPresentationState =
+  | 'INTRO_GARAGE'
+  | 'INTRO_POWER_ON'
+  | 'READY'
+  | 'BET_CHANGE'
+  | 'LEVER_PULL'
+  | 'SPIN_START'
+  | 'SPINNING'
+  | 'REEL_SETTLING'
+  | 'PATTERN_REVEAL'
+  | 'SPECIAL_REVEAL'
+  | 'RESULT_SUMMARY'
+  | 'QUOTA_REACHED'
+  | 'QUOTA_SEAL'
+  | 'UPGRADE_SELECTION'
+  | 'UPGRADE_INSTALL'
+  | 'BANKRUPT'
+  | 'MACHINE_BROKEN'
+  | 'VICTORY';
+
 export type FortunariumBetMode = 'normal' | 'doble' | 'sobrecarga';
 
 export type FortunariumTurnMode = 'turns' | 'free';
 
 export type FortunariumDifficulty = 'normal' | 'dificil' | 'temerario';
 
+export type FortunariumQuotaLimit = 5 | 10 | 15 | 20 | null;
+
 export interface FortunariumConfig {
-  totalRounds: 5 | 7 | 10;
+  totalRounds: FortunariumQuotaLimit; // null = ILIMITADAS
   difficulty: FortunariumDifficulty;
   turnMode: FortunariumTurnMode;
 }
@@ -49,13 +71,18 @@ export interface FortunariumPlayerStats {
   totalMoneyLost: number;
   netBalance: number;
   biggestSingleWin: number;
+  biggestSingleLoss?: number;
+  patternsHit: number;
+  specialSymbolsTriggered?: number;
   jackpotsHit: number;
   bombsTriggered: number;
+  bombsDefused?: number;
   skullsTriggered: number;
   coinsCollected: number;
   keysFound: number;
   integrityDamageCaused: number;
   integrityRepaired: number;
+  repairsCount?: number;
   upgradesBought: number;
 }
 
@@ -77,20 +104,37 @@ export interface FortunariumCellCoord {
 
 export type FortunariumPatternType =
   | 'HORIZONTAL'
+  | 'VERTICAL'
   | 'DIAGONAL'
-  | 'V'
-  | 'V_INVERTIDA'
-  | 'ZIGZAG';
+  | 'X'
+  | 'TRIANGULO'
+  | 'TRIANGULO_INVERTIDO';
+
+export interface FortunariumWildSubstitution {
+  col: number;
+  row: number;
+  substitutedFor: FortunariumSymbolId;
+}
 
 export interface FortunariumWinLine {
   id: string;
+  patternId: string;
   name: string;
+  type: FortunariumPatternType;
   patternType: FortunariumPatternType;
-  patternMultiplier: number;
+  patternCategory: 'LINE' | 'SHAPE';
+  resolvedSymbol: FortunariumSymbolId;
   symbolId: FortunariumSymbolId;
-  count: number;
-  payout: number;
+  coordinates: FortunariumCellCoord[];
   cells: FortunariumCellCoord[];
+  length: number;
+  count: number;
+  baseReward: number;
+  multiplier: number;
+  patternMultiplier: number;
+  finalReward: number;
+  payout: number;
+  wildSubstitutions?: FortunariumWildSubstitution[];
 }
 
 export interface FortunariumSpecialEffectLog {
@@ -104,6 +148,28 @@ export interface FortunariumSpecialEffectLog {
   keysDelta: number;
   variant: 'positive' | 'negative' | 'neutral' | 'jackpot';
   cells: FortunariumCellCoord[];
+  grantedModifierId?: FortunariumModifierId;
+}
+
+export type FortunariumModifierId =
+  | 'fiebre_cerezas'
+  | 'lluvia_monedas'
+  | 'escudo_termico'
+  | 'sobrecarga_dorada'
+  | 'fortuna_desatada'
+  | 'siete_suerte'
+  | 'cableado_quemado'
+  | 'fuga_creditos'
+  | 'rodillos_oxidados';
+
+export interface FortunariumActiveModifier {
+  id: string;
+  modifierId: FortunariumModifierId;
+  name: string;
+  type: 'BUFF' | 'DEBUFF';
+  effect: string;
+  spinsRemaining: number;
+  appliedAtSpin: number;
 }
 
 export interface FortunariumSpinResult {
@@ -111,6 +177,8 @@ export interface FortunariumSpinResult {
   stateVersion: number;
   playerId: string;
   playerName: string;
+  initiatedByPlayerId: string;
+  triggerSource: 'button' | 'lever';
   betMode: FortunariumBetMode;
   spinCost: number;
   moneyBeforeSpin: number;
@@ -124,6 +192,7 @@ export interface FortunariumSpinResult {
   winningCells: FortunariumCellCoord[];
   hazardCells: FortunariumCellCoord[];
   grossPayout: number;
+  jackpotPayout: number;
   penalties: number;
   netMoneyDelta: number;
   integrityDelta: number;
@@ -191,6 +260,7 @@ export interface FortunariumActionLogEntry {
 
 export interface FortunariumRoomState {
   roomCode: string;
+  matchId: string;
   stateVersion: number;
   gameType: 'fortunarium';
   phase: FortunariumPhase;
@@ -199,14 +269,18 @@ export interface FortunariumRoomState {
   currentTurnPlayerId: string | null;
 
   // Shared Machine State
-  round: number;
-  totalRounds: number;
-  money: number; // CAJA COMÚN (spendable shared credits)
-  quotaProgress: number; // PROGRESO DE CUOTA (earnings accumulated toward current cycle quota)
-  quota: number; // Current cycle quota target
-  spinsLeft: number;
+  round: number; // Current quota number (1, 2, 3...)
+  totalRounds: FortunariumQuotaLimit; // 5 | 10 | 15 | 20 | null (ILIMITADAS)
+  money: number; // Shared available credits (NEVER resets when sealing a quota!)
+  quotaProgress: number; // Synchronized with shared money for threshold comparison
+  quota: number; // Current money threshold target
+  spinsLeft: number; // Spins in current cycle
   maxSpinsPerRound: number;
   totalSpinsInMatch: number;
+  totalPatternsHit: number;
+  totalJackpotsHit: number;
+  biggestSingleWinInMatch: number;
+  bestPatternNameInMatch: string;
 
   integrity: number;
   maxIntegrity: number;
@@ -220,28 +294,65 @@ export interface FortunariumRoomState {
   lastSpinResult: FortunariumSpinResult | null;
 
   upgrades: Record<FortunariumUpgradeId, number>;
-  // 3 Random upgrade options offered upon completing a quota
   offeredUpgradeIds: FortunariumUpgradeId[];
-  // Map of playerId -> chosen FortunariumUpgradeId for unanimous multiplayer selection
   upgradeVotes: Record<string, FortunariumUpgradeId>;
+  lastInstalledUpgradeId?: FortunariumUpgradeId | null;
+
+  // Temporary Buffs & Debuffs (Paper Note on Left of Machine)
+  activeModifiers: FortunariumActiveModifier[];
 
   activeEvent: FortunariumActiveEvent | null;
   readyForNextRoundPlayerIds: string[];
   actionLog: FortunariumActionLogEntry[];
 
+  defeatCause?: 'bankruptcy' | 'integrity' | 'quota' | null;
   endReason?: string | null;
 }
 
-export type FortunariumWinTier = 'NONE' | 'LOSS' | 'SMALL' | 'MEDIUM' | 'BIG' | 'HUGE' | 'JACKPOT';
+export type FortunariumWinTier =
+  | 'NONE'
+  | 'LOSS'
+  | 'SMALL'
+  | 'MEDIUM'
+  | 'BIG'
+  | 'HUGE'
+  | 'JACKPOT';
 
 export interface FortunariumRemoteCursor {
   playerId: string;
   name: string;
   color: string;
-  x: number; // normalized 0..1 relative to shared Fortunarium scene
-  y: number; // normalized 0..1 relative to shared Fortunarium scene
+  x: number;
+  y: number;
   updatedAt: number;
 }
+
+export type FortunariumDevScenario =
+  | 'horizontal_3'
+  | 'horizontal_4'
+  | 'horizontal_5'
+  | 'vertical_3'
+  | 'diagonal_left'
+  | 'diagonal_right'
+  | 'pat_x'
+  | 'triangulo'
+  | 'triangulo_invertido'
+  | 'multi_pattern'
+  | 'three_patterns'
+  | 'pattern_overlap'
+  | 'wild_substitution'
+  | 'no_pattern'
+  | 'special_symbol'
+  | 'special_bomba'
+  | 'special_llave'
+  | 'special_rayo'
+  | 'special_calavera'
+  | 'special_moneda'
+  | 'special_interrogacion'
+  | 'jackpot'
+  | 'single_pattern'
+  | 'force_bankruptcy'
+  | 'force_integrity_zero';
 
 export type FortunariumClientMessage =
   | {
@@ -276,7 +387,12 @@ export type FortunariumClientMessage =
     }
   | {
       type: 'SPIN_SLOT';
-      forceScenario?: 'single_pattern' | 'multi_pattern' | 'special_symbol' | 'jackpot';
+      forceScenario?: FortunariumDevScenario;
+      triggerSource?: 'button' | 'lever';
+    }
+  | {
+      type: 'DEV_GRANT_MODIFIER';
+      modifierId: FortunariumModifierId;
     }
   | {
       type: 'REPAIR_MACHINE';

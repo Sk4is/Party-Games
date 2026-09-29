@@ -30,7 +30,7 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
 
   return (
     <div
-      className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      className="fortunarium-root font-fortunarium fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
       onClick={onClose}
     >
       <div
@@ -256,8 +256,8 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
                         </p>
 
                         {sym.id === 'comodin' && (
-                          <div className="mt-1 text-[11px] font-mono text-amber-300">
-                            Línea pura de Comodines: 3× {sym.basePayout3}€ · 4× {sym.basePayout4}€ · 5× {sym.basePayout5}€
+                          <div className="mt-1 text-[11px] font-mono text-amber-300 tabular-nums">
+                            Sustituye a cualquier símbolo normal en los 6 patrones oficiales (+25% bono por Comodín).
                           </div>
                         )}
                       </div>
@@ -271,9 +271,13 @@ export const FortunariumPrizeTableModal: React.FC<FortunariumPrizeTableModalProp
           {/* TAB 3: PATRONES (VISUAL MINIATURE 3x5 SLOT GRIDS) */}
           {activeTab === 'patrones' && (
             <div className="flex flex-col gap-3">
-              <div className="text-xs text-stone-300 px-1">
-                Los patrones de línea premian a partir de{' '}
-                <strong className="text-amber-300">3 símbolos iguales contiguos</strong> sobre la geometría del patrón. Si una tirada forma varios patrones a la vez, se cobran todos secuencialmente.
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-stone-200">
+                <strong className="text-amber-300">Regla Oficial de Patrones:</strong>{' '}
+                <strong className="text-white underline">
+                  Todas las casillas marcadas deben contener el mismo símbolo compatible
+                </strong>{' '}
+                (el Comodín puede sustituir a cualquier símbolo normal otorgando +25% de bono).
+                En líneas horizontales se paga la cadena máxima contigua (3, 4 o 5).
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

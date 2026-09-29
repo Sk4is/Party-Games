@@ -6,6 +6,8 @@ import {
   FortunariumBetMode,
   FortunariumPatternType,
   FortunariumCellCoord,
+  FortunariumModifierId,
+  FortunariumActiveModifier,
 } from '../../types/fortunarium';
 
 export const FORTUNARIUM_MACHINE_ASSET = '/assets/fortunarium/tragaperras.png';
@@ -64,9 +66,9 @@ export interface FortunariumSymbolMeta {
 }
 
 // ============================================================================
-// SINGLE AUTHORITATIVE SYMBOL & WEIGHT TABLE
-// Normal pool total weight = 944.0
-// Special pool total weight = 9.95 (~1.04% per cell -> genuinely rare)
+// SINGLE AUTHORITATIVE SYMBOL & WEIGHT TABLE (SECTION 8)
+// Normal weights: 220, 190, 165, 140, 115, 90, 68, 50, 34, 20, 9, 3 (Sum = 1104)
+// Special weights: 1.20, 0.85, 0.55, 0.35, 0.28, 0.20, 0.12 (Sum = 3.55)
 // ============================================================================
 export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolMeta> = {
   cereza: {
@@ -75,12 +77,12 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 1,
     asset: FORTUNARIUM_SYMBOL_ASSETS.cereza,
-    basePayout3: 8,
-    basePayout4: 22,
-    basePayout5: 58,
-    weight: 180,
-    shortDesc: 'Fruta básica muy frecuente. Ideal para amortiguar el coste de tirada.',
-    specialProperty: 'Sinergia con «Cosecha Roja» (+30% pago)',
+    basePayout3: 11,
+    basePayout4: 32,
+    basePayout5: 85,
+    weight: 220,
+    shortDesc: 'Fruta básica muy frecuente. Permite recuperar el coste de la tirada.',
+    specialProperty: 'Sinergia con «Cosecha Roja» (+35% pago por nivel)',
     badgeColor: '#fb7185',
   },
   limon: {
@@ -89,12 +91,12 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 1,
     asset: FORTUNARIUM_SYMBOL_ASSETS.limon,
-    basePayout3: 9,
-    basePayout4: 26,
-    basePayout5: 72,
-    weight: 155,
-    shortDesc: 'Cítrico frecuente con retorno constante en líneas horizontales.',
-    specialProperty: 'Sinergia con «Huerto Cítrico» (+18% frecuencia, +20% pago)',
+    basePayout3: 13,
+    basePayout4: 38,
+    basePayout5: 100,
+    weight: 190,
+    shortDesc: 'Cítrico frecuente que aporta pequeños beneficios iniciales.',
+    specialProperty: 'Sinergia con «Huerto Cítrico» (+18% frecuencia, +25% pago)',
     badgeColor: '#fde047',
   },
   naranja: {
@@ -103,12 +105,12 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 1,
     asset: FORTUNARIUM_SYMBOL_ASSETS.naranja,
-    basePayout3: 11,
-    basePayout4: 33,
-    basePayout5: 88,
-    weight: 135,
-    shortDesc: 'Fruta jugosa que equilibra la tirada con 3 aciertos.',
-    specialProperty: 'Sinergia con «Huerto Cítrico» (+18% frecuencia, +20% pago)',
+    basePayout3: 17,
+    basePayout4: 48,
+    basePayout5: 125,
+    weight: 165,
+    shortDesc: 'Fruta jugosa con retorno sólido en líneas de 3, 4 o 5.',
+    specialProperty: 'Sinergia con «Huerto Cítrico» (+18% frecuencia, +25% pago)',
     badgeColor: '#fb923c',
   },
   ciruela: {
@@ -117,12 +119,12 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 1,
     asset: FORTUNARIUM_SYMBOL_ASSETS.ciruela,
-    basePayout3: 14,
-    basePayout4: 42,
-    basePayout5: 115,
-    weight: 115,
-    shortDesc: 'Fruta selecta que genera un beneficio modesto desde 3 en línea.',
-    specialProperty: 'Sinergia con «Cosecha Roja» (+30% pago)',
+    basePayout3: 20,
+    basePayout4: 58,
+    basePayout5: 150,
+    weight: 140,
+    shortDesc: 'Fruta clásica de buen rendimiento cuando forma diagonales o columnas.',
+    specialProperty: 'Sinergia con «Cosecha Roja» (+35% pago por nivel)',
     badgeColor: '#c084fc',
   },
   uvas: {
@@ -131,12 +133,12 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 2,
     asset: FORTUNARIUM_SYMBOL_ASSETS.uvas,
-    basePayout3: 19,
-    basePayout4: 55,
-    basePayout5: 150,
-    weight: 95,
-    shortDesc: 'Racimo real con buen beneficio desde 3 en línea.',
-    specialProperty: 'Sinergia con «Reserva de la Viña» (+30% pago)',
+    basePayout3: 27,
+    basePayout4: 76,
+    basePayout5: 195,
+    weight: 115,
+    shortDesc: 'Racimo selecto de valor medio con excelentes premios en 4 y 5 aciertos.',
+    specialProperty: 'Sinergia con «Reserva de la Viña» (+35% pago)',
     badgeColor: '#a855f7',
   },
   trebol: {
@@ -145,13 +147,13 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 2,
     asset: FORTUNARIUM_SYMBOL_ASSETS.trebol,
-    basePayout3: 25,
-    basePayout4: 75,
-    basePayout5: 205,
-    weight: 78,
-    shortDesc: 'Amuleto de la fortuna: paga en línea y bloquea 1 Calavera en pantalla.',
-    specialProperty: 'Anula 1 Calavera en la misma tirada',
-    badgeColor: '#4ade80',
+    basePayout3: 36,
+    basePayout4: 100,
+    basePayout5: 255,
+    weight: 90,
+    shortDesc: 'Amuleto de buena fortuna que además neutraliza Calaveras.',
+    specialProperty: 'Cada Trébol neutraliza 1 Calavera en la tirada (+12 CR)',
+    badgeColor: '#34d399',
   },
   campana: {
     id: 'campana',
@@ -159,12 +161,12 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 2,
     asset: FORTUNARIUM_SYMBOL_ASSETS.campana,
-    basePayout3: 35,
-    basePayout4: 105,
-    basePayout5: 285,
-    weight: 62,
-    shortDesc: 'Campana de bronce con excelente escalado en 4 y 5 aciertos.',
-    specialProperty: 'Sinergia con «Campana de Bronce» (+40% en 4×/5×)',
+    basePayout3: 50,
+    basePayout4: 140,
+    basePayout5: 355,
+    weight: 68,
+    shortDesc: 'Campana de bronce del casino con pagos potentes.',
+    specialProperty: 'Sinergia con «Campana de Bronce» (+45% en 4×/5×)',
     badgeColor: '#fbbf24',
   },
   herradura: {
@@ -173,12 +175,12 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.herradura,
-    basePayout3: 48,
-    basePayout4: 150,
-    basePayout5: 410,
-    weight: 48,
-    shortDesc: 'Forja de hierro: al formar línea ganadora restaura +3% de Integridad.',
-    specialProperty: 'Restaura +3% de Integridad al formar línea',
+    basePayout3: 68,
+    basePayout4: 190,
+    basePayout5: 485,
+    weight: 50,
+    shortDesc: 'Forja pesada que repara el chasis al formar un patrón ganador.',
+    specialProperty: 'Al formar patrón ganador repara +4% de Integridad',
     badgeColor: '#f59e0b',
   },
   estrella: {
@@ -187,12 +189,12 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.estrella,
-    basePayout3: 72,
-    basePayout4: 220,
-    basePayout5: 620,
-    weight: 35,
-    shortDesc: 'Astro de casino de alto valor que impulsa el progreso de cuota.',
-    specialProperty: 'Premio alto; sinergia con «Imán de Diamante»',
+    basePayout3: 95,
+    basePayout4: 265,
+    basePayout5: 680,
+    weight: 34,
+    shortDesc: 'Astro brillante de alto valor para escalar cuotas avanzadas.',
+    specialProperty: 'Al formar patrón ganador sube +0.10x el Voltaje',
     badgeColor: '#fef08a',
   },
   diamante: {
@@ -201,12 +203,12 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 4,
     asset: FORTUNARIUM_SYMBOL_ASSETS.diamante,
-    basePayout3: 110,
-    basePayout4: 350,
+    basePayout3: 145,
+    basePayout4: 400,
     basePayout5: 1000,
-    weight: 23,
-    shortDesc: 'Joya de alta precisión con premios enormes en 4 y 5 aciertos.',
-    specialProperty: 'Gran premio; sinergia con «Imán de Diamante»',
+    weight: 20,
+    shortDesc: 'Joya de alta rareza capaz de sellar una cuota de un golpe.',
+    specialProperty: 'Sinergia con «Imán de Diamante» (+25% aparición)',
     badgeColor: '#38bdf8',
   },
   corona: {
@@ -215,74 +217,77 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'normal',
     tier: 4,
     asset: FORTUNARIUM_SYMBOL_ASSETS.corona,
-    basePayout3: 190,
+    basePayout3: 235,
     basePayout4: 640,
-    basePayout5: 1800,
-    weight: 12,
-    shortDesc: 'Reliquia imperial muy rara capaz de sellar una cuota entera.',
-    specialProperty: 'Activa categoría Gran Premio; sinergia «Siete Dorado»',
+    basePayout5: 1600,
+    weight: 9,
+    shortDesc: 'Reliquia real extremadamente codiciada.',
+    specialProperty: 'Otorga +1 Llave de Taller al alinear 4 o 5 Coronas',
     badgeColor: '#facc15',
   },
   siete: {
     id: 'siete',
     name: 'Siete',
     category: 'normal',
-    tier: 4,
+    tier: 5,
     asset: FORTUNARIUM_SYMBOL_ASSETS.siete,
-    basePayout3: 375,
-    basePayout4: 1250,
-    basePayout5: 3800,
-    weight: 6,
-    shortDesc: 'El símbolo más codiciado del Fortunarium. 3, 4 o 5 Sietes desatan el Bote.',
-    specialProperty: 'Símbolo de Bote Mayor (Jackpot)',
-    badgeColor: '#ef4444',
+    basePayout3: 390,
+    basePayout4: 1050,
+    basePayout5: 2750,
+    weight: 3,
+    shortDesc: 'El emblema supremo del Fortunarium (rareza máxima).',
+    specialProperty: 'Sinergia con «Siete Dorado» (+45% pago y mayor probabilidad de Jackpot)',
+    badgeColor: '#f43f5e',
   },
 
   // ==========================================================================
-  // RARE SPECIAL SYMBOLS (Relative weights against 944 normal pool)
+  // SPECIAL SYMBOLS (7) — Total weight = 3.55 (~0.32% per cell -> genuinely rare)
   // ==========================================================================
   moneda: {
     id: 'moneda',
     name: 'Moneda',
     category: 'special',
-    tier: 5,
+    tier: 2,
     asset: FORTUNARIUM_SYMBOL_ASSETS.moneda,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
-    weight: 3.0,
-    shortDesc: 'Otorga +18 créditos directos por cada Moneda sin necesitar línea.',
-    specialProperty: 'Pago directo (+18 CR por Moneda × Voltaje)',
+    weight: 1.2,
+    shortDesc:
+      '¡Efecto directo! Cada Moneda otorga +16 CR inmediatos (escalados por apuesta y voltaje). Con 3+ Monedas añade un bono extra de +45 CR.',
+    specialProperty: '+16 CR directos por cada Moneda',
     activationRule: 'SE ACTIVA CON 1 APARICIÓN',
-    badgeColor: '#eab308',
+    badgeColor: '#fcd34d',
   },
   llave: {
     id: 'llave',
     name: 'Llave',
     category: 'special',
-    tier: 5,
+    tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.llave,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
-    weight: 2.2,
-    shortDesc: 'Repara +8% de Integridad, suma +1 Llave de Taller y desactiva 1 Bomba.',
-    specialProperty: '+8% Integridad, +1 Llave y desactiva 1 Bomba',
+    weight: 0.85,
+    shortDesc:
+      '¡Efecto directo! Otorga +1 Llave de Taller, repara +8% de Integridad y desactiva 1 Bomba en la misma tirada (+35 CR).',
+    specialProperty: '+1 Llave · +8% Integridad · Desactiva 1 Bomba',
     activationRule: 'SE ACTIVA CON 1 APARICIÓN',
-    badgeColor: '#34d399',
+    badgeColor: '#fbbf24',
   },
   rayo: {
     id: 'rayo',
     name: 'Rayo',
     category: 'special',
-    tier: 5,
+    tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.rayo,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
-    weight: 1.6,
-    shortDesc: 'Aumenta el multiplicador de Voltaje en +0.25x para esta tirada y las siguientes.',
-    specialProperty: 'Sube +0.25x el Multiplicador de Voltaje',
+    weight: 0.55,
+    shortDesc:
+      '¡Efecto directo! Sobrecarga la máquina subiendo +0.25x el multiplicador de Voltaje antes de pagar los patrones.',
+    specialProperty: '+0.25x Multiplicador de Voltaje inmediato',
     activationRule: 'SE ACTIVA CON 1 APARICIÓN',
     badgeColor: '#38bdf8',
   },
@@ -290,46 +295,49 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     id: 'interrogacion',
     name: 'Interrogación',
     category: 'special',
-    tier: 5,
+    tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.interrogacion,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
-    weight: 1.1,
-    shortDesc: 'Otorga un bono misterioso (+25 CR) o abre un Dilema del Fortunarium.',
-    specialProperty: 'Premio sorpresa o Dilema Cooperativo',
+    weight: 0.35,
+    shortDesc:
+      '¡Efecto directo! Otorga un premio misterioso (+20 CR) o abre un Evento Interactivo de Riesgo/Recompensa para el grupo.',
+    specialProperty: 'Premio Misterioso + Evento Interactivo',
     activationRule: 'SE ACTIVA CON 1 APARICIÓN',
-    badgeColor: '#c084fc',
+    badgeColor: '#e879f9',
   },
   bomba: {
     id: 'bomba',
     name: 'Bomba',
     category: 'special',
-    tier: 5,
+    tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.bomba,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
-    weight: 0.9,
-    shortDesc: 'Explota causando -14% de Integridad y -15 CR salvo que haya Llave o Artificiero.',
-    specialProperty: 'Peligro: -14% Integridad y -15 CR',
-    activationRule: 'SE ACTIVA CON 1 APARICIÓN',
-    badgeColor: '#f97316',
+    weight: 0.28,
+    shortDesc:
+      '¡Peligro! Explota causando -14% de Integridad y destruyendo -20 CR de la Caja Común. Se neutraliza con Llave o Artificiero.',
+    specialProperty: '-14% Integridad y -20 CR (Neutralizable)',
+    activationRule: 'PELIGRO CON 1 APARICIÓN',
+    badgeColor: '#ef4444',
   },
   calavera: {
     id: 'calavera',
     name: 'Calavera',
     category: 'special',
-    tier: 5,
+    tier: 3,
     asset: FORTUNARIUM_SYMBOL_ASSETS.calavera,
     basePayout3: 0,
     basePayout4: 0,
     basePayout5: 0,
-    weight: 0.7,
-    shortDesc: 'Maldición: drena -12 CR y -7% de Integridad salvo que un Trébol la bloquee.',
-    specialProperty: 'Maldición: -12 CR y -7% Integridad (Trébol la bloquea)',
-    activationRule: 'SE ACTIVA CON 1 APARICIÓN',
-    badgeColor: '#94a3b8',
+    weight: 0.2,
+    shortDesc:
+      '¡Maldición! Drena el 20% de la ganancia de la tirada (mín. -15 CR) y resta -6% de Integridad. Un Trébol la bloquea.',
+    specialProperty: 'Drena ganancias y -6% Integridad',
+    activationRule: 'MALDICIÓN CON 1 APARICIÓN',
+    badgeColor: '#a1a1aa',
   },
   comodin: {
     id: 'comodin',
@@ -337,14 +345,15 @@ export const FORTUNARIUM_SYMBOLS: Record<FortunariumSymbolId, FortunariumSymbolM
     category: 'special',
     tier: 5,
     asset: FORTUNARIUM_SYMBOL_ASSETS.comodin,
-    basePayout3: 60,
-    basePayout4: 180,
-    basePayout5: 500,
-    weight: 0.45,
-    shortDesc: 'Sustituye a cualquier símbolo normal en un patrón y añade +15% al pago.',
-    specialProperty: 'Sustituye cualquier símbolo normal (+15% bono)',
-    activationRule: 'ACTÚA EN CUALQUIER LÍNEA',
-    badgeColor: '#f43f5e',
+    basePayout3: 180,
+    basePayout4: 480,
+    basePayout5: 1200,
+    weight: 0.12,
+    shortDesc:
+      'Sustituye a cualquier símbolo normal en patrones Horizontales, Verticales, Diagonales y Triángulos otorgando +25% de bono.',
+    specialProperty: 'Sustituye a cualquier símbolo normal (+25% pago)',
+    activationRule: ' SUSTITUYE EN PATRONES',
+    badgeColor: '#c084fc',
   },
 };
 
@@ -363,7 +372,6 @@ export const NORMAL_SYMBOL_IDS: NormalSymbolId[] = [
   'siete',
 ];
 
-// Ordered from HIGHEST VALUE to LOWEST VALUE as required for TABLA DE PREMIOS
 export const NORMAL_SYMBOLS_BY_VALUE_DESC: NormalSymbolId[] = [
   'siete',
   'corona',
@@ -395,12 +403,94 @@ export const ALL_FORTUNARIUM_SYMBOL_IDS: FortunariumSymbolId[] = [
 ];
 
 // ============================================================================
-// CENTRALIZED PATTERN DEFINITIONS & GEOMETRY MULTIPLIERS
+// DEDICATED JACKPOT CHANCE (SECTIONS 22–26)
+// Base chance = 0.1% (0.001 = 1 / 1000) per completed paid spin
+// Hard cap = 1.0% (0.01)
+// ============================================================================
+export const BASE_JACKPOT_CHANCE = 0.001;
+export const MAX_JACKPOT_CHANCE = 0.01;
+
+export function computeEffectiveJackpotChance(
+  upgrades: Record<FortunariumUpgradeId, number>,
+  betMode: FortunariumBetMode,
+  activeModifiers: Pick<FortunariumActiveModifier, 'modifierId'>[] = []
+): number {
+  let baseChance = BASE_JACKPOT_CHANCE;
+  const hasSieteSuerte = activeModifiers.some((m) => m.modifierId === 'siete_suerte');
+  const hasFortunaDesatada = activeModifiers.some(
+    (m) => m.modifierId === 'fortuna_desatada'
+  );
+
+  if (hasSieteSuerte) {
+    baseChance = Math.max(baseChance, 0.005); // 0.50%
+  } else if (hasFortunaDesatada) {
+    baseChance = Math.max(baseChance, 0.0025); // 0.25%
+  }
+
+  let mult = 1.0;
+  if ((upgrades.siete_dorado || 0) > 0) {
+    mult += upgrades.siete_dorado * 0.25;
+  }
+  if (betMode === 'doble') mult *= 1.15;
+  if (betMode === 'sobrecarga') mult *= 1.35;
+
+  // Hard cap at 1.0% (0.01) so Jackpot remains genuinely rare
+  return Math.min(MAX_JACKPOT_CHANCE, Number((baseChance * mult).toFixed(5)));
+}
+
+// ============================================================================
+// EXACT SHAPE MASKS FOR X, TRIÁNGULO AND TRIÁNGULO INVERTIDO (SECTIONS 17–21)
+// ============================================================================
+// X Pattern (5 cells spanning the full 3×5 reel window):
+// [X][ ][ ][ ][X] -> (row 0, col 0), (row 0, col 4)
+// [ ][ ][X][ ][ ] -> (row 1, col 2)
+// [X][ ][ ][ ][X] -> (row 2, col 0), (row 2, col 4)
+export const X_MASK_CELLS: FortunariumCellCoord[] = [
+  { col: 0, row: 0 },
+  { col: 4, row: 0 },
+  { col: 2, row: 1 },
+  { col: 0, row: 2 },
+  { col: 4, row: 2 },
+];
+
+// Upright Triangle (8 cells):
+// [ ][ ][X][ ][ ]
+// [ ][X][ ][X][ ]
+// [X][X][X][X][X]
+export const TRIANGLE_MASK_CELLS: FortunariumCellCoord[] = [
+  { col: 2, row: 0 },
+  { col: 1, row: 1 },
+  { col: 3, row: 1 },
+  { col: 0, row: 2 },
+  { col: 1, row: 2 },
+  { col: 2, row: 2 },
+  { col: 3, row: 2 },
+  { col: 4, row: 2 },
+];
+
+// Inverted Triangle (8 cells):
+// [X][X][X][X][X]
+// [ ][X][ ][X][ ]
+// [ ][ ][X][ ][ ]
+export const INVERTED_TRIANGLE_MASK_CELLS: FortunariumCellCoord[] = [
+  { col: 0, row: 0 },
+  { col: 1, row: 0 },
+  { col: 2, row: 0 },
+  { col: 3, row: 0 },
+  { col: 4, row: 0 },
+  { col: 1, row: 1 },
+  { col: 3, row: 1 },
+  { col: 2, row: 2 },
+];
+
+// ============================================================================
+// DATA-DRIVEN PATTERN GUIDE CATALOG (SECTIONS 11–17 & 41)
 // ============================================================================
 export interface FortunariumPatternGuideItem {
   id: string;
   name: string;
   patternType: FortunariumPatternType;
+  patternCategory: 'LINE' | 'SHAPE';
   baseMultiplier: number;
   geometryDesc: string;
   payoutDesc: string;
@@ -410,12 +500,14 @@ export interface FortunariumPatternGuideItem {
 
 export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
   {
-    id: 'horizontal_center',
-    name: 'Horizontal Central',
+    id: 'horizontal_line',
+    name: 'Horizontal (3, 4 o 5)',
     patternType: 'HORIZONTAL',
+    patternCategory: 'LINE',
     baseMultiplier: 1.0,
-    geometryDesc: '3, 4 o 5 símbolos iguales desde la columna izquierda en la fila central.',
-    payoutDesc: 'Multiplicador de patrón ×1.00',
+    geometryDesc:
+      '3, 4 o 5 símbolos iguales compatibles consecutivos en la misma fila horizontal (superior, central o inferior). Se paga la cadena máxima.',
+    payoutDesc: 'Multiplicador de línea ×1.00 (según longitud 3×, 4× o 5×)',
     allowsWild: true,
     cells: [
       { col: 0, row: 1 },
@@ -426,116 +518,88 @@ export const FORTUNARIUM_PATTERNS_CATALOG: FortunariumPatternGuideItem[] = [
     ],
   },
   {
-    id: 'horizontal_top',
-    name: 'Horizontal Superior',
-    patternType: 'HORIZONTAL',
+    id: 'vertical_line',
+    name: 'Vertical (3)',
+    patternType: 'VERTICAL',
+    patternCategory: 'LINE',
     baseMultiplier: 1.0,
-    geometryDesc: '3, 4 o 5 símbolos iguales desde la columna izquierda en la fila superior.',
-    payoutDesc: 'Multiplicador de patrón ×1.00',
+    geometryDesc:
+      '3 símbolos iguales compatibles alineados verticalmente en cualquiera de las 5 columnas.',
+    payoutDesc: 'Pago 3× del símbolo (Multiplicador ×1.00)',
     allowsWild: true,
     cells: [
-      { col: 0, row: 0 },
-      { col: 1, row: 0 },
       { col: 2, row: 0 },
-      { col: 3, row: 0 },
-      { col: 4, row: 0 },
-    ],
-  },
-  {
-    id: 'horizontal_bottom',
-    name: 'Horizontal Inferior',
-    patternType: 'HORIZONTAL',
-    baseMultiplier: 1.0,
-    geometryDesc: '3, 4 o 5 símbolos iguales desde la columna izquierda en la fila inferior.',
-    payoutDesc: 'Multiplicador de patrón ×1.00',
-    allowsWild: true,
-    cells: [
-      { col: 0, row: 2 },
-      { col: 1, row: 2 },
+      { col: 2, row: 1 },
       { col: 2, row: 2 },
-      { col: 3, row: 2 },
-      { col: 4, row: 2 },
     ],
   },
   {
     id: 'diagonal_down',
-    name: 'Diagonal Descendente',
+    name: 'Diagonal Descendente (3)',
     patternType: 'DIAGONAL',
+    patternCategory: 'LINE',
     baseMultiplier: 1.15,
-    geometryDesc: 'Escalera diagonal de arriba-izquierda hacia abajo-derecha.',
-    payoutDesc: 'Multiplicador de patrón ×1.15',
-    allowsWild: true,
-    cells: [
-      { col: 0, row: 0 },
-      { col: 1, row: 0 },
-      { col: 2, row: 1 },
-      { col: 3, row: 2 },
-      { col: 4, row: 2 },
-    ],
-  },
-  {
-    id: 'diagonal_up',
-    name: 'Diagonal Ascendente',
-    patternType: 'DIAGONAL',
-    baseMultiplier: 1.15,
-    geometryDesc: 'Escalera diagonal de abajo-izquierda hacia arriba-derecha.',
-    payoutDesc: 'Multiplicador de patrón ×1.15',
-    allowsWild: true,
-    cells: [
-      { col: 0, row: 2 },
-      { col: 1, row: 2 },
-      { col: 2, row: 1 },
-      { col: 3, row: 0 },
-      { col: 4, row: 0 },
-    ],
-  },
-  {
-    id: 'v_shape',
-    name: 'Patrón en V',
-    patternType: 'V',
-    baseMultiplier: 1.25,
-    geometryDesc: 'Baja hasta el centro inferior y vuelve a subir (3, 4 o 5 columnas).',
-    payoutDesc: 'Multiplicador de patrón ×1.25',
+    geometryDesc:
+      '3 símbolos iguales compatibles en diagonal continua de arriba-izquierda a abajo-derecha en cualquier tramo de 3 columnas.',
+    payoutDesc: 'Pago 3× del símbolo × 1.15',
     allowsWild: true,
     cells: [
       { col: 0, row: 0 },
       { col: 1, row: 1 },
       { col: 2, row: 2 },
-      { col: 3, row: 1 },
-      { col: 4, row: 0 },
     ],
   },
   {
-    id: 'v_inverted',
-    name: 'Patrón en V Invertida',
-    patternType: 'V_INVERTIDA',
-    baseMultiplier: 1.25,
-    geometryDesc: 'Sube hasta la cumbre central y vuelve a bajar (3, 4 o 5 columnas).',
-    payoutDesc: 'Multiplicador de patrón ×1.25',
+    id: 'diagonal_up',
+    name: 'Diagonal Ascendente (3)',
+    patternType: 'DIAGONAL',
+    patternCategory: 'LINE',
+    baseMultiplier: 1.15,
+    geometryDesc:
+      '3 símbolos iguales compatibles en diagonal continua de abajo-izquierda a arriba-derecha en cualquier tramo de 3 columnas.',
+    payoutDesc: 'Pago 3× del símbolo × 1.15',
     allowsWild: true,
     cells: [
       { col: 0, row: 2 },
       { col: 1, row: 1 },
       { col: 2, row: 0 },
-      { col: 3, row: 1 },
-      { col: 4, row: 2 },
     ],
   },
   {
-    id: 'zigzag_wave',
-    name: 'Zigzag Real',
-    patternType: 'ZIGZAG',
-    baseMultiplier: 1.35,
-    geometryDesc: 'Alterna filas arriba-abajo-arriba-abajo-arriba a través de los 5 rodillos.',
-    payoutDesc: 'Multiplicador de patrón ×1.35',
+    id: 'pat_x',
+    name: 'X (5 Casillas)',
+    patternType: 'X',
+    patternCategory: 'SHAPE',
+    baseMultiplier: 3.5,
+    geometryDesc:
+      'Cinco símbolos iguales formando una X a través del tablero ( las 4 esquinas exteriores y el centro exacto ).',
+    payoutDesc: 'Pago 5× del símbolo × 3.50',
     allowsWild: true,
-    cells: [
-      { col: 0, row: 0 },
-      { col: 1, row: 2 },
-      { col: 2, row: 0 },
-      { col: 3, row: 2 },
-      { col: 4, row: 0 },
-    ],
+    cells: X_MASK_CELLS,
+  },
+  {
+    id: 'triangulo',
+    name: 'Triángulo (8 Casillas)',
+    patternType: 'TRIANGULO',
+    patternCategory: 'SHAPE',
+    baseMultiplier: 8.0,
+    geometryDesc:
+      'Figura completa de 8 casillas: las 5 de la fila inferior, los 2 hombros interiores de la fila central y el vértice superior central. Todas deben tener el mismo símbolo compatible.',
+    payoutDesc: 'Pago 5× del símbolo × 8.00 (Figura Suprema)',
+    allowsWild: true,
+    cells: TRIANGLE_MASK_CELLS,
+  },
+  {
+    id: 'triangulo_invertido',
+    name: 'Triángulo Invertido (8 Casillas)',
+    patternType: 'TRIANGULO_INVERTIDO',
+    patternCategory: 'SHAPE',
+    baseMultiplier: 8.0,
+    geometryDesc:
+      'Figura completa de 8 casillas: las 5 de la fila superior, los 2 hombros interiores de la fila central y el vértice inferior central. Todas deben tener el mismo símbolo compatible.',
+    payoutDesc: 'Pago 5× del símbolo × 8.00 (Figura Suprema)',
+    allowsWild: true,
+    cells: INVERTED_TRIANGLE_MASK_CELLS,
   },
 ];
 
@@ -561,8 +625,8 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   cosecha_roja: {
     id: 'cosecha_roja',
     name: 'Cosecha Roja',
-    description: 'Aumenta los pagos de Cereza y Ciruela un +30% por nivel.',
-    effectSummary: '+30% pago de Cereza y Ciruela',
+    description: 'Aumenta los pagos de Cereza y Ciruela un +35% por nivel.',
+    effectSummary: '+35% pago de Cereza y Ciruela',
     baseCostMoney: 55,
     costMultiplierPerLevel: 1.55,
     keyCost: 1,
@@ -572,8 +636,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   huerto_citrico: {
     id: 'huerto_citrico',
     name: 'Huerto Cítrico',
-    description: 'Limón y Naranja aparecen un +18% más a menudo y pagan un +20% adicional por nivel.',
-    effectSummary: '+18% frecuencia y +20% pago en Limón/Naranja',
+    description:
+      'Limón y Naranja aparecen un +18% más a menudo y pagan un +25% adicional por nivel.',
+    effectSummary: '+18% frecuencia y +25% pago en Limón/Naranja',
     baseCostMoney: 60,
     costMultiplierPerLevel: 1.55,
     keyCost: 1,
@@ -583,8 +648,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   campana_bronce: {
     id: 'campana_bronce',
     name: 'Campana de Bronce',
-    description: 'Campana y Herradura pagan +40% más en combinaciones de 4 y 5 símbolos.',
-    effectSummary: '+40% en líneas 4×/5× de Campana y Herradura',
+    description:
+      'Campana y Herradura pagan +45% más en patrones y +20% más de frecuencia por nivel.',
+    effectSummary: '+45% pago y +20% frecuencia Campana/Herradura',
     baseCostMoney: 70,
     costMultiplierPerLevel: 1.6,
     keyCost: 1,
@@ -594,8 +660,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   iman_diamante: {
     id: 'iman_diamante',
     name: 'Imán de Diamante',
-    description: 'Diamante y Estrella aparecen un +25% más a menudo, pero el coste de tirada sube +5%.',
-    effectSummary: '+25% peso Diamante/Estrella · +5% coste tirada',
+    description:
+      'Diamante y Estrella aparecen un +30% más a menudo, pero el coste de tirada sube +5%.',
+    effectSummary: '+30% peso Diamante/Estrella · +5% coste tirada',
     baseCostMoney: 85,
     costMultiplierPerLevel: 1.65,
     keyCost: 1,
@@ -605,8 +672,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   siete_dorado: {
     id: 'siete_dorado',
     name: 'Siete Dorado',
-    description: 'Los pagos de Siete y Corona aumentan un +45% por nivel manteniendo su rareza.',
-    effectSummary: '+45% pago en Siete y Corona',
+    description:
+      'Los pagos de Siete y Corona aumentan un +45% por nivel y mejora un +25% la probabilidad de Jackpot.',
+    effectSummary: '+45% pago Siete/Corona · +25% prob. Jackpot',
     baseCostMoney: 95,
     costMultiplierPerLevel: 1.7,
     keyCost: 2,
@@ -616,8 +684,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   geometra: {
     id: 'geometra',
     name: 'Geómetra',
-    description: 'Aumenta los multiplicadores de patrones Diagonal, V, V Invertida y Zigzag un +25% por nivel.',
-    effectSummary: '+25% en patrones Diagonal, V y Zigzag',
+    description:
+      'Aumenta los multiplicadores de patrones Vertical, Diagonal, X y Triángulos un +30% por nivel.',
+    effectSummary: '+30% en patrones Vertical, Diagonal, X y Triángulos',
     baseCostMoney: 80,
     costMultiplierPerLevel: 1.6,
     keyCost: 1,
@@ -627,8 +696,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   mano_tahur: {
     id: 'mano_tahur',
     name: 'Mano del Tahúr',
-    description: 'El Comodín aparece un +40% más a menudo y el Trébol un +20% más a menudo.',
-    effectSummary: '+40% frecuencia Comodín · +20% Trébol',
+    description:
+      'El Comodín aparece un +50% más a menudo y el Trébol un +25% más a menudo.',
+    effectSummary: '+50% frecuencia Comodín · +25% Trébol',
     baseCostMoney: 90,
     costMultiplierPerLevel: 1.65,
     keyCost: 1,
@@ -638,8 +708,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   mecanico_jefe: {
     id: 'mecanico_jefe',
     name: 'Mecánico',
-    description: 'La Llave aparece un +35% más a menudo y cada reparación restaura +10% extra de Integridad.',
-    effectSummary: '+35% frecuencia Llave · +10% reparación',
+    description:
+      'La Llave aparece un +40% más a menudo y cada reparación restaura +10% extra de Integridad.',
+    effectSummary: '+40% frecuencia Llave · +10% reparación',
     baseCostMoney: 65,
     costMultiplierPerLevel: 1.55,
     keyCost: 1,
@@ -649,8 +720,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   cableado_ilegal: {
     id: 'cableado_ilegal',
     name: 'Cableado Ilegal',
-    description: 'El Rayo aparece un +45% más a menudo y da +0.15x extra de Voltaje, pero añade +1% de desgaste por tirada.',
-    effectSummary: '+45% Rayo y más Voltaje · +1% desgaste',
+    description:
+      'El Rayo aparece un +50% más a menudo y da +0.15x extra de Voltaje, pero añade +1% de desgaste por tirada.',
+    effectSummary: '+50% Rayo y más Voltaje · +1% desgaste',
     baseCostMoney: 75,
     costMultiplierPerLevel: 1.6,
     keyCost: 1,
@@ -660,8 +732,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   prensa_uvas: {
     id: 'prensa_uvas',
     name: 'Reserva de la Viña',
-    description: 'Uvas y Trébol pagan +30% más por nivel y las Monedas dan +8 CR extra.',
-    effectSummary: '+30% pago Uvas/Trébol · +8 CR por Moneda',
+    description:
+      'Uvas y Trébol pagan +35% más por nivel y las Monedas dan +10 CR extra.',
+    effectSummary: '+35% pago Uvas/Trébol · +10 CR por Moneda',
     baseCostMoney: 70,
     costMultiplierPerLevel: 1.6,
     keyCost: 1,
@@ -671,8 +744,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   artificiero: {
     id: 'artificiero',
     name: 'Artificiero Automático',
-    description: 'Desactiva automáticamente 1 Bomba por tirada por nivel y otorga +30 CR al neutralizarla.',
-    effectSummary: 'Desactiva 1 Bomba/nivel (+30 CR)',
+    description:
+      'Desactiva automáticamente 1 Bomba por tirada por nivel y otorga +35 CR al neutralizarla.',
+    effectSummary: 'Desactiva 1 Bomba/nivel (+35 CR)',
     baseCostMoney: 80,
     costMultiplierPerLevel: 1.65,
     keyCost: 1,
@@ -682,8 +756,9 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
   motor_extra: {
     id: 'motor_extra',
     name: 'Reserva de Manivela',
-    description: 'Otorga +2 tiradas máximas por ciclo y +15% de Integridad máxima por nivel.',
-    effectSummary: '+2 tiradas por ciclo · +15% Integridad máx.',
+    description:
+      'Aumenta +15% la Integridad máxima por nivel y reduce en -1 CR el coste base de cada tirada.',
+    effectSummary: '-1 CR coste tirada · +15% Integridad máx.',
     baseCostMoney: 90,
     costMultiplierPerLevel: 1.7,
     keyCost: 2,
@@ -695,6 +770,98 @@ export const FORTUNARIUM_UPGRADES_CATALOG: Record<
 export const ALL_UPGRADE_IDS: FortunariumUpgradeId[] = Object.keys(
   FORTUNARIUM_UPGRADES_CATALOG
 ) as FortunariumUpgradeId[];
+
+export interface FortunariumModifierCatalogItem {
+  id: FortunariumModifierId;
+  name: string;
+  type: 'BUFF' | 'DEBUFF';
+  effect: string;
+  defaultSpins: number;
+  jackpotBaseOverride?: number;
+}
+
+export const FORTUNARIUM_MODIFIERS_CATALOG: Record<
+  FortunariumModifierId,
+  FortunariumModifierCatalogItem
+> = {
+  fiebre_cerezas: {
+    id: 'fiebre_cerezas',
+    name: 'FIEBRE DE CEREZAS',
+    type: 'BUFF',
+    effect: 'Las Cerezas pagan ×2.',
+    defaultSpins: 3,
+  },
+  lluvia_monedas: {
+    id: 'lluvia_monedas',
+    name: 'LLUVIA DE BRONCE',
+    type: 'BUFF',
+    effect: 'Cada tirada otorga +12 CR adicionales.',
+    defaultSpins: 3,
+  },
+  escudo_termico: {
+    id: 'escudo_termico',
+    name: 'BLINDAJE TÉRMICO',
+    type: 'BUFF',
+    effect: 'Bloquea el desgaste y convierte Bombas en +45 CR.',
+    defaultSpins: 3,
+  },
+  sobrecarga_dorada: {
+    id: 'sobrecarga_dorada',
+    name: 'SOBRECARGA DORADA',
+    type: 'BUFF',
+    effect: 'Todos los patrones ganadores pagan ×1.5.',
+    defaultSpins: 2,
+  },
+  fortuna_desatada: {
+    id: 'fortuna_desatada',
+    name: 'FORTUNA DESATADA',
+    type: 'BUFF',
+    effect: '+ Probabilidad de Jackpot',
+    defaultSpins: 4,
+    jackpotBaseOverride: 0.0025,
+  },
+  siete_suerte: {
+    id: 'siete_suerte',
+    name: 'SIETE DE LA SUERTE',
+    type: 'BUFF',
+    effect: '+ Probabilidad de Jackpot',
+    defaultSpins: 3,
+    jackpotBaseOverride: 0.005,
+  },
+  cableado_quemado: {
+    id: 'cableado_quemado',
+    name: 'CABLEADO QUEMADO',
+    type: 'DEBUFF',
+    effect: 'Cada tirada provoca +3% de daño adicional al chasis.',
+    defaultSpins: 5,
+  },
+  fuga_creditos: {
+    id: 'fuga_creditos',
+    name: 'FUGA DE CRÉDITOS',
+    type: 'DEBUFF',
+    effect: 'Cada tirada pierde -6 CR por cortocircuito.',
+    defaultSpins: 4,
+  },
+  rodillos_oxidados: {
+    id: 'rodillos_oxidados',
+    name: 'RODILLOS OXIDADOS',
+    type: 'DEBUFF',
+    effect: 'Reduce el pago de líneas un -20%.',
+    defaultSpins: 3,
+  },
+};
+
+export const ALL_MODIFIER_IDS: FortunariumModifierId[] = [
+  'fiebre_cerezas',
+  'lluvia_monedas',
+  'escudo_termico',
+  'sobrecarga_dorada',
+  'fortuna_desatada',
+  'siete_suerte',
+  'cableado_quemado',
+  'fuga_creditos',
+  'rodillos_oxidados',
+];
 
 export function createInitialUpgradesState(): Record<FortunariumUpgradeId, number> {
   return {
@@ -734,7 +901,7 @@ export const FORTUNARIUM_BET_MODES: Record<
     costMultiplier: 1,
     payoutMultiplier: 1.0,
     integrityWear: 1,
-    description: '10 créditos por tirada. Desgaste mínimo (-1% integridad).',
+    description: '10 CR por tirada. Desgaste mínimo (-1% integridad).',
   },
   doble: {
     id: 'doble',
@@ -744,7 +911,7 @@ export const FORTUNARIUM_BET_MODES: Record<
     costMultiplier: 2,
     payoutMultiplier: 2.0,
     integrityWear: 2,
-    description: '20 créditos por tirada. Premios x2.0 y desgaste moderado (-2% integridad).',
+    description: '20 CR por tirada. Premios x2.0 y desgaste moderado (-2% integridad).',
   },
   sobrecarga: {
     id: 'sobrecarga',
@@ -754,13 +921,18 @@ export const FORTUNARIUM_BET_MODES: Record<
     costMultiplier: 3,
     payoutMultiplier: 3.0,
     integrityWear: 4,
-    description: '30 créditos por tirada. Premios x3.0 y desgaste elevado (-4% integridad).',
+    description: '30 CR por tirada. Premios x3.0 y desgaste elevado (-4% integridad).',
   },
 };
 
-export function getUpgradeCostMoney(upgradeId: FortunariumUpgradeId, currentLevel: number): number {
+export function getUpgradeCostMoney(
+  upgradeId: FortunariumUpgradeId,
+  currentLevel: number
+): number {
   const item = FORTUNARIUM_UPGRADES_CATALOG[upgradeId];
-  return Math.round(item.baseCostMoney * Math.pow(item.costMultiplierPerLevel, currentLevel));
+  return Math.round(
+    item.baseCostMoney * Math.pow(item.costMultiplierPerLevel, currentLevel)
+  );
 }
 
 export function calculateEffectiveSpinCost(
@@ -769,8 +941,16 @@ export function calculateEffectiveSpinCost(
 ): number {
   const base = FORTUNARIUM_BET_MODES[betMode].baseSpinCost;
   const imanLv = upgrades.iman_diamante || 0;
+  const motorLv = upgrades.motor_extra || 0;
   const mult = 1 + imanLv * 0.05;
-  return Math.max(1, Math.round(base * mult));
+  const discounted = Math.round(base * mult) - motorLv * FORTUNARIUM_BET_MODES[betMode].costMultiplier;
+  return Math.max(2, discounted);
+}
+
+export function calculateMinimumSpinCost(
+  upgrades: Record<FortunariumUpgradeId, number>
+): number {
+  return calculateEffectiveSpinCost('normal', upgrades);
 }
 
 // ============================================================================
@@ -790,29 +970,32 @@ export function computeEffectiveSymbolWeights(
     if ((id === 'limon' || id === 'naranja') && (upgrades.huerto_citrico || 0) > 0) {
       w *= 1 + upgrades.huerto_citrico * 0.18;
     }
+    if ((id === 'campana' || id === 'herradura') && (upgrades.campana_bronce || 0) > 0) {
+      w *= 1 + upgrades.campana_bronce * 0.2;
+    }
     if ((id === 'diamante' || id === 'estrella') && (upgrades.iman_diamante || 0) > 0) {
-      w *= 1 + upgrades.iman_diamante * 0.25;
+      w *= 1 + upgrades.iman_diamante * 0.3;
     }
     if (id === 'comodin' && (upgrades.mano_tahur || 0) > 0) {
-      w *= 1 + upgrades.mano_tahur * 0.4;
+      w *= 1 + upgrades.mano_tahur * 0.5;
     }
     if (id === 'trebol' && (upgrades.mano_tahur || 0) > 0) {
-      w *= 1 + upgrades.mano_tahur * 0.2;
+      w *= 1 + upgrades.mano_tahur * 0.25;
     }
     if (id === 'llave' && (upgrades.mecanico_jefe || 0) > 0) {
-      w *= 1 + upgrades.mecanico_jefe * 0.35;
+      w *= 1 + upgrades.mecanico_jefe * 0.4;
     }
     if (id === 'rayo' && (upgrades.cableado_ilegal || 0) > 0) {
-      w *= 1 + upgrades.cableado_ilegal * 0.45;
+      w *= 1 + upgrades.cableado_ilegal * 0.5;
     }
 
     // Slight voltage risk/reward modifier in sobrecarga
     if (betMode === 'sobrecarga') {
       if (id === 'bomba' || id === 'calavera') {
-        w *= 1.18;
+        w *= 1.15;
       }
       if (id === 'rayo' || id === 'moneda') {
-        w *= 1.12;
+        w *= 1.1;
       }
     }
 

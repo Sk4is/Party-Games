@@ -132,7 +132,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
 
   return (
     <div
-      className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      className="fortunarium-root font-fortunarium fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
       onClick={onClose}
     >
       <div
@@ -227,7 +227,7 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                         <strong className="text-white">una única máquina tragaperras física compartida</strong> (en solitario o cooperativo).
                       </p>
                       <p>
-                        Para ganar la partida debéis superar todos los <strong className="text-amber-300">Ciclos de Cuota</strong> (5, 7 o 10 ciclos) generando el <strong className="text-amber-300">Progreso de Cuota</strong> exigido antes de quedaros sin tiradas y sin que la <strong className="text-emerald-300">Integridad</strong> baje al 0%.
+                        Para ganar la partida debéis superar los <strong className="text-amber-300">Umbrales de Cuota</strong> (5, 10, 15, 20 o Ilimitadas) acumulando créditos en la <strong className="text-amber-300">Caja Común</strong> sin caer en bancarrota (0 CR) y sin que la <strong className="text-emerald-300">Integridad</strong> baje al 0%.
                       </p>
                     </div>
                   </div>
@@ -238,15 +238,15 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                         CÓMO GANAR
                       </div>
                       <p className="text-xs text-stone-300">
-                        Alcanza o supera la <strong>Cuota</strong> de cada ciclo antes de agotar las tiradas disponibles.
+                        Alcanza o supera el umbral de <strong>Cuota</strong> en créditos y séllala para elegir 1 mejora gratis y pasar al siguiente umbral sin perder tu dinero.
                       </p>
                     </div>
                     <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-500/35">
                       <div className="text-sm font-fortunarium text-rose-300 mb-1">
-                        DERROTA POR CUOTA
+                        DERROTA: SIN CRÉDITOS
                       </div>
                       <p className="text-xs text-stone-300">
-                        Si las tiradas del ciclo llegan a <strong>0</strong> y la Caja Común no alcanza la Cuota, el casino os embarga.
+                        Si al terminar una tirada la Caja Común queda a <strong>0 CR</strong> (o no podéis pagar la tirada mínima), la fortuna se termina.
                       </p>
                     </div>
                     <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-500/35">
@@ -327,8 +327,8 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                             <div className="text-xs font-black text-white truncate">
                               {s.name}
                             </div>
-                            <div className="text-[10px] font-mono text-amber-300">
-                              3×{s.basePayout3}€ · 5×{s.basePayout5}€
+                            <div className="text-[10px] font-mono text-amber-300 tabular-nums">
+                              3×{s.basePayout3} CR · 5×{s.basePayout5} CR
                             </div>
                           </div>
                         </div>
@@ -341,17 +341,26 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
               {/* 4. PATRONES */}
               {activeId === 'patrones' && (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs sm:text-sm text-stone-200">
-                    Un patrón se activa cuando <strong className="text-amber-300">3, 4 o 5 símbolos iguales contiguos</strong> siguen una de las geometrías válidas. Si consigues varios patrones en la misma tirada, se iluminan y cobran uno tras otro:
-                  </p>
+                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-xs sm:text-sm text-amber-100">
+                    <strong>Regla fundamental:</strong>{' '}
+                    <span className="underline font-bold text-white">
+                      Todas las casillas marcadas deben contener el mismo símbolo compatible
+                    </span>{' '}
+                    (3, 4 o 5 en Horizontal; 3 en Vertical; 3 en Diagonal; las 5 casillas de las columnas 2, 3 y 4 en <strong>Patrón X</strong>; o las 8 casillas completas en Triángulo y Triángulo Invertido).
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {FORTUNARIUM_PATTERNS_CATALOG.slice(0, 6).map((pat) => (
+                    {FORTUNARIUM_PATTERNS_CATALOG.map((pat) => (
                       <div
                         key={pat.id}
                         className="p-3 rounded-2xl bg-stone-900 border border-stone-800 flex flex-col gap-2"
                       >
-                        <div className="text-sm font-fortunarium text-amber-300">
-                          {pat.name.toUpperCase()}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-sm font-fortunarium text-amber-300">
+                            {pat.name.toUpperCase()}
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-[10px] font-mono font-black text-amber-300 tabular-nums">
+                            ×{pat.baseMultiplier}
+                          </span>
                         </div>
                         <MiniPatternGrid cells={pat.cells} />
                         <p className="text-xs text-stone-300">{pat.geometryDesc}</p>
@@ -409,28 +418,28 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                     />
                     <div>
                       <h4 className="text-base font-fortunarium text-amber-300">
-                        ¿QUÉ ES LA CUOTA DEL CICLO?
+                        LAS CUOTAS SON UMBRALES DE DINERO (NUNCA SE RESETEAN)
                       </h4>
                       <p className="text-stone-300 mt-1">
-                        Cada ciclo tiene un objetivo de dinero (por ejemplo, <strong>220€</strong> en el Ciclo 1) y un número limitado de tiradas (8 tiradas base).
+                        Cada cuota es un umbral de créditos (por ejemplo, <strong>220 CR</strong> en la Cuota 1). Al sellar una cuota, <strong>conserváis el 100% de vuestro dinero</strong> y el siguiente umbral aproximadamente se duplica respecto al objetivo anterior.
                       </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800">
                       <strong className="text-emerald-300 block mb-1">
-                        Cierre Anticipado con Bono
+                        Sellar Ahora o Seguir Arriesgando
                       </strong>
                       <p className="text-xs text-stone-300">
-                        En cuanto la Caja Común iguala o supera la Cuota, podéis pulsar <strong>«Cerrar Ciclo»</strong> para pasar inmediatamente al Taller y cobrar un bono en metálico por cada tirada ahorrada.
+                        Al alcanzar la cuota podéis pulsar <strong>«SELLAR CUOTA»</strong> para asegurar vuestro avance y elegir 1 de 3 mejoras gratuitas, o seguir girando para acumular más margen (la siguiente cuota se calcula sobre el objetivo anterior, ¡no os penaliza por superar el umbral!).
                       </p>
                     </div>
                     <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800">
-                      <strong className="text-amber-300 block mb-1">
-                        Tributo entre Ciclos
+                      <strong className="text-rose-300 block mb-1">
+                        Bancarrota (Sin Créditos) y Modo Ilimitado
                       </strong>
                       <p className="text-xs text-stone-300">
-                        Al superar un ciclo, el casino cobra el 50% de la cuota como tributo y os deja el resto del capital para comprar mejoras en el Taller y afrontar el siguiente ciclo.
+                        Si al terminar una tirada os quedáis a <strong>0 CR</strong> (o sin créditos suficientes para pagar la tirada mínima), la partida termina por bancarrota. En modo <strong>CUOTAS ILIMITADAS</strong> la partida continúa indefinidamente hasta caer en bancarrota o romper la máquina.
                       </p>
                     </div>
                   </div>
@@ -583,13 +592,16 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                         SINERGIAS POSITIVAS (BUFFS)
                       </div>
                       <p className="text-stone-200">
-                        • <strong>Llave + Bomba:</strong> Cada Llave en pantalla (o nivel de Artificiero) desactiva 1 Bomba y la convierte en <strong>+40€</strong> de recompensa.
+                        • <strong>Llave + Bomba:</strong> Cada Llave en pantalla (o nivel de Artificiero) desactiva 1 Bomba y la convierte en <strong>+30 CR</strong> de recompensa.
                       </p>
                       <p className="text-stone-200">
-                        • <strong>Trébol + Calavera:</strong> Cada Trébol bloquea la maldición de 1 Calavera en la misma tirada y otorga <strong>+10€</strong>.
+                        • <strong>Trébol + Calavera:</strong> Cada Trébol bloquea la maldición de 1 Calavera en la misma tirada y otorga <strong>+12 CR</strong>.
                       </p>
                       <p className="text-stone-200">
                         • <strong>3+ Rayos:</strong> Además de subir el Voltaje, otorgan <strong>+1 Tirada Extra</strong> inmediata.
+                      </p>
+                      <p className="text-amber-200">
+                        • <strong>Fortuna Desatada / Siete de la Suerte:</strong> Buffs de probabilidad de <strong>JACKPOT SUPREMO</strong> (base 0.25% → hasta un tope máximo del 1.00% durante las tiradas indicadas).
                       </p>
                     </div>
                     <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-500/35 flex flex-col gap-2">
@@ -597,10 +609,10 @@ export const FortunariumRulebookModal: React.FC<FortunariumRulebookModalProps> =
                         PELIGROS Y PENALIZACIONES (DEBUFFS)
                       </div>
                       <p className="text-stone-200">
-                        • <strong>Explosión de Bomba:</strong> Resta <strong>-14% de Integridad</strong> y destruye dinero del fondo común.
+                        • <strong>Explosión de Bomba:</strong> Resta <strong>-16% de Integridad</strong> y destruye <strong>-26 CR</strong> del fondo común.
                       </p>
                       <p className="text-stone-200">
-                        • <strong>Corrupción de Calavera:</strong> Absorbe el <strong>15% de la ganancia</strong> de la tirada (mínimo -16€) y daña -7% la Integridad.
+                        • <strong>Corrupción de Calavera:</strong> Absorbe el <strong>20% de la ganancia</strong> de la tirada (mínimo -14 CR) y daña -8% la Integridad.
                       </p>
                       <p className="text-stone-200">
                         • <strong>Desgaste por Sobrecarga:</strong> Jugar en x2 o x3 consume Integridad en cada giro aunque ganes premios mayores.

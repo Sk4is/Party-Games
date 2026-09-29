@@ -41,7 +41,7 @@ export const FortunariumAudioModal: React.FC<FortunariumAudioModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fortunarium-root font-fortunarium fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div

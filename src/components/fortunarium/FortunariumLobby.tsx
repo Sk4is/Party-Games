@@ -68,7 +68,7 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#09060e] text-amber-50 flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-y-auto select-none relative">
+    <div className="fortunarium-root font-fortunarium min-h-screen w-full bg-[#09060e] text-amber-50 flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-y-auto select-none relative">
       {/* Warm brass & crimson casino ambient spotlight */}
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(245,158,11,0.14),transparent_65%),radial-gradient(ellipse_at_bottom_right,rgba(225,29,72,0.12),transparent_60%)] pointer-events-none" />
 
@@ -350,28 +350,37 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Total Rounds */}
+              {/* Total Quotas / Infinite Mode (Section 36) */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-stone-300">
-                  Ciclos de Cuota
+                  CANTIDAD DE CUOTAS
                 </label>
-                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-stone-900 border border-stone-800">
-                  {([5, 7, 10] as const).map((r) => (
+                <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-stone-900 border border-stone-800">
+                  {(
+                    [
+                      { val: 5, label: '5', title: '5 cuotas' },
+                      { val: 10, label: '10', title: '10 cuotas' },
+                      { val: 15, label: '15', title: '15 cuotas' },
+                      { val: 20, label: '20', title: '20 cuotas' },
+                      { val: null, label: '∞', title: 'Cuotas ilimitadas' },
+                    ] as const
+                  ).map((item) => (
                     <button
-                      key={r}
+                      key={String(item.val)}
                       type="button"
+                      title={item.title}
                       disabled={!isHost}
                       onClick={() => {
                         fortunariumAudio.playButtonClick();
-                        onUpdateConfig({ totalRounds: r });
+                        onUpdateConfig({ totalRounds: item.val });
                       }}
-                      className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:cursor-default ${
-                        roomState.config.totalRounds === r
+                      className={`py-2 px-1 rounded-lg text-xs sm:text-sm font-mono font-black transition-all cursor-pointer disabled:cursor-default tabular-nums ${
+                        roomState.config.totalRounds === item.val
                           ? 'bg-amber-500 text-stone-950 shadow'
                           : 'text-stone-400 hover:text-white'
                       }`}
                     >
-                      {r} Ciclos
+                      {item.label}
                     </button>
                   ))}
                 </div>
@@ -531,8 +540,8 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                         />
                       </div>
                       <div className="text-xs font-black text-white">{sym.name}</div>
-                      <div className="text-[11px] font-mono font-bold text-amber-300">
-                        3x:{sym.basePayout3}€ · 4x:{sym.basePayout4}€ · 5x:{sym.basePayout5}€
+                      <div className="text-[11px] font-mono font-bold text-amber-300 tabular-nums">
+                        3x:{sym.basePayout3} CR · 4x:{sym.basePayout4} CR · 5x:{sym.basePayout5} CR
                       </div>
                       <div className="text-[10px] text-emerald-300/90 font-medium leading-tight">
                         {sym.specialProperty}

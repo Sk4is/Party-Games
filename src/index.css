@@ -17,8 +17,16 @@
 }
 
 @font-face {
-  font-family: "FortunariumBouncy";
-  src: url("/assets/fonts/Bouncy-Thin-PERSONAL_USE_ONLY.otf") format("opentype");
+  font-family: "Fortunarium";
+  src: url("/assets/fonts/JandaManateeSolid.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "FortunariumDisplay";
+  src: url("/assets/fonts/JandaManateeSolid.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -62,7 +70,7 @@ body,
     font-family: 'BLAZE', 'Chalkboard SE', 'Comic Sans MS', 'Caveat', cursive, sans-serif;
   }
   .font-fortunarium {
-    font-family: "FortunariumBouncy", "Titan One", "Fredoka", cursive, sans-serif;
+    font-family: "Fortunarium", "Titan One", "Fredoka", cursive, sans-serif;
     letter-spacing: 0.04em;
   }
   .no-scrollbar::-webkit-scrollbar {
@@ -783,6 +791,199 @@ body,
   }
 }
 
+/* =========================================================================
+   FORTUNARIUM PHYSICAL MACHINE IDLE LIFE, BULBS & MECHANICAL ANIMATIONS
+   ========================================================================= */
+
+@keyframes fort-bulb-breathe {
+  0%, 100% {
+    opacity: 0.86;
+    filter: brightness(1);
+  }
+  47% {
+    opacity: 1;
+    filter: brightness(1.18);
+  }
+  52% {
+    opacity: 0.78;
+    filter: brightness(0.92);
+  }
+  55% {
+    opacity: 0.96;
+    filter: brightness(1.12);
+  }
+}
+
+@keyframes fort-crt-subtle {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.04);
+  }
+}
+
+@keyframes fort-cabinet-spin-hum {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(-0.6px, 0.5px, 0);
+  }
+  50% {
+    transform: translate3d(0.6px, -0.4px, 0);
+  }
+  75% {
+    transform: translate3d(-0.4px, -0.5px, 0);
+  }
+}
+
+@keyframes fort-reel-stop-bounce {
+  0% {
+    transform: translateY(-14px);
+  }
+  65% {
+    transform: translateY(5px);
+  }
+  84% {
+    transform: translateY(-2px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fort-note-slap {
+  0% {
+    opacity: 0;
+    transform: scale(1.22) rotate(-7deg) translateY(-10px);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(0.96) rotate(1.5deg) translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-1.2deg) translateY(0);
+  }
+}
+
+@keyframes fort-wild-morph {
+  0% {
+    transform: scale(0.82) rotate(-8deg);
+    filter: brightness(1.6) drop-shadow(0 0 14px rgba(251, 191, 36, 0.9));
+  }
+  55% {
+    transform: scale(1.14) rotate(4deg);
+    filter: brightness(1.35) drop-shadow(0 0 18px rgba(251, 191, 36, 0.95));
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1.08);
+  }
+}
+
+.animate-fort-bulb {
+  animation: fort-bulb-breathe 4.2s ease-in-out infinite;
+}
+
+.animate-fort-crt {
+  animation: fort-crt-subtle 3.6s ease-in-out infinite;
+}
+
+.animate-fort-spin-hum {
+  animation: fort-cabinet-spin-hum 0.14s linear infinite;
+}
+
+.animate-fort-reel-bounce {
+  animation: fort-reel-stop-bounce 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-fort-note-slap {
+  animation: fort-note-slap 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fort-wild-morph {
+  animation: fort-wild-morph 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Global Fortunarium Typography: JandaManateeSolid applied across all Fortunarium screens */
+.fortunarium-root,
+.fortunarium-root *,
+.fortunarium-root .font-mono,
+.fortunarium-root .font-sans {
+  font-family: "FortunariumDisplay", "Fortunarium", "Titan One", "Fredoka", sans-serif !important;
+  letter-spacing: 0.035em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Smooth ~1.0s Winning Symbol Artwork Growth (Transform-Only, No Cell Resize) */
+@keyframes fort-symbol-grow-cycle {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+  }
+  26% {
+    transform: scale(1.18);
+    filter: brightness(1.14) drop-shadow(0 6px 14px rgba(251, 191, 36, 0.85));
+  }
+  74% {
+    transform: scale(1.17);
+    filter: brightness(1.12) drop-shadow(0 6px 14px rgba(251, 191, 36, 0.85));
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+  }
+}
+
+.animate-fort-symbol-grow {
+  animation: fort-symbol-grow-cycle 1.05s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Visual +XX CR Addition Travelling Upward Toward Top Display */
+@keyframes fort-reward-fly-to-top {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.88);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, 0px) scale(1.08);
+  }
+  65% {
+    opacity: 1;
+    transform: translate(-50%, -18px) scale(1.04);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -62px) scale(0.82);
+  }
+}
+
+.animate-fort-reward-fly-up {
+  animation: fort-reward-fly-to-top 0.68s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes fort-total-light-sweep {
+  0% {
+    transform: scale(0.94);
+    box-shadow: 0 0 0 rgba(250, 204, 21, 0);
+  }
+  45% {
+    transform: scale(1.06);
+    box-shadow: 0 0 36px rgba(250, 204, 21, 0.65);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 18px rgba(16, 185, 129, 0.45);
+  }
+}
+
+.animate-fort-total-pulse {
+  animation: fort-total-light-sweep 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Accessibility: Respect user reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   .fam2play-wordmark {
@@ -796,7 +997,10 @@ body,
   .animate-home-blob-emerald,
   .animate-home-blob-orange,
   .animate-home-aurora-stream,
-  .animate-home-aurora-counter {
+  .animate-home-aurora-counter,
+  .animate-fort-bulb,
+  .animate-fort-crt,
+  .animate-fort-spin-hum {
     animation: none !important;
   }
 }

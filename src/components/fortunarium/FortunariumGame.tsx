@@ -76,6 +76,7 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
     startGame,
     setBetMode,
     spinSlot,
+    devGrantModifier,
     repairMachine,
     buyUpgrade,
     voteUpgrade,
@@ -153,7 +154,7 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
   if (roomState) {
     if (roomState.phase === 'LOBBY') {
       return (
-        <div className="relative min-h-screen w-full bg-[#09060e]">
+        <div className="fortunarium-root font-fortunarium relative min-h-screen w-full bg-[#09060e]">
           {notification && (
             <div className="fixed top-4 inset-x-4 max-w-md mx-auto z-50 p-3 rounded-2xl bg-amber-950/95 border border-amber-500/50 text-amber-200 text-xs font-bold shadow-2xl flex items-center gap-2 backdrop-blur-md">
               <Bell className="w-4 h-4 text-amber-400 shrink-0" />
@@ -191,6 +192,7 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
         onSetCursorColor={handleSelectColor}
         onSetBetMode={setBetMode}
         onSpinSlot={spinSlot}
+        onDevGrantModifier={devGrantModifier}
         onRepairMachine={repairMachine}
         onBuyUpgrade={buyUpgrade}
         onVoteUpgrade={voteUpgrade}
@@ -205,7 +207,7 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 w-screen h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-[#09060e] text-stone-100 select-none overflow-hidden z-50">
+    <div className="fortunarium-root font-fortunarium fixed inset-0 w-screen h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-[#09060e] text-stone-100 select-none overflow-hidden z-50">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.15),transparent_70%)] pointer-events-none" />
 
       <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between">

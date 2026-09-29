@@ -11,6 +11,7 @@ import {
   FortunariumSpinResult,
   FortunariumActiveEvent,
   FortunariumActionLogEntry,
+  FortunariumModifierId,
 } from '../src/types/fortunarium';
 import {
   FORTUNARIUM_UPGRADES_CATALOG,
@@ -18,10 +19,15 @@ import {
   createInitialUpgradesState,
   getUpgradeCostMoney,
   calculateEffectiveSpinCost,
+  FORTUNARIUM_MODIFIERS_CATALOG,
 } from '../src/data/fortunarium/fortunariumAssets';
 import {
   generateAuthoritativeGrid,
+  generateDeterministicTestGrid,
   evaluateSpinGridCore,
+  calculateInitialQuota,
+  calculateNextQuotaTarget,
+  validateWorkshopPurchase,
 } from '../src/utils/fortunariumEconomyEngine';
 import { roomRegistry } from './roomRegistry';
 
@@ -43,6 +49,8 @@ const DEFAULT_CONFIG: FortunariumConfig = {
   turnMode: 'turns',
 };
 
+const STARTING_CREDITS = 140;
+
 function createEmptyStats(): FortunariumPlayerStats {
   return {
     spinsTriggered: 0,
@@ -50,13 +58,18 @@ function createEmptyStats(): FortunariumPlayerStats {
     totalMoneyLost: 0,
     netBalance: 0,
     biggestSingleWin: 0,
+    biggestSingleLoss: 0,
+    patternsHit: 0,
+    specialSymbolsTriggered: 0,
     jackpotsHit: 0,
     bombsTriggered: 0,
+    bombsDefused: 0,
     skullsTriggered: 0,
     coinsCollected: 0,
     keysFound: 0,
     integrityDamageCaused: 0,
     integrityRepaired: 0,
+    repairsCount: 0,
     upgradesBought: 0,
   };
 }
@@ -64,10 +77,10 @@ function createEmptyStats(): FortunariumPlayerStats {
 function createDefaultGrid(): FortunariumSymbolId[][] {
   return [
     ['cereza', 'siete', 'limon'],
-    ['campana', 'siete', 'naranja'],
+    ['campana', 'corona', 'naranja'],
     ['diamante', 'siete', 'trebol'],
-    ['herradura', 'corona', 'ciruela'],
-    ['uvas', 'estrella', 'cereza'],
+    ['herradura', 'estrella', 'ciruela'],
+    ['uvas', 'campana', 'cereza'],
   ];
 }
 
@@ -145,8 +158,11 @@ export class FortunariumServer {
       stats: createEmptyStats(),
     };
 
+    const initialQuota = calculateInitialQuota(finalConfig.difficulty);
+
     const room: ServerFortunariumRoom = {
       roomCode: code,
+      matchId: `match_${code}_${Date.now()}`,
       stateVersion: 1,
       gameType: 'fortunarium',
       hostId: host.id,
@@ -156,12 +172,16 @@ export class FortunariumServer {
       currentTurnPlayerId: host.id,
       round: 1,
       totalRounds: finalConfig.totalRounds,
-      money: 120,
-      quotaProgress: 0,
-      quota: 95,
-      spinsLeft: 15,
-      maxSpinsPerRound: 15,
+      money: STARTING_CREDITS,
+      quotaProgress: STARTING_CREDITS,
+      quota: initialQuota,
+      spinsLeft: 999,
+      maxSpinsPerRound: 999,
       totalSpinsInMatch: 0,
+      totalPatternsHit: 0,
+      totalJackpotsHit: 0,
+      biggestSingleWinInMatch: 0,
+      bestPatternNameInMatch: '—',
       integrity: 100,
       maxIntegrity: 100,
       voltageMultiplier: 1.0,
@@ -173,9 +193,12 @@ export class FortunariumServer {
       upgrades: createInitialUpgradesState(),
       offeredUpgradeIds: [],
       upgradeVotes: {},
+      lastInstalledUpgradeId: null,
+      activeModifiers: [],
       activeEvent: null,
       readyForNextRoundPlayerIds: [],
       actionLog: [],
+      defeatCause: null,
       endReason: null,
       spinTimer: null,
       disconnectTimers: new Map(),
@@ -189,6 +212,7 @@ export class FortunariumServer {
   private serializeRoom(room: ServerFortunariumRoom): FortunariumRoomState {
     return {
       roomCode: room.roomCode,
+      matchId: room.matchId,
       stateVersion: room.stateVersion,
       gameType: room.gameType,
       phase: room.phase,
@@ -203,6 +227,10 @@ export class FortunariumServer {
       spinsLeft: room.spinsLeft,
       maxSpinsPerRound: room.maxSpinsPerRound,
       totalSpinsInMatch: room.totalSpinsInMatch,
+      totalPatternsHit: room.totalPatternsHit,
+      totalJackpotsHit: room.totalJackpotsHit,
+      biggestSingleWinInMatch: room.biggestSingleWinInMatch,
+      bestPatternNameInMatch: room.bestPatternNameInMatch,
       integrity: room.integrity,
       maxIntegrity: room.maxIntegrity,
       voltageMultiplier: room.voltageMultiplier,
@@ -214,9 +242,12 @@ export class FortunariumServer {
       upgrades: room.upgrades,
       offeredUpgradeIds: room.offeredUpgradeIds,
       upgradeVotes: room.upgradeVotes,
+      lastInstalledUpgradeId: room.lastInstalledUpgradeId,
+      activeModifiers: room.activeModifiers,
       activeEvent: room.activeEvent,
       readyForNextRoundPlayerIds: room.readyForNextRoundPlayerIds,
       actionLog: room.actionLog.slice(0, 18),
+      defeatCause: room.defeatCause,
       endReason: room.endReason,
     };
   }
@@ -265,17 +296,6 @@ export class FortunariumServer {
     }
   }
 
-  // Quota 1 = 95 CR (~10-12 ordinary spins). Escalates each cycle as upgrades empower the machine.
-  private calculateQuotaForRound(
-    round: number,
-    difficulty: FortunariumConfig['difficulty']
-  ): number {
-    const diffMult =
-      difficulty === 'temerario' ? 1.3 : difficulty === 'dificil' ? 1.15 : 1.0;
-    const base = 95 * Math.pow(1.48, round - 1);
-    return Math.round((base * diffMult) / 5) * 5;
-  }
-
   // Pick 3 random distinct upgrades that are not yet at max level
   private rollRandomUpgrades(room: ServerFortunariumRoom): FortunariumUpgradeId[] {
     const candidates = ALL_UPGRADE_IDS.filter((id) => {
@@ -304,10 +324,9 @@ export class FortunariumServer {
     if (currentLv >= catalogItem.maxLevel) return;
 
     room.upgrades[upgradeId] = currentLv + 1;
+    room.lastInstalledUpgradeId = upgradeId;
 
     if (upgradeId === 'motor_extra') {
-      room.maxSpinsPerRound += 2;
-      room.spinsLeft += 2;
       room.maxIntegrity += 15;
       room.integrity = Math.min(room.maxIntegrity, room.integrity + 15);
     }
@@ -339,48 +358,7 @@ export class FortunariumServer {
     }
   }
 
-  private generateForcedGrid(
-    scenario: 'single_pattern' | 'multi_pattern' | 'special_symbol' | 'jackpot'
-  ): FortunariumSymbolId[][] {
-    if (scenario === 'single_pattern') {
-      return [
-        ['cereza', 'campana', 'limon'],
-        ['naranja', 'campana', 'uvas'],
-        ['ciruela', 'campana', 'trebol'],
-        ['herradura', 'campana', 'estrella'],
-        ['uvas', 'limon', 'cereza'],
-      ];
-    }
-    if (scenario === 'multi_pattern') {
-      return [
-        ['diamante', 'corona', 'cereza'],
-        ['diamante', 'corona', 'cereza'],
-        ['diamante', 'corona', 'cereza'],
-        ['diamante', 'comodin', 'limon'],
-        ['estrella', 'herradura', 'naranja'],
-      ];
-    }
-    if (scenario === 'special_symbol') {
-      return [
-        ['moneda', 'llave', 'cereza'],
-        ['rayo', 'moneda', 'limon'],
-        ['bomba', 'rayo', 'naranja'],
-        ['moneda', 'trebol', 'calavera'],
-        ['ciruela', 'uvas', 'campana'],
-      ];
-    }
-    return [
-      ['siete', 'corona', 'diamante'],
-      ['siete', 'corona', 'diamante'],
-      ['siete', 'comodin', 'estrella'],
-      ['siete', 'corona', 'moneda'],
-      ['siete', 'moneda', 'rayo'],
-    ];
-  }
-
-  private createInteractiveEvent(
-    player: FortunariumPlayer
-  ): FortunariumActiveEvent {
+  private createInteractiveEvent(player: FortunariumPlayer): FortunariumActiveEvent {
     const templates: FortunariumActiveEvent[] = [
       {
         id: `evt_overclock_${Date.now()}`,
@@ -394,7 +372,7 @@ export class FortunariumServer {
             id: 'overclock_push',
             label: 'Forzar el Condensador',
             description:
-              'Gana +45 CR para la Caja y la Cuota y +0.4x de Voltaje, pero sufre -12% de Integridad.',
+              'Gana +45 CR para la Caja Común y +0.4x de Voltaje, pero sufre -12% de Integridad.',
             badgeText: '+45 CR / +0.4x / -12% INT',
             riskLevel: 'high',
           },
@@ -408,8 +386,8 @@ export class FortunariumServer {
           {
             id: 'overclock_key',
             label: 'Extraer Pieza Maestra',
-            description: 'Obtén +1 Llave de Taller y +2 Tiradas Extra en este ciclo.',
-            badgeText: '+1 LLAVE / +2 TIRADAS',
+            description: 'Obtén +1 Llave de Taller y +15 CR.',
+            badgeText: '+1 LLAVE / +15 CR',
             riskLevel: 'medium',
           },
         ],
@@ -485,7 +463,8 @@ export class FortunariumServer {
           return;
         }
         const occupiedSeats = new Set(room.players.map((p) => p.seatIndex));
-        const seatIndex = [0, 1, 2, 3].find((s) => !occupiedSeats.has(s)) ?? room.players.length;
+        const seatIndex =
+          [0, 1, 2, 3].find((s) => !occupiedSeats.has(s)) ?? room.players.length;
         const defaultColors = ['#06b6d4', '#ef4444', '#84cc16', '#a855f7'];
 
         player = {
@@ -565,7 +544,11 @@ export class FortunariumServer {
 
       case 'UPDATE_CONFIG': {
         if (!player.isHost || room.phase !== 'LOBBY') return;
-        if (msg.config.totalRounds && [5, 7, 10].includes(msg.config.totalRounds)) {
+        if (
+          msg.config.totalRounds === null ||
+          (typeof msg.config.totalRounds === 'number' &&
+            [5, 10, 15, 20].includes(msg.config.totalRounds))
+        ) {
           room.config.totalRounds = msg.config.totalRounds;
           room.totalRounds = msg.config.totalRounds;
         }
@@ -585,7 +568,6 @@ export class FortunariumServer {
       case 'START_GAME': {
         if (!player.isHost || room.phase !== 'LOBBY') return;
         const connectedCount = room.players.filter((p) => p.isConnected).length;
-        // Support 1 to 4 players (solo + co-op)
         if (connectedCount < 1) {
           this.sendError(ws, 'Se necesita al menos 1 jugador conectado para iniciar.');
           return;
@@ -609,33 +591,58 @@ export class FortunariumServer {
 
       case 'SPIN_SLOT': {
         if (room.phase !== 'PLAYING' || room.isSpinning) return;
-        if (room.spinsLeft <= 0) {
-          this.sendError(ws, 'No quedan tiradas en este ciclo.');
-          return;
-        }
         if (room.config.turnMode === 'turns' && room.currentTurnPlayerId !== player.id) {
           this.sendError(ws, 'Es el turno de otro compañero en la máquina.');
           return;
         }
 
-        const rawCost = calculateEffectiveSpinCost(room.betMode, room.upgrades);
-        if (room.money <= 0) {
-          this.sendError(ws, 'No quedan créditos en la Caja Común.');
+        if (msg.forceScenario === 'force_bankruptcy') {
+          room.money = 0;
+          room.quotaProgress = 0;
+          room.phase = 'DEFEAT';
+          room.defeatCause = 'bankruptcy';
+          room.endReason =
+            'SIN CRÉDITOS — LA FORTUNA SE HA TERMINADO. FORTUNARIUM HA CERRADO SUS PUERTAS.';
+          this.broadcastRoomState(room);
           return;
         }
-        const actualSpinCost = Math.min(room.money, rawCost);
+        if (msg.forceScenario === 'force_integrity_zero') {
+          room.integrity = 0;
+          room.phase = 'DEFEAT';
+          room.defeatCause = 'integrity';
+          room.endReason =
+            '¡MÁQUINA AVERIADA! LA INTEGRIDAD DEL FORTUNARIUM HA LLEGADO A CERO.';
+          this.broadcastRoomState(room);
+          return;
+        }
+
+        const cheapestSpinCost = calculateEffectiveSpinCost('normal', room.upgrades);
+        if (room.money < cheapestSpinCost) {
+          // Cannot afford even the cheapest spin -> evaluate bankruptcy
+          this.evaluateBankruptcyOrQuota(room);
+          this.broadcastRoomState(room);
+          return;
+        }
+
+        let currentBetCost = calculateEffectiveSpinCost(room.betMode, room.upgrades);
+        if (room.money < currentBetCost) {
+          // Auto-adjust to normal bet mode if they can afford normal but not higher bet mode
+          room.betMode = 'normal';
+          currentBetCost = cheapestSpinCost;
+        }
+
+        const actualSpinCost = currentBetCost;
         const moneyBeforeSpin = room.money;
         const moneyAfterSpinCost = Math.max(0, moneyBeforeSpin - actualSpinCost);
-        const quotaProgressBefore = room.quotaProgress;
 
-        // Deduct ONLY spin cost and decrement spinsLeft when spin starts
+        // Deduct ONLY spin cost when spin starts; do NOT evaluate bankruptcy mid-spin!
         room.money = moneyAfterSpinCost;
-        room.spinsLeft = Math.max(0, room.spinsLeft - 1);
+        room.quotaProgress = moneyAfterSpinCost;
         room.totalSpinsInMatch += 1;
 
         const newGrid = msg.forceScenario
-          ? this.generateForcedGrid(msg.forceScenario)
-          : generateAuthoritativeGrid(room.upgrades, room.betMode);
+          ? generateDeterministicTestGrid(msg.forceScenario)
+          : generateAuthoritativeGrid(room.upgrades, room.betMode, room.activeModifiers);
 
         const core = evaluateSpinGridCore({
           grid: newGrid,
@@ -643,7 +650,10 @@ export class FortunariumServer {
           upgrades: room.upgrades,
           currentVoltage: room.voltageMultiplier,
           round: room.round,
-          allowMysteryEvents: room.spinsLeft >= 1,
+          activeModifiers: room.activeModifiers,
+          allowMysteryEvents: true,
+          forceJackpot: msg.forceScenario === 'jackpot',
+          enableJackpotRoll: !msg.forceScenario || msg.forceScenario === 'jackpot',
         });
 
         let triggeredEventId: string | null = null;
@@ -657,23 +667,25 @@ export class FortunariumServer {
           0,
           moneyAfterSpinCost + core.grossPayout - core.penalties
         );
-        const finalQuotaProgress = quotaProgressBefore + core.grossPayout;
+        const finalQuotaProgress = finalMoney;
         const finalIntegrity = Math.max(
           0,
           Math.min(room.maxIntegrity, room.integrity + core.integrityDelta)
         );
         const finalKeys = room.keys + core.keysGained;
-        const netMoneyDelta = core.grossPayout - core.penalties - actualSpinCost;
+        const netMoneyDelta = finalMoney - moneyBeforeSpin;
 
         let summaryText = '';
-        if (core.grossPayout > 0 && core.penalties > 0) {
-          summaryText = `${player.name} ganó +${core.grossPayout} CR (y sufrió -${core.penalties} CR en penalizaciones)`;
+        if (core.isJackpot) {
+          summaryText = `¡JACKPOT DEL FORTUNARIUM! ${player.name} desató +${core.grossPayout} CR`;
+        } else if (core.grossPayout > 0 && core.penalties > 0) {
+          summaryText = `${player.name} ganó +${core.grossPayout} CR (-${core.penalties} CR en penalizaciones)`;
         } else if (core.grossPayout > 0) {
-          summaryText = `${player.name} obtuvo +${core.grossPayout} CR`;
+          summaryText = `${player.name} obtuvo +${core.grossPayout} CR (${core.winLines.length} patrón/es)`;
         } else if (core.penalties > 0) {
           summaryText = `${player.name} sufrió -${core.penalties} CR en penalizaciones`;
         } else {
-          summaryText = `${player.name} giró sin combinación ganadora`;
+          summaryText = `${player.name} giró sin combinación (-${actualSpinCost} CR)`;
         }
 
         room.stateVersion += 1;
@@ -682,12 +694,14 @@ export class FortunariumServer {
           stateVersion: room.stateVersion,
           playerId: player.id,
           playerName: player.name,
+          initiatedByPlayerId: player.id,
+          triggerSource: msg.triggerSource || 'button',
           betMode: room.betMode,
           spinCost: actualSpinCost,
           moneyBeforeSpin,
           moneyAfterSpinCost,
           finalMoney,
-          quotaProgressBefore,
+          quotaProgressBefore: moneyBeforeSpin,
           finalQuotaProgress,
           grid: newGrid,
           winLines: core.winLines,
@@ -695,6 +709,7 @@ export class FortunariumServer {
           winningCells: core.winningCells,
           hazardCells: core.hazardCells,
           grossPayout: core.grossPayout,
+          jackpotPayout: core.jackpotPayout,
           penalties: core.penalties,
           netMoneyDelta,
           integrityDelta: core.integrityDelta,
@@ -710,7 +725,7 @@ export class FortunariumServer {
           timestamp: Date.now(),
         };
 
-        // Keep pre-payout money/quotaProgress in room state while reels spin so nothing leaks early
+        // Keep pre-payout money in room state while reels spin so nothing leaks early
         room.grid = newGrid;
         room.isSpinning = true;
 
@@ -720,7 +735,13 @@ export class FortunariumServer {
           state: this.serializeRoom(room),
         });
 
-        // Wait for the 5-reel carousel stop sequence (3.00s) before committing final state
+        // Wait for the 5-reel carousel stop sequence (3050ms) + pattern reveal before committing final state
+        const presentationStepsCount = core.winLines.length + core.specialEffects.length;
+        const spinCommitDelayMs = core.isJackpot
+          ? 14200
+          : presentationStepsCount === 0
+          ? 3250
+          : Math.min(10800, 3250 + presentationStepsCount * 1160 + 850);
         if (room.spinTimer) clearTimeout(room.spinTimer);
         room.spinTimer = setTimeout(() => {
           room.spinTimer = null;
@@ -731,7 +752,34 @@ export class FortunariumServer {
           room.integrity = finalIntegrity;
           room.voltageMultiplier = core.voltageMultiplierAfter;
           room.keys = finalKeys;
-          room.spinsLeft += core.extraSpinsGained;
+          room.totalPatternsHit += core.winLines.length;
+          if (core.isJackpot) {
+            room.totalJackpotsHit += 1;
+          }
+          if (core.grossPayout > room.biggestSingleWinInMatch) {
+            room.biggestSingleWinInMatch = core.grossPayout;
+          }
+          for (const wl of core.winLines) {
+            if (room.bestPatternNameInMatch === '—' || wl.payout >= room.biggestSingleWinInMatch * 0.5) {
+              room.bestPatternNameInMatch = wl.name;
+            }
+          }
+
+          // Decrement existing temporary modifiers by 1 spin and remove expired ones
+          room.activeModifiers = room.activeModifiers
+            .map((m) => ({
+              ...m,
+              spinsRemaining: m.spinsRemaining - 1,
+            }))
+            .filter((m) => m.spinsRemaining > 0);
+
+          // Apply any new temporary modifier granted during this spin (e.g. from '?')
+          for (const fx of core.specialEffects) {
+            if (fx.grantedModifierId) {
+              this.applyTemporaryModifier(room, fx.grantedModifierId);
+            }
+          }
+
           room.lastSpinResult = spinResult;
 
           // Update individual player statistics
@@ -740,8 +788,17 @@ export class FortunariumServer {
           player.stats.totalMoneyLost += actualSpinCost + core.penalties;
           player.stats.netBalance =
             player.stats.totalMoneyGenerated - player.stats.totalMoneyLost;
+          player.stats.patternsHit += core.winLines.length;
+          player.stats.specialSymbolsTriggered =
+            (player.stats.specialSymbolsTriggered || 0) + core.specialEffects.length;
           if (core.grossPayout > player.stats.biggestSingleWin) {
             player.stats.biggestSingleWin = core.grossPayout;
+          }
+          if (netMoneyDelta < 0) {
+            const singleSpinLoss = Math.abs(netMoneyDelta);
+            if (singleSpinLoss > (player.stats.biggestSingleLoss || 0)) {
+              player.stats.biggestSingleLoss = singleSpinLoss;
+            }
           }
           if (core.isJackpot) {
             player.stats.jackpotsHit += 1;
@@ -749,7 +806,12 @@ export class FortunariumServer {
           const bombsCount = newGrid.flat().filter((s) => s === 'bomba').length;
           const skullsCount = newGrid.flat().filter((s) => s === 'calavera').length;
           const coinsCount = newGrid.flat().filter((s) => s === 'moneda').length;
+          const defusedEffectsCount = core.specialEffects.filter(
+            (fx) => fx.symbolId === 'synergy'
+          ).length;
           player.stats.bombsTriggered += bombsCount;
+          player.stats.bombsDefused =
+            (player.stats.bombsDefused || 0) + defusedEffectsCount;
           player.stats.skullsTriggered += skullsCount;
           player.stats.coinsCollected += coinsCount;
           player.stats.keysFound += core.keysGained;
@@ -776,6 +838,7 @@ export class FortunariumServer {
           // 1. Check critical integrity breakdown
           if (room.integrity <= 0) {
             room.phase = 'DEFEAT';
+            room.defeatCause = 'integrity';
             room.endReason =
               '¡AVERÍA CATASTRÓFICA! La integridad de la máquina cayó al 0% y el Fortunarium quedó fuera de servicio.';
             this.broadcastRoomState(room);
@@ -789,17 +852,18 @@ export class FortunariumServer {
             return;
           }
 
-          // 3. Advance turn and check round completion if out of spins or out of money
+          // 3. Advance turn and evaluate bankruptcy ONLY after full spin transaction resolves
           this.advanceTurn(room);
-          this.checkRoundEndAfterAction(room);
+          this.evaluateBankruptcyOrQuota(room);
           this.broadcastRoomState(room);
-        }, 3150);
+        }, spinCommitDelayMs);
 
         break;
       }
 
       case 'REPAIR_MACHINE': {
-        if ((room.phase !== 'PLAYING' && room.phase !== 'ROUND_SHOP') || room.isSpinning) return;
+        if ((room.phase !== 'PLAYING' && room.phase !== 'ROUND_SHOP') || room.isSpinning)
+          return;
         if (room.integrity >= room.maxIntegrity) {
           this.sendError(ws, 'La integridad de la máquina ya está al máximo.');
           return;
@@ -814,19 +878,36 @@ export class FortunariumServer {
           room.keys -= 1;
         } else {
           const repairCost = 28 + (room.round - 1) * 8;
-          if (room.money < repairCost) {
-            this.sendError(ws, `Necesitáis ${repairCost} CR para reparar la máquina.`);
+          const check = validateWorkshopPurchase({
+            currentMoney: room.money,
+            cost: repairCost,
+            quotaTarget: room.quota,
+            upgrades: room.upgrades,
+            activeModifiers: room.activeModifiers,
+          });
+          if (!check.allowed) {
+            this.sendError(
+              ws,
+              check.code === 'SPIN_RESERVE_REQUIRED'
+                ? `Compra bloqueada: debéis reservar al menos ${check.minSpinReserve} CR para poder girar.`
+                : `Necesitáis ${repairCost} CR para reparar la máquina.`
+            );
             return;
           }
           room.money -= repairCost;
+          room.quotaProgress = room.money;
           player.stats.totalMoneyLost += repairCost;
           player.stats.netBalance =
             player.stats.totalMoneyGenerated - player.stats.totalMoneyLost;
         }
 
-        const actualRepaired = Math.min(baseRepairAmount, room.maxIntegrity - room.integrity);
+        const actualRepaired = Math.min(
+          baseRepairAmount,
+          room.maxIntegrity - room.integrity
+        );
         room.integrity += actualRepaired;
         player.stats.integrityRepaired += actualRepaired;
+        player.stats.repairsCount = (player.stats.repairsCount || 0) + 1;
 
         this.addLog(room, {
           playerId: player.id,
@@ -836,12 +917,14 @@ export class FortunariumServer {
           variant: 'repair',
         });
 
+        this.evaluateBankruptcyOrQuota(room);
         this.broadcastRoomState(room);
         break;
       }
 
       case 'BUY_UPGRADE': {
-        if ((room.phase !== 'PLAYING' && room.phase !== 'ROUND_SHOP') || room.isSpinning) return;
+        if ((room.phase !== 'PLAYING' && room.phase !== 'ROUND_SHOP') || room.isSpinning)
+          return;
         const catalogItem = FORTUNARIUM_UPGRADES_CATALOG[msg.upgradeId];
         if (!catalogItem) return;
 
@@ -862,18 +945,37 @@ export class FortunariumServer {
           room.keys -= catalogItem.keyCost;
         } else {
           const cost = getUpgradeCostMoney(msg.upgradeId, currentLevel);
-          if (room.money < cost) {
-            this.sendError(ws, `No hay suficientes créditos en la Caja Común (${cost} CR).`);
+          const check = validateWorkshopPurchase({
+            currentMoney: room.money,
+            cost,
+            quotaTarget: room.quota,
+            upgrades: room.upgrades,
+            activeModifiers: room.activeModifiers,
+            isMaxLevel: currentLevel >= catalogItem.maxLevel,
+          });
+          if (!check.allowed) {
+            this.sendError(
+              ws,
+              check.code === 'SPIN_RESERVE_REQUIRED'
+                ? `Compra bloqueada: debéis reservar al menos ${check.minSpinReserve} CR para poder girar.`
+                : `No hay suficientes créditos en la Caja Común (${cost} CR).`
+            );
             return;
           }
           room.money -= cost;
+          room.quotaProgress = room.money;
           player.stats.totalMoneyLost += cost;
           player.stats.netBalance =
             player.stats.totalMoneyGenerated - player.stats.totalMoneyLost;
         }
 
         player.stats.upgradesBought += 1;
-        this.installUpgradeOnMachine(room, msg.upgradeId, `${player.name} compró en el Taller`);
+        this.installUpgradeOnMachine(
+          room,
+          msg.upgradeId,
+          `${player.name} compró en el Taller`
+        );
+        this.evaluateBankruptcyOrQuota(room);
         this.broadcastRoomState(room);
         break;
       }
@@ -890,7 +992,6 @@ export class FortunariumServer {
           connectedPlayers.every((p) => room.upgradeVotes[p.id] === msg.upgradeId);
 
         if (allVotedSame) {
-          // Unanimous agreement reached! Install the selected build-defining upgrade
           player.stats.upgradesBought += 1;
           this.installUpgradeOnMachine(
             room,
@@ -933,9 +1034,9 @@ export class FortunariumServer {
           }
           case 'overclock_key': {
             room.keys += 1;
-            room.spinsLeft += 2;
+            moneyChange = 15;
             player.stats.keysFound += 1;
-            outcomeText = `${player.name} extrajo +1 Llave y +2 Tiradas Extra.`;
+            outcomeText = `${player.name} extrajo +1 Llave y +15 CR.`;
             break;
           }
           case 'vault_key_open': {
@@ -971,7 +1072,6 @@ export class FortunariumServer {
 
         if (moneyChange > 0) {
           room.money += moneyChange;
-          room.quotaProgress += moneyChange;
           player.stats.totalMoneyGenerated += moneyChange;
           if (moneyChange > player.stats.biggestSingleWin) {
             player.stats.biggestSingleWin = moneyChange;
@@ -981,6 +1081,7 @@ export class FortunariumServer {
           room.money -= loss;
           player.stats.totalMoneyLost += loss;
         }
+        room.quotaProgress = room.money;
         player.stats.netBalance =
           player.stats.totalMoneyGenerated - player.stats.totalMoneyLost;
 
@@ -1005,6 +1106,7 @@ export class FortunariumServer {
 
         if (room.integrity <= 0) {
           room.phase = 'DEFEAT';
+          room.defeatCause = 'integrity';
           room.endReason =
             '¡AVERÍA CATASTRÓFICA! El evento sobrecargó la máquina y redujo su integridad al 0%.';
           this.broadcastRoomState(room);
@@ -1013,21 +1115,21 @@ export class FortunariumServer {
 
         room.phase = 'PLAYING';
         this.advanceTurn(room);
-        this.checkRoundEndAfterAction(room);
+        this.evaluateBankruptcyOrQuota(room);
         this.broadcastRoomState(room);
         break;
       }
 
       case 'PAY_QUOTA_EARLY': {
         if (room.phase !== 'PLAYING' || room.isSpinning) return;
-        if (room.quotaProgress < room.quota) {
+        if (room.money < room.quota) {
           this.sendError(
             ws,
-            `Aún faltan ${room.quota - room.quotaProgress} CR de Progreso de Cuota.`
+            `Aún faltan ${room.quota - room.money} CR para alcanzar la Cuota ${room.round}.`
           );
           return;
         }
-        this.completeCurrentQuota(room, player);
+        this.sealCurrentQuota(room, player);
         this.broadcastRoomState(room);
         break;
       }
@@ -1037,7 +1139,7 @@ export class FortunariumServer {
         if (room.offeredUpgradeIds.length > 0) {
           this.sendError(
             ws,
-            'Debéis elegir por unanimidad una de las 3 mejoras de cuota antes de continuar.'
+            'Debéis elegir una de las 3 mejoras de cuota antes de continuar.'
           );
           return;
         }
@@ -1053,17 +1155,28 @@ export class FortunariumServer {
 
         if (player.isHost || allReady || connectedIds.length === 1) {
           room.round += 1;
-          room.quotaProgress = 0;
-          room.quota = this.calculateQuotaForRound(room.round, room.config.difficulty);
-          room.spinsLeft = room.maxSpinsPerRound;
+          // CRITICAL (Sections 30, 31, 33, 34, 49):
+          // Money is NEVER reset or subtracted!
+          // Next quota is calculated from `previousQuota`, NOT `room.money`!
+          room.quota = calculateNextQuotaTarget(room.quota, room.config.difficulty);
+          room.quotaProgress = room.money;
           room.readyForNextRoundPlayerIds = [];
           room.offeredUpgradeIds = [];
           room.upgradeVotes = {};
           room.phase = 'PLAYING';
+
+          const quotaLabel =
+            room.totalRounds === null
+              ? `Cuota ${room.round} (Ilimitadas)`
+              : `Cuota ${room.round}/${room.totalRounds}`;
+
           this.addLog(room, {
-            text: `¡Comienza la Cuota ${room.round}/${room.totalRounds}! Objetivo del ciclo: ${room.quota} CR.`,
+            text: `¡Comienza la ${quotaLabel}! Nuevo umbral: ${room.quota} CR (Conserváis ${room.money} CR).`,
             variant: 'round',
           });
+
+          // If player spent all their money in the workshop during ROUND_SHOP, check bankruptcy on entering PLAYING
+          this.evaluateBankruptcyOrQuota(room);
         }
         this.broadcastRoomState(room);
         break;
@@ -1083,6 +1196,7 @@ export class FortunariumServer {
         room.phase = 'LOBBY';
         room.isSpinning = false;
         room.activeEvent = null;
+        room.defeatCause = null;
         room.endReason = null;
         this.broadcastRoomState(room);
         break;
@@ -1093,27 +1207,57 @@ export class FortunariumServer {
         this.clients.delete(ws);
         break;
       }
+
+      case 'DEV_GRANT_MODIFIER': {
+        this.applyTemporaryModifier(room, msg.modifierId);
+        this.broadcastRoomState(room);
+        break;
+      }
     }
   }
 
-  private completeCurrentQuota(room: ServerFortunariumRoom, triggeredBy?: FortunariumPlayer) {
-    if (room.round >= room.totalRounds) {
+  private applyTemporaryModifier(
+    room: ServerFortunariumRoom,
+    modifierId: FortunariumModifierId
+  ) {
+    const def = FORTUNARIUM_MODIFIERS_CATALOG[modifierId];
+    if (!def) return;
+    const existingIdx = room.activeModifiers.findIndex(
+      (m) => m.modifierId === modifierId
+    );
+    if (existingIdx >= 0) {
+      room.activeModifiers[existingIdx].spinsRemaining = def.defaultSpins;
+      room.activeModifiers[existingIdx].appliedAtSpin = room.totalSpinsInMatch;
+    } else {
+      room.activeModifiers.unshift({
+        id: `mod_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+        modifierId,
+        name: def.name,
+        type: def.type,
+        effect: def.effect,
+        spinsRemaining: def.defaultSpins,
+        appliedAtSpin: room.totalSpinsInMatch,
+      });
+      if (room.activeModifiers.length > 4) {
+        room.activeModifiers.length = 4;
+      }
+    }
+  }
+
+  // CRITICAL (Sections 30–39, 49, 55):
+  // Sealing a quota NEVER subtracts or resets `room.money`.
+  // In finite mode (`totalRounds !== null`), sealing the final quota wins the run.
+  // In infinite mode (`totalRounds === null`), it always offers 3 upgrades and continues.
+  private sealCurrentQuota(room: ServerFortunariumRoom, triggeredBy?: FortunariumPlayer) {
+    room.quotaProgress = room.money;
+
+    if (room.totalRounds !== null && room.round >= room.totalRounds) {
       room.phase = 'VICTORY';
-      room.endReason = `¡Habéis superado las ${room.totalRounds} cuotas del Fortunarium con ${room.money} CR en la Caja Común!`;
+      room.defeatCause = null;
+      room.endReason = `¡Habéis superado las ${room.totalRounds} cuotas del Fortunarium conservando ${room.money} CR en la Caja Común!`;
       return;
     }
 
-    const earlySpinBonus = room.spinsLeft * (4 + room.round * 2);
-    if (earlySpinBonus > 0) {
-      room.money += earlySpinBonus;
-      if (triggeredBy) {
-        triggeredBy.stats.totalMoneyGenerated += earlySpinBonus;
-        triggeredBy.stats.netBalance =
-          triggeredBy.stats.totalMoneyGenerated - triggeredBy.stats.totalMoneyLost;
-      }
-    }
-
-    room.spinsLeft = 0;
     room.readyForNextRoundPlayerIds = [];
     room.offeredUpgradeIds = this.rollRandomUpgrades(room);
     room.upgradeVotes = {};
@@ -1122,32 +1266,32 @@ export class FortunariumServer {
     this.addLog(room, {
       playerId: triggeredBy?.id,
       playerName: triggeredBy?.name,
-      text:
-        earlySpinBonus > 0
-          ? `¡Cuota ${room.round} sellada! Bono por tiradas restantes: +${earlySpinBonus} CR. Elegid 1 de las 3 mejoras.`
-          : `¡Cuota ${room.round} completada! Elegid 1 de las 3 mejoras.`,
-      moneyDelta: earlySpinBonus,
+      text: `¡Cuota ${room.round} sellada con ${room.money} CR! Conserváis todo el dinero. Elegid 1 de las 3 mejoras.`,
       variant: 'round',
     });
   }
 
-  private checkRoundEndAfterAction(room: ServerFortunariumRoom) {
-    if (room.phase !== 'PLAYING') return;
+  // Evaluate Bankruptcy (Sections 3, 4, 45, 54):
+  // If sharedCash <= 0 OR sharedCash < cheapestSpinCost (and below quota with no active event),
+  // the team is bankrupt -> DEFEAT.
+  private evaluateBankruptcyOrQuota(room: ServerFortunariumRoom) {
+    if (room.phase !== 'PLAYING' || room.isSpinning || room.activeEvent) return;
 
-    // If out of spins or out of money without enough to spin
-    const minSpinCost = calculateEffectiveSpinCost('normal', room.upgrades);
-    const cannotSpinAnymore = room.spinsLeft <= 0 || room.money <= 0;
+    const cheapestSpinCost = calculateEffectiveSpinCost('normal', room.upgrades);
 
-    if (!cannotSpinAnymore) return;
+    // If they cannot afford a spin, check if they already reached the quota
+    if (room.money < cheapestSpinCost) {
+      if (room.money >= room.quota) {
+        this.sealCurrentQuota(room);
+        return;
+      }
 
-    if (room.quotaProgress >= room.quota) {
-      this.completeCurrentQuota(room);
-    } else {
       room.phase = 'DEFEAT';
+      room.defeatCause = 'bankruptcy';
       room.endReason =
-        room.money <= 0 && room.spinsLeft > 0 && minSpinCost > 0
-          ? `La Caja Común se quedó a 0 CR en la Cuota ${room.round} (${room.quotaProgress}/${room.quota} CR conseguidos).`
-          : `Se agotaron las tiradas de la Cuota ${room.round}. Lograsteis ${room.quotaProgress} CR de los ${room.quota} CR requeridos.`;
+        room.money <= 0
+          ? 'SIN CRÉDITOS — LA FORTUNA SE HA TERMINADO. FORTUNARIUM HA CERRADO SUS PUERTAS.'
+          : `SIN CRÉDITOS SUFICIENTES (${room.money} CR) PARA COBRAR LA TIRADA MÍNIMA (${cheapestSpinCost} CR). LA FORTUNA SE HA TERMINADO.`;
     }
   }
 
@@ -1165,15 +1309,22 @@ export class FortunariumServer {
       .filter((p) => p.isConnected)
       .sort((a, b) => a.seatIndex - b.seatIndex);
 
+    const initialQuota = calculateInitialQuota(room.config.difficulty);
+
+    room.matchId = `match_${room.roomCode}_${Date.now()}`;
     room.phase = 'PLAYING';
     room.round = 1;
     room.totalRounds = room.config.totalRounds;
-    room.money = 120;
-    room.quotaProgress = 0;
-    room.quota = this.calculateQuotaForRound(1, room.config.difficulty);
-    room.maxSpinsPerRound = 15;
-    room.spinsLeft = 15;
+    room.money = STARTING_CREDITS;
+    room.quotaProgress = STARTING_CREDITS;
+    room.quota = initialQuota;
+    room.maxSpinsPerRound = 999;
+    room.spinsLeft = 999;
     room.totalSpinsInMatch = 0;
+    room.totalPatternsHit = 0;
+    room.totalJackpotsHit = 0;
+    room.biggestSingleWinInMatch = 0;
+    room.bestPatternNameInMatch = '—';
     room.integrity = 100;
     room.maxIntegrity = 100;
     room.voltageMultiplier = 1.0;
@@ -1185,14 +1336,21 @@ export class FortunariumServer {
     room.upgrades = createInitialUpgradesState();
     room.offeredUpgradeIds = [];
     room.upgradeVotes = {};
+    room.lastInstalledUpgradeId = null;
+    room.activeModifiers = [];
     room.activeEvent = null;
     room.readyForNextRoundPlayerIds = [];
+    room.defeatCause = null;
     room.endReason = null;
     room.currentTurnPlayerId = sortedConnected[0]?.id || room.hostId;
+
+    const quotaModeLabel =
+      room.totalRounds === null ? 'ILIMITADAS' : `${room.totalRounds} Cuotas`;
+
     room.actionLog = [
       {
         id: `log_init_${Date.now()}`,
-        text: `¡Fortunarium encendido! Cuota 1/${room.totalRounds} — Objetivo: ${room.quota} CR.`,
+        text: `¡Fortunarium encendido! Modo: ${quotaModeLabel} — Cuota 1: alcanza ${room.quota} CR.`,
         variant: 'round',
         timestamp: Date.now(),
       },

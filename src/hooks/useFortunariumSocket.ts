@@ -8,6 +8,8 @@ import {
   FortunariumUpgradeId,
   FortunariumSpinResult,
   FortunariumRemoteCursor,
+  FortunariumDevScenario,
+  FortunariumModifierId,
 } from '../types/fortunarium';
 import {
   createOnlineRoom,
@@ -369,8 +371,15 @@ export function useFortunariumSocket({
   );
 
   const spinSlot = useCallback(
-    (forceScenario?: 'single_pattern' | 'multi_pattern' | 'special_symbol' | 'jackpot') => {
-      sendMessage({ type: 'SPIN_SLOT', forceScenario });
+    (forceScenario?: FortunariumDevScenario, triggerSource?: 'button' | 'lever') => {
+      sendMessage({ type: 'SPIN_SLOT', forceScenario, triggerSource });
+    },
+    [sendMessage]
+  );
+
+  const devGrantModifier = useCallback(
+    (modifierId: FortunariumModifierId) => {
+      sendMessage({ type: 'DEV_GRANT_MODIFIER', modifierId });
     },
     [sendMessage]
   );
@@ -435,6 +444,7 @@ export function useFortunariumSocket({
     startGame,
     setBetMode,
     spinSlot,
+    devGrantModifier,
     repairMachine,
     buyUpgrade,
     voteUpgrade,
