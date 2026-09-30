@@ -582,14 +582,18 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           if (!isDead) {
                             laCriptaAudio.playDoorHover();
                             setSelectedEnemyId(enemy.id);
-                            onInspectEnemy?.(enemy.id);
+                            if (contextualPanelMode === 'ENEMY_INSPECTION') {
+                              onInspectEnemy?.(enemy.id);
+                            }
                           }
                         }}
                         onKeyDown={(e) => {
                           if (!isDead && (e.key === 'Enter' || e.key === ' ')) {
                             e.preventDefault();
                             setSelectedEnemyId(enemy.id);
-                            onInspectEnemy?.(enemy.id);
+                            if (contextualPanelMode === 'ENEMY_INSPECTION') {
+                              onInspectEnemy?.(enemy.id);
+                            }
                           }
                         }}
                         className={`group relative flex flex-col items-center transition-all duration-300 outline-none ${
@@ -609,16 +613,48 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           </div>
                         )}
 
-                        {/* Multi-Enemy Target Indicator Pill */}
-                        {visibleRoomEnemies.length > 1 && !isDead && (
-                          <div
-                            className={`mb-1 px-2 py-0.5 border text-[8px] font-cripta-pixel font-bold uppercase tracking-wider transition-colors ${
-                              isTargeted
-                                ? 'bg-[#2A141D] border-[#FF4D6D] text-[#FFD166] shadow-[0_0_10px_rgba(255,77,109,0.4)]'
-                                : 'bg-[#0E0A14]/80 border-[#3E2F4B] text-[#D8C6A0]/60 group-hover:text-[#D8C6A0]'
-                            }`}
-                          >
-                            {isTargeted ? '◆ OBJETIVO ACTIVO ◆' : 'CLIC: OBJETIVO + EXAMINAR'}
+                        {/* Multi-Enemy Target Indicator & Explicit Inspect Action */}
+                        {!isDead && (
+                          <div className="mb-1 flex items-center gap-1">
+                            {visibleRoomEnemies.length > 1 && (
+                              <div
+                                className={`px-2 py-0.5 border text-[8px] font-cripta-pixel font-bold uppercase tracking-wider transition-colors ${
+                                  isTargeted
+                                    ? 'bg-[#2A141D] border-[#FF4D6D] text-[#FFD166] shadow-[0_0_10px_rgba(255,77,109,0.4)]'
+                                    : 'bg-[#0E0A14]/80 border-[#3E2F4B] text-[#D8C6A0]/60 group-hover:text-[#D8C6A0]'
+                                }`}
+                              >
+                                {isTargeted ? '◆ OBJETIVO ◆' : 'CLIC: OBJETIVO'}
+                              </div>
+                            )}
+                            {onInspectEnemy && visibleRoomEnemies.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  laCriptaAudio.playStoneClick();
+                                  if (
+                                    contextualPanelMode === 'ENEMY_INSPECTION' &&
+                                    inspectedEnemyId === enemy.id &&
+                                    onCloseContextualPanel
+                                  ) {
+                                    onCloseContextualPanel();
+                                  } else {
+                                    onInspectEnemy(enemy.id);
+                                  }
+                                }}
+                                className={`px-1.5 py-0.5 border text-[8px] font-cripta-pixel font-bold uppercase flex items-center gap-1 cursor-pointer transition-colors ${
+                                  contextualPanelMode === 'ENEMY_INSPECTION' &&
+                                  inspectedEnemyId === enemy.id
+                                    ? 'bg-[#2A1C12] border-[#FFD166] text-[#FFD166]'
+                                    : 'bg-[#120D1A]/95 hover:bg-[#211730] border-[#4A3B5C] hover:border-[#E7A54A] text-[#D8C6A0] hover:text-[#FFD166]'
+                                }`}
+                                title={`Examinar a ${enemy.name}`}
+                              >
+                                <Eye className="w-2.5 h-2.5 text-[#E7A54A]" />
+                                <span>EXAMINAR</span>
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -669,8 +705,25 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     );
                   })}
                 </div>
+              ) : activeRoom.type === 'COMBAT' ||
+                activeRoom.type === 'ELITE' ||
+                activeRoom.type === 'MINIBOSS' ||
+                activeRoom.type === 'BOSS' ? (
+                /* Cleared Combat Chamber Stage — Never Spawn a Post-Combat NPC */
+                <div className="flex flex-col items-center justify-center py-4 select-none">
+                  {unclaimedDrops.length === 0 && (
+                    <div className="flex flex-col items-center gap-2 px-5 py-3 bg-[#0D0914]/90 border border-[#3E2F4B] shadow-[0_10px_28px_rgba(0,0,0,0.85)]">
+                      <div className="text-[10px] font-cripta-pixel font-bold text-[#6EE7B7] uppercase tracking-widest">
+                        ✦ CÁMARA DESPEJADA ✦
+                      </div>
+                      <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/75 text-center max-w-xs">
+                        Los enemigos han caído. El umbral hacia la siguiente sala está abierto.
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
-                /* Non-Combat or Cleared Room Large Stage Portrait */
+                /* Non-Combat Room Large Stage Portrait (Merchant / Chest / Shrine / Rest / Forge / Event) */
                 <div className="flex flex-col items-center justify-center">
                   <LaCriptaNonCombatStagePortrait
                     room={activeRoom}
@@ -1181,7 +1234,9 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   {/* Narrative Prompt / Resolution Banner */}
                   <div className="max-w-3xl w-full bg-[#140E1D]/95 border border-[#3E2F4B] px-4 py-3 text-center">
                     <p className="text-xs sm:text-sm font-cripta-pixel text-[#E8DFCE] leading-relaxed">
-                      {activeRoom.resolutionText || activeRoom.description}
+                      {activeRoom.outcomeLog ||
+                        activeRoom.narrative ||
+                        activeRoom.subtitle}
                     </p>
                   </div>
 
@@ -1192,41 +1247,63 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         ✦ RECOGE EL BOTÍN DE LA SALA ANTES DE CONTINUAR ✦
                       </div>
                       <div className="flex flex-wrap items-stretch justify-center gap-3.5">
-                        {unclaimedDrops.map((drop) => (
-                          <LaCriptaPlayableCard
-                            key={drop.id}
-                            title={drop.label}
-                            categoryLabel={
-                              drop.kind === 'GOLD'
-                                ? 'BOTÍN DE ORO'
-                                : drop.kind === 'RELIC'
-                                ? 'RELIQUIA ANCESTRAL'
-                                : 'OBJETO DE CRIPTA'
-                            }
-                            costLabel="GRATIS"
-                            cooldownLabel={drop.rarity || 'BOTÍN'}
-                            summary={drop.description}
-                            accentColor={
-                              drop.kind === 'RELIC'
-                                ? 'purple'
-                                : drop.kind === 'GOLD'
-                                ? 'amber'
-                                : 'emerald'
-                            }
-                            illustration={
-                              <LaCriptaCardPixelIllustration
-                                kind="TREASURE_CHEST"
-                                itemId={drop.itemId}
-                                relicId={drop.relicId}
-                              />
-                            }
-                            onClick={() => {
-                              laCriptaAudio.playDoorVote();
-                              onClaimGroundDrop(drop.id);
-                            }}
-                            footerBadge="CLIC PARA RECOGER"
-                          />
-                        ))}
+                        {unclaimedDrops.map((drop) => {
+                          const itemDef = drop.itemId
+                            ? CRIPTA_ITEMS_REGISTRY[drop.itemId]
+                            : undefined;
+                          const relicDef = drop.relicId
+                            ? CRIPTA_RELICS_REGISTRY[drop.relicId]
+                            : undefined;
+                          const resolvedSummary =
+                            itemDef?.description ||
+                            relicDef?.description ||
+                            (drop.type === 'GOLD_POUCH' && drop.goldAmount
+                              ? `Bolsa con +${drop.goldAmount} de oro para el grupo.`
+                              : `Botín hallado en la cámara: ${drop.label}.`);
+                          const resolvedRarity =
+                            relicDef?.rarity ||
+                            (drop.type === 'RELIC_PEDESTAL'
+                              ? 'RELIQUIA'
+                              : drop.type === 'GOLD_POUCH'
+                              ? 'ORO'
+                              : 'CONSUMIBLE');
+
+                          return (
+                            <LaCriptaPlayableCard
+                              key={drop.dropId}
+                              title={drop.label}
+                              categoryLabel={
+                                drop.type === 'GOLD_POUCH'
+                                  ? 'BOTÍN DE ORO'
+                                  : drop.type === 'RELIC_PEDESTAL'
+                                  ? 'RELIQUIA ANCESTRAL'
+                                  : 'OBJETO DE CRIPTA'
+                              }
+                              costLabel="RECOGER"
+                              cooldownLabel={resolvedRarity}
+                              summary={resolvedSummary}
+                              accentColor={
+                                drop.type === 'RELIC_PEDESTAL'
+                                  ? 'purple'
+                                  : drop.type === 'GOLD_POUCH'
+                                  ? 'amber'
+                                  : 'emerald'
+                              }
+                              illustration={
+                                <LaCriptaCardPixelIllustration
+                                  kind="TREASURE_CHEST"
+                                  itemId={drop.itemId}
+                                  relicId={drop.relicId}
+                                />
+                              }
+                              onClick={() => {
+                                laCriptaAudio.playDoorVote();
+                                onClaimGroundDrop(drop.dropId);
+                              }}
+                              footerBadge="CLIC PARA RECOGER"
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1379,48 +1456,48 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     activeRoom.puzzleRunes && (
                       <div className="w-full flex flex-col items-center gap-3">
                         <div className="text-[10px] font-cripta-pixel text-[#E7A54A] uppercase tracking-wider">
-                          ORDEN OBJETIVO:{' '}
-                          {(activeRoom.puzzleTargetOrder || [])
-                            .map((i) => activeRoom.puzzleRunes?.[i])
-                            .join(' → ')}
+                          SECUENCIA RÚNICA (INTENTOS:{' '}
+                          {activeRoom.puzzleRunes.attemptsLeft ?? 2})
                         </div>
                         <div className="flex flex-wrap items-stretch justify-center gap-3.5">
-                          {activeRoom.puzzleRunes.map((runeName, rIdx) => {
-                            const enteredPos = (
-                              activeRoom.puzzleEnteredOrder || []
-                            ).indexOf(rIdx);
-                            const isActivated = enteredPos !== -1;
+                          {(activeRoom.puzzleRunes.sequence || []).map(
+                            (runeName, rIdx) => {
+                              const currentInput =
+                                activeRoom.puzzleRunes?.currentInput || [];
+                              const enteredPos = currentInput.indexOf(runeName);
+                              const isActivated = enteredPos !== -1;
 
-                            return (
-                              <LaCriptaPlayableCard
-                                key={`${runeName}_${rIdx}`}
-                                title={`Runa: ${runeName}`}
-                                categoryLabel="ACERTIJO ARCANO"
-                                costLabel={`RUNA #${rIdx + 1}`}
-                                cooldownLabel={
-                                  isActivated
-                                    ? `PASO ${enteredPos + 1}`
-                                    : 'PENDIENTE'
-                                }
-                                summary={`Activar el sello rúnico de ${runeName} en el altar.`}
-                                accentColor={isActivated ? 'emerald' : 'purple'}
-                                disabled={isActivated || iAmDead}
-                                selected={isActivated}
-                                illustration={
-                                  <LaCriptaCardPixelIllustration kind="EVENT_RUNE" />
-                                }
-                                onClick={() => {
-                                  if (onPuzzleInput && !isActivated) {
-                                    laCriptaAudio.playDoorVote();
-                                    onPuzzleInput(rIdx);
+                              return (
+                                <LaCriptaPlayableCard
+                                  key={`${runeName}_${rIdx}`}
+                                  title={`Runa: ${runeName}`}
+                                  categoryLabel="ACERTIJO ARCANO"
+                                  costLabel={`RUNA #${rIdx + 1}`}
+                                  cooldownLabel={
+                                    isActivated
+                                      ? `PASO ${enteredPos + 1}`
+                                      : 'PENDIENTE'
                                   }
-                                }}
-                                footerBadge={
-                                  isActivated ? '✓ ACTIVADA' : 'PULSAR RUNA'
-                                }
-                              />
-                            );
-                          })}
+                                  summary={`Activar el sello rúnico de ${runeName} en el obelisco.`}
+                                  accentColor={isActivated ? 'emerald' : 'purple'}
+                                  disabled={isActivated || iAmDead}
+                                  selected={isActivated}
+                                  illustration={
+                                    <LaCriptaCardPixelIllustration kind="EVENT_RUNE" />
+                                  }
+                                  onClick={() => {
+                                    if (onPuzzleInput && !isActivated) {
+                                      laCriptaAudio.playDoorVote();
+                                      onPuzzleInput(rIdx);
+                                    }
+                                  }}
+                                  footerBadge={
+                                    isActivated ? '✓ ACTIVADA' : 'PULSAR RUNA'
+                                  }
+                                />
+                              );
+                            }
+                          )}
                         </div>
                       </div>
                     )}
@@ -1434,10 +1511,12 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           const cardIllustrationKind =
                             activeRoom.type === 'SHRINE'
                               ? 'SHRINE_ALTAR'
-                              : activeRoom.type === 'LOOT'
+                              : activeRoom.type === 'TREASURE'
                               ? 'TREASURE_CHEST'
                               : activeRoom.type === 'REST'
                               ? 'REST_CAMPFIRE'
+                              : activeRoom.type === 'FORGE'
+                              ? 'FORGE_ANVIL'
                               : activeRoom.type === 'TRAP'
                               ? 'EVENT_TRAP'
                               : idx === 0
@@ -1446,12 +1525,24 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                               ? 'EVENT_RUNE'
                               : 'EVENT_PATH';
 
-                          const accent =
-                            opt.riskLevel === 'ALTO'
-                              ? 'crimson'
-                              : opt.riskLevel === 'MEDIO'
-                              ? 'amber'
-                              : 'emerald';
+                          const hasHpCost = Boolean(opt.costHp && opt.costHp > 0);
+                          const hasGoldCost = Boolean(
+                            opt.costGold && opt.costGold > 0
+                          );
+                          const accent = hasHpCost
+                            ? 'crimson'
+                            : hasGoldCost
+                            ? 'amber'
+                            : 'emerald';
+                          const resolvedCostLabel = hasGoldCost
+                            ? `${opt.costGold} ORO`
+                            : hasHpCost
+                            ? `-${opt.costHp} PV`
+                            : opt.subtitle || 'DECISIÓN';
+                          const resolvedSummary =
+                            opt.effectText ||
+                            opt.subtitle ||
+                            'Ejecutar esta decisión en la cámara.';
 
                           return (
                             <LaCriptaPlayableCard
@@ -1460,17 +1551,15 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                               categoryLabel={`DECISIÓN · ${
                                 ROOM_TYPE_LABELS[activeRoom.type] || 'EVENTO'
                               }`}
-                              costLabel={
-                                opt.riskLevel === 'ALTO'
-                                  ? 'RIESGO ALTO'
-                                  : opt.riskLevel === 'MEDIO'
-                                  ? 'RIESGO MEDIO'
-                                  : 'SEGURO'
-                              }
+                              costLabel={resolvedCostLabel}
                               cooldownLabel={`OPCIÓN ${idx + 1}`}
-                              summary={opt.description}
+                              summary={resolvedSummary}
                               accentColor={accent}
-                              disabled={iAmDead}
+                              disabled={
+                                iAmDead ||
+                                (hasGoldCost &&
+                                  partyGold < (opt.costGold || 0))
+                              }
                               illustration={
                                 <LaCriptaCardPixelIllustration
                                   kind={cardIllustrationKind}

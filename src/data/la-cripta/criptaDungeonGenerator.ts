@@ -537,17 +537,30 @@ function buildEnemiesForRoom(
       dungeon.enemyPool[(roomIndex + i) % Math.max(1, dungeon.enemyPool.length)] ||
       'centinela_de_cripta';
 
-    // Ensure rich tactical variety across multi-enemy encounters (Tank, Healer/Shaman, Controller, Predator)
-    if (count >= 2 && i === 1 && (roomIndex + i) % 3 === 0) {
-      slug =
-        config.spriteArchetype === 'plague_bloom'
-          ? 'chaman_fungico'
-          : config.spriteArchetype === 'skeleton_warrior' ||
-            config.spriteArchetype === 'bone_colossus'
-          ? 'acolyto_de_hueso_chaman'
-          : `${slug}_chaman`;
-    } else if (count >= 2 && i === 0 && roomIndex % 2 === 1) {
-      slug = `${slug}_guardian`;
+    // Ensure every enemy in a multi-enemy encounter has a distinct role & silhouette:
+    // Slot 0: Frontline Guardian / Brute
+    // Slot 1: Shaman / Spore Caster / Necromancer
+    // Slot 2: Agile Stalker / Predator / Skirmisher
+    if (count >= 2) {
+      if (i === 0) {
+        slug =
+          config.spriteArchetype === 'plague_bloom'
+            ? 'huesped_de_micelio_guardian'
+            : `${slug}_guardian`;
+      } else if (i === 1) {
+        slug =
+          config.spriteArchetype === 'plague_bloom'
+            ? 'chaman_fungico'
+            : config.spriteArchetype === 'skeleton_warrior' ||
+              config.spriteArchetype === 'bone_colossus'
+            ? 'acolyto_de_hueso_chaman'
+            : `${slug}_chaman`;
+      } else if (i >= 2) {
+        slug =
+          config.spriteArchetype === 'plague_bloom'
+            ? 'bestia_espinosa_acechador'
+            : `${slug}_acechador`;
+      }
     }
 
     const baseHp = count === 1 ? 38 : count === 2 ? 26 : 22;

@@ -83,6 +83,7 @@ export interface CreatureAnimationTiming {
 export interface CreatureVisualDefinition {
   creatureId: string;
   family: CriptaCreatureVisualFamily;
+  subVariant?: 'GUARDIAN' | 'SHAMAN_CASTER' | 'STALKER_BEAST';
   biomeId: CriptaDungeonId;
   baseScale: number;
   anchor: 'ground' | 'floating';
@@ -111,11 +112,45 @@ export interface CreatureVisualDefinition {
 
 export function resolveCreatureVisualDefinition(
   enemy: CriptaRoomEnemy,
-  dungeonId?: CriptaDungeonId | null
+  dungeonId?: CriptaDungeonId | null,
+  enemyIndex = 0
 ): CreatureVisualDefinition {
   const slug = (enemy.slug || '').toLowerCase();
   const nameLower = (enemy.name || '').toLowerCase();
   const arch = enemy.spriteArchetype;
+
+  const isShamanOrCaster =
+    slug.includes('chaman') ||
+    slug.includes('acolito') ||
+    slug.includes('acólito') ||
+    slug.includes('sacerdote') ||
+    slug.includes('oraculo') ||
+    slug.includes('escriba') ||
+    enemy.roleTag === 'HEALER' ||
+    enemy.roleTag === 'SUPPORT' ||
+    (enemyIndex === 1 && !slug.includes('guardian'));
+
+  const isStalkerOrBeast =
+    slug.includes('zarza') ||
+    slug.includes('arana') ||
+    slug.includes('rata') ||
+    slug.includes('escarabajo') ||
+    slug.includes('mastin') ||
+    slug.includes('sabueso') ||
+    slug.includes('lobo') ||
+    slug.includes('acechador') ||
+    slug.includes('arquero') ||
+    slug.includes('artificiero') ||
+    slug.includes('tomo') ||
+    enemy.roleTag === 'ASSASSIN' ||
+    enemy.roleTag === 'SWARM' ||
+    enemyIndex === 2;
+
+  const subVariant: 'GUARDIAN' | 'SHAMAN_CASTER' | 'STALKER_BEAST' = isShamanOrCaster
+    ? 'SHAMAN_CASTER'
+    : isStalkerOrBeast
+    ? 'STALKER_BEAST'
+    : 'GUARDIAN';
 
   const tierScaleBoost = enemy.isFinalBoss
     ? 1.32
@@ -381,53 +416,99 @@ export function resolveCreatureVisualDefinition(
     };
   }
 
-  // 4. JARDÍN PODRIDO (Fungal / Spores / Roots)
+  // 4. JARDÍN PODRIDO (Fungal Guardian Brute / Mycelial Shaman / Briar Stalker Beast)
   if (arch === 'plague_bloom' || dungeonId === 'jardin_podrido') {
-    const isSpore = slug.includes('espora');
-    const isThorn = slug.includes('zarza');
+    const isShaman =
+      slug.includes('chaman') ||
+      slug.includes('espora_errante') ||
+      (slug.includes('espora') && !slug.includes('guardian') && !slug.includes('brote')) ||
+      enemy.roleTag === 'HEALER' ||
+      (enemyIndex === 1 && !slug.includes('guardian'));
+    const isThorn =
+      slug.includes('zarza') ||
+      slug.includes('arana') ||
+      enemy.roleTag === 'ASSASSIN' ||
+      (enemyIndex === 2 && !isShaman);
     return {
       creatureId: enemy.slug,
-      family: isSpore
+      family: isShaman
         ? 'GARDEN_SPORE_FLOAT'
         : isThorn
         ? 'GARDEN_THORN_BEAST'
         : 'GARDEN_MYCELIUM_HOST',
+      subVariant,
       biomeId: 'jardin_podrido',
-      baseScale: (isSpore ? 0.88 : 1.02) * tierScaleBoost,
-      anchor: isSpore ? 'floating' : 'ground',
-      rimLightColor: '#A3C995',
-      shadowWidth: 38,
+      baseScale: (isShaman ? 0.98 : isThorn ? 0.96 : 1.05) * tierScaleBoost,
+      anchor: 'ground',
+      rimLightColor: isShaman ? '#7BDFF2' : '#A3C995',
+      shadowWidth: isThorn ? 44 : isShaman ? 34 : 40,
       timing: {
-        breathDurationMs: 2400,
-        variantMinIntervalMs: 3200,
-        variantMaxIntervalMs: 6400,
+        breathDurationMs: isShaman ? 2100 : 2400,
+        variantMinIntervalMs: 3000,
+        variantMaxIntervalMs: 6000,
         variantDurationMs: 1100,
       },
       palette: {
         primary: '#2A3B2C',
-        primaryDark: '#141F16',
-        primaryLight: '#466349',
-        secondary: '#8E5EA8',
-        secondaryDark: '#4E2F61',
+        primaryDark: '#121C14',
+        primaryLight: '#49694D',
+        secondary: isShaman ? '#328276' : '#8E5EA8',
+        secondaryDark: isShaman ? '#1B4A43' : '#4E2F61',
         metal: '#6B533B',
-        metalLight: '#967656',
+        metalLight: '#9E7D5B',
         metalDark: '#3D2E1F',
-        skinOrBone: '#D8C9A8',
+        skinOrBone: '#DFD2B4',
         skinShadow: '#8A7D60',
-        eyeGlow: '#D4FF80',
+        eyeGlow: isShaman ? '#7BDFF2' : '#D4FF80',
         accent: '#8EE6AE',
       },
     };
   }
 
-  // 5. FORJA INFERNAL (Molten / Furnace / Smith)
+  // 5. FORJA INFERNAL (Molten / Furnace / Smith / Ember Hound)
   if (arch === 'iron_golem' || dungeonId === 'forja_infernal') {
-    const isConstruct = slug.includes('golem') || slug.includes('coloso');
+    if (slug.includes('sabueso') || enemyIndex === 2) {
+      return {
+        creatureId: enemy.slug,
+        family: 'FORGE_EMBER_HOUND',
+        subVariant: 'STALKER_BEAST',
+        biomeId: 'forja_infernal',
+        baseScale: 0.96 * tierScaleBoost,
+        anchor: 'ground',
+        rimLightColor: '#FF7A33',
+        shadowWidth: 42,
+        timing: {
+          breathDurationMs: 1750,
+          variantMinIntervalMs: 3000,
+          variantMaxIntervalMs: 5800,
+          variantDurationMs: 950,
+        },
+        palette: {
+          primary: '#2E1A18',
+          primaryDark: '#140A09',
+          primaryLight: '#4D2B26',
+          secondary: '#E65C26',
+          secondaryDark: '#8C2B0E',
+          metal: '#6E7380',
+          metalLight: '#A8B0C2',
+          metalDark: '#393C45',
+          skinOrBone: '#FFD166',
+          skinShadow: '#C96A2B',
+          eyeGlow: '#FFD166',
+          accent: '#FF7A33',
+        },
+      };
+    }
+    const isConstruct =
+      slug.includes('golem') ||
+      slug.includes('coloso') ||
+      (enemyIndex === 0 && !slug.includes('herrador'));
     return {
       creatureId: enemy.slug,
       family: isConstruct ? 'FORGE_SLAG_CONSTRUCT' : 'FORGE_BLIND_SMITH',
+      subVariant,
       biomeId: 'forja_infernal',
-      baseScale: (isConstruct ? 1.12 : 1.02) * tierScaleBoost,
+      baseScale: (isConstruct ? 1.12 : 1.0) * tierScaleBoost,
       anchor: 'ground',
       rimLightColor: '#FF7A33',
       shadowWidth: 42,
@@ -456,10 +537,15 @@ export function resolveCreatureVisualDefinition(
 
   // 6. TEMPLO SUMERGIDO (Aquatic / Barnacles / Coral / Drowned Priest)
   if (arch === 'deep_serpent' || dungeonId === 'templo_sumergido') {
-    const isCoralBeast = slug.includes('acechador') || slug.includes('coral') || slug.includes('leviat');
+    const isCoralBeast =
+      slug.includes('acechador') ||
+      slug.includes('coral') ||
+      slug.includes('leviat') ||
+      (enemyIndex % 2 === 1 && !slug.includes('sacerdote'));
     return {
       creatureId: enemy.slug,
       family: isCoralBeast ? 'TEMPLE_CORAL_CRUSTACEAN' : 'TEMPLE_BRINE_PRIEST',
+      subVariant,
       biomeId: 'templo_sumergido',
       baseScale: 1.02 * tierScaleBoost,
       anchor: 'ground',
@@ -490,10 +576,14 @@ export function resolveCreatureVisualDefinition(
 
   // 7. MINAS ABANDONADAS (Lantern Miner / Crystal Vein Beetle)
   if (arch === 'mine_stalker' || dungeonId === 'minas_abandonadas') {
-    const isBeetle = slug.includes('escarabajo') || slug.includes('devorador');
+    const isBeetle =
+      slug.includes('escarabajo') ||
+      slug.includes('devorador') ||
+      (enemyIndex % 2 === 1 && !slug.includes('minero'));
     return {
       creatureId: enemy.slug,
       family: isBeetle ? 'MINES_CRYSTAL_BEETLE' : 'MINES_LANTERN_MINER',
+      subVariant,
       biomeId: 'minas_abandonadas',
       baseScale: (isBeetle ? 0.94 : 1.0) * tierScaleBoost,
       anchor: 'ground',
@@ -524,10 +614,14 @@ export function resolveCreatureVisualDefinition(
 
   // 8. BOSQUE DE LOS SUSURROS (Antler Stag / Hollow Woodsman)
   if (arch === 'wisp_phantom' || dungeonId === 'bosque_de_los_susurros') {
-    const isWoodsman = slug.includes('leñador');
+    const isWoodsman =
+      slug.includes('leñador') ||
+      slug.includes('guardian') ||
+      (enemyIndex % 2 === 1 && !slug.includes('ciervo'));
     return {
       creatureId: enemy.slug,
       family: isWoodsman ? 'WOODS_HOLLOW_WOODSMAN' : 'WOODS_ANTLER_STAG',
+      subVariant,
       biomeId: 'bosque_de_los_susurros',
       baseScale: 1.04 * tierScaleBoost,
       anchor: 'ground',
@@ -558,12 +652,15 @@ export function resolveCreatureVisualDefinition(
 
   // 9. BIBLIOTECA PROHIBIDA (Faceless Ink Scribe / Voracious Chained Tome)
   if (arch === 'arcane_archivist' || dungeonId === 'biblioteca_prohibida') {
-    const isTome = slug.includes('tomo');
+    const isTome =
+      slug.includes('tomo') ||
+      (enemyIndex % 2 === 1 && !slug.includes('archivista'));
     return {
       creatureId: enemy.slug,
       family: isTome ? 'LIBRARY_VORACIOUS_TOME' : 'LIBRARY_FACELESS_SCRIBE',
+      subVariant,
       biomeId: 'biblioteca_prohibida',
-      baseScale: (isTome ? 0.92 : 1.0) * tierScaleBoost,
+      baseScale: (isTome ? 0.94 : 1.02) * tierScaleBoost,
       anchor: isTome ? 'floating' : 'ground',
       rimLightColor: '#9B72CF',
       shadowWidth: 34,
@@ -823,10 +920,14 @@ export function resolveCreatureVisualDefinition(
 
   // 17. CAVERNAS HELADAS
   if (arch === 'frost_wolf' || dungeonId === 'cavernas_heladas') {
-    const isWolf = slug.includes('lobo') || slug.includes('wyrm');
+    const isWolf =
+      slug.includes('lobo') ||
+      slug.includes('wyrm') ||
+      (enemyIndex % 2 === 1 && !slug.includes('guerrero'));
     return {
       creatureId: enemy.slug,
       family: isWolf ? 'ICE_FROST_WOLF' : 'ICE_FROZEN_WARRIOR',
+      subVariant,
       biomeId: 'cavernas_heladas',
       baseScale: (isWolf ? 0.96 : 1.04) * tierScaleBoost,
       anchor: 'ground',
@@ -857,12 +958,17 @@ export function resolveCreatureVisualDefinition(
 
   // 18. FORTALEZA GOBLIN
   if (arch === 'goblin_raider' || dungeonId === 'fortaleza_goblin') {
-    const isBombardier = slug.includes('artificiero') || slug.includes('polvora');
+    const isBombardier =
+      slug.includes('artificiero') ||
+      slug.includes('polvora') ||
+      slug.includes('chaman') ||
+      enemyIndex % 2 === 1;
     return {
       creatureId: enemy.slug,
       family: isBombardier ? 'GOBLIN_BOMBARDIER' : 'GOBLIN_SCRAP_RAIDER',
+      subVariant,
       biomeId: 'fortaleza_goblin',
-      baseScale: 0.9 * tierScaleBoost,
+      baseScale: 0.92 * tierScaleBoost,
       anchor: 'ground',
       rimLightColor: '#E7A54A',
       shadowWidth: 34,
@@ -894,6 +1000,7 @@ export function resolveCreatureVisualDefinition(
     return {
       creatureId: enemy.slug,
       family: 'GIANT_OSSUARY_COLOSSUS',
+      subVariant,
       biomeId: 'cementerio_de_gigantes',
       baseScale: 1.14 * tierScaleBoost,
       anchor: 'ground',
@@ -927,6 +1034,7 @@ export function resolveCreatureVisualDefinition(
     return {
       creatureId: enemy.slug,
       family: 'ABYSS_VOID_ENTITY',
+      subVariant,
       biomeId: 'el_abismo',
       baseScale: 1.06 * tierScaleBoost,
       anchor: 'floating',
@@ -956,8 +1064,13 @@ export function resolveCreatureVisualDefinition(
   }
 
   // DEFAULT / CATACUMBAS DEL REY (Royal Skeleton Soldier / Archer / Ash Acolyte)
-  const isArcher = slug.includes('arquero');
-  const isAcolyte = slug.includes('acolito') || slug.includes('acólito');
+  const isArcher = slug.includes('arquero') || enemyIndex === 2;
+  const isAcolyte =
+    slug.includes('acolito') ||
+    slug.includes('acólito') ||
+    slug.includes('chaman') ||
+    enemy.roleTag === 'HEALER' ||
+    (enemyIndex === 1 && !isArcher);
   return {
     creatureId: enemy.slug,
     family: isArcher
@@ -965,6 +1078,7 @@ export function resolveCreatureVisualDefinition(
       : isAcolyte
       ? 'CATACOMBS_ASH_ACOLYTE'
       : 'CATACOMBS_ROYAL_SKELETON',
+    subVariant,
     biomeId: 'catacumbas_del_rey',
     baseScale: 1.0 * tierScaleBoost,
     anchor: 'ground',
@@ -1048,8 +1162,8 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
   customSizePx,
 }) => {
   const def = useMemo(
-    () => resolveCreatureVisualDefinition(enemy, dungeonId),
-    [enemy, dungeonId]
+    () => resolveCreatureVisualDefinition(enemy, dungeonId, enemyIndex),
+    [enemy, dungeonId, enemyIndex]
   );
 
   const seed = useMemo(() => hashStringSeed(enemy.id || enemy.slug || 'e'), [
@@ -1964,156 +2078,278 @@ function renderArticulatedCreatureFamily(
     }
 
     // ========================================================================
-    // CATACUMBAS DEL REY: ROYAL SKELETON SOLDIER / ARCHER / ASH ACOLYTE
-    // Cracked golden crown, rotted burgundy velvet cloak, articulated jaw,
-    // exposed ribcage & spine, royal burial jewelry, sword & heraldic shield.
+    // CATACUMBAS DEL REY: 3 DISTINCT SILHOUETTES (ROYAL SENTINEL / ARCHER / ASH PRIEST)
     // ========================================================================
     case 'CATACOMBS_ROYAL_SKELETON':
     case 'CATACOMBS_SEPULCHER_ARCHER':
     case 'CATACOMBS_ASH_ACOLYTE': {
       const isArcher = family === 'CATACOMBS_SEPULCHER_ARCHER';
       const isAcolyte = family === 'CATACOMBS_ASH_ACOLYTE';
+
+      if (isAcolyte) {
+        // SILHOUETTE B: TALL MITRED NECROMANCER / ASH ACOLYTE (Flowing robes, bone stole, skull staff & swinging wax-candle censer)
+        return (
+          <g>
+            {/* Floating Funeral Wax Candles Orbiting Shoulders */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY - pose.breathPhase})`}>
+              <rect x="13" y="10" width="2" height="5" fill="#F4EBD9" />
+              <rect x="13" y="7" width="2" height="3" fill="#FFD166" />
+              <rect x="14" y="8" width="1" height="1" fill="#FFFFFF" />
+              <rect x="47" y="11" width="2" height="5" fill="#F4EBD9" />
+              <rect x="47" y="8" width="2" height="3" fill="#FFD166" />
+              <rect x="48" y="9" width="1" height="1" fill="#FFFFFF" />
+            </g>
+
+            {/* Long Flowing Ash-Velvet Liturgical Robes (5-tone cloth shading) */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="18" y="21" width="26" height="35" fill="#120D17" />
+              <rect x="19" y="22" width="24" height="33" fill={pal.primaryDark} />
+              <rect x="21" y="23" width="20" height="31" fill={pal.primary} />
+              <rect x="23" y="24" width="16" height="29" fill={pal.secondaryDark} />
+              {/* Vertical Crimson & Gold Embroidered Stole */}
+              <rect x="25" y="22" width="3" height="32" fill={pal.metal} />
+              <rect x="34" y="22" width="3" height="32" fill={pal.metal} />
+              <rect x="26" y="23" width="1" height="30" fill={pal.metalLight} />
+              <rect x="35" y="23" width="1" height="30" fill={pal.metalLight} />
+              {/* Exposed Skeletal Rib-Collar & Scroll Belt */}
+              <rect x="23" y="22" width="16" height="2" fill={pal.skinOrBone} />
+              <rect x="24" y="25" width="14" height="2" fill={pal.skinShadow} />
+              <rect x="20" y="37" width="22" height="3" fill="#1C1424" />
+              <rect x="29" y="36" width="4" height="5" fill={pal.metalLight} />
+              {/* Hanging Parchment Prayer Strips */}
+              <rect x="24" y="40" width="3" height="8" fill={pal.skinOrBone} />
+              <rect x="35" y="40" width="3" height="9" fill={pal.skinShadow} />
+            </g>
+
+            {/* Left Arm + Swinging Chain Thurible Censer */}
+            <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY + pose.propY})`}>
+              <rect x="41" y="25" width="6" height="5" fill={pal.primary} />
+              <rect x="44" y="28" width="4" height="3" fill={pal.skinOrBone} />
+              <rect x="45" y="31" width="1" height="7" fill={pal.metalLight} />
+              <rect x="47" y="31" width="1" height="7" fill={pal.metal} />
+              <rect x="42" y="38" width="8" height="7" fill={pal.metalDark} />
+              <rect x="43" y="39" width="6" height="5" fill={pal.metalLight} />
+              <rect x="44" y="36" width="4" height="3" fill="#FFD166" />
+              <rect x="45" y={33 - (pose.secondaryPhase % 2)} width="2" height="3" fill="#FFF3C4" />
+            </g>
+
+            {/* Tall Ceremonial Bishop Mitre & Whispering Skull Visage */}
+            <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+              <rect x="25" y="2" width="12" height="4" fill={pal.secondaryDark} />
+              <rect x="23" y="5" width="16" height="7" fill={pal.secondary} />
+              <rect x="30" y="2" width="2" height="9" fill={pal.metalLight} />
+              <rect x="26" y="6" width="10" height="2" fill={pal.metalLight} />
+              <rect x="24" y="11" width="14" height="8" fill={pal.skinShadow} />
+              <rect x="25" y="11" width="12" height="7" fill={pal.skinOrBone} />
+              <rect x="26" y="12" width="10" height="4" fill="#FFF8EC" />
+              <rect x="26" y="13" width="3" height="3" fill="#09070D" />
+              <rect x="33" y="13" width="3" height="3" fill="#09070D" />
+              {!pose.eyeBlink && (
+                <g fill="#FFD166">
+                  <rect x={27 + pose.eyeShiftX} y="14" width="2" height="2" />
+                  <rect x={34 + pose.eyeShiftX} y="14" width="2" height="2" />
+                </g>
+              )}
+              <g transform={`translate(0, ${pose.jawOpen})`}>
+                <rect x="26" y="19" width="10" height="3" fill={pal.skinShadow} />
+                <rect x="27" y="19" width="2" height="2" fill="#FFF8EC" />
+                <rect x="30" y="19" width="2" height="2" fill="#FFF8EC" />
+                <rect x="33" y="19" width="2" height="2" fill="#FFF8EC" />
+              </g>
+            </g>
+
+            {/* Right Arm + Tall Horned Skull-Crowned Necromancer Staff */}
+            <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+              <rect x="12" y="10" width="3" height="45" fill="#4A3525" />
+              <rect x="13" y="10" width="1" height="44" fill="#7D5B42" />
+              <rect x="9" y="6" width="9" height="6" fill={pal.skinOrBone} />
+              <rect x="10" y="8" width="2" height="2" fill="#09070D" />
+              <rect x="15" y="8" width="2" height="2" fill="#09070D" />
+              <rect x="11" y="3" width="5" height="3" fill="#FFD166" />
+              <rect x="12" y="1" width="3" height="2" fill="#FFF3C4" />
+            </g>
+          </g>
+        );
+      }
+
+      if (isArcher) {
+        // SILHOUETTE C: CROUCHED SEPULCHER GREATBOW MARKSMAN (Bristling quiver, hooded sniper cloak, drawn bone greatbow)
+        return (
+          <g>
+            {/* Back Bone-Quiver Bristling with Fletched Arrows */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="37" y="14" width="8" height="20" fill="#4A2E20" />
+              <rect x="38" y="15" width="6" height="18" fill="#6E4632" />
+              <rect x="38" y="9" width="2" height="6" fill={pal.skinOrBone} />
+              <rect x="37" y="8" width="4" height="2" fill="#C93B5B" />
+              <rect x="42" y="10" width="2" height="5" fill={pal.skinOrBone} />
+              <rect x="41" y="9" width="4" height="2" fill="#FFD166" />
+              <rect x="45" y="11" width="2" height="5" fill={pal.skinOrBone} />
+            </g>
+
+            {/* Wide Crouched Marksman Legs & Knee-Guards */}
+            <g transform={`translate(0, ${pose.isDeadCollapsed ? 8 : 0})`}>
+              <rect x="19" y="43" width="5" height="13" fill={pal.primaryDark} />
+              <rect x="20" y="44" width="3" height="11" fill={pal.skinShadow} />
+              <rect x="17" y="53" width="8" height="4" fill={pal.metalDark} />
+              <rect x="36" y="43" width="5" height="13" fill={pal.primaryDark} />
+              <rect x="37" y="44" width="3" height="11" fill={pal.skinShadow} />
+              <rect x="35" y="53" width="8" height="4" fill={pal.metalDark} />
+            </g>
+
+            {/* Crouched Leather Brigandine, Bandolier & Tattered Ranger Scarf */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="20" y="23" width="22" height="21" fill={pal.primaryDark} />
+              <rect x="22" y="24" width="18" height="19" fill={pal.primary} />
+              <rect x="24" y="27" width="14" height="2" fill={pal.skinOrBone} />
+              <rect x="25" y="31" width="12" height="2" fill={pal.skinShadow} />
+              <rect x="22" y="24" width="16" height="3" fill={pal.metal} />
+              <rect x="21" y="37" width="20" height="3" fill="#1C1424" />
+              <rect x="29" y="36" width="4" height="5" fill={pal.metalLight} />
+            </g>
+
+            {/* Deep Ranger Hood & One-Eyed Sniper Skull */}
+            <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+              <rect x="21" y="9" width="19" height="14" fill={pal.secondaryDark} />
+              <rect x="22" y="10" width="17" height="11" fill={pal.secondary} />
+              <rect x="24" y="12" width="13" height="9" fill="#09070D" />
+              <rect x="25" y="13" width="11" height="7" fill={pal.skinOrBone} />
+              <rect x="26" y="15" width="4" height="3" fill="#09070D" />
+              {!pose.eyeBlink && (
+                <g>
+                  <rect x={27 + pose.eyeShiftX} y="15" width="2" height="2" fill="#FFD166" />
+                  <rect x={27 + pose.eyeShiftX} y="15" width="1" height="1" fill="#FFFFFF" />
+                </g>
+              )}
+              <rect x="32" y="14" width="4" height="4" fill={pal.metalDark} />
+            </g>
+
+            {/* Massive Curved Bone-and-Bronze Sepulcher Greatbow + Nocked Spectral Arrow */}
+            <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+              <rect x="11" y="7" width="3" height="10" fill={pal.skinOrBone} />
+              <rect x="9" y="15" width="3" height="18" fill={pal.metalLight} />
+              <rect x="11" y="31" width="3" height="11" fill={pal.skinOrBone} />
+              <rect x="13" y="5" width="3" height="3" fill={pal.metal} />
+              <rect x="13" y="41" width="3" height="3" fill={pal.metal} />
+              <rect x="15" y="7" width="1" height="35" fill="#D8C6A0" />
+              <rect x="4" y="23" width="16" height="2" fill="#FFD166" />
+              <rect x="2" y="22" width="4" height="4" fill="#FFF3C4" />
+            </g>
+          </g>
+        );
+      }
+
+      // SILHOUETTE A: ROYAL CRYPT SENTINEL (Heavy Crowned Skeleton Warrior with Cape, Broadsword & Kite Shield)
       return (
         <g>
-          {/* Rotted Royal Burgundy Velvet Cloak (sways with secondaryPhase) */}
+          {/* Rotted Royal Burgundy Velvet Cloak (5-tone shading) */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect
-              x={19 + (pose.secondaryPhase % 2)}
-              y="19"
-              width="24"
-              height="31"
-              fill={pal.secondaryDark}
-            />
-            <rect
-              x={21 + (pose.secondaryPhase % 2)}
-              y="21"
-              width="20"
-              height="27"
-              fill={pal.secondary}
-            />
+            <rect x={16 + (pose.secondaryPhase % 2)} y="18" width="30" height="34" fill="#1A0910" />
+            <rect x={18 + (pose.secondaryPhase % 2)} y="19" width="26" height="32" fill={pal.secondaryDark} />
+            <rect x={20 + (pose.secondaryPhase % 2)} y="21" width="22" height="28" fill={pal.secondary} />
+            <rect x="21" y="49" width="3" height="3" fill={pal.secondaryDark} />
+            <rect x="28" y="49" width="4" height="4" fill={pal.secondaryDark} />
+            <rect x="36" y="49" width="3" height="3" fill={pal.secondaryDark} />
           </g>
 
-          {/* Skeletal Legs & Armored Sabatons */}
+          {/* Heavy Armored Greaves & Skeletal Knees */}
           <g transform={`translate(0, ${pose.isDeadCollapsed ? 8 : 0})`}>
-            <rect x="24" y="42" width="3" height="13" fill={pal.skinShadow} />
-            <rect x="25" y="42" width="1" height="12" fill={pal.skinOrBone} />
-            <rect x="22" y="53" width="6" height="4" fill={pal.metal} />
-            <rect x="35" y="42" width="3" height="13" fill={pal.skinShadow} />
-            <rect x="36" y="42" width="1" height="12" fill={pal.skinOrBone} />
-            <rect x="34" y="53" width="6" height="4" fill={pal.metal} />
+            <rect x="22" y="42" width="6" height="14" fill="#120E17" />
+            <rect x="23" y="42" width="4" height="12" fill={pal.skinShadow} />
+            <rect x="24" y="43" width="2" height="10" fill={pal.skinOrBone} />
+            <rect x="20" y="52" width="8" height="5" fill={pal.metalDark} />
+            <rect x="21" y="53" width="6" height="3" fill={pal.metalLight} />
+
+            <rect x="34" y="42" width="6" height="14" fill="#120E17" />
+            <rect x="35" y="42" width="4" height="12" fill={pal.skinShadow} />
+            <rect x="36" y="43" width="2" height="10" fill={pal.skinOrBone} />
+            <rect x="33" y="52" width="8" height="5" fill={pal.metalDark} />
+            <rect x="34" y="53" width="6" height="3" fill={pal.metalLight} />
           </g>
 
-          {/* Articulated Ribcage, Oxidized Cuirass & Burial Gold Medallion */}
+          {/* Articulated Ribcage, Oxidized Plate Cuirass, Pauldrons & Royal Medallion */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect x="22" y="21" width="18" height="19" fill={pal.primaryDark} />
-            {/* Individual Ribs & Spine */}
+            <rect x="20" y="20" width="22" height="22" fill="#120E17" />
+            <rect x="22" y="21" width="18" height="20" fill={pal.primaryDark} />
             <rect x="30" y="21" width="2" height="19" fill={pal.skinShadow} />
-            <rect x="24" y="23" width="14" height="2" fill={pal.skinOrBone} />
-            <rect x="25" y="27" width="12" height="2" fill={pal.skinOrBone} />
-            <rect x="26" y="31" width="10" height="2" fill={pal.skinShadow} />
-            {/* Oxidized Gold Pauldrons & Burial Necklace */}
-            <rect x="18" y="19" width="7" height="6" fill={pal.metalDark} />
-            <rect x="19" y="20" width="5" height="4" fill={pal.metal} />
-            <rect x="37" y="19" width="7" height="6" fill={pal.metalDark} />
-            <rect x="38" y="20" width="5" height="4" fill={pal.metal} />
-            <rect x="28" y="22" width="6" height="4" fill={pal.metalLight} />
-            <rect x="30" y="23" width="2" height="2" fill={pal.secondary} />
+            <rect x="23" y="23" width="16" height="2" fill={pal.skinOrBone} />
+            <rect x="24" y="23" width="5" height="1" fill="#FFF8EC" />
+            <rect x="24" y="27" width="14" height="2" fill={pal.skinOrBone} />
+            <rect x="25" y="31" width="12" height="2" fill={pal.skinShadow} />
+            <rect x="26" y="35" width="10" height="2" fill={pal.skinShadow} />
+            <rect x="15" y="18" width="9" height="8" fill="#120E17" />
+            <rect x="16" y="19" width="7" height="6" fill={pal.metalDark} />
+            <rect x="17" y="20" width="5" height="4" fill={pal.metal} />
+            <rect x="18" y="20" width="3" height="2" fill={pal.metalLight} />
+            <rect x="38" y="18" width="9" height="8" fill="#120E17" />
+            <rect x="39" y="19" width="7" height="6" fill={pal.metalDark} />
+            <rect x="40" y="20" width="5" height="4" fill={pal.metal} />
+            <rect x="41" y="20" width="3" height="2" fill={pal.metalLight} />
+            <rect x="28" y="21" width="6" height="5" fill={pal.metalLight} />
+            <rect x="30" y="22" width="2" height="3" fill={pal.secondary} />
+            <rect x="21" y="38" width="20" height="3" fill={pal.metalDark} />
+            <rect x="29" y="37" width="4" height="5" fill={pal.metalLight} />
           </g>
 
-          {/* Left Arm: Royal Heraldic Shield or Wax Candle Censer */}
-          <g
-            transform={`translate(${pose.torsoX + pose.propX}, ${
-              pose.torsoY + pose.propY
-            })`}
-          >
-            {isAcolyte ? (
-              /* Burning Funeral Candle Censer */
-              <g>
-                <rect x="41" y="28" width="6" height="9" fill={pal.metal} />
-                <rect x="42" y="23" width="4" height="5" fill="#F4EBD9" />
-                <rect x="43" y="19" width="2" height="4" fill="#FFD166" />
-                <rect x="43" y="20" width="1" height="2" fill="#FFFFFF" />
-              </g>
-            ) : (
-              /* Cracked Royal Crest Shield */
-              <g>
-                <rect x="38" y="22" width="12" height="20" fill={pal.primaryDark} />
-                <rect x="39" y="23" width="10" height="18" fill={pal.secondary} />
-                <rect x="39" y="23" width="10" height="2" fill={pal.metalLight} />
-                <rect x="43" y="26" width="2" height="12" fill={pal.metalLight} />
-                <rect x="41" y="30" width="6" height="2" fill={pal.metalLight} />
-              </g>
-            )}
+          {/* Left Arm + Royal Heraldic Kite Shield */}
+          <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY + pose.propY})`}>
+            <rect x="38" y="20" width="15" height="24" fill="#120E17" />
+            <rect x="39" y="21" width="13" height="22" fill={pal.metalDark} />
+            <rect x="40" y="22" width="11" height="20" fill={pal.secondaryDark} />
+            <rect x="41" y="23" width="9" height="18" fill={pal.secondary} />
+            <rect x="39" y="21" width="13" height="2" fill={pal.metalLight} />
+            <rect x="44" y="24" width="3" height="15" fill={pal.metalLight} />
+            <rect x="41" y="29" width="9" height="3" fill={pal.metalLight} />
+            <rect x="45" y="29" width="1" height="3" fill="#FFF8EC" />
           </g>
 
           {/* Articulated Skull, Cracked Royal Crown & Moving Jaw */}
-          <g
-            transform={`translate(${pose.torsoX + pose.headX}, ${
-              pose.torsoY + pose.headY
-            })`}
-          >
-            {/* Cracked Gold Burial Crown */}
-            <rect x="24" y="6" width="14" height="4" fill={pal.metalDark} />
-            <rect x="25" y="4" width="2" height="5" fill={pal.metalLight} />
-            <rect x="30" y="3" width="2" height="6" fill={pal.metalLight} />
-            <rect x="35" y="5" width="2" height="4" fill={pal.metal} />
+          <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+            <rect x="22" y="5" width="18" height="5" fill={pal.metalDark} />
+            <rect x="23" y="6" width="16" height="3" fill={pal.metal} />
+            <rect x="23" y="3" width="2" height="5" fill={pal.metalLight} />
+            <rect x="27" y="2" width="2" height="6" fill={pal.metalLight} />
+            <rect x="30" y="1" width="2" height="7" fill="#FFF8EC" />
+            <rect x="34" y="2" width="2" height="6" fill={pal.metalLight} />
+            <rect x="37" y="4" width="2" height="4" fill={pal.metal} />
             <rect x="30" y="6" width="2" height="2" fill={pal.secondary} />
-            {/* Detailed Cranium */}
-            <rect x="24" y="9" width="14" height="8" fill={pal.skinOrBone} />
-            <rect x="25" y="10" width="12" height="6" fill="#F5EFE6" />
-            {/* Dark Eye Sockets + Ember Pupils */}
-            <rect x="26" y="12" width="3" height="3" fill="#09070D" />
-            <rect x="33" y="12" width="3" height="3" fill="#09070D" />
+            <rect x="23" y="9" width="16" height="9" fill="#120E17" />
+            <rect x="24" y="9" width="14" height="8" fill={pal.skinShadow} />
+            <rect x="25" y="10" width="12" height="6" fill={pal.skinOrBone} />
+            <rect x="26" y="10" width="10" height="3" fill="#FFF8EC" />
+            <rect x="25" y="12" width="4" height="3" fill="#09070D" />
+            <rect x="33" y="12" width="4" height="3" fill="#09070D" />
             {!pose.eyeBlink && (
               <g>
-                <rect
-                  x={27 + pose.eyeShiftX}
-                  y="13"
-                  width="2"
-                  height="2"
-                  fill={pal.eyeGlow}
-                />
-                <rect
-                  x={34 + pose.eyeShiftX}
-                  y="13"
-                  width="2"
-                  height="2"
-                  fill={pal.eyeGlow}
-                />
+                <rect x={26 + pose.eyeShiftX} y="13" width="2" height="2" fill={pal.eyeGlow} />
+                <rect x={26 + pose.eyeShiftX} y="13" width="1" height="1" fill="#FFF8EC" />
+                <rect x={34 + pose.eyeShiftX} y="13" width="2" height="2" fill={pal.eyeGlow} />
+                <rect x={34 + pose.eyeShiftX} y="13" width="1" height="1" fill="#FFF8EC" />
               </g>
             )}
-            {/* Articulated Mandible / Jaw */}
+            <rect x="30" y="14" width="2" height="2" fill="#09070D" />
             <g transform={`translate(0, ${pose.jawOpen})`}>
+              <rect x="25" y="17" width="12" height="4" fill="#120E17" />
               <rect x="26" y="17" width="10" height="3" fill={pal.skinShadow} />
-              <rect x="27" y="17" width="1" height="2" fill={pal.skinOrBone} />
-              <rect x="29" y="17" width="1" height="2" fill={pal.skinOrBone} />
-              <rect x="31" y="17" width="1" height="2" fill={pal.skinOrBone} />
-              <rect x="33" y="17" width="1" height="2" fill={pal.skinOrBone} />
+              <rect x="27" y="17" width="1" height="2" fill="#FFF8EC" />
+              <rect x="29" y="17" width="1" height="2" fill="#FFF8EC" />
+              <rect x="31" y="17" width="1" height="2" fill="#FFF8EC" />
+              <rect x="33" y="17" width="1" height="2" fill="#FFF8EC" />
+              <rect x="35" y="17" width="1" height="2" fill="#FFF8EC" />
             </g>
           </g>
 
-          {/* Right Arm + Ceremonial Broadsword or Sepulcher Greatbow */}
-          <g
-            transform={`translate(${pose.torsoX + pose.weaponX}, ${
-              pose.torsoY + pose.weaponY
-            })`}
-          >
-            {isArcher ? (
-              <g>
-                <rect x="11" y="12" width="2" height="28" fill={pal.metal} />
-                <rect x="13" y="10" width="3" height="3" fill={pal.metalLight} />
-                <rect x="13" y="39" width="3" height="3" fill={pal.metalLight} />
-                <rect x="15" y="12" width="1" height="28" fill={pal.skinOrBone} />
-                <rect x="8" y="25" width="10" height="2" fill={pal.eyeGlow} />
-              </g>
-            ) : (
-              <g>
-                <rect x="13" y="7" width="4" height="24" fill="#9A96A4" />
-                <rect x="14" y="7" width="2" height="22" fill="#E5DEC9" />
-                <rect x="10" y="30" width="10" height="3" fill={pal.metalLight} />
-                <rect x="14" y="33" width="2" height="5" fill={pal.secondary} />
-              </g>
-            )}
+          {/* Right Arm + Notched Royal Sepulcher Broadsword */}
+          <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+            <rect x="11" y="4" width="6" height="28" fill="#120E17" />
+            <rect x="12" y="5" width="4" height="26" fill="#7D7A8A" />
+            <rect x="13" y="5" width="2" height="25" fill="#D9D0BC" />
+            <rect x="13" y="6" width="1" height="22" fill="#FFFFFF" />
+            <rect x="14" y="12" width="1" height="14" fill={pal.secondary} />
+            <rect x="8" y="30" width="12" height="3" fill={pal.metalDark} />
+            <rect x="9" y="30" width="10" height="2" fill={pal.metalLight} />
+            <rect x="13" y="33" width="2" height="5" fill={pal.secondaryDark} />
+            <rect x="12" y="38" width="4" height="3" fill={pal.metalLight} />
           </g>
         </g>
       );
@@ -2182,77 +2418,305 @@ function renderArticulatedCreatureFamily(
     }
 
     // ========================================================================
-    // JARDÍN PODRIDO: HUÉSPED DEL MICELIO / ESPORA / ZARZA
-    // Fungal mushroom caps pulsing on shoulders, spore sacs, root tendrils.
+    // JARDÍN PODRIDO 1: BROTE ESPORA GUARDIÁN / HUÉSPED DEL MICELIO (Hulking Fungal Brute)
+    // Wide armored bark-and-mushroom frontline juggernaut with stacked polypore
+    // shoulder plates, living root tower shield, and toxic spore-maul.
     // ========================================================================
-    case 'GARDEN_MYCELIUM_HOST':
-    case 'GARDEN_SPORE_FLOAT':
+    case 'GARDEN_MYCELIUM_HOST': {
+      return (
+        <g>
+          {/* Thick Gnarled Root-Greaves & Mossy Talons */}
+          <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
+            <rect x="18" y="42" width="9" height="14" fill="#0F1711" />
+            <rect x="19" y="43" width="7" height="12" fill={pal.metalDark} />
+            <rect x="20" y="44" width="5" height="10" fill={pal.metal} />
+            <rect x="21" y="45" width="2" height="7" fill={pal.primaryLight} />
+            <rect x="16" y="54" width="11" height="3" fill="#18261B" />
+            <rect x="16" y="55" width="2" height="2" fill={pal.skinOrBone} />
+            <rect x="20" y="55" width="2" height="2" fill={pal.skinOrBone} />
+
+            <rect x="35" y="42" width="9" height="14" fill="#0F1711" />
+            <rect x="36" y="43" width="7" height="12" fill={pal.metalDark} />
+            <rect x="37" y="44" width="5" height="10" fill={pal.metal} />
+            <rect x="38" y="45" width="2" height="7" fill={pal.primaryLight} />
+            <rect x="34" y="54" width="11" height="3" fill="#18261B" />
+            <rect x="39" y="55" width="2" height="2" fill={pal.skinOrBone} />
+            <rect x="43" y="55" width="2" height="2" fill={pal.skinOrBone} />
+          </g>
+
+          {/* Broad Bark-Carapace Torso, Polypore Shelf Pauldrons & Pulsing Spore Heart */}
+          <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+            <rect x="15" y="19" width="32" height="25" fill="#0F1711" />
+            <rect x="16" y="20" width="30" height="23" fill={pal.primaryDark} />
+            <rect x="18" y="21" width="26" height="21" fill={pal.primary} />
+            <rect x="20" y="22" width="22" height="16" fill={pal.primaryLight} />
+            {/* Stacked Bracket-Mushroom Pauldrons on Shoulders */}
+            <rect x="11" y="16" width="10" height="6" fill="#4E2F61" />
+            <rect x="12" y="15" width="8" height="4" fill="#8E5EA8" />
+            <rect x="13" y="15" width="5" height="2" fill="#C997E6" />
+            <rect x="41" y="15" width="11" height="7" fill="#4E2F61" />
+            <rect x="42" y="14" width="9" height="5" fill="#8E5EA8" />
+            <rect x="44" y="14" width="5" height="2" fill="#C997E6" />
+            {/* Exposed Wooden Rib-Slats & Inflating Bioluminescent Spore Sac */}
+            <rect x="22" y="24" width="18" height="12" fill="#121C14" />
+            <rect
+              x="24"
+              y="25"
+              width={8 + pose.breathPhase}
+              height={8 + pose.breathPhase}
+              fill="#683B7D"
+            />
+            <rect
+              x="25"
+              y="26"
+              width={6 + pose.breathPhase}
+              height={6 + pose.breathPhase}
+              fill="#9159AD"
+            />
+            <rect x="27" y="28" width="3" height="3" fill={pal.eyeGlow} />
+            <rect x="34" y="27" width="5" height="6" fill={pal.accent} />
+            <rect x="35" y="28" width="2" height="3" fill="#FFFFFF" />
+            {/* Heavy Root-Vine Belt & Bone Trophy Buckle */}
+            <rect x="17" y="38" width="28" height="4" fill="#291D12" />
+            <rect x="28" y="37" width="6" height="5" fill={pal.skinOrBone} />
+            <rect x="30" y="39" width="2" height="2" fill="#0F1711" />
+          </g>
+
+          {/* Left Arm + Living Root & Mushroom Tower Pavise Shield */}
+          <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY + pose.propY})`}>
+            <rect x="40" y="20" width="15" height="24" fill="#0F1711" />
+            <rect x="41" y="21" width="13" height="22" fill={pal.metalDark} />
+            <rect x="42" y="22" width="11" height="20" fill={pal.metal} />
+            <rect x="43" y="23" width="9" height="18" fill={pal.primary} />
+            <rect x="44" y="25" width="7" height="4" fill="#8E5EA8" />
+            <rect x="45" y="25" width="4" height="2" fill="#D4FF80" />
+            <rect x="46" y="29" width="3" height="5" fill={pal.skinOrBone} />
+            <rect x="43" y="35" width="8" height="3" fill={pal.primaryLight} />
+          </g>
+
+          {/* Wide Armored Toadstool Canopy Head, Gills & 3 Glowing Fungal Eyes */}
+          <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+            <rect x="11" y="8" width="40" height="7" fill="#1E1029" />
+            <rect x="12" y="7" width="38" height="6" fill="#4E2F61" />
+            <rect x="15" y="4" width="32" height="7" fill="#6E3F8A" />
+            <rect x="19" y="2" width="24" height="6" fill="#9159AD" />
+            <rect x="23" y="2" width="14" height="3" fill="#C997E6" />
+            <rect x="16" y="7" width="4" height="3" fill={pal.skinOrBone} />
+            <rect x="17" y="7" width="2" height="2" fill="#FFF8EC" />
+            <rect x="28" y="4" width="5" height="4" fill={pal.skinOrBone} />
+            <rect x="29" y="4" width="3" height="2" fill="#FFF8EC" />
+            <rect x="39" y="6" width="4" height="3" fill={pal.skinOrBone} />
+            <rect x="14" y="12" width="34" height="3" fill="#2D1A3B" />
+            <rect x="17" y="12" width="2" height="3" fill={pal.skinShadow} />
+            <rect x="23" y="12" width="2" height="3" fill={pal.skinShadow} />
+            <rect x="37" y="12" width="2" height="3" fill={pal.skinShadow} />
+            <rect x="43" y="12" width="2" height="3" fill={pal.skinShadow} />
+            <rect x="21" y="14" width="20" height="8" fill="#0F1711" />
+            <rect x="22" y="15" width="18" height="6" fill={pal.primaryDark} />
+            {!pose.eyeBlink && (
+              <g>
+                <rect x={24 + pose.eyeShiftX} y="16" width="3" height="3" fill={pal.eyeGlow} />
+                <rect x={25 + pose.eyeShiftX} y="16" width="1" height="1" fill="#FFFFFF" />
+                <rect x={30 + pose.eyeShiftX} y="15" width="2" height="2" fill="#FFD166" />
+                <rect x={34 + pose.eyeShiftX} y="16" width="3" height="3" fill={pal.eyeGlow} />
+                <rect x={35 + pose.eyeShiftX} y="16" width="1" height="1" fill="#FFFFFF" />
+              </g>
+            )}
+            <g transform={`translate(0, ${pose.jawOpen})`}>
+              <rect x="24" y="21" width="14" height="3" fill={pal.metalDark} />
+              <rect x="25" y="20" width="2" height="2" fill={pal.skinOrBone} />
+              <rect x="29" y="20" width="2" height="2" fill={pal.skinOrBone} />
+              <rect x="33" y="20" width="2" height="2" fill={pal.skinOrBone} />
+            </g>
+          </g>
+
+          {/* Right Arm + Heavy Spore-Crusher Root Maul */}
+          <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+            <rect x="9" y="14" width="4" height="36" fill="#291D12" />
+            <rect x="10" y="14" width="2" height="35" fill={pal.metal} />
+            <rect x="3" y="8" width="16" height="12" fill="#1E1029" />
+            <rect x="4" y="9" width="14" height="10" fill="#6E3F8A" />
+            <rect x="6" y="10" width="10" height="6" fill="#9159AD" />
+            <rect x="5" y="12" width="3" height="3" fill={pal.eyeGlow} />
+            <rect x="13" y="11" width="3" height="3" fill={pal.eyeGlow} />
+          </g>
+        </g>
+      );
+    }
+
+    // ========================================================================
+    // JARDÍN PODRIDO 2: CHAMÁN FÚNGICO / ESPORA ERRANTE (Tall Crooked Mycelial Mystic)
+    // Towering curled witch-mushroom cap, veiled wooden ritual mask, tattered
+    // herbalist robes with potion bandolier, and tall gnarled staff with
+    // swinging bioluminescent spore-censer lantern!
+    // ========================================================================
+    case 'GARDEN_SPORE_FLOAT': {
+      return (
+        <g>
+          {/* Orbiting Bioluminescent Spore Motes */}
+          <g transform={`translate(${pose.torsoX}, ${pose.torsoY - pose.breathPhase})`}>
+            <rect x="10" y="12" width="3" height="3" fill="#7BDFF2" />
+            <rect x="11" y="12" width="1" height="1" fill="#FFFFFF" />
+            <rect x="49" y="16" width="3" height="3" fill="#D4FF80" />
+            <rect x="50" y="16" width="1" height="1" fill="#FFFFFF" />
+          </g>
+
+          {/* Slender Root-Wrapped Legs & Herbalist Sandals */}
+          <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
+            <rect x="24" y="45" width="4" height="12" fill={pal.primaryDark} />
+            <rect x="25" y="45" width="2" height="11" fill={pal.metal} />
+            <rect x="34" y="45" width="4" height="12" fill={pal.primaryDark} />
+            <rect x="35" y="45" width="2" height="11" fill={pal.metal} />
+          </g>
+
+          {/* Tall Layered Spore-Priest Vestments, Alchemical Vial Bandolier & Herb Pouches */}
+          <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+            <rect x="19" y="21" width="24" height="30" fill="#0E1A16" />
+            <rect x="20" y="22" width="22" height="27" fill={pal.primaryDark} />
+            <rect x="22" y="23" width="18" height="24" fill={pal.primary} />
+            <rect x="24" y="24" width="14" height="21" fill={pal.secondaryDark} />
+            <rect x="28" y="23" width="6" height="25" fill={pal.secondary} />
+            <rect x="30" y="25" width="2" height="21" fill="#7BDFF2" />
+            <rect x="21" y="26" width="20" height="3" fill={pal.metalDark} />
+            <rect x="23" y="25" width="3" height="5" fill="#FF4D6D" />
+            <rect x="24" y="26" width="1" height="2" fill="#FFF3C4" />
+            <rect x="29" y="26" width="3" height="5" fill="#7BDFF2" />
+            <rect x="30" y="27" width="1" height="2" fill="#FFFFFF" />
+            <rect x="35" y="27" width="3" height="5" fill="#D4FF80" />
+            <rect x="21" y="36" width="20" height="3" fill="#291D12" />
+            <rect x="22" y="38" width="5" height="5" fill={pal.metal} />
+            <rect x="35" y="38" width="5" height="5" fill={pal.metal} />
+            <rect x="29" y="36" width="4" height="4" fill="#FFD166" />
+          </g>
+
+          {/* Left Arm: Casting Gnarled Claw + Swirling Spore Hex */}
+          <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY + pose.propY})`}>
+            <rect x="40" y="24" width="7" height="5" fill={pal.primary} />
+            <rect x="45" y="23" width="5" height="4" fill={pal.skinOrBone} />
+            <rect x="44" y={16 - (pose.secondaryPhase % 2)} width="8" height="6" fill="#7BDFF2" opacity="0.85" />
+            <rect x="46" y={17 - (pose.secondaryPhase % 2)} width="4" height="4" fill="#D4FF80" />
+            <rect x="47" y={18 - (pose.secondaryPhase % 2)} width="2" height="2" fill="#FFFFFF" />
+          </g>
+
+          {/* Towering Curled Witch-Mushroom Hat & Carved Wooden Ritual Mask */}
+          <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+            <rect x="30" y="0" width="7" height="3" fill="#1B4A43" />
+            <rect x="35" y="2" width="5" height="4" fill="#328276" />
+            <rect x="25" y="2" width="10" height="4" fill="#1B4A43" />
+            <rect x="26" y="3" width="8" height="4" fill="#328276" />
+            <rect x="21" y="6" width="18" height="5" fill="#328276" />
+            <rect x="23" y="6" width="14" height="4" fill="#55AD8E" />
+            <rect x="13" y="10" width="34" height="4" fill="#122E2A" />
+            <rect x="15" y="9" width="30" height="3" fill="#328276" />
+            <rect x="18" y="9" width="24" height="2" fill="#7BDFF2" />
+            <rect x="15" y="14" width="2" height="3" fill="#7BDFF2" />
+            <rect x="43" y="14" width="2" height="3" fill="#7BDFF2" />
+            <rect x="24" y="13" width="13" height="9" fill="#291D12" />
+            <rect x="25" y="14" width="11" height="7" fill={pal.skinOrBone} />
+            <rect x="26" y="14" width="9" height="2" fill={pal.skinShadow} />
+            {!pose.eyeBlink && (
+              <g>
+                <rect x={26 + pose.eyeShiftX} y="16" width="3" height="2" fill="#09070D" />
+                <rect x={27 + pose.eyeShiftX} y="16" width="2" height="2" fill="#7BDFF2" />
+                <rect x={32 + pose.eyeShiftX} y="16" width="3" height="2" fill="#09070D" />
+                <rect x={33 + pose.eyeShiftX} y="16" width="2" height="2" fill="#7BDFF2" />
+              </g>
+            )}
+            <rect x="26" y="21" width="9" height="4" fill={pal.primaryLight} />
+            <rect x="28" y="25" width="5" height="3" fill={pal.accent} />
+          </g>
+
+          {/* Right Arm + Tall Gnarled Elder-Root Staff with Swinging Spore-Lantern Censer */}
+          <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+            <rect x="11" y="5" width="3" height="50" fill="#291D12" />
+            <rect x="12" y="6" width="1" height="48" fill={pal.metalLight} />
+            <rect x="5" y="3" width="10" height="3" fill="#291D12" />
+            <rect x="6" y="4" width="8" height="2" fill={pal.metalLight} />
+            <g transform={`translate(${pose.propX}, 0)`}>
+              <rect x="6" y="6" width="1" height="5" fill="#D8C6A0" />
+              <rect x="3" y="11" width="7" height="9" fill="#1B4A43" />
+              <rect x="4" y="12" width="5" height="7" fill="#7BDFF2" />
+              <rect x="5" y="13" width="3" height="5" fill="#D4FF80" />
+              <rect x="6" y="14" width="1" height="3" fill="#FFFFFF" />
+            </g>
+          </g>
+        </g>
+      );
+    }
+
+    // ========================================================================
+    // JARDÍN PODRIDO 3: ZARZA ESTRANGULADORA / ARAÑA DE MICELIO (Low-Slung Briar-Arachnid)
+    // Wide, low-slung 6-legged predatory crawler with bulbous spore-sac abdomen,
+    // 6 glowing arachnid eyes & raptorial thorn claws!
+    // ========================================================================
     case 'GARDEN_THORN_BEAST': {
       return (
         <g>
-          {/* Twitching Root Legs */}
-          <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
-            <rect x="21" y="43" width="6" height="13" fill={pal.metalDark} />
-            <rect x="36" y="43" width="6" height="13" fill={pal.metal} />
-            <rect x="18" y="54" width="9" height="3" fill={pal.primaryDark} />
-            <rect x="35" y="54" width="10" height="3" fill={pal.primaryDark} />
+          {/* 6 Articulated Thorny Spider-Root Legs (Wide Low Stance) */}
+          <g transform={`translate(0, ${pose.isDeadCollapsed ? 6 : 0})`}>
+            <rect x="8" y="36" width="8" height="3" fill="#0F1711" />
+            <rect x="6" y="38" width="4" height="18" fill={pal.metalDark} />
+            <rect x="7" y="39" width="2" height="16" fill={pal.primaryLight} />
+
+            <rect x="14" y="40" width="6" height="3" fill="#0F1711" />
+            <rect x="13" y="42" width="4" height="15" fill={pal.metalDark} />
+            <rect x="14" y="43" width="2" height="13" fill={pal.metal} />
+
+            <rect x="21" y="43" width="4" height="14" fill={pal.metalDark} />
+            <rect x="39" y="43" width="4" height="14" fill={pal.metalDark} />
+            <rect x="45" y="42" width="4" height="15" fill={pal.metalDark} />
+            <rect x="46" y="43" width="2" height="13" fill={pal.metal} />
+            <rect x="52" y="38" width="4" height="18" fill={pal.metalDark} />
+            <rect x="53" y="39" width="2" height="16" fill={pal.primaryLight} />
           </g>
 
-          {/* Bark-and-Moss Torso with Inflating Toxic Spore Sacs */}
+          {/* Bulbous Parasitic Spore-Abdomen & Sprouting Back Mushrooms */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect x="18" y="21" width="27" height="24" fill={pal.primaryDark} />
-            <rect x="20" y="22" width="23" height="21" fill={pal.primary} />
-            {/* Pulsing Bioluminescent Spore Sacs on Chest */}
+            <rect x="24" y="22" width="26" height="22" fill="#141F16" />
+            <rect x="26" y="23" width="22" height="19" fill={pal.primary} />
+            <rect x="28" y="24" width="18" height="15" fill={pal.primaryLight} />
             <rect
-              x="24"
+              x="31"
               y="26"
-              width={7 + pose.breathPhase}
-              height={7 + pose.breathPhase}
-              fill={pal.secondary}
+              width={12 + pose.breathPhase}
+              height={9 + pose.breathPhase}
+              fill="#6E3F8A"
             />
-            <rect x="26" y="28" width="3" height="3" fill={pal.eyeGlow} />
-            <rect
-              x="34"
-              y="30"
-              width="6"
-              height="6"
-              fill={pal.accent}
-            />
+            <rect x="33" y="28" width="4" height="4" fill="#D4FF80" />
+            <rect x="34" y="29" width="2" height="2" fill="#FFFFFF" />
+            <rect x="40" y="29" width="3" height="3" fill="#8EE6AE" />
+            <rect x="33" y="17" width="2" height="5" fill={pal.skinOrBone} />
+            <rect x="30" y="14" width="8" height="4" fill="#8E5EA8" />
+            <rect x="32" y="14" width="4" height="2" fill="#C997E6" />
+            <rect x="43" y="18" width="2" height="4" fill={pal.skinOrBone} />
+            <rect x="41" y="16" width="6" height="3" fill="#8E5EA8" />
           </g>
 
-          {/* Giant Spotted Fungal Cap Head & Flower-Maw */}
-          <g
-            transform={`translate(${pose.torsoX + pose.headX}, ${
-              pose.torsoY + pose.headY
-            })`}
-          >
-            {/* Wide Mushroom Canopy */}
-            <rect x="14" y="9" width="34" height="6" fill={pal.secondaryDark} />
-            <rect x="17" y="6" width="28" height="7" fill={pal.secondary} />
-            {/* Fungal Cream Spots */}
-            <rect x="20" y="8" width="4" height="3" fill={pal.skinOrBone} />
-            <rect x="29" y="7" width="5" height="3" fill={pal.skinOrBone} />
-            <rect x="38" y="8" width="4" height="3" fill={pal.skinOrBone} />
-            {/* Under-Cap Gills & Glowing Eyes */}
-            <rect x="22" y="15" width="18" height="8" fill={pal.primaryDark} />
+          {/* Low Crouched Cephalothorax, 6 Arachnid Eyes & Snapping Briar Mandibles */}
+          <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+            <rect x="13" y="27" width="16" height="14" fill="#0F1711" />
+            <rect x="14" y="28" width="14" height="12" fill={pal.primaryDark} />
             {!pose.eyeBlink && (
-              <g>
-                <rect x="25" y="17" width="3" height="2" fill={pal.eyeGlow} />
-                <rect x="34" y="17" width="3" height="2" fill={pal.eyeGlow} />
+              <g fill="#D4FF80">
+                <rect x={15 + pose.eyeShiftX} y="30" width="2" height="2" />
+                <rect x={18 + pose.eyeShiftX} y="29" width="3" height="3" />
+                <rect x={19 + pose.eyeShiftX} y="29" width="1" height="1" fill="#FFFFFF" />
+                <rect x={22 + pose.eyeShiftX} y="30" width="2" height="2" />
+                <rect x={16 + pose.eyeShiftX} y="33" width="2" height="2" fill="#7BDFF2" />
+                <rect x={21 + pose.eyeShiftX} y="33" width="2" height="2" fill="#7BDFF2" />
               </g>
             )}
+            <g transform={`translate(0, ${pose.jawOpen})`}>
+              <rect x="9" y="36" width="6" height="4" fill={pal.skinOrBone} />
+              <rect x="7" y="38" width="3" height="3" fill="#D4FF80" />
+            </g>
           </g>
 
-          {/* Whipping Thorn Vine / Spore Club */}
-          <g
-            transform={`translate(${pose.torsoX + pose.weaponX}, ${
-              pose.torsoY + pose.weaponY
-            })`}
-          >
-            <rect x="9" y="18" width="9" height="5" fill={pal.primaryLight} />
-            <rect x="7" y="22" width="5" height="18" fill={pal.metal} />
-            <rect x="5" y="26" width="3" height="3" fill={pal.eyeGlow} />
-            <rect x="11" y="32" width="3" height="3" fill={pal.eyeGlow} />
+          {/* Raptorial Serrated Thorn-Scythe Foreclaws */}
+          <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+            <rect x="4" y="25" width="11" height="4" fill={pal.primaryLight} />
+            <rect x="2" y="28" width="5" height="11" fill="#8EE6AE" />
+            <rect x="3" y="29" width="2" height="8" fill="#FFF8EC" />
           </g>
         </g>
       );
@@ -3560,6 +4024,16 @@ export const LaCriptaAnimatedStageNpc: React.FC<{
 
   const trimColor = dungeon.palette.highlight || '#E7A54A';
   const glowColor = dungeon.palette.glow || '#FFD166';
+
+  // Never render a post-combat NPC when a combat / elite / miniboss / boss room is cleared!
+  if (
+    rType === 'COMBAT' ||
+    rType === 'ELITE' ||
+    rType === 'MINIBOSS' ||
+    rType === 'BOSS'
+  ) {
+    return null;
+  }
 
   return (
     <div

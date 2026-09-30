@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   CriptaCanonicalRoomType,
   CriptaDungeonDefinition,
@@ -684,52 +684,290 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
   dungeon: CriptaDungeonDefinition;
   isBossOrMiniboss?: boolean;
 }> = ({ dungeon, isBossOrMiniboss = false }) => {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setTick((t) => (t + 1) % 24);
+    }, 340);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const biomeId = dungeon.id;
+  const flicker = tick % 3 === 0 ? 1 : tick % 3 === 1 ? 0.86 : 0.94;
+  const pulseY = tick % 4 === 1 || tick % 4 === 2 ? -1 : 0;
+  const driftX = (tick % 6) - 2;
+  const particleLift = tick % 8;
+
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden select-none">
       {/* Deep Biome Atmospheric Gradient */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 transition-opacity duration-500"
         style={{
-          background: `radial-gradient(ellipse at 50% 42%, ${dungeon.palette.glow}2A 0%, ${dungeon.palette.fog}66 48%, ${dungeon.palette.stoneDark} 92%)`,
+          background: `radial-gradient(ellipse at 50% 42%, ${dungeon.palette.glow}33 0%, ${dungeon.palette.fog}75 48%, ${dungeon.palette.stoneDark} 94%)`,
         }}
       />
 
-      {/* Full-Stage Pixel Art Architectural Silhouettes & Pedestal */}
+      {/* Full-Stage Pixel Art Biome Architecture, Props, Lighting & Ambient Particles */}
       <svg
         viewBox="0 0 160 120"
         preserveAspectRatio="none"
         shapeRendering="crispEdges"
-        className="absolute inset-0 w-full h-full opacity-55"
+        className="absolute inset-0 w-full h-full opacity-75"
       >
-        {/* Distant Vault Pillars */}
-        <rect x="10" y="0" width="12" height="96" fill={dungeon.palette.stone} opacity="0.55" />
-        <rect x="138" y="0" width="12" height="96" fill={dungeon.palette.stone} opacity="0.55" />
-        <rect x="22" y="0" width="4" height="88" fill={dungeon.palette.stoneDark} opacity="0.7" />
-        <rect x="134" y="0" width="4" height="88" fill={dungeon.palette.stoneDark} opacity="0.7" />
+        {/* Distant Vault Pillars & Layered Stonework */}
+        <rect x="8" y="0" width="13" height="92" fill={dungeon.palette.stone} opacity="0.52" />
+        <rect x="139" y="0" width="13" height="92" fill={dungeon.palette.stone} opacity="0.52" />
+        <rect x="21" y="0" width="4" height="88" fill={dungeon.palette.stoneDark} opacity="0.78" />
+        <rect x="135" y="0" width="4" height="88" fill={dungeon.palette.stoneDark} opacity="0.78" />
+
+        {/* Brick Mortar & Crack Lines on Pillars */}
+        <rect x="9" y="22" width="11" height="1" fill="#09070E" opacity="0.6" />
+        <rect x="11" y="46" width="9" height="1" fill="#09070E" opacity="0.6" />
+        <rect x="8" y="68" width="12" height="1" fill="#09070E" opacity="0.6" />
+        <rect x="140" y="26" width="10" height="1" fill="#09070E" opacity="0.6" />
+        <rect x="139" y="52" width="11" height="1" fill="#09070E" opacity="0.6" />
 
         {/* Upper Gothic Arch Silhouette */}
-        <rect x="0" y="0" width="160" height="10" fill="#07050A" opacity="0.8" />
-        <rect x="26" y="10" width="108" height="3" fill={dungeon.palette.stone} opacity="0.45" />
+        <rect x="0" y="0" width="160" height="9" fill="#07050A" opacity="0.86" />
+        <rect x="24" y="9" width="112" height="3" fill={dungeon.palette.stone} opacity="0.45" />
 
-        {/* Wall Torches / Biome Sconces */}
+        {/* ================================================================ */}
+        {/* BIOME-SPECIFIC ARCHITECTURAL PROPS & LIVING DETAILS              */}
+        {/* ================================================================ */}
+
+        {biomeId === 'jardin_podrido' && (
+          <g>
+            {/* Hanging Overgrown Vines & Tangled Canopy Roots */}
+            <rect x="28" y="9" width="3" height={22 + (tick % 2)} fill="#1D3622" />
+            <rect x="30" y="20" width="2" height="15" fill="#355E3B" />
+            <rect x="46" y="9" width="2" height="16" fill="#234229" />
+            <rect x="114" y="9" width="2" height="19" fill="#234229" />
+            <rect x="128" y="9" width="3" height={25 - (tick % 2)} fill="#1D3622" />
+            <rect x="127" y="24" width="2" height="14" fill="#355E3B" />
+
+            {/* Giant Background Bioluminescent Fungal Stalks (Left & Right) */}
+            <rect x="25" y="66" width="5" height="20" fill="#5A4D41" />
+            <rect x="27" y="66" width="2" height="20" fill="#8C7A68" />
+            <rect x="18" y="58" width="19" height="8" fill="#4A2559" />
+            <rect x="20" y="55" width="15" height="4" fill="#7A3E8F" />
+            <rect x="22" y="59" width="11" height="2" fill="#A55CC2" />
+            {/* Glowing Fungal Cap Spots */}
+            <rect x="22" y="57" width="3" height="2" fill="#B8FF66" opacity={flicker} />
+            <rect x="29" y="60" width="3" height="2" fill="#D4FF80" opacity={flicker} />
+            <rect x="20" y="65" width="15" height="2" fill="#2D1638" />
+
+            {/* Right Cluster of Glowing Toadstools */}
+            <rect x="128" y="70" width="4" height="16" fill="#5A4D41" />
+            <rect x="122" y="63" width="16" height="7" fill="#3D204A" />
+            <rect x="124" y="61" width="12" height="3" fill="#7A3E8F" />
+            <rect x="126" y="63" width="3" height="2" fill="#B8FF66" opacity={flicker} />
+            <rect x="132" y="65" width="2" height="2" fill="#8CE65A" opacity={flicker} />
+
+            {/* Smaller Foreground Spore Bulbs on Floor */}
+            <rect x="38" y="81" width="6" height="4" fill="#59306B" />
+            <rect x="39" y="80" width="4" height="2" fill="#B8FF66" opacity={flicker} />
+            <rect x="116" y="81" width="6" height="4" fill="#59306B" />
+            <rect x="117" y="80" width="4" height="2" fill="#B8FF66" opacity={flicker} />
+
+            {/* Floating Bioluminescent Spore Particles */}
+            <rect x={34 + driftX} y={70 - particleLift * 4} width="2" height="2" fill="#B8FF66" opacity="0.8" />
+            <rect x={62 - driftX} y={64 - ((particleLift + 3) % 8) * 4} width="2" height="2" fill="#D4FF80" opacity="0.7" />
+            <rect x={98 + driftX} y={68 - ((particleLift + 5) % 8) * 4} width="2" height="2" fill="#B8FF66" opacity="0.75" />
+            <rect x={122 - driftX} y={60 - ((particleLift + 2) % 8) * 4} width="2" height="2" fill="#C285E6" opacity="0.75" />
+            <rect x={78} y={52 - particleLift * 3} width="1" height="1" fill="#E6FFB2" opacity="0.65" />
+          </g>
+        )}
+
+        {biomeId === 'catacumbas_reales' && (
+          <g>
+            {/* Recessed Skull Ossuary Niches in Walls */}
+            <rect x="26" y="46" width="14" height="24" fill="#0B0912" />
+            <rect x="28" y="50" width="4" height="4" fill="#9E927B" opacity="0.6" />
+            <rect x="34" y="50" width="4" height="4" fill="#8A7E68" opacity="0.6" />
+            <rect x="28" y="58" width="4" height="4" fill="#8A7E68" opacity="0.6" />
+            <rect x="34" y="58" width="4" height="4" fill="#9E927B" opacity="0.6" />
+
+            <rect x="120" y="46" width="14" height="24" fill="#0B0912" />
+            <rect x="122" y="50" width="4" height="4" fill="#9E927B" opacity="0.6" />
+            <rect x="128" y="50" width="4" height="4" fill="#8A7E68" opacity="0.6" />
+            <rect x="122" y="58" width="4" height="4" fill="#8A7E68" opacity="0.6" />
+            <rect x="128" y="58" width="4" height="4" fill="#9E927B" opacity="0.6" />
+
+            {/* Hanging Crypt Chains & Necromantic Green Torch Sconces */}
+            <rect x="44" y="12" width="2" height="18" fill="#4E4A59" />
+            <rect x="114" y="12" width="2" height="22" fill="#4E4A59" />
+            <rect x="29" y="25" width="6" height="6" fill="#5CE6A0" opacity={flicker} />
+            <rect x="125" y="25" width="6" height="6" fill="#5CE6A0" opacity={flicker} />
+
+            {/* Rising Soul Wisps & Crypt Dust Motes */}
+            <rect x={42 + driftX} y={68 - particleLift * 4} width="2" height="3" fill="#5CE6A0" opacity="0.65" />
+            <rect x={112 - driftX} y={64 - ((particleLift + 4) % 8) * 4} width="2" height="3" fill="#5CE6A0" opacity="0.65" />
+          </g>
+        )}
+
+        {biomeId === 'bosque_susurrante' && (
+          <g>
+            {/* Gnarled Deadwood Trunks & Hanging Briar Branches */}
+            <rect x="22" y="12" width="9" height="74" fill="#1E1714" />
+            <rect x="31" y="24" width="12" height="4" fill="#29201B" />
+            <rect x="129" y="12" width="9" height="74" fill="#1E1714" />
+            <rect x="117" y="28" width="12" height="4" fill="#29201B" />
+
+            {/* Drifting Ground Mist & Will-o'-Wisp Fireflies */}
+            <rect x={18 + driftX * 2} y="76" width="48" height="4" fill="#4B6B63" opacity="0.32" />
+            <rect x={92 - driftX * 2} y="78" width="46" height="4" fill="#4B6B63" opacity="0.32" />
+            <rect x={44 + driftX} y={62 - particleLift * 3} width="2" height="2" fill="#8CE6B8" opacity={flicker} />
+            <rect x={108 - driftX} y={58 - ((particleLift + 3) % 8) * 3} width="2" height="2" fill="#B8FFE0" opacity={flicker} />
+          </g>
+        )}
+
+        {biomeId === 'forja_infernal' && (
+          <g>
+            {/* Dwarf Smelter Crucible Pipes & Molten Lava Channels */}
+            <rect x="26" y="12" width="8" height="72" fill="#2B2121" />
+            <rect x="28" y="12" width="4" height="72" fill="#FF5926" opacity={flicker} />
+            <rect x="30" y="12" width="1" height="72" fill="#FFD166" opacity={flicker} />
+
+            <rect x="126" y="12" width="8" height="72" fill="#2B2121" />
+            <rect x="128" y="12" width="4" height="72" fill="#FF5926" opacity={flicker} />
+            <rect x="129" y="12" width="1" height="72" fill="#FFD166" opacity={flicker} />
+
+            {/* Rising Forge Sparks & Cinders */}
+            <rect x={38 + driftX} y={76 - particleLift * 6} width="2" height="2" fill="#FF8C3B" opacity="0.9" />
+            <rect x={76 - driftX} y={74 - ((particleLift + 3) % 8) * 6} width="2" height="2" fill="#FFD166" opacity="0.85" />
+            <rect x={118 + driftX} y={78 - ((particleLift + 5) % 8) * 6} width="2" height="2" fill="#FF5926" opacity="0.9" />
+          </g>
+        )}
+
+        {biomeId === 'alcantarillas_imperiales' && (
+          <g>
+            {/* Iron Sewer Grates & Dripping Toxic Sluice Pipes */}
+            <rect x="26" y="34" width="16" height="12" fill="#1C2621" />
+            <rect x="28" y="34" width="2" height="12" fill="#3B4D43" />
+            <rect x="33" y="34" width="2" height="12" fill="#3B4D43" />
+            <rect x="38" y="34" width="2" height="12" fill="#3B4D43" />
+            {/* Dripping Acid Stream */}
+            <rect x="31" y="46" width="4" height="40" fill="#6EE64E" opacity="0.55" />
+            <rect x="32" y={48 + particleLift * 4} width="2" height="4" fill="#C4FF80" />
+
+            <rect x="118" y="34" width="16" height="12" fill="#1C2621" />
+            <rect x="123" y="46" width="4" height="40" fill="#6EE64E" opacity="0.55" />
+            <rect x="124" y={48 + ((particleLift + 4) % 8) * 4} width="2" height="4" fill="#C4FF80" />
+
+            {/* Rising Alchemical / Sewer Gas Bubbles */}
+            <rect x={46 + driftX} y={76 - particleLift * 4} width="3" height="3" fill="#80FF59" opacity="0.65" />
+            <rect x={112 - driftX} y={74 - ((particleLift + 3) % 8) * 4} width="3" height="3" fill="#80FF59" opacity="0.65" />
+          </g>
+        )}
+
+        {biomeId === 'cavernas_heladas' && (
+          <g>
+            {/* Jagged Ceiling Icicles & Frozen Crystal Columns */}
+            <rect x="26" y="9" width="6" height="18" fill="#6EC2E6" opacity="0.8" />
+            <rect x="28" y="27" width="2" height="8" fill="#B8F2FF" opacity="0.9" />
+            <rect x="40" y="9" width="4" height="14" fill="#6EC2E6" opacity="0.75" />
+            <rect x="116" y="9" width="4" height="15" fill="#6EC2E6" opacity="0.75" />
+            <rect x="128" y="9" width="6" height="20" fill="#6EC2E6" opacity="0.8" />
+            <rect x="130" y="29" width="2" height="8" fill="#B8F2FF" opacity="0.9" />
+
+            {/* Falling Snowflakes & Frost Crystals */}
+            <rect x={36 + driftX} y={18 + particleLift * 7} width="2" height="2" fill="#E0FAFF" opacity="0.85" />
+            <rect x={78 - driftX} y={14 + ((particleLift + 3) % 8) * 7} width="2" height="2" fill="#B8F2FF" opacity="0.8" />
+            <rect x={118 + driftX} y={20 + ((particleLift + 5) % 8) * 7} width="2" height="2" fill="#E0FAFF" opacity="0.85" />
+          </g>
+        )}
+
+        {/* Default & Shared Wall Sconces with Animated Flicker */}
         <rect x="30" y="32" width="4" height="10" fill="#2B2138" />
-        <rect x="29" y="27" width="6" height="5" fill={dungeon.palette.highlight} opacity="0.85" />
-        <rect x="30" y="24" width="4" height="3" fill="#FFF3B0" opacity="0.9" />
+        <rect
+          x="29"
+          y={27 + pulseY}
+          width="6"
+          height="5"
+          fill={dungeon.palette.highlight}
+          opacity={0.85 * flicker}
+        />
+        <rect
+          x="30"
+          y={24 + pulseY}
+          width="4"
+          height="3"
+          fill="#FFF3B0"
+          opacity={0.92 * flicker}
+        />
 
         <rect x="126" y="32" width="4" height="10" fill="#2B2138" />
-        <rect x="125" y="27" width="6" height="5" fill={dungeon.palette.highlight} opacity="0.85" />
-        <rect x="126" y="24" width="4" height="3" fill="#FFF3B0" opacity="0.9" />
+        <rect
+          x="125"
+          y={27 + pulseY}
+          width="6"
+          height="5"
+          fill={dungeon.palette.highlight}
+          opacity={0.85 * flicker}
+        />
+        <rect
+          x="126"
+          y={24 + pulseY}
+          width="4"
+          height="3"
+          fill="#FFF3B0"
+          opacity={0.92 * flicker}
+        />
+
+        {/* Ambient Floating Motes for All Other Biomes */}
+        {biomeId !== 'jardin_podrido' &&
+          biomeId !== 'forja_infernal' &&
+          biomeId !== 'cavernas_heladas' && (
+            <g>
+              <rect
+                x={48 + driftX}
+                y={68 - particleLift * 4}
+                width="2"
+                height="2"
+                fill={dungeon.palette.glow}
+                opacity="0.65"
+              />
+              <rect
+                x={108 - driftX}
+                y={62 - ((particleLift + 4) % 8) * 4}
+                width="2"
+                height="2"
+                fill={dungeon.palette.highlight}
+                opacity="0.65"
+              />
+            </g>
+          )}
 
         {/* Creature Stage Stone Pedestal / Ground Plane */}
-        <rect x="0" y="88" width="160" height="32" fill="#08060D" opacity="0.88" />
-        <rect x="14" y="84" width="132" height="5" fill={dungeon.palette.stone} opacity="0.75" />
-        <rect x="24" y="82" width="112" height="2" fill={dungeon.palette.highlight} opacity="0.38" />
+        <rect x="0" y="88" width="160" height="32" fill="#08060D" opacity="0.9" />
+        <rect x="12" y="84" width="136" height="5" fill={dungeon.palette.stone} opacity="0.82" />
+        <rect x="20" y="83" width="120" height="1" fill={dungeon.palette.highlight} opacity="0.45" />
+        {/* Carved Pedestal Stone Blocks */}
+        <rect x="38" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
+        <rect x="80" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
+        <rect x="122" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
 
         {/* Boss / Miniboss Runic Circle Glow on Floor */}
         {isBossOrMiniboss && (
           <>
-            <rect x="36" y="85" width="88" height="2" fill={dungeon.palette.highlight} opacity="0.75" />
-            <rect x="48" y="88" width="64" height="1" fill={dungeon.palette.glow} opacity="0.85" />
+            <rect
+              x="34"
+              y="85"
+              width="92"
+              height="2"
+              fill={dungeon.palette.highlight}
+              opacity={0.8 * flicker}
+            />
+            <rect
+              x="46"
+              y="88"
+              width="68"
+              height="1"
+              fill={dungeon.palette.glow}
+              opacity={0.9 * flicker}
+            />
           </>
         )}
       </svg>

@@ -38,123 +38,173 @@ export const LaCriptaItemPixelIcon: React.FC<{
     >
       {itemId === 'venda' && (
         <g>
-          {/* Bandage roll with crimson cross */}
-          <rect x="2" y="4" width="12" height="8" fill="#D9D0BC" />
-          <rect x="3" y="3" width="10" height="10" fill="#EAE2D0" />
-          <rect x="4" y="5" width="8" height="6" fill="#D8C6A0" />
-          <rect x="7" y="5" width="2" height="6" fill="#C93B5B" />
-          <rect x="5" y="7" width="6" height="2" fill="#C93B5B" />
-          <rect x="12" y="9" width="3" height="2" fill="#D9D0BC" />
+          {/* Dark Pixel Outline */}
+          <rect x="2" y="3" width="12" height="10" fill="#18121E" />
+          {/* Multi-tone Linen Bandage Roll with Folds & Crimson Cross */}
+          <rect x="3" y="4" width="10" height="8" fill="#B8AC96" />
+          <rect x="4" y="4" width="8" height="7" fill="#D9D0BC" />
+          <rect x="4" y="4" width="7" height="2" fill="#F2ECE1" />
+          <rect x="4" y="9" width="8" height="1" fill="#8C7F6A" />
+          {/* Crimson Healer Cross */}
+          <rect x="7" y="5" width="2" height="6" fill="#9E2340" />
+          <rect x="5" y="7" width="6" height="2" fill="#9E2340" />
+          <rect x="7" y="6" width="2" height="4" fill="#E02F56" />
+          <rect x="6" y="7" width="4" height="2" fill="#E02F56" />
+          <rect x="7" y="7" width="1" height="1" fill="#FF9BB0" />
+          {/* Loose Linen Tail */}
+          <rect x="13" y="9" width="2" height="3" fill="#18121E" />
+          <rect x="13" y="10" width="2" height="1" fill="#D9D0BC" />
         </g>
       )}
       {(itemId === 'pocion_curacion' || itemId === 'pocion_mayor') && (
         <g>
-          {/* Cork & glass neck */}
-          <rect x="6" y="1" width="4" height="2" fill="#B88746" />
-          <rect x="5" y="3" width="6" height="1" fill="#A9C6D9" />
+          {/* Dark Outline */}
+          <rect x="5" y="1" width="6" height="4" fill="#140E1C" />
+          <rect x="2" y="5" width="12" height="10" fill="#140E1C" />
+          {/* Cork & Glass Lip */}
+          <rect x="6" y="1" width="4" height="2" fill="#9E6B30" />
+          <rect x="6" y="1" width="2" height="1" fill="#D9A05B" />
+          <rect x="5" y="3" width="6" height="1" fill="#C4E8F5" />
           <rect x="6" y="4" width="4" height="2" fill="#7D9FB8" />
-          {/* Flask body */}
+          {/* Multi-Tone Crimson Alchemical Flask */}
           <rect
             x="3"
             y="6"
             width="10"
             height="8"
-            fill={itemId === 'pocion_mayor' ? '#E02F56' : '#C93B5B'}
+            fill={itemId === 'pocion_mayor' ? '#7A1129' : '#631022'}
           />
           <rect
             x="4"
-            y="5"
+            y="6"
             width="8"
-            height="10"
-            fill={itemId === 'pocion_mayor' ? '#C93B5B' : '#9E2340'}
+            height="7"
+            fill={itemId === 'pocion_mayor' ? '#C9244B' : '#A82040'}
           />
-          {/* Liquid highlight & gold trim on Mayor */}
-          <rect x="5" y="7" width="2" height="4" fill="#FF9BB0" />
+          <rect
+            x="4"
+            y="8"
+            width="7"
+            height="4"
+            fill={itemId === 'pocion_mayor' ? '#FF3B6B' : '#E02F56'}
+          />
+          {/* Specular Glass Reflection & Meniscus */}
+          <rect x="4" y="7" width="7" height="1" fill="#FF85A1" />
+          <rect x="4" y="7" width="2" height="4" fill="#FFD6E0" />
           {itemId === 'pocion_mayor' && (
-            <rect x="3" y="9" width="10" height="2" fill="#E7A54A" />
+            <g>
+              <rect x="3" y="9" width="10" height="2" fill="#B87D28" />
+              <rect x="4" y="9" width="8" height="1" fill="#FFD166" />
+              <rect x="7" y="8" width="2" height="4" fill="#FFF3C4" />
+            </g>
           )}
         </g>
       )}
       {itemId === 'antidoto' && (
         <g>
-          <rect x="6" y="1" width="4" height="2" fill="#B88746" />
-          <rect x="6" y="3" width="4" height="3" fill="#A9C6D9" />
-          <rect x="4" y="6" width="8" height="8" fill="#3B9B64" />
-          <rect x="5" y="7" width="6" height="6" fill="#5EE088" />
-          <rect x="5" y="7" width="2" height="3" fill="#C8FFE0" />
+          <rect x="5" y="1" width="6" height="5" fill="#140E1C" />
+          <rect x="3" y="5" width="10" height="10" fill="#140E1C" />
+          <rect x="6" y="1" width="4" height="2" fill="#9E6B30" />
+          <rect x="5" y="3" width="6" height="1" fill="#C4E8F5" />
+          <rect x="6" y="4" width="4" height="2" fill="#7D9FB8" />
+          <rect x="4" y="6" width="8" height="8" fill="#1E5E3A" />
+          <rect x="4" y="7" width="7" height="6" fill="#3B9B64" />
+          <rect x="5" y="8" width="5" height="4" fill="#5EE088" />
+          <rect x="5" y="7" width="2" height="3" fill="#D4FFE4" />
         </g>
       )}
       {itemId === 'tonico_claridad' && (
         <g>
+          <rect x="5" y="1" width="6" height="4" fill="#140E1C" />
+          <rect x="3" y="4" width="10" height="11" fill="#140E1C" />
           <rect x="6" y="1" width="4" height="2" fill="#E7A54A" />
           <rect x="5" y="3" width="6" height="2" fill="#A9C6D9" />
-          <rect x="4" y="5" width="8" height="9" fill="#468EA8" />
-          <rect x="5" y="6" width="6" height="7" fill="#6CD4FF" />
-          <rect x="7" y="7" width="2" height="4" fill="#FFFFFF" />
+          <rect x="4" y="5" width="8" height="9" fill="#245B73" />
+          <rect x="5" y="6" width="6" height="7" fill="#46A8CC" />
+          <rect x="5" y="7" width="5" height="5" fill="#7CE0FF" />
+          <rect x="5" y="6" width="2" height="4" fill="#FFFFFF" />
         </g>
       )}
       {itemId === 'unguento_igneo' && (
         <g>
-          {/* Wide jar with warm salve */}
+          <rect x="3" y="1" width="10" height="3" fill="#140E1C" />
+          <rect x="2" y="4" width="12" height="10" fill="#140E1C" />
           <rect x="4" y="2" width="8" height="2" fill="#8C5A32" />
-          <rect x="3" y="4" width="10" height="9" fill="#D97A2B" />
-          <rect x="4" y="5" width="8" height="7" fill="#FFB347" />
-          <rect x="6" y="6" width="4" height="4" fill="#FFF3C4" />
+          <rect x="5" y="2" width="6" height="1" fill="#C48852" />
+          <rect x="3" y="4" width="10" height="9" fill="#9E421B" />
+          <rect x="4" y="5" width="8" height="7" fill="#E06D2B" />
+          <rect x="5" y="6" width="6" height="5" fill="#FFB347" />
+          <rect x="6" y="6" width="3" height="3" fill="#FFF3C4" />
         </g>
       )}
       {itemId === 'sal_purificadora' && (
         <g>
-          {/* Crystalline pouch */}
+          <rect x="5" y="1" width="6" height="3" fill="#140E1C" />
+          <rect x="3" y="4" width="10" height="10" fill="#140E1C" />
           <rect x="6" y="2" width="4" height="2" fill="#E7A54A" />
-          <rect x="4" y="4" width="8" height="9" fill="#9B72CF" />
-          <rect x="5" y="5" width="6" height="7" fill="#D8C6A0" />
+          <rect x="4" y="4" width="8" height="9" fill="#5E3D82" />
+          <rect x="5" y="5" width="6" height="7" fill="#9B72CF" />
           <rect x="7" y="6" width="2" height="5" fill="#FFFFFF" />
           <rect x="5" y="8" width="6" height="2" fill="#FFFFFF" />
         </g>
       )}
       {itemId === 'elixir_fuerza' && (
         <g>
+          <rect x="5" y="1" width="6" height="4" fill="#140E1C" />
+          <rect x="2" y="5" width="12" height="10" fill="#140E1C" />
           <rect x="6" y="1" width="4" height="2" fill="#E7A54A" />
-          <rect x="5" y="3" width="6" height="3" fill="#593E25" />
-          <rect x="3" y="6" width="10" height="8" fill="#B83227" />
-          <rect x="4" y="7" width="8" height="6" fill="#FF6B3D" />
-          <rect x="7" y="7" width="2" height="5" fill="#FFF3C4" />
+          <rect x="5" y="3" width="6" height="2" fill="#593E25" />
+          <rect x="3" y="6" width="10" height="8" fill="#7D1D18" />
+          <rect x="4" y="6" width="8" height="7" fill="#C93829" />
+          <rect x="5" y="7" width="6" height="5" fill="#FF6B3D" />
+          <rect x="5" y="7" width="2" height="4" fill="#FFF3C4" />
         </g>
       )}
       {itemId === 'elixir_hierro' && (
         <g>
+          <rect x="5" y="1" width="6" height="3" fill="#140E1C" />
+          <rect x="3" y="3" width="10" height="12" fill="#140E1C" />
           <rect x="6" y="1" width="4" height="2" fill="#D8C6A0" />
-          <rect x="4" y="3" width="8" height="11" fill="#4A6475" />
-          <rect x="5" y="4" width="6" height="9" fill="#7CA3B8" />
-          <rect x="6" y="5" width="4" height="4" fill="#C4E8F5" />
+          <rect x="4" y="3" width="8" height="11" fill="#324654" />
+          <rect x="5" y="4" width="6" height="9" fill="#688DA3" />
+          <rect x="5" y="5" width="5" height="7" fill="#9BC4DB" />
+          <rect x="5" y="5" width="2" height="4" fill="#EBF8FF" />
         </g>
       )}
       {itemId === 'elixir_arcano' && (
         <g>
-          <rect x="6" y="1" width="4" height="2" fill="#E7A54A" />
+          <rect x="5" y="1" width="6" height="4" fill="#140E1C" />
+          <rect x="2" y="5" width="12" height="10" fill="#140E1C" />
+          <rect x="6" y="1" width="4" height="2" fill="#FFD166" />
           <rect x="5" y="3" width="6" height="2" fill="#7656A8" />
-          <rect x="3" y="5" width="10" height="9" fill="#63389E" />
-          <rect x="4" y="6" width="8" height="7" fill="#B57CFF" />
-          <rect x="7" y="7" width="2" height="4" fill="#FFF3C4" />
+          <rect x="3" y="5" width="10" height="9" fill="#3D1E6D" />
+          <rect x="4" y="6" width="8" height="7" fill="#7B46CC" />
+          <rect x="5" y="7" width="6" height="5" fill="#C77DFF" />
+          <rect x="5" y="7" width="2" height="3" fill="#FFF3C4" />
         </g>
       )}
       {itemId === 'bomba_humo' && (
         <g>
-          {/* Fuse + dark iron sphere */}
-          <rect x="9" y="1" width="3" height="2" fill="#E7A54A" />
+          <rect x="9" y="1" width="3" height="2" fill="#FF6B3D" />
+          <rect x="10" y="1" width="1" height="1" fill="#FFF3C4" />
           <rect x="7" y="2" width="2" height="2" fill="#D8C6A0" />
+          <rect x="2" y="4" width="12" height="11" fill="#120E1A" />
           <rect x="3" y="4" width="10" height="10" fill="#2A2633" />
           <rect x="4" y="5" width="8" height="8" fill="#474157" />
-          <rect x="5" y="6" width="3" height="3" fill="#8C84A3" />
+          <rect x="5" y="6" width="5" height="5" fill="#68607D" />
+          <rect x="5" y="6" width="2" height="2" fill="#B8B0CC" />
         </g>
       )}
       {itemId === 'frasco_volatil' && (
         <g>
+          <rect x="5" y="1" width="6" height="4" fill="#140E1C" />
+          <rect x="2" y="5" width="12" height="10" fill="#140E1C" />
           <rect x="6" y="1" width="4" height="2" fill="#E7A54A" />
           <rect x="5" y="3" width="6" height="2" fill="#A9C6D9" />
-          <rect x="3" y="5" width="10" height="9" fill="#2C8C4B" />
-          <rect x="4" y="6" width="8" height="7" fill="#7CFC00" />
-          <rect x="6" y="7" width="4" height="4" fill="#FFF3C4" />
+          <rect x="3" y="5" width="10" height="9" fill="#1B5E2E" />
+          <rect x="4" y="6" width="8" height="7" fill="#38B04A" />
+          <rect x="5" y="7" width="6" height="5" fill="#80FF40" />
+          <rect x="5" y="7" width="2" height="3" fill="#FFF3C4" />
         </g>
       )}
     </svg>
@@ -356,28 +406,38 @@ export const LaCriptaGroundDropsOverlay: React.FC<{
   drops: CriptaRoomGroundDrop[];
   onClaimDrop: (dropId: string) => void;
 }> = ({ drops, onClaimDrop }) => {
-  const unclaimed = drops.filter((d) => !d.claimedByPlayerId);
+  const unclaimed = drops.filter((d) => !d.claimed && !d.claimedByPlayerId);
   if (unclaimed.length === 0) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-4 bottom-2.5 z-30 flex flex-wrap items-center justify-center gap-3">
+    <div className="pointer-events-none relative z-30 flex flex-wrap items-center justify-center gap-3 py-1">
       {unclaimed.map((drop) => {
-        const itemDef = drop.kind === 'ITEM' && drop.itemId ? CRIPTA_ITEMS_REGISTRY[drop.itemId] : null;
-        const relicDef = drop.kind === 'RELIC' && drop.relicId ? CRIPTA_RELICS_REGISTRY[drop.relicId] : null;
-        const title = itemDef ? itemDef.name : relicDef ? relicDef.name : 'Botín';
-        const isRelic = drop.kind === 'RELIC';
+        const resolvedId = drop.dropId || drop.id || drop.label;
+        const isRelic = drop.type === 'RELIC_PEDESTAL' || drop.kind === 'RELIC';
+        const isGold = drop.type === 'GOLD_POUCH' || drop.kind === 'GOLD';
+        const itemDef = drop.itemId ? CRIPTA_ITEMS_REGISTRY[drop.itemId] : null;
+        const relicDef = drop.relicId ? CRIPTA_RELICS_REGISTRY[drop.relicId] : null;
+        const title = drop.label || itemDef?.name || relicDef?.name || 'Botín';
 
         return (
           <LaCriptaPixelTooltip
-            key={drop.id}
+            key={resolvedId}
             title={title}
-            category={isRelic ? 'RELIQUIA CAÍDA' : 'BOTÍN DE SALA'}
+            category={
+              isRelic
+                ? 'RELIQUIA ANCESTRAL'
+                : isGold
+                ? 'BOLSA DE ORO'
+                : 'BOTÍN DE LA SALA'
+            }
             description={
               itemDef
                 ? itemDef.description
                 : relicDef
                 ? relicDef.description
-                : 'Haz clic para recoger este objeto del suelo.'
+                : isGold && drop.goldAmount
+                ? `Bolsa con +${drop.goldAmount} de oro para el grupo.`
+                : 'Haz clic para recoger este botín del altar de piedra.'
             }
             footerLabel="CLIC PARA RECOGER"
             borderColor={isRelic ? '#FFD166' : '#E7A54A'}
@@ -394,19 +454,39 @@ export const LaCriptaGroundDropsOverlay: React.FC<{
               type="button"
               onClick={() => {
                 laCriptaAudio.playGoldChange(true);
-                onClaimDrop(drop.id);
+                onClaimDrop(resolvedId);
               }}
-              className={`group px-2.5 py-1.5 border-2 flex items-center gap-2 transition-all cursor-pointer animate-bounce shadow-[0_0_18px_rgba(0,0,0,0.9)] ${
+              className={`group px-3 py-2 border-2 flex items-center gap-2.5 transition-all cursor-pointer hover:-translate-y-0.5 shadow-[0_6px_20px_rgba(0,0,0,0.92)] ${
                 isRelic
                   ? 'bg-[#221233]/95 hover:bg-[#2F1A46] border-[#FFD166]'
                   : 'bg-[#171122]/95 hover:bg-[#241B35] border-[#E7A54A]'
               }`}
             >
-              {itemDef && <LaCriptaItemPixelIcon itemId={itemDef.id} size={20} />}
-              {relicDef && <LaCriptaRelicPixelIcon relicId={relicDef.id} size={20} />}
+              {itemDef && <LaCriptaItemPixelIcon itemId={itemDef.id} size={22} />}
+              {relicDef && <LaCriptaRelicPixelIcon relicId={relicDef.id} size={22} />}
+              {isGold && !itemDef && !relicDef && (
+                <svg
+                  width={22}
+                  height={22}
+                  viewBox="0 0 16 16"
+                  shapeRendering="crispEdges"
+                  className="shrink-0"
+                >
+                  <rect x="5" y="2" width="6" height="2" fill="#9E6B30" />
+                  <rect x="4" y="4" width="8" height="2" fill="#FFD166" />
+                  <rect x="3" y="6" width="10" height="8" fill="#8C5A32" />
+                  <rect x="4" y="7" width="8" height="6" fill="#C48852" />
+                  <rect x="6" y="8" width="4" height="4" fill="#FFD166" />
+                  <rect x="7" y="9" width="2" height="2" fill="#FFF3C4" />
+                </svg>
+              )}
               <div className="text-left">
                 <div className="text-[8px] font-cripta-pixel uppercase tracking-wider text-[#D8C6A0]">
-                  {isRelic ? '✦ RELIQUIA CAÍDA' : 'BOTÍN EN EL SUELO'}
+                  {isRelic
+                    ? '✦ RELIQUIA EN EL PEDESTAL'
+                    : isGold
+                    ? '✦ ORO EN EL SUELO'
+                    : '✦ BOTÍN EN EL SUELO'}
                 </div>
                 <div className="font-cripta-pixel text-[10px] font-bold text-[#FFD166]">
                   RECOGER: {title.toUpperCase()}
