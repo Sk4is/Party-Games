@@ -26,6 +26,10 @@ import {
   computeEnemyApproxDamageRange,
   pickWeaponDropForDungeon,
 } from './criptaEquipmentAndEvents';
+import {
+  CRIPTA_MINIBOSS_ARENAS_REGISTRY,
+  resolveEnemyVisualBlueprint,
+} from './criptaBiomeBestiary';
 
 export interface DungeonGenerationConfig {
   tier: CriptaDungeonLengthTier;
@@ -469,20 +473,34 @@ function buildEnemiesForRoom(
   if (roomType === 'MINIBOSS' || roomType === 'BOSS') {
     const minibossDef =
       DUNGEON_MINIBOSS_REGISTRY[dungeonId] || DUNGEON_MINIBOSS_REGISTRY.catacumbas_del_rey;
+    const bossSlug =
+      roomType === 'BOSS'
+        ? dungeon.bossPool[0] || minibossDef.slug
+        : minibossDef.slug;
+    const blueprint = resolveEnemyVisualBlueprint(
+      {
+        slug: bossSlug,
+        name: minibossDef.name,
+        isMiniboss: roomType === 'MINIBOSS',
+        isBoss: true,
+        isFinalBoss: roomType === 'BOSS',
+      },
+      dungeonId
+    );
     const bossMaxHp = Math.round(96 * scaleFactor);
     const baseAtk = Math.round(13 + roomIndex * 1.15);
     return [
       enrichEnemyInstance(
         {
           id: `enemy_miniboss_${roomIndex}_0`,
-          slug: minibossDef.slug,
-          name: minibossDef.name,
-          title: minibossDef.title,
+          slug: blueprint.slug,
+          name: blueprint.name || minibossDef.name,
+          title: `MINIBOSS · ${blueprint.title}`,
           isElite: false,
           isMiniboss: true,
           isBoss: true,
-          isFinalBoss: false,
-          signatureMoveName: minibossDef.signatureMoveName,
+          isFinalBoss: roomType === 'BOSS',
+          signatureMoveName: blueprint.signatureMoveName || minibossDef.signatureMoveName,
           enrageTriggered: false,
           hp: bossMaxHp,
           maxHp: bossMaxHp,
@@ -491,10 +509,10 @@ function buildEnemiesForRoom(
           intent: 'AFLICCIÓN',
           intentCategory: 'SPECIAL',
           intentValue: baseAtk + 2,
-          accentColor: dungeon.palette.glow,
-          statusThreat: threatProfile.primaryStatus,
+          accentColor: blueprint.palette.eyeGlow || dungeon.palette.glow,
+          statusThreat: blueprint.statusThreat || threatProfile.primaryStatus,
           statusSecondaryThreat: threatProfile.secondaryStatus,
-          abilityName: minibossDef.signatureMoveName,
+          abilityName: blueprint.signatureMoveName || minibossDef.signatureMoveName,
           spriteArchetype: config.spriteArchetype,
         },
         roomIndex
@@ -505,14 +523,22 @@ function buildEnemiesForRoom(
   if (roomType === 'ELITE') {
     const eliteSlug =
       dungeon.elitePool[Math.floor(rng() * dungeon.elitePool.length)] || 'campeon_maldito';
+    const blueprint = resolveEnemyVisualBlueprint(
+      {
+        slug: eliteSlug,
+        name: formatSlugTitle(eliteSlug),
+        isElite: true,
+      },
+      dungeonId
+    );
     const eliteMaxHp = Math.round(62 * scaleFactor);
     return [
       enrichEnemyInstance(
         {
           id: `enemy_elite_${roomIndex}_0`,
-          slug: eliteSlug,
-          name: formatSlugTitle(eliteSlug),
-          title: 'Campeón de Élite',
+          slug: blueprint.slug,
+          name: blueprint.name,
+          title: `ÉLITE · ${blueprint.title}`,
           isElite: true,
           isBoss: false,
           hp: eliteMaxHp,
@@ -522,10 +548,10 @@ function buildEnemiesForRoom(
           intent: 'AFLICCIÓN',
           intentCategory: 'ATTACK',
           intentValue: Math.round(12 + roomIndex),
-          accentColor: dungeon.palette.highlight,
-          statusThreat: threatProfile.primaryStatus,
+          accentColor: blueprint.palette.eyeGlow || dungeon.palette.highlight,
+          statusThreat: blueprint.statusThreat || threatProfile.primaryStatus,
           statusSecondaryThreat: threatProfile.secondaryStatus,
-          abilityName: threatProfile.enemyAbilityLabel,
+          abilityName: blueprint.signatureMoveName || threatProfile.enemyAbilityLabel,
           spriteArchetype: config.spriteArchetype,
         },
         roomIndex
@@ -534,66 +560,78 @@ function buildEnemiesForRoom(
   }
 
   // COMBAT: 1 to 2 enemies in solo, 2 to 3 enemies in multiplayer
+  // Every enemy in the room picks a DISTINCT canonical creature from dungeon.enemyPool
+  // so no two enemies in an encounter share the same sprite or role!
   const count = playerCount <= 1 ? (rng() > 0.45 ? 2 : 1) : rng() > 0.55 ? 3 : 2;
-  const enemies: CriptaRoomEnemy[] = [];
-  for (let i = 0; i < count; i++) {
-    let slug =
-      dungeon.enemyPool[(roomIndex + i) % Math.max(1, dungeon.enemyPool.length)] ||
-      'centinela_de_cripta';
+  const pool =
+    dungeon.enemyPool.length > 0 ? [...dungeon.enemyPool] : ['centinela_de_cripta'];
+  const pickedSlugs: string[] = [];
 
-    // Ensure every enemy in a multi-enemy encounter has a distinct role & silhouette:
-    // Slot 0: Frontline Guardian / Brute
-    // Slot 1: Shaman / Spore Caster / Necromancer
-    // Slot 2: Agile Stalker / Predator / Skirmisher
-    if (count >= 2) {
-      if (i === 0) {
-        slug =
-          config.spriteArchetype === 'plague_bloom'
-            ? 'huesped_de_micelio_guardian'
-            : `${slug}_guardian`;
-      } else if (i === 1) {
-        slug =
-          config.spriteArchetype === 'plague_bloom'
-            ? 'chaman_fungico'
-            : config.spriteArchetype === 'skeleton_warrior' ||
-              config.spriteArchetype === 'bone_colossus'
-            ? 'acolyto_de_hueso_chaman'
-            : `${slug}_chaman`;
-      } else if (i >= 2) {
-        slug =
-          config.spriteArchetype === 'plague_bloom'
-            ? 'bestia_espinosa_acechador'
-            : `${slug}_acechador`;
-      }
+  for (let i = 0; i < count; i++) {
+    // Rotate through the biome's 5 canonical enemies without repeating in the same room
+    const candidateIdx = (roomIndex * 2 + i) % pool.length;
+    let candidate = pool[candidateIdx];
+    if (pickedSlugs.includes(candidate)) {
+      const unused = pool.find((s) => !pickedSlugs.includes(s));
+      if (unused) candidate = unused;
     }
+    pickedSlugs.push(candidate);
+  }
+
+  const enemies: CriptaRoomEnemy[] = [];
+  for (let i = 0; i < pickedSlugs.length; i++) {
+    const rawSlug = pickedSlugs[i];
+    const blueprint = resolveEnemyVisualBlueprint(
+      {
+        slug: rawSlug,
+        name: formatSlugTitle(rawSlug),
+      },
+      dungeonId
+    );
+
+    const isTankOrBrute =
+      blueprint.roleTag === 'TANK' || blueprint.roleTag === 'BRUTE';
+    const isCasterOrHealer =
+      blueprint.roleTag === 'CASTER' ||
+      blueprint.roleTag === 'HEALER' ||
+      blueprint.roleTag === 'SUPPORT';
 
     const baseHp = count === 1 ? 38 : count === 2 ? 26 : 22;
-    const maxHp = Math.round(baseHp * scaleFactor);
+    const roleHpMod = isTankOrBrute ? 1.18 : isCasterOrHealer ? 0.88 : 1.0;
+    const maxHp = Math.round(baseHp * scaleFactor * roleHpMod);
     const intents: CriptaRoomEnemy['intent'][] = ['ATAQUE', 'AFLICCIÓN', 'GUARDIA', 'MALDICIÓN'];
-    const intent = intents[(roomIndex + i) % intents.length];
+    const intent = isTankOrBrute
+      ? i === 0 && roomIndex % 2 === 1
+        ? 'GUARDIA'
+        : 'ATAQUE'
+      : isCasterOrHealer
+      ? 'MALDICIÓN'
+      : intents[(roomIndex + i) % intents.length];
     const assignedStatus =
-      i % 2 === 0 ? threatProfile.primaryStatus : threatProfile.secondaryStatus;
+      blueprint.statusThreat ||
+      (i % 2 === 0 ? threatProfile.primaryStatus : threatProfile.secondaryStatus);
+
     enemies.push(
       enrichEnemyInstance(
         {
           id: `enemy_${roomIndex}_${i}`,
-          slug,
-          name: formatSlugTitle(slug),
-          title: `Guardián de ${dungeon.name}`,
+          slug: blueprint.slug,
+          name: blueprint.name,
+          title: blueprint.title,
           isElite: false,
           isBoss: false,
           hp: maxHp,
           maxHp,
           attack: Math.round(7 + roomIndex * 0.8),
-          armor: 2 + (i % 2),
+          armor: isTankOrBrute ? 4 : 2 + (i % 2),
           intent,
           intentCategory:
             intent === 'GUARDIA' ? 'DEFEND' : intent === 'ATAQUE' ? 'ATTACK' : 'MAGIC',
           intentValue: Math.round(7 + roomIndex * 0.8),
-          accentColor: dungeon.palette.glow,
+          accentColor: blueprint.palette.eyeGlow || dungeon.palette.glow,
           statusThreat: assignedStatus,
           statusSecondaryThreat: threatProfile.secondaryStatus,
-          abilityName: threatProfile.enemyAbilityLabel,
+          abilityName: blueprint.signatureMoveName || threatProfile.enemyAbilityLabel,
           spriteArchetype: config.spriteArchetype,
         },
         roomIndex + i
@@ -1203,6 +1241,10 @@ export function generateProceduralDungeon(
 
     const minibossDef =
       DUNGEON_MINIBOSS_REGISTRY[dungeonId] || DUNGEON_MINIBOSS_REGISTRY.catacumbas_del_rey;
+    const minibossArena =
+      CRIPTA_MINIBOSS_ARENAS_REGISTRY[dungeonId] ||
+      CRIPTA_MINIBOSS_ARENAS_REGISTRY.catacumbas_del_rey;
+    const minibossEnemyName = enemies[0]?.name || minibossDef.name;
 
     return {
       id: `room_${dungeonId}_${idx + 1}`,
@@ -1218,17 +1260,18 @@ export function generateProceduralDungeon(
       visited: isFirst,
       resolved: false,
       title:
-        rType === 'MINIBOSS'
-          ? `Cámara de ${minibossDef.name}`
-          : rType === 'BOSS'
-          ? `Trono de ${formatSlugTitle(dungeon.bossPool[0] || 'Guardián')}`
+        rType === 'MINIBOSS' || rType === 'BOSS'
+          ? minibossArena.arenaTitle
           : specificTitle,
-      subtitle: ROOM_TYPE_SUBTITLES[rType],
+      subtitle:
+        rType === 'MINIBOSS' || rType === 'BOSS'
+          ? `${minibossArena.arenaSubtitle} · CUSTODIO: ${minibossEnemyName.toUpperCase()}`
+          : ROOM_TYPE_SUBTITLES[rType],
       narrative:
         idx === 0
           ? `Habéis cruzado el umbral de ${dungeon.name}. ${dungeon.description}`
           : rType === 'MINIBOSS'
-          ? `El umbral final de ${dungeon.name} está custodiado por ${minibossDef.name}. Derrotadlo para sellar esta puerta.`
+          ? `${minibossArena.arenaTitle}: ${minibossEnemyName} aguarda en el santuario final de ${dungeon.name}. Derrotadlo para sellar esta puerta.`
           : rType === 'BOSS'
           ? `La cámara final de ${dungeon.name} tiembla ante la presencia de su guardián supremo.`
           : `Sala ${idx + 1} de ${dungeon.name} (${dungeon.environmentModifiers.join(' · ')}).`,

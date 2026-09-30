@@ -12,6 +12,10 @@ import {
 } from './LaCriptaItemRelicArt';
 import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
 import { LaCriptaAnimatedStageNpc } from './LaCriptaCreatureArtSystem';
+import {
+  CRIPTA_MINIBOSS_ARENAS_REGISTRY,
+  CriptaMinibossArenaBlueprint,
+} from '../../data/la-cripta/criptaBiomeBestiary';
 
 export type CriptaCardVisualTheme =
   | 'ATTACK'
@@ -1632,6 +1636,9 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
   const id = dungeon.id;
   const p = getBiomeVisualProfile(id);
   const isBoss = roomType === 'BOSS' || roomType === 'MINIBOSS';
+  const minibossArena =
+    CRIPTA_MINIBOSS_ARENAS_REGISTRY[id] ||
+    CRIPTA_MINIBOSS_ARENAS_REGISTRY.catacumbas_del_rey;
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden select-none z-0">
@@ -1968,8 +1975,10 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
         className="absolute inset-0"
         style={{
           background: `radial-gradient(circle at 24% 48%, ${
-            isBoss ? 'rgba(244,63,94,0.28)' : p.glowColor
-          }, transparent 56%), radial-gradient(circle at 74% 44%, ${p.glowColor}, transparent 60%)`,
+            isBoss ? `${minibossArena.floorSealColor}40` : p.glowColor
+          }, transparent 56%), radial-gradient(circle at 74% 44%, ${
+            isBoss ? `${minibossArena.altarAccentColor}36` : p.glowColor
+          }, transparent 60%)`,
           animation: 'criptaTorchBreathe 5.4s ease-in-out infinite',
         }}
       />
@@ -1982,6 +1991,270 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
     </div>
   );
 };
+
+function renderMinibossSanctumCenterpieceSvg(
+  arena: CriptaMinibossArenaBlueprint,
+  p: CriptaBiomeVisualProfile,
+  flicker: number,
+  pulseY: number
+) {
+  const seal = arena.floorSealColor;
+  const accent = arena.altarAccentColor;
+
+  switch (arena.centerpieceKind) {
+    case 'OSSUARY_THRONE':
+      return (
+        <g>
+          {/* Royal Sarcophagus Archway & Crowned Ossuary Throne */}
+          <rect x="50" y="18" width="60" height="66" fill="#0B0F1A" opacity="0.88" />
+          <rect x="48" y="16" width="64" height="4" fill={accent} opacity="0.85" />
+          <rect x="52" y="22" width="4" height="62" fill="#334155" />
+          <rect x="104" y="22" width="4" height="62" fill="#334155" />
+          {/* Royal Crown Crest */}
+          <rect x="70" y="11" width="20" height="5" fill={accent} />
+          <rect x="72" y="8" width="3" height="3" fill={accent} />
+          <rect x="78" y="7" width="4" height="4" fill="#FEF08A" />
+          <rect x="85" y="8" width="3" height="3" fill={accent} />
+          {/* Twin Spectral Blue Braziers */}
+          <rect x="40" y="54" width="8" height="30" fill="#1E293B" />
+          <rect x="39" y={47 + pulseY} width="10" height="7" fill={seal} opacity={0.9 * flicker} />
+          <rect x="112" y="54" width="8" height="30" fill="#1E293B" />
+          <rect x="111" y={47 + pulseY} width="10" height="7" fill={seal} opacity={0.9 * flicker} />
+        </g>
+      );
+    case 'MYCELIAL_HEART_ALTAR':
+      return (
+        <g>
+          {/* Giant Pulsing Mycelium Brood Pod & Spore Vents */}
+          <rect x="54" y="14" width="52" height="68" fill="#091C10" opacity="0.85" />
+          <rect x="46" y="10" width="6" height="42" fill="#166534" />
+          <rect x="108" y="10" width="6" height="42" fill="#166534" />
+          <rect x="60" y="22" width="40" height="38" fill="#3B1D4E" opacity="0.82" />
+          <rect x="66" y={28 + pulseY} width="28" height="24" fill={seal} opacity={0.45 * flicker} />
+          <rect x="40" y="70" width="14" height="14" fill="#15803D" />
+          <rect x="42" y="67" width="10" height="4" fill={accent} opacity={flicker} />
+          <rect x="106" y="70" width="14" height="14" fill="#15803D" />
+          <rect x="108" y="67" width="10" height="4" fill={accent} opacity={flicker} />
+        </g>
+      );
+    case 'MOLTEN_ANVIL_CRUCIBLE':
+      return (
+        <g>
+          {/* Colossal Molten Crucible pouring lava behind the Abyssal Anvil */}
+          <rect x="62" y="10" width="36" height="22" fill="#27120B" />
+          <rect x="66" y="14" width="28" height="6" fill={accent} opacity={flicker} />
+          <rect x="75" y="32" width="10" height="52" fill={seal} opacity={0.88 * flicker} />
+          <rect x="78" y="32" width="4" height="52" fill="#FEF08A" opacity={flicker} />
+          <rect x="48" y="64" width="64" height="20" fill="#1C1917" />
+          <rect x="52" y="62" width="56" height="4" fill={seal} opacity="0.9" />
+        </g>
+      );
+    case 'SUNKEN_LEVIATHAN_SHRINE':
+      return (
+        <g>
+          {/* Abyssal Kraken Idol & Glowing Coral Monoliths */}
+          <rect x="56" y="18" width="48" height="66" fill="#062032" opacity="0.86" />
+          <rect x="66" y="24" width="28" height="26" fill="#0F3E5C" />
+          <rect x="71" y="32" width="5" height="5" fill={accent} opacity={flicker} />
+          <rect x="84" y="32" width="5" height="5" fill={accent} opacity={flicker} />
+          <rect x="40" y="38" width="8" height="46" fill="#0C4A6E" />
+          <rect x="42" y="42" width="4" height="36" fill={seal} opacity={0.8 * flicker} />
+          <rect x="112" y="38" width="8" height="46" fill="#0C4A6E" />
+          <rect x="114" y="42" width="4" height="36" fill={seal} opacity={0.8 * flicker} />
+        </g>
+      );
+    case 'RUNIC_EXCAVATION_SHAFT':
+      return (
+        <g>
+          {/* Timber-framed Black Quartz Motherlode Monolith */}
+          <rect x="44" y="12" width="8" height="72" fill="#451A03" />
+          <rect x="108" y="12" width="8" height="72" fill="#451A03" />
+          <rect x="44" y="14" width="72" height="6" fill="#78350F" />
+          <rect x="60" y="24" width="40" height="60" fill="#1C1917" />
+          <rect x="68" y="30" width="6" height="44" fill={seal} opacity={0.9 * flicker} />
+          <rect x="86" y="36" width="5" height="38" fill={accent} opacity={0.85 * flicker} />
+        </g>
+      );
+    case 'GUILLOTINE_SCAFFOLD':
+      return (
+        <g>
+          {/* Towering Guillotine Frame & Blood Banners */}
+          <rect x="56" y="10" width="6" height="74" fill="#3F1D24" />
+          <rect x="98" y="10" width="6" height="74" fill="#3F1D24" />
+          <rect x="52" y="12" width="56" height="6" fill="#4C0519" />
+          {/* Angled Guillotine Blade */}
+          <rect x="62" y={22 + pulseY} width="36" height="8" fill="#CBD5E1" />
+          <rect x="62" y={28 + pulseY} width="36" height="3" fill={seal} />
+          {/* Crimson Banners */}
+          <rect x="38" y="18" width="10" height="48" fill="#881337" />
+          <rect x="112" y="18" width="10" height="48" fill="#881337" />
+        </g>
+      );
+    case 'BLACK_ROOT_MENHIR':
+      return (
+        <g>
+          {/* Hollow Spirit-Tree Archway & Soul Lanterns */}
+          <rect x="48" y="12" width="14" height="72" fill="#0F292E" />
+          <rect x="98" y="12" width="14" height="72" fill="#0F292E" />
+          <rect x="56" y="12" width="48" height="10" fill="#134E4A" />
+          <rect x="64" y="24" width="32" height="60" fill="#041317" />
+          <rect x="42" y={34 + pulseY} width="6" height="8" fill={seal} opacity={0.9 * flicker} />
+          <rect x="112" y={34 + pulseY} width="6" height="8" fill={accent} opacity={0.9 * flicker} />
+        </g>
+      );
+    case 'PLAGUE_SLUICE_CAULDRON':
+      return (
+        <g>
+          {/* Imperial Sluice Gate & Toxic Cistern Cascade */}
+          <rect x="52" y="16" width="56" height="68" fill="#142611" />
+          <rect x="60" y="24" width="40" height="60" fill={seal} opacity={0.45 * flicker} />
+          <rect x="68" y="24" width="8" height="60" fill={accent} opacity={0.75 * flicker} />
+          <rect x="84" y="24" width="8" height="60" fill={accent} opacity={0.75 * flicker} />
+        </g>
+      );
+    case 'FORBIDDEN_CHANDELIER_PODIUM':
+      return (
+        <g>
+          {/* Floating Forbidden Grimoire Pedestal & Arcane Seal Chains */}
+          <rect x="42" y="16" width="76" height="4" fill={accent} opacity="0.6" />
+          <rect x="62" y={24 + pulseY} width="36" height="24" fill="#3B0764" />
+          <rect x="66" y={26 + pulseY} width="13" height="20" fill="#FEF3C7" />
+          <rect x="81" y={26 + pulseY} width="13" height="20" fill="#FEF3C7" />
+          <rect x="44" y="20" width="18" height="3" fill={seal} opacity={flicker} />
+          <rect x="98" y="20" width="18" height="3" fill={seal} opacity={flicker} />
+        </g>
+      );
+    case 'CELESTIAL_ORRERY_RING':
+      return (
+        <g>
+          {/* Celestial Astrolabe Rings & Eclipsed Sun */}
+          <rect x="54" y="16" width="52" height="52" fill="#0B1338" opacity="0.85" />
+          <rect x="58" y="20" width="44" height="3" fill={accent} opacity="0.85" />
+          <rect x="58" y="61" width="44" height="3" fill={accent} opacity="0.85" />
+          <rect x="70" y={30 + pulseY} width="20" height="20" fill="#020617" />
+          <rect x="68" y={28 + pulseY} width="24" height="2" fill={seal} opacity={flicker} />
+          <rect x="68" y={50 + pulseY} width="24" height="2" fill={seal} opacity={flicker} />
+        </g>
+      );
+    case 'ROYAL_BROOD_CHAMBER':
+      return (
+        <g>
+          {/* Hexagonal Amber Hive Throne & Royal Jelly Cells */}
+          <rect x="50" y="16" width="60" height="68" fill="#2E1B07" opacity="0.9" />
+          {[56, 74, 92].map((hx) => (
+            <g key={hx}>
+              <rect x={hx} y="24" width="12" height="12" fill={seal} opacity={0.8 * flicker} />
+              <rect x={hx} y="42" width="12" height="12" fill={accent} opacity={0.7 * flicker} />
+            </g>
+          ))}
+        </g>
+      );
+    case 'PRISMATIC_GEODE_SANCTUM':
+      return (
+        <g>
+          {/* Prismatic Crystal Octahedron & Refracting Quartz Pillars */}
+          <rect x="42" y="22" width="10" height="62" fill={seal} opacity="0.65" />
+          <rect x="108" y="22" width="10" height="62" fill={accent} opacity="0.65" />
+          <rect x="68" y={20 + pulseY} width="24" height="34" fill={seal} opacity={0.85 * flicker} />
+          <rect x="72" y={24 + pulseY} width="16" height="26" fill="#FFFFFF" opacity={0.75 * flicker} />
+        </g>
+      );
+    case 'HANGING_TORTURE_CAGES':
+      return (
+        <g>
+          {/* Suspended Iron Panopticon Cage & Condemnation Chains */}
+          <rect x="62" y="10" width="36" height="44" fill="#1E293B" />
+          <rect x="66" y="14" width="4" height="36" fill="#64748B" />
+          <rect x="78" y="14" width="4" height="36" fill="#64748B" />
+          <rect x="90" y="14" width="4" height="36" fill="#64748B" />
+          <rect x="70" y={28 + pulseY} width="20" height="10" fill={seal} opacity={0.85 * flicker} />
+        </g>
+      );
+    case 'OVERFLOWING_BLOOD_CHALICE':
+      return (
+        <g>
+          {/* Blood Cathedral Stained Glass & Overflowing Crimson Chalice */}
+          <rect x="52" y="14" width="56" height="70" fill="#2A0610" opacity="0.9" />
+          <rect x="58" y="20" width="16" height="42" fill={seal} opacity={0.65 * flicker} />
+          <rect x="86" y="20" width="16" height="42" fill={accent} opacity={0.65 * flicker} />
+          <rect x="70" y="54" width="20" height="10" fill={accent} />
+          <rect x="72" y="50" width="16" height="5" fill={seal} opacity={flicker} />
+        </g>
+      );
+    case 'SUNLESS_PHARAOH_DAIS':
+      return (
+        <g>
+          {/* Twin Golden Obelisks & Open Royal Sarcophagus */}
+          <rect x="42" y="18" width="10" height="66" fill={seal} opacity="0.85" />
+          <rect x="108" y="18" width="10" height="66" fill={seal} opacity="0.85" />
+          <rect x="62" y="22" width="36" height="62" fill="#451A03" />
+          <rect x="66" y="26" width="28" height="54" fill={seal} opacity="0.75" />
+          <rect x="72" y="32" width="16" height="40" fill={accent} opacity={0.7 * flicker} />
+        </g>
+      );
+    case 'GRAND_SHATTERED_MIRROR':
+      return (
+        <g>
+          {/* Hall of Fractured Quicksilver Mirrors */}
+          <rect x="44" y="18" width="20" height="64" fill="#CBD5E1" opacity="0.7" />
+          <rect x="68" y="14" width="24" height="68" fill="#E2E8F0" opacity="0.8" />
+          <rect x="96" y="18" width="20" height="64" fill="#CBD5E1" opacity="0.7" />
+          <rect x="72" y="22" width="16" height="52" fill={accent} opacity={0.55 * flicker} />
+        </g>
+      );
+    case 'GLACIAL_ICE_MONOLITH':
+      return (
+        <g>
+          {/* Permafrost Glacier Spires & Mammoth-Fang Throne */}
+          <rect x="44" y="20" width="14" height="64" fill={seal} opacity="0.75" />
+          <rect x="102" y="20" width="14" height="64" fill={seal} opacity="0.75" />
+          <rect x="58" y="32" width="8" height="52" fill="#F8FAFC" />
+          <rect x="94" y="32" width="8" height="52" fill="#F8FAFC" />
+        </g>
+      );
+    case 'GOBLIN_WAR_PALISADE':
+      return (
+        <g>
+          {/* Scrap-Iron War Throne & Powder Keg Stack */}
+          <rect x="48" y="24" width="64" height="60" fill="#291D12" />
+          <rect x="38" y="62" width="14" height="22" fill="#7C2D12" />
+          <rect x="108" y="62" width="14" height="22" fill="#7C2D12" />
+          <rect x="42" y={56 + pulseY} width="6" height="6" fill={seal} opacity={flicker} />
+          <rect x="112" y={56 + pulseY} width="6" height="6" fill={seal} opacity={flicker} />
+        </g>
+      );
+    case 'TITAN_SKULL_MAUSOLEUM':
+      return (
+        <g>
+          {/* Monumental Titan Cranium Archway & Crossed Colossal Femurs */}
+          <rect x="46" y="14" width="68" height="54" fill="#CBD5E1" opacity="0.82" />
+          <rect x="54" y="20" width="52" height="44" fill="#E2E8F0" opacity="0.88" />
+          {/* Giant Hollow Eye Sockets */}
+          <rect x="58" y="30" width="16" height="14" fill="#090D16" />
+          <rect x="86" y="30" width="16" height="14" fill="#090D16" />
+          <rect x="63" y={34 + pulseY} width="6" height="6" fill={accent} opacity={0.95 * flicker} />
+          <rect x="91" y={34 + pulseY} width="6" height="6" fill={accent} opacity={0.95 * flicker} />
+          {/* Nasal Cavity & Giant Teeth */}
+          <rect x="76" y="42" width="8" height="10" fill="#090D16" />
+          {[58, 66, 74, 82, 90, 98].map((tx) => (
+            <rect key={tx} x={tx} y="56" width="5" height="12" fill="#F8FAFC" />
+          ))}
+        </g>
+      );
+    case 'ABYSSAL_ECLIPSE_CORE':
+    default:
+      return (
+        <g>
+          {/* Abyssal Eclipse Singularity & Floating Void Monoliths */}
+          <rect x="42" y={20 + pulseY} width="10" height="52" fill="#1E0B36" />
+          <rect x="108" y={20 - pulseY} width="10" height="52" fill="#1E0B36" />
+          <rect x="62" y="18" width="36" height="36" fill={seal} opacity={0.75 * flicker} />
+          <rect x="66" y="22" width="28" height="28" fill="#05010A" />
+          <rect x="74" y="30" width="12" height="12" fill={accent} opacity={0.9 * flicker} />
+        </g>
+      );
+  }
+}
 
 export const LaCriptaBiomeStageBackdrop: React.FC<{
   dungeon: CriptaDungeonDefinition;
@@ -1999,6 +2272,9 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
 
   const biomeId = dungeon.id;
   const p = getBiomeVisualProfile(biomeId);
+  const minibossArena =
+    CRIPTA_MINIBOSS_ARENAS_REGISTRY[biomeId] ||
+    CRIPTA_MINIBOSS_ARENAS_REGISTRY.catacumbas_del_rey;
   const flicker = tick % 3 === 0 ? 1 : tick % 3 === 1 ? 0.88 : 0.94;
   const pulseY = tick % 4 === 1 || tick % 4 === 2 ? -1 : 0;
 
@@ -2204,6 +2480,9 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
         />
 
         {/* Creature Stage Stone Pedestal / Ground Plane */}
+        {isBossOrMiniboss &&
+          renderMinibossSanctumCenterpieceSvg(minibossArena, p, flicker, pulseY)}
+
         <rect x="0" y="88" width="160" height="32" fill={p.floorDark} opacity="0.92" />
         <rect x="12" y="84" width="136" height="5" fill={p.floorMid} opacity="0.9" />
         <rect x="20" y="83" width="120" height="1" fill={p.floorLight} opacity="0.65" />
@@ -2211,24 +2490,32 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
         <rect x="80" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
         <rect x="122" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
 
-        {/* Boss / Miniboss Runic Circle Glow on Floor */}
+        {/* Boss / Miniboss Sanctum Runic Seal on Floor */}
         {isBossOrMiniboss && (
           <>
             <rect
-              x="34"
-              y="85"
-              width="92"
+              x="24"
+              y="84"
+              width="112"
               height="2"
-              fill={p.accentPrimary}
+              fill={minibossArena.floorSealColor}
+              opacity={0.9 * flicker}
+            />
+            <rect
+              x="36"
+              y="87"
+              width="88"
+              height="2"
+              fill={minibossArena.altarAccentColor}
               opacity={0.85 * flicker}
             />
             <rect
-              x="46"
-              y="88"
-              width="68"
+              x="48"
+              y="90"
+              width="64"
               height="1"
-              fill={p.particlePrimary}
-              opacity={0.95 * flicker}
+              fill="#FFFFFF"
+              opacity={0.75 * flicker}
             />
           </>
         )}

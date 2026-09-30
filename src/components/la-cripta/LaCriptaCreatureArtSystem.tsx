@@ -6,6 +6,47 @@ import {
   CriptaDungeonRoom,
   CriptaRoomEnemy,
 } from '../../types/laCripta';
+import { resolveEnemyVisualBlueprint } from '../../data/la-cripta/criptaBiomeBestiary';
+import { LaCriptaUniqueBiomeSpriteSvg } from './LaCriptaUniqueBiomeSpriteRenderer';
+
+const PRIMARY_AUTHORED_RIG_OWNER_SLUGS = new Set<string>([
+  'guardian_de_la_cripta',
+  'acolito_de_hueso',
+  'hongo_errante',
+  'trepadora_espinosa',
+  'herrero_de_ceniza',
+  'automata_de_escoria',
+  'acolito_abisal',
+  'guardian_de_coral',
+  'minero_descascarado',
+  'aranuelo_de_filon',
+  'carcelero_real',
+  'sabueso_de_cadenas',
+  'penitente_de_hierro',
+  'el_gran_verdugo',
+  'ciervo_de_osamenta',
+  'anciano_de_corteza',
+  'rata_de_peste',
+  'contrabandista_mutado',
+  'limo_de_cloaca',
+  'escriba_sin_rostro',
+  'grimorio_animado',
+  'esfera_armilar',
+  'obrera_de_quitina',
+  'centinela_de_geoda',
+  'alma_enjaulada',
+  'acolito_carmesi',
+  'guardia_momificado',
+  'duelista_del_reflejo',
+  'lobo_de_escarcha',
+  'guerrero_congelado',
+  'lancero_chatarra',
+  'piromano_de_barril',
+  'esqueleto_colosal',
+  'heraldo_del_vacio',
+  'soberano_del_umbral',
+  'soberano_del_umbral_p2',
+]);
 
 // ============================================================================
 // 1. CANONICAL CREATURE ANIMATION STATE MACHINE
@@ -1173,6 +1214,14 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
     [enemy, dungeonId, enemyIndex]
   );
 
+  const uniqueBlueprint = useMemo(
+    () => resolveEnemyVisualBlueprint(enemy, dungeonId),
+    [enemy, dungeonId]
+  );
+  const useUniqueBiomeRig = !PRIMARY_AUTHORED_RIG_OWNER_SLUGS.has(
+    uniqueBlueprint.slug
+  );
+
   const seed = useMemo(() => hashStringSeed(enemy.id || enemy.slug || 'e'), [
     enemy.id,
     enemy.slug,
@@ -1629,9 +1678,23 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
         </g>
 
         {/* ===================================================================
-            LAYER 2: AUTHORED 64x64 ARTICULATED CREATURE RIG BY FAMILY
+            LAYER 2: AUTHORED 64x64 ARTICULATED CREATURE RIG BY UNIQUE SLUG
             =================================================================== */}
-        {renderArticulatedCreatureFamily(def, enemy, pose)}
+        {useUniqueBiomeRig ? (
+          <g transform={`translate(${pose.torsoX}, 0)`}>
+            <LaCriptaUniqueBiomeSpriteSvg
+              blueprint={uniqueBlueprint}
+              torsoY={pose.torsoY}
+              headY={pose.headY}
+              armL={pose.propY}
+              armR={pose.weaponY}
+              wingSpread={pose.breathPhase}
+              pulse={pose.secondaryPhase % 2 === 0}
+            />
+          </g>
+        ) : (
+          renderArticulatedCreatureFamily(def, enemy, pose)
+        )}
 
         {/* ===================================================================
             LAYER 3: ELITE / MINIBOSS / BOSS INSIGNIA & MANTLE ACCENTS

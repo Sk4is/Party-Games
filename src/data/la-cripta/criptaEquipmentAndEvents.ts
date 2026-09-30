@@ -19,6 +19,7 @@ import type {
 import { CRIPTA_CHARACTERS_CATALOG } from './criptaCatalog';
 import { playerHasStatus } from './criptaStatusEffects';
 import { playerHasRelic } from './criptaItemsAndRelics';
+import { resolveEnemyVisualBlueprint } from './criptaBiomeBestiary';
 
 export const WEAPON_UPGRADE_MAX_LEVEL = 3;
 
@@ -909,6 +910,13 @@ export function getEnemyWeaknessAndResistanceProfile(enemy: CriptaRoomEnemy): {
   weaknesses: CriptaEnemyTraitEntry[];
   resistances: CriptaEnemyTraitEntry[];
 } {
+  const blueprint = resolveEnemyVisualBlueprint(enemy);
+  if (blueprint && blueprint.weaknesses.length > 0) {
+    return {
+      weaknesses: blueprint.weaknesses,
+      resistances: blueprint.resistances,
+    };
+  }
   const arch = enemy.spriteArchetype;
 
   if (arch === 'skeleton_warrior' || arch === 'bone_colossus') {

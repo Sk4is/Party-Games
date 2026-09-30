@@ -30,6 +30,10 @@ import {
 } from '../../data/la-cripta/criptaEquipmentAndEvents';
 import { buildEnemyAiProfileForArchetype } from '../../data/la-cripta/criptaEnemyAiEngine';
 import { CRIPTA_STATUS_EFFECTS_REGISTRY } from '../../data/la-cripta/criptaStatusEffects';
+import {
+  CRIPTA_MINIBOSS_ARENAS_REGISTRY,
+  resolveEnemyVisualBlueprint,
+} from '../../data/la-cripta/criptaBiomeBestiary';
 import { LaCriptaItemPixelIcon } from './LaCriptaItemRelicArt';
 import {
   LaCriptaStatusEffectBadge,
@@ -882,6 +886,13 @@ export const LaCriptaContextualSidePanel: React.FC<
               const magicRes = inspectedEnemy.magicResistance || 0;
               const resolvedDungeon =
                 dungeon || CRIPTA_DUNGEONS_REGISTRY.catacumbas_del_rey;
+              const creatureBlueprint = resolveEnemyVisualBlueprint(
+                inspectedEnemy,
+                resolvedDungeon.id
+              );
+              const minibossArena =
+                CRIPTA_MINIBOSS_ARENAS_REGISTRY[resolvedDungeon.id] ||
+                CRIPTA_MINIBOSS_ARENAS_REGISTRY.catacumbas_del_rey;
 
               // Collect statuses this creature can apply from its abilities & threats
               const statusCapabilities: Array<{
@@ -934,20 +945,22 @@ export const LaCriptaContextualSidePanel: React.FC<
                   <div className="px-4 py-3.5 bg-[#171123] border-b-2 border-[#2E223D] flex items-start justify-between gap-3 shrink-0">
                     <div className="min-w-0">
                       <div className="text-[9px] font-cripta-pixel font-bold text-[#E7A54A] uppercase tracking-widest">
-                        {inspectedEnemy.isFinalBoss || inspectedEnemy.isBoss
+                        {inspectedEnemy.isFinalBoss
                           ? 'SOBERANO DEL ABISMO'
-                          : inspectedEnemy.isMiniboss
-                          ? 'MINIJFE DE LA MAZMORRA'
+                          : inspectedEnemy.isMiniboss || inspectedEnemy.isBoss
+                          ? `MINIJFE DE LA MAZMORRA · ${minibossArena.arenaTitle}`
                           : inspectedEnemy.isElite
-                          ? 'CRIATURA ÉLITE'
-                          : 'CRIATURA DE CRIPTA'}
+                          ? `CRIATURA ÉLITE · ${creatureBlueprint.title}`
+                          : `BESTIARIO · ${creatureBlueprint.title}`}
                       </div>
                       <h3 className="mt-0.5 font-cripta-display text-lg sm:text-xl font-black text-[#F5EFE6] uppercase leading-tight tracking-wide">
                         {inspectedEnemy.name}
                       </h3>
                       <div className="mt-0.5 text-[10px] font-cripta-pixel text-[#D8C6A0]/80 uppercase tracking-wider">
                         {resolvedDungeon.name}
-                        {inspectedEnemy.title ? ` · ${inspectedEnemy.title}` : ''}
+                        {inspectedEnemy.title
+                          ? ` · ${inspectedEnemy.title}`
+                          : ` · ${creatureBlueprint.title}`}
                       </div>
                     </div>
 
@@ -1003,6 +1016,13 @@ export const LaCriptaContextualSidePanel: React.FC<
                           animState={inspectedEnemy.hp <= 0 ? 'death' : 'idle'}
                           customSizePx={spriteDisplaySize}
                         />
+                      </div>
+
+                      {/* Canonical Creature Signature Move & Role Tag Note */}
+                      <div className="relative z-10 mt-1.5 px-3 text-center">
+                        <p className="font-cripta-pixel text-[9px] text-[#E6DCCB]/85 leading-relaxed max-w-[340px] mx-auto">
+                          TÉCNICA INSIGNIA: {creatureBlueprint.signatureMoveName}
+                        </p>
                       </div>
 
                       {/* Active Status Badges Floating at Bottom of Bestiary Stage if any */}
