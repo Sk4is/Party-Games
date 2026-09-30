@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FortunariumRoomState,
   FortunariumConfig,
+  FortunariumPlayerSessionStats,
 } from '../../types/fortunarium';
 import {
   FORTUNARIUM_SYMBOLS,
@@ -22,6 +23,9 @@ import {
   Coins,
   BookOpen,
   Sliders,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { fortunariumAudio } from '../../utils/fortunariumAudio';
 import { FortunariumRulebookModal } from './FortunariumRulebookModal';
@@ -51,6 +55,52 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
   const [showRulebook, setShowRulebook] = useState(false);
   const [showPrizeTable, setShowPrizeTable] = useState(false);
   const [showAudioModal, setShowAudioModal] = useState(false);
+
+  const sessionSummary = roomState.fortunariumSessionSummary || {
+    totalMatchesPlayed: 0,
+    totalSpins: 0,
+    totalQuotasCompleted: 0,
+    totalJackpots: 0,
+  };
+
+  // Auto-open session panel when returning to lobby after at least 1 match
+  const [isSessionOpen, setIsSessionOpen] = useState<boolean>(
+    () => (roomState.fortunariumSessionSummary?.totalMatchesPlayed || 0) > 0
+  );
+
+  useEffect(() => {
+    if (sessionSummary.totalMatchesPlayed > 0) {
+      setIsSessionOpen(true);
+    }
+  }, [sessionSummary.totalMatchesPlayed]);
+
+  // Stable join/participation order (never sorted by competitive winner/loser)
+  const sessionEntries = useMemo<FortunariumPlayerSessionStats[]>(() => {
+    const rawMap: Record<string, FortunariumPlayerSessionStats> =
+      roomState.fortunariumSessionStats || {};
+    const list: FortunariumPlayerSessionStats[] = Object.values(rawMap);
+    if (list.length > 0) {
+      return [...list].sort(
+        (a, b) => (a.firstJoinedOrder || 0) - (b.firstJoinedOrder || 0)
+      );
+    }
+    return roomState.players.map((p, idx) => ({
+      playerId: p.id,
+      displayName: p.name,
+      cursorColor: p.color,
+      firstJoinedOrder: idx + 1,
+      isCurrentlyInRoom: true,
+      isConnected: p.isConnected,
+      matchesPlayed: 0,
+      spins: 0,
+      creditsWon: 0,
+      creditsLost: 0,
+      netBalance: 0,
+      bestSpin: 0,
+      quotasCompleted: 0,
+      jackpots: 0,
+    }));
+  }, [roomState.fortunariumSessionStats, roomState.players]);
 
   const localPlayer = roomState.players.find((p) => p.id === localPlayerId);
   const isHost = Boolean(localPlayer?.isHost);
@@ -513,6 +563,211 @@ export const FortunariumLobby: React.FC<FortunariumLobbyProps> = ({
                 <div className="text-xs text-slate-300 leading-snug relative z-10">
                   <strong className="text-cyan-300 block">Valor Base × Patrón</strong>
                   Cada símbolo tiene su Valor Base (CR) que se multiplica por el patrón y las mejoras (hasta Nv. 10).
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Room-Session Cumulative Statistics Panel (REGISTRO DE LA SALA) */}
+          <div className="fort-cyber-modal p-5 sm:p-6 rounded-2xl flex flex-col gap-3.5 overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-[#1a0814] border border-[#FF2A6D]/60 flex items-center justify-center text-[#FF2A6D] shadow-[0_0_14px_rgba(255,42,109,0.28)] shrink-0">
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-lg font-fortunarium text-white tracking-wide">
+                      REGISTRO DE LA SALA
+                    </h2>
+                    <span className="text-xs font-mono font-bold text-cyan-300 tabular-nums">
+                      {sessionEntries.length}{' '}
+                      {sessionEntries.length === 1 ? 'jugador' : 'jugadores'} ·{' '}
+                      {sessionSummary.totalMatchesPlayed}{' '}
+                      {sessionSummary.totalMatchesPlayed === 1
+                        ? 'partida'
+                        : 'partidas'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 font-sans mt-0.5">
+                    Estadísticas acumuladas durante esta sesión.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  fortunariumAudio.playButtonClick();
+                  setIsSessionOpen((prev) => !prev);
+                }}
+                className="fort-arcade-btn inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#071320] hover:bg-[#0d2136] border border-[#FF2A6D]/55 text-xs font-mono font-black uppercase tracking-wider text-pink-100 cursor-pointer shrink-0"
+              >
+                <span>
+                  {isSessionOpen ? 'OCULTAR ESTADÍSTICAS' : 'VER ESTADÍSTICAS'}
+                </span>
+                {isSessionOpen ? (
+                  <ChevronUp className="w-3.5 h-3.5 text-[#FF2A6D]" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-[#FF2A6D]" />
+                )}
+              </button>
+            </div>
+
+            {/* Smooth Expandable Cyber-Terminal Content (300ms transition) */}
+            <div
+              className={`grid transition-all duration-300 ease-out ${
+                isSessionOpen
+                  ? 'grid-rows-[1fr] opacity-100 pt-1'
+                  : 'grid-rows-[0fr] opacity-0 pointer-events-none'
+              }`}
+            >
+              <div className="overflow-hidden flex flex-col gap-3">
+                {/* Compact Room Total Summary (SESIÓN ACTUAL) */}
+                <div className="fort-crt-display px-3.5 py-2.5 rounded-xl border border-cyan-500/35 flex flex-wrap items-center justify-between gap-2 text-xs font-mono tabular-nums">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-[#FF2A6D]">
+                    SESIÓN ACTUAL
+                  </span>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-bold">
+                    <span className="text-white">
+                      {sessionSummary.totalMatchesPlayed}{' '}
+                      {sessionSummary.totalMatchesPlayed === 1
+                        ? 'PARTIDA'
+                        : 'PARTIDAS'}
+                    </span>
+                    <span className="text-cyan-500/50">·</span>
+                    <span className="text-cyan-200">
+                      {sessionSummary.totalSpins} TIRADAS
+                    </span>
+                    <span className="text-cyan-500/50">·</span>
+                    <span className="text-amber-300">
+                      {sessionSummary.totalQuotasCompleted}{' '}
+                      {sessionSummary.totalQuotasCompleted === 1
+                        ? 'CUOTA'
+                        : 'CUOTAS'}
+                    </span>
+                    <span className="text-cyan-500/50">·</span>
+                    <span
+                      className={
+                        sessionSummary.totalJackpots > 0
+                          ? 'text-amber-300 font-black'
+                          : 'text-slate-400'
+                      }
+                    >
+                      {sessionSummary.totalJackpots}{' '}
+                      {sessionSummary.totalJackpots === 1
+                        ? 'JACKPOT'
+                        : 'JACKPOTS'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Player Session Cards (2 per row on desktop, 1 per row on mobile) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {sessionEntries.map((entry) => {
+                    const net = entry.netBalance;
+                    const balanceCardClass =
+                      net > 0
+                        ? 'text-emerald-300 border-emerald-400/50 bg-emerald-950/35'
+                        : net < 0
+                        ? 'text-[#FF2A6D] border-[#FF2A6D]/55 bg-[#240915]/55'
+                        : 'text-slate-200 border-cyan-500/30 bg-[#050d17]';
+
+                    return (
+                      <div
+                        key={entry.playerId}
+                        className="fort-crt-panel p-3.5 rounded-2xl border border-cyan-500/35 flex flex-col gap-2.5 text-left"
+                      >
+                        {/* Header: Cursor Color Dot + Name + Presence + Matches Played */}
+                        <div className="flex items-center justify-between gap-2 border-b border-cyan-500/20 pb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/35"
+                              style={{ backgroundColor: entry.cursorColor }}
+                            />
+                            <span className="font-fortunarium text-base text-white tracking-wide uppercase truncate">
+                              {entry.displayName}
+                            </span>
+                            <span
+                              className={`text-[10px] font-mono font-bold uppercase tracking-wider shrink-0 ${
+                                entry.isCurrentlyInRoom
+                                  ? 'text-emerald-300'
+                                  : 'text-slate-400'
+                              }`}
+                            >
+                              {entry.isCurrentlyInRoom
+                                ? '● EN SALA'
+                                : '○ FUERA DE LA SALA'}
+                            </span>
+                          </div>
+
+                          <span className="text-xs font-mono font-black text-cyan-200 uppercase tracking-wider tabular-nums shrink-0">
+                            {entry.matchesPlayed}{' '}
+                            {entry.matchesPlayed === 1 ? 'PARTIDA' : 'PARTIDAS'}
+                          </span>
+                        </div>
+
+                        {/* Main Financial Row: GANADO | PERDIDO | BALANCE (Largest) */}
+                        <div className="grid grid-cols-3 gap-2 font-mono tabular-nums">
+                          <div className="px-2.5 py-2 rounded-xl bg-[#040a12] border border-cyan-500/25">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/75 block">
+                              GANADO
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-cyan-300">
+                              +{entry.creditsWon.toLocaleString('es-ES')} CR
+                            </span>
+                          </div>
+
+                          <div className="px-2.5 py-2 rounded-xl bg-[#040a12] border border-cyan-500/25">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/75 block">
+                              PERDIDO
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-[#FF2A6D]">
+                              -{entry.creditsLost.toLocaleString('es-ES')} CR
+                            </span>
+                          </div>
+
+                          <div
+                            className={`px-2.5 py-2 rounded-xl border ${balanceCardClass}`}
+                          >
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-200/85 block">
+                              BALANCE
+                            </span>
+                            <span className="text-base sm:text-lg font-black">
+                              {net > 0
+                                ? `+${net.toLocaleString('es-ES')} CR`
+                                : `${net.toLocaleString('es-ES')} CR`}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Supporting Metrics Row: TIRADAS · MEJOR TIRADA · CUOTAS · JACKPOTS */}
+                        <div className="pt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] font-mono font-bold tabular-nums text-cyan-200/85">
+                          <span className="text-amber-200">
+                            {entry.spins} TIRADAS
+                          </span>
+                          <span>
+                            MEJOR{' '}
+                            <strong className="text-amber-300">
+                              +{entry.bestSpin.toLocaleString('es-ES')} CR
+                            </strong>
+                          </span>
+                          <span>
+                            {entry.quotasCompleted}{' '}
+                            {entry.quotasCompleted === 1 ? 'CUOTA' : 'CUOTAS'}
+                          </span>
+                          {entry.jackpots > 0 ? (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-400/20 border border-amber-300/60 text-amber-200 font-black">
+                              ★ {entry.jackpots}{' '}
+                              {entry.jackpots === 1 ? 'JACKPOT' : 'JACKPOTS'}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">0 JACKPOTS</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

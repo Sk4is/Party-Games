@@ -15,6 +15,8 @@ import {
   FortunariumIncidentType,
   FortunariumActiveIncident,
   FortunariumEffectRouletteState,
+  FortunariumPlayerSessionStats,
+  FortunariumRoomSessionSummary,
 } from '../src/types/fortunarium';
 import {
   FORTUNARIUM_UPGRADES_CATALOG,
@@ -45,11 +47,20 @@ interface ClientConnection {
   roomCode: string;
 }
 
+interface MatchParticipantRecord {
+  player: FortunariumPlayer;
+  quotasCompletedWhilePresent: number;
+}
+
 interface ServerFortunariumRoom extends FortunariumRoomState {
   hostId: string;
   spinTimer: NodeJS.Timeout | null;
   disconnectTimers: Map<string, NodeJS.Timeout>;
   spinsSinceLastIncident: number;
+  processedMatchIds: Set<string>;
+  nextSessionJoinOrder: number;
+  currentMatchQuotasCompleted: number;
+  currentMatchParticipants: Map<string, MatchParticipantRecord>;
 }
 
 const DEFAULT_CONFIG: FortunariumConfig = {
@@ -216,9 +227,37 @@ export class FortunariumServer {
       actionLog: [],
       defeatCause: null,
       endReason: null,
+      fortunariumSessionStats: {
+        [host.id]: {
+          playerId: host.id,
+          displayName: host.name,
+          cursorColor: host.color,
+          firstJoinedOrder: 1,
+          isCurrentlyInRoom: true,
+          isConnected: true,
+          matchesPlayed: 0,
+          spins: 0,
+          creditsWon: 0,
+          creditsLost: 0,
+          netBalance: 0,
+          bestSpin: 0,
+          quotasCompleted: 0,
+          jackpots: 0,
+        },
+      },
+      fortunariumSessionSummary: {
+        totalMatchesPlayed: 0,
+        totalSpins: 0,
+        totalQuotasCompleted: 0,
+        totalJackpots: 0,
+      },
       spinTimer: null,
       disconnectTimers: new Map(),
       spinsSinceLastIncident: 0,
+      processedMatchIds: new Set(),
+      nextSessionJoinOrder: 2,
+      currentMatchQuotasCompleted: 0,
+      currentMatchParticipants: new Map(),
     };
 
     this.rooms.set(code, room);
@@ -226,7 +265,142 @@ export class FortunariumServer {
     return this.serializeRoom(room);
   }
 
+  private ensurePlayerSessionEntry(
+    room: ServerFortunariumRoom,
+    player: { id: string; name: string; color: string; isConnected?: boolean },
+    isCurrentlyInRoom: boolean
+  ): FortunariumPlayerSessionStats {
+    if (!room.fortunariumSessionStats) {
+      room.fortunariumSessionStats = {};
+    }
+    let entry = room.fortunariumSessionStats[player.id];
+    if (!entry) {
+      entry = {
+        playerId: player.id,
+        displayName: player.name,
+        cursorColor: player.color,
+        firstJoinedOrder: room.nextSessionJoinOrder++,
+        isCurrentlyInRoom,
+        isConnected: Boolean(player.isConnected ?? isCurrentlyInRoom),
+        matchesPlayed: 0,
+        spins: 0,
+        creditsWon: 0,
+        creditsLost: 0,
+        netBalance: 0,
+        bestSpin: 0,
+        quotasCompleted: 0,
+        jackpots: 0,
+      };
+      room.fortunariumSessionStats[player.id] = entry;
+    } else {
+      if (player.name) entry.displayName = player.name;
+      if (player.color) entry.cursorColor = player.color;
+      entry.isCurrentlyInRoom = isCurrentlyInRoom;
+      entry.isConnected = Boolean(player.isConnected ?? isCurrentlyInRoom);
+    }
+    return entry;
+  }
+
+  private syncSessionParticipantsPresence(room: ServerFortunariumRoom) {
+    if (!room.fortunariumSessionStats) {
+      room.fortunariumSessionStats = {};
+    }
+    if (!room.fortunariumSessionSummary) {
+      room.fortunariumSessionSummary = {
+        totalMatchesPlayed: 0,
+        totalSpins: 0,
+        totalQuotasCompleted: 0,
+        totalJackpots: 0,
+      };
+    }
+
+    const currentRoomIds = new Set<string>();
+    for (const p of room.players) {
+      currentRoomIds.add(p.id);
+      this.ensurePlayerSessionEntry(room, p, true);
+    }
+
+    for (const [playerId, entry] of Object.entries(room.fortunariumSessionStats)) {
+      if (!currentRoomIds.has(playerId)) {
+        entry.isCurrentlyInRoom = false;
+        entry.isConnected = false;
+      }
+    }
+  }
+
+  private recordMatchParticipantSnapshot(room: ServerFortunariumRoom, player: FortunariumPlayer) {
+    if (!room.currentMatchParticipants) {
+      room.currentMatchParticipants = new Map();
+    }
+    const existing = room.currentMatchParticipants.get(player.id);
+    room.currentMatchParticipants.set(player.id, {
+      player: {
+        ...player,
+        stats: { ...player.stats },
+      },
+      quotasCompletedWhilePresent: existing?.quotasCompletedWhilePresent ?? 0,
+    });
+  }
+
+  /**
+   * Idempotently merges the finalized match statistics into the room's cumulative
+   * session statistics (`fortunariumSessionStats` & `fortunariumSessionSummary`)
+   * EXACTLY ONCE per unique `room.matchId`.
+   */
+  private finalizeMatchSessionStats(room: ServerFortunariumRoom) {
+    if (!room.matchId) return;
+    if (!room.processedMatchIds) {
+      room.processedMatchIds = new Set();
+    }
+    if (room.processedMatchIds.has(room.matchId)) {
+      return;
+    }
+
+    room.processedMatchIds.add(room.matchId);
+
+    // Ensure all current room players are snapshotted into currentMatchParticipants
+    for (const p of room.players) {
+      this.recordMatchParticipantSnapshot(room, p);
+    }
+
+    if (!room.fortunariumSessionSummary) {
+      room.fortunariumSessionSummary = {
+        totalMatchesPlayed: 0,
+        totalSpins: 0,
+        totalQuotasCompleted: 0,
+        totalJackpots: 0,
+      };
+    }
+
+    room.fortunariumSessionSummary.totalMatchesPlayed += 1;
+    room.fortunariumSessionSummary.totalSpins += room.totalSpinsInMatch || 0;
+    room.fortunariumSessionSummary.totalQuotasCompleted +=
+      room.currentMatchQuotasCompleted || 0;
+    room.fortunariumSessionSummary.totalJackpots += room.totalJackpotsHit || 0;
+
+    for (const [playerId, record] of room.currentMatchParticipants.entries()) {
+      const p = record.player;
+      const isStillInRoom = room.players.some((rp) => rp.id === playerId);
+      const entry = this.ensurePlayerSessionEntry(room, p, isStillInRoom);
+
+      const won = p.stats.totalMoneyGenerated || 0;
+      const lost = p.stats.totalMoneyLost || 0;
+
+      entry.matchesPlayed += 1;
+      entry.spins += p.stats.spinsTriggered || 0;
+      entry.creditsWon += won;
+      entry.creditsLost += lost;
+      entry.netBalance = entry.creditsWon - entry.creditsLost;
+      entry.bestSpin = Math.max(entry.bestSpin, p.stats.biggestSingleWin || 0);
+      entry.quotasCompleted += record.quotasCompletedWhilePresent || 0;
+      entry.jackpots += p.stats.jackpotsHit || 0;
+    }
+
+    this.syncSessionParticipantsPresence(room);
+  }
+
   private serializeRoom(room: ServerFortunariumRoom): FortunariumRoomState {
+    this.syncSessionParticipantsPresence(room);
     return {
       roomCode: room.roomCode,
       matchId: room.matchId,
@@ -273,10 +447,20 @@ export class FortunariumServer {
       actionLog: room.actionLog.slice(0, 18),
       defeatCause: room.defeatCause,
       endReason: room.endReason,
+      fortunariumSessionStats: room.fortunariumSessionStats || {},
+      fortunariumSessionSummary: room.fortunariumSessionSummary || {
+        totalMatchesPlayed: 0,
+        totalSpins: 0,
+        totalQuotasCompleted: 0,
+        totalJackpots: 0,
+      },
     };
   }
 
   private broadcastRoomState(room: ServerFortunariumRoom) {
+    if (room.phase === 'VICTORY' || room.phase === 'DEFEAT') {
+      this.finalizeMatchSessionStats(room);
+    }
     room.stateVersion += 1;
     const state = this.serializeRoom(room);
     const payload = JSON.stringify({
@@ -953,6 +1137,7 @@ export class FortunariumServer {
           } else if (core.integrityDelta > 0) {
             player.stats.integrityRepaired += core.integrityDelta;
           }
+          this.recordMatchParticipantSnapshot(room, player);
 
           this.addLog(room, {
             playerId: player.id,
@@ -1474,6 +1659,13 @@ export class FortunariumServer {
           clearTimeout(room.spinTimer);
           room.spinTimer = null;
         }
+        if (
+          room.phase === 'VICTORY' ||
+          room.phase === 'DEFEAT' ||
+          (room.phase !== 'LOBBY' && room.totalSpinsInMatch > 0)
+        ) {
+          this.finalizeMatchSessionStats(room);
+        }
         room.phase = 'LOBBY';
         room.isSpinning = false;
         room.activeEvent = null;
@@ -1800,10 +1992,21 @@ export class FortunariumServer {
       room.keys += overdriveBonusKeys;
     }
 
+    // Track completed quota for room-session statistics
+    room.currentMatchQuotasCompleted = (room.currentMatchQuotasCompleted || 0) + 1;
+    for (const p of room.players) {
+      this.recordMatchParticipantSnapshot(room, p);
+      const rec = room.currentMatchParticipants.get(p.id);
+      if (rec) {
+        rec.quotasCompletedWhilePresent += 1;
+      }
+    }
+
     if (room.totalRounds !== null && room.round >= room.totalRounds) {
       room.phase = 'VICTORY';
       room.defeatCause = null;
       room.endReason = `¡Habéis superado las ${room.totalRounds} cuotas del Fortunarium conservando ${room.money} CR en la Caja Común!`;
+      this.finalizeMatchSessionStats(room);
       return;
     }
 
@@ -1852,6 +2055,15 @@ export class FortunariumServer {
       room.spinTimer = null;
     }
 
+    // If a previous match had not yet been finalized (e.g. direct restart), finalize it once
+    if (
+      room.phase === 'VICTORY' ||
+      room.phase === 'DEFEAT' ||
+      (room.phase !== 'LOBBY' && room.totalSpinsInMatch > 0)
+    ) {
+      this.finalizeMatchSessionStats(room);
+    }
+
     for (const p of room.players) {
       p.stats = createEmptyStats();
     }
@@ -1862,7 +2074,16 @@ export class FortunariumServer {
 
     const initialQuota = calculateInitialQuota(room.config.difficulty);
 
-    room.matchId = `match_${room.roomCode}_${Date.now()}`;
+    room.matchId = `match_${room.roomCode}_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 6)}`;
+    room.currentMatchQuotasCompleted = 0;
+    room.currentMatchParticipants = new Map();
+    for (const p of room.players) {
+      this.ensurePlayerSessionEntry(room, p, true);
+      this.recordMatchParticipantSnapshot(room, p);
+    }
+
     room.phase = 'PLAYING';
     room.round = 1;
     room.totalRounds = room.config.totalRounds;
@@ -1950,8 +2171,30 @@ export class FortunariumServer {
       room.disconnectTimers.delete(playerId);
     }
 
+    const departingPlayer = room.players.find((p) => p.id === playerId);
+    if (departingPlayer && room.phase !== 'LOBBY') {
+      this.recordMatchParticipantSnapshot(room, departingPlayer);
+    }
+
     room.players = room.players.filter((p) => p.id !== playerId);
     delete room.upgradeVotes[playerId];
+
+    // Update room-session presence: keep entry if they participated in any match, otherwise clean up 0-stat entry
+    const sessionEntry = room.fortunariumSessionStats?.[playerId];
+    if (sessionEntry) {
+      const participatedInCurrentMatch =
+        room.phase !== 'LOBBY' && room.currentMatchParticipants?.has(playerId);
+      if (
+        sessionEntry.matchesPlayed === 0 &&
+        sessionEntry.spins === 0 &&
+        !participatedInCurrentMatch
+      ) {
+        delete room.fortunariumSessionStats[playerId];
+      } else {
+        sessionEntry.isCurrentlyInRoom = false;
+        sessionEntry.isConnected = false;
+      }
+    }
 
     if (room.players.length === 0) {
       if (room.spinTimer) clearTimeout(room.spinTimer);

@@ -97,6 +97,32 @@ export interface FortunariumPlayer {
   stats: FortunariumPlayerStats;
 }
 
+export interface FortunariumPlayerSessionStats {
+  playerId: string;
+  displayName: string;
+  cursorColor: string;
+  firstJoinedOrder: number;
+  isCurrentlyInRoom: boolean;
+  isConnected: boolean;
+
+  matchesPlayed: number;
+  spins: number;
+  creditsWon: number;
+  creditsLost: number;
+  netBalance: number;
+
+  bestSpin: number;
+  quotasCompleted: number;
+  jackpots: number;
+}
+
+export interface FortunariumRoomSessionSummary {
+  totalMatchesPlayed: number;
+  totalSpins: number;
+  totalQuotasCompleted: number;
+  totalJackpots: number;
+}
+
 export interface FortunariumCellCoord {
   col: number; // 0..4
   row: number; // 0..2
@@ -445,6 +471,10 @@ export interface FortunariumRoomState {
 
   defeatCause?: 'bankruptcy' | 'integrity' | 'quota' | null;
   endReason?: string | null;
+
+  // Room-session cumulative statistics (persist across matches for the lifetime of this room only)
+  fortunariumSessionStats?: Record<string, FortunariumPlayerSessionStats>;
+  fortunariumSessionSummary?: FortunariumRoomSessionSummary;
 }
 
 export type FortunariumWinTier =
