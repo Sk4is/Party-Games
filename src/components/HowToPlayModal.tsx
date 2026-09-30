@@ -522,6 +522,57 @@ const GAMES: GameGuide[] = [
       },
     ],
   },
+  {
+    id: 'la-cripta',
+    name: 'La Cripta',
+    icon: '🕯️',
+    tagline: 'Expedición de mazmorras procedurales en solitario o cooperativo',
+    playersBadge: '1–4 Jugadores',
+    typeBadge: 'Solitario / Cooperativo',
+    accent: {
+      primary: '#E7A54A',
+      contrastText: '#0B0A0E',
+      borderClass: 'border-[#E7A54A]/40',
+      glowColor: 'rgba(231, 165, 74, 0.18)',
+      titleColor: 'text-[#E7A54A]',
+      iconBg: 'bg-[#E7A54A]/15',
+      iconBorder: 'border-[#E7A54A]/35',
+      numberBg: 'rgba(231, 165, 74, 0.18)',
+      numberColor: '#E7A54A',
+      tagBg: 'bg-amber-500/10',
+      tagBorder: 'border-amber-500/30',
+      tagText: 'text-[#D8C6A0]',
+    },
+    rules: [
+      {
+        num: '01',
+        title: 'De 1 a 4 aventureros en la misma expedición',
+        content: (
+          <p>
+            Puedes adentrarte en <strong className="text-white">La Cripta en solitario (1 jugador)</strong> o compartir sala con hasta <strong className="text-white">4 jugadores</strong>. En modo multijugador todos ven los punteros del grupo en tiempo real.
+          </p>
+        ),
+      },
+      {
+        num: '02',
+        title: 'Seis clases de aventurero sin duplicados',
+        content: (
+          <p>
+            Dentro de la sala eliges entre <strong className="text-[#E7A54A]">Caballero, Mago, Pícaro, Cazador, Clérigo y Alquimista</strong>, cada uno con sus puntuaciones de <em>Vida, Ataque, Defensa y Magia</em>. En partidas de varios jugadores no se puede repetir aventurero.
+          </p>
+        ),
+      },
+      {
+        num: '03',
+        title: 'Las tres puertas procedurales',
+        content: (
+          <p>
+            Cada expedición presenta <strong className="text-white">3 puertas distintas</strong> elegidas entre un registro de 20 mazmorras. En solitario tu elección abre el umbral al instante; en grupo, la puerta se desbloquea cuando los jugadores coinciden en el mismo destino.
+          </p>
+        ),
+      },
+    ],
+  },
 ];
 
 export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose, initialGame }) => {

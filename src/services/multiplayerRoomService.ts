@@ -22,7 +22,8 @@ export type MultiplayerGameType =
   | 'coartada'
   | 'entre-topos'
   | 'la_cantina_del_farol'
-  | 'fortunarium';
+  | 'fortunarium'
+  | 'la-cripta';
 
 export interface SharedRoomSummary {
   roomId: string;

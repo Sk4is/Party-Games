@@ -82,6 +82,23 @@ body,
     letter-spacing: 0.04em;
     font-variant-numeric: tabular-nums;
   }
+  .font-cripta-display {
+    font-family: "Cinzel", "Special Elite", Georgia, serif;
+    letter-spacing: 0.06em;
+  }
+  .font-cripta-pixel {
+    font-family: "Silkscreen", "JetBrains Mono", monospace;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  .font-cripta-mono {
+    font-family: "JetBrains Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .pixelated-art {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -1636,6 +1653,227 @@ body,
   animation: fort-crt-scanline-sweep 8.5s linear infinite;
 }
 
+/* La Cripta — Dark Fantasy Pixel-Art Atmosphere Animations */
+@keyframes cripta-torch-flicker {
+  0%, 100% {
+    opacity: 0.92;
+    transform: scale(1) translateY(0px);
+    filter: drop-shadow(0 0 12px rgba(231, 165, 74, 0.55));
+  }
+  25% {
+    opacity: 0.78;
+    transform: scale(0.96, 1.04) translateY(-1px);
+    filter: drop-shadow(0 0 8px rgba(231, 165, 74, 0.42));
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.03, 0.98) translateY(0.5px);
+    filter: drop-shadow(0 0 16px rgba(231, 165, 74, 0.7));
+  }
+  80% {
+    opacity: 0.85;
+    transform: scale(0.98, 1.02) translateY(-0.5px);
+    filter: drop-shadow(0 0 10px rgba(231, 165, 74, 0.48));
+  }
+}
+
+@keyframes cripta-mote-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) translateX(0px) scale(0.85);
+  }
+  25% {
+    opacity: 0.75;
+  }
+  75% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-28px) translateX(4px) scale(1.05);
+  }
+}
+
+@keyframes cripta-door-tremor {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-1.5px, 1px); }
+  40% { transform: translate(1.5px, -1px); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 1.5px); }
+}
+
+.animate-cripta-torch {
+  animation: cripta-torch-flicker 2.8s ease-in-out infinite;
+}
+
+.animate-cripta-mote {
+  animation: cripta-mote-rise 4.2s ease-in-out infinite;
+}
+
+.animate-cripta-door-tremor {
+  animation: cripta-door-tremor 0.22s ease-in-out infinite;
+}
+
+@keyframes cripta-sprite-idle-bob {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes cripta-sprite-cloth-sway {
+  0%, 100% {
+    transform: translateX(0px);
+  }
+  50% {
+    transform: translateX(1px);
+  }
+}
+
+@keyframes cripta-sprite-blink {
+  0%, 92%, 100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes cripta-sprite-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+    filter: brightness(2.2) contrast(1.4);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.03);
+    filter: brightness(1.45);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes cripta-sprite-hit {
+  0%, 100% { transform: translateX(0); filter: none; }
+  25% { transform: translateX(-3px); filter: brightness(1.8) sepia(1) hue-rotate(-50deg); }
+  75% { transform: translateX(3px); filter: brightness(1.5); }
+}
+
+@keyframes cripta-sprite-heal {
+  0%, 100% { transform: translateY(0); filter: none; }
+  50% { transform: translateY(-3px); filter: drop-shadow(0 0 8px rgba(105, 168, 165, 0.85)) brightness(1.3); }
+}
+
+.animate-cripta-sprite-idle {
+  animation: cripta-sprite-idle-bob 3.2s steps(2, end) infinite;
+}
+
+.animate-cripta-sprite-cloth {
+  animation: cripta-sprite-cloth-sway 3.6s steps(2, end) infinite;
+}
+
+.animate-cripta-sprite-blink {
+  transform-origin: center;
+  animation: cripta-sprite-blink 5.2s steps(1, end) infinite;
+}
+
+@keyframes cripta-metal-glint {
+  0%, 84%, 100% {
+    opacity: 0.25;
+  }
+  88%, 92% {
+    opacity: 1;
+  }
+}
+
+@keyframes cripta-arcane-pulse {
+  0%, 100% {
+    opacity: 0.75;
+    transform: translateY(0px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes cripta-relic-flicker {
+  0%, 100% {
+    opacity: 0.88;
+  }
+  40% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.72;
+  }
+}
+
+@keyframes cripta-flask-bubble {
+  0%, 70%, 100% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  78% {
+    opacity: 0.95;
+    transform: translateY(0px);
+  }
+  90% {
+    opacity: 0.85;
+    transform: translateY(-2px);
+  }
+}
+
+.animate-cripta-glint {
+  animation: cripta-metal-glint 4.8s steps(1, end) infinite;
+}
+
+.animate-cripta-arcane-pulse {
+  animation: cripta-arcane-pulse 2.8s steps(2, end) infinite;
+}
+
+.animate-cripta-relic-glow {
+  animation: cripta-relic-flicker 2.6s steps(2, end) infinite;
+}
+
+.animate-cripta-flask-bubble {
+  animation: cripta-flask-bubble 3.8s steps(1, end) infinite;
+}
+
+.animate-cripta-sprite-enter {
+  animation: cripta-sprite-enter 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-cripta-sprite-hit {
+  animation: cripta-sprite-hit 0.28s steps(2, end) forwards;
+}
+
+.animate-cripta-sprite-heal {
+  animation: cripta-sprite-heal 0.45s ease-out forwards;
+}
+
+/* Subtle Fantasy Arcade CRT Treatment (pointer-events: none guaranteed) */
+.cripta-crt-scanlines {
+  pointer-events: none !important;
+  background:
+    linear-gradient(
+      rgba(18, 16, 20, 0) 50%,
+      rgba(0, 0, 0, 0.16) 50%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(231, 165, 74, 0.015) 0%,
+      rgba(11, 10, 14, 0.22) 100%
+    );
+  background-size: 100% 3px, 100% 100%;
+}
+
 /* Accessibility: Respect user reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   .fam2play-wordmark {
@@ -1659,7 +1897,10 @@ body,
   .animate-home-aurora-counter,
   .animate-fort-bulb,
   .animate-fort-crt,
-  .animate-fort-spin-hum {
+  .animate-fort-spin-hum,
+  .animate-cripta-torch,
+  .animate-cripta-mote,
+  .animate-cripta-door-tremor {
     animation: none !important;
   }
   .fort-gauge-fill {

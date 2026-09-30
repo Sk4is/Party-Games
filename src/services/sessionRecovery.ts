@@ -13,7 +13,8 @@ export type SupportedGameType =
   | 'coartada'
   | 'entre-topos'
   | 'la_cantina_del_farol'
-  | 'fortunarium';
+  | 'fortunarium'
+  | 'la-cripta';
 
 export interface ActiveSessionData {
   gameType: SupportedGameType;
@@ -31,11 +32,13 @@ export const sessionRecovery = {
    */
   saveActiveSession(data: { gameType: SupportedGameType; roomCode: string; playerId: string }): void {
     if (typeof window === 'undefined') return;
+    const rawCode = typeof data?.roomCode === 'string' ? data.roomCode.trim() : '';
+    if (!rawCode) return;
 
     const session: ActiveSessionData = {
       gameType: data.gameType,
-      roomCode: data.roomCode.toUpperCase().trim(),
-      playerId: data.playerId,
+      roomCode: rawCode.toUpperCase(),
+      playerId: data.playerId || '',
       timestamp: Date.now(),
     };
 
@@ -102,9 +105,11 @@ export const sessionRecovery = {
           'entre-topos',
           'la_cantina_del_farol',
           'fortunarium',
+          'la-cripta',
         ].includes(urlGame)
       ) {
         const playerId =
+          localStorage.getItem('fam2play_la_cripta_player_id') ||
           localStorage.getItem('fam2play_fortunarium_player_id') ||
           localStorage.getItem('fam2play_cantina_player_id') ||
           localStorage.getItem('fam2play_player_id') ||

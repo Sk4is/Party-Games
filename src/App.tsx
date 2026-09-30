@@ -18,6 +18,7 @@ import { CoartadaGame } from './components/coartada/CoartadaGame';
 import { EntreToposGame } from './components/entre-topos/EntreToposGame';
 import { CantinaGame } from './components/cantina/CantinaGame';
 import { FortunariumGame } from './components/fortunarium/FortunariumGame';
+import { LaCriptaGame } from './components/la-cripta/LaCriptaGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 import { sessionRecovery } from './services/sessionRecovery';
 import { BackendConnectingModal } from './components/common/BackendConnectingModal';
@@ -33,6 +34,7 @@ type AppView =
   | 'ENTRE_TOPOS'
   | 'CANTINA'
   | 'FORTUNARIUM'
+  | 'LA_CRIPTA'
   | 'BOMBA_LOCAL_SETUP'
   | 'BOMBA_LOCAL_GAME'
   | 'LPR_LOCAL_SETUP'
@@ -68,6 +70,9 @@ export default function App() {
       if ((activeSession.gameType as string) === 'fortunarium') {
         return 'FORTUNARIUM';
       }
+      if ((activeSession.gameType as string) === 'la-cripta') {
+        return 'LA_CRIPTA';
+      }
     }
 
     if (typeof window !== 'undefined') {
@@ -84,6 +89,7 @@ export default function App() {
       if (game === 'entre-topos') return 'ENTRE_TOPOS';
       if (game === 'la_cantina_del_farol' || game === 'la-cantina-del-farol') return 'CANTINA';
       if (game === 'fortunarium') return 'FORTUNARIUM';
+      if (game === 'la-cripta') return 'LA_CRIPTA';
       if (room) {
         return 'PINTURILLO';
       }
@@ -122,6 +128,8 @@ export default function App() {
       setCurrentView('CANTINA');
     } else if (gameId === 'fortunarium') {
       setCurrentView('FORTUNARIUM');
+    } else if (gameId === 'la-cripta') {
+      setCurrentView('LA_CRIPTA');
     }
   };
 
@@ -141,7 +149,8 @@ export default function App() {
       | 'coartada'
       | 'entre-topos'
       | 'la_cantina_del_farol'
-      | 'fortunarium',
+      | 'fortunarium'
+      | 'la-cripta',
     code: string
   ) => {
     setUrlRoomCode(code);
@@ -154,6 +163,7 @@ export default function App() {
     else if (game === 'entre-topos') setCurrentView('ENTRE_TOPOS');
     else if (game === 'la_cantina_del_farol') setCurrentView('CANTINA');
     else if (game === 'fortunarium') setCurrentView('FORTUNARIUM');
+    else if (game === 'la-cripta') setCurrentView('LA_CRIPTA');
   };
 
   return (
@@ -240,6 +250,15 @@ export default function App() {
       {/* 9. FORTUNARIUM (ONLINE COOPERATIVE SLOT MACHINE 2-4 PLAYERS) */}
       {currentView === 'FORTUNARIUM' && (
         <FortunariumGame
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
+      )}
+
+      {/* 10. LA CRIPTA (ONLINE COOPERATIVE PROCEDURAL DUNGEON ADVENTURE 2-4 PLAYERS) */}
+      {currentView === 'LA_CRIPTA' && (
+        <LaCriptaGame
           onBackToMenu={handleBackToMenu}
           initialRoomCode={urlRoomCode}
           onSwitchGame={handleSwitchGame}
