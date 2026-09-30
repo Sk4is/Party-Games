@@ -78,6 +78,8 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
     spinSlot,
     devGrantModifier,
     resolveIncident,
+    interactIncident,
+    lastResolvedMalfunction,
     dismissRoulette,
     devTriggerIncident,
     devTriggerRoulette,
@@ -200,6 +202,8 @@ export const FortunariumGame: React.FC<FortunariumGameProps> = ({
         onSpinSlot={spinSlot}
         onDevGrantModifier={devGrantModifier}
         onResolveIncident={resolveIncident}
+        onInteractIncident={interactIncident}
+        lastResolvedMalfunction={lastResolvedMalfunction}
         onDismissRoulette={dismissRoulette}
         onDevTriggerIncident={devTriggerIncident}
         onDevTriggerRoulette={devTriggerRoulette}

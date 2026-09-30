@@ -14,6 +14,8 @@ import {
   FortunariumModifierId,
   FortunariumIncidentType,
   FortunariumActiveIncident,
+  FortunariumIncidentControl,
+  FortunariumMalfunctionVisualEffect,
   FortunariumEffectRouletteState,
   FortunariumPlayerSessionStats,
   FortunariumRoomSessionSummary,
@@ -57,6 +59,10 @@ interface ServerFortunariumRoom extends FortunariumRoomState {
   spinTimer: NodeJS.Timeout | null;
   disconnectTimers: Map<string, NodeJS.Timeout>;
   spinsSinceLastIncident: number;
+  lastMalfunctionResolvedAt: number;
+  malfunctionsInCurrentQuota: number;
+  malfunctionsInMatch: number;
+  lastMalfunctionType: FortunariumIncidentType | null;
   processedMatchIds: Set<string>;
   nextSessionJoinOrder: number;
   currentMatchQuotasCompleted: number;
@@ -222,6 +228,7 @@ export class FortunariumServer {
       activeModifiers: [],
       activeEvent: null,
       activeIncident: null,
+      activeMalfunction: null,
       activeRoulette: null,
       readyForNextRoundPlayerIds: [],
       actionLog: [],
@@ -254,6 +261,10 @@ export class FortunariumServer {
       spinTimer: null,
       disconnectTimers: new Map(),
       spinsSinceLastIncident: 0,
+      lastMalfunctionResolvedAt: 0,
+      malfunctionsInCurrentQuota: 0,
+      malfunctionsInMatch: 0,
+      lastMalfunctionType: null,
       processedMatchIds: new Set(),
       nextSessionJoinOrder: 2,
       currentMatchQuotasCompleted: 0,
@@ -442,6 +453,7 @@ export class FortunariumServer {
       activeModifiers: room.activeModifiers,
       activeEvent: room.activeEvent,
       activeIncident: room.activeIncident || null,
+      activeMalfunction: room.activeIncident || null,
       activeRoulette: room.activeRoulette || null,
       readyForNextRoundPlayerIds: room.readyForNextRoundPlayerIds,
       actionLog: room.actionLog.slice(0, 18),
@@ -1170,26 +1182,36 @@ export class FortunariumServer {
             return;
           }
 
-          // 3. Random Machine Incident or Overdrive Effect Roulette check
+          // 3. Occasional Shared Malfunction Event or Overdrive Effect Roulette check
           room.spinsSinceLastIncident = (room.spinsSinceLastIncident || 0) + 1;
+          const msSinceLastIncident =
+            room.lastMalfunctionResolvedAt > 0
+              ? Date.now() - room.lastMalfunctionResolvedAt
+              : undefined;
           const incidentProb = calculateIncidentProbability({
             round: room.round,
             overdriveSpins: room.overdriveSpins || 0,
             integrity: room.integrity,
             maxIntegrity: room.maxIntegrity,
             spinsSinceLastIncident: room.spinsSinceLastIncident,
+            totalSpinsInMatch: room.totalSpinsInMatch,
+            msSinceLastIncident,
+            malfunctionsInQuota: room.malfunctionsInCurrentQuota || 0,
+            malfunctionsInMatch: room.malfunctionsInMatch || 0,
             activeModifiers: room.activeModifiers,
             playerId: player.id,
           });
 
-          if (!room.activeIncident && Math.random() < incidentProb) {
+          if (!room.activeIncident && !room.activeRoulette && Math.random() < incidentProb) {
             room.spinsSinceLastIncident = 0;
+            room.malfunctionsInCurrentQuota = (room.malfunctionsInCurrentQuota || 0) + 1;
+            room.malfunctionsInMatch = (room.malfunctionsInMatch || 0) + 1;
             this.triggerRandomIncident(room, player);
           } else if (
             !room.activeIncident &&
             !room.activeRoulette &&
             (room.overdriveSpins || 0) >= 2 &&
-            Math.random() < 0.26
+            Math.random() < 0.22
           ) {
             this.triggerEffectRoulette(
               room,
@@ -1277,20 +1299,90 @@ export class FortunariumServer {
         break;
       }
 
-      case 'RESOLVE_INCIDENT': {
-        if (!room.activeIncident || room.isSpinning) return;
+      case 'INTERACT_INCIDENT': {
+        if (room.isSpinning) return;
         const inc = room.activeIncident;
+        // Authoritative Exactly-Once guard: ignore if no active malfunction or already resolved
+        if (!inc || inc.state !== 'ACTIVE' || inc.resolved) {
+          return;
+        }
+        if (
+          msg.incidentId &&
+          inc.id !== msg.incidentId &&
+          inc.eventId !== msg.incidentId &&
+          inc.incidentId !== msg.incidentId
+        ) {
+          return;
+        }
 
+        const ctrl = inc.controls?.find((c) => c.id === msg.controlId);
+        if (!ctrl || ctrl.completed) {
+          return;
+        }
+
+        // If this control is a distractor (e.g., wrong frequency channel or already-intact fuse), ignore or provide harmless feedback
+        if (ctrl.isCorrectTarget === false) {
+          return;
+        }
+
+        ctrl.currentValue = Math.min(ctrl.targetValue, ctrl.currentValue + 1);
+        if (!ctrl.activatedByPlayerIds.includes(player.id)) {
+          ctrl.activatedByPlayerIds.push(player.id);
+        }
+        if (!ctrl.activatedByPlayerNames) {
+          ctrl.activatedByPlayerNames = [];
+        }
+        if (!ctrl.activatedByPlayerNames.includes(player.name)) {
+          ctrl.activatedByPlayerNames.push(player.name);
+        }
+        if (ctrl.currentValue >= ctrl.targetValue) {
+          ctrl.completed = true;
+          ctrl.statusText = 'ESTABILIZADO ✓';
+        }
+
+        const allCompleted = inc.controls.every((c) => c.completed);
+        if (!allCompleted) {
+          this.broadcastRoomState(room);
+          return;
+        }
+
+        this.completeInteractiveMalfunction(room, inc, player);
+        break;
+      }
+
+      case 'RESOLVE_INCIDENT': {
+        if (room.isSpinning) return;
+        const inc = room.activeIncident;
+        // Authoritative Exactly-Once guard: ignore if already resolved by another player
+        if (!inc || inc.state !== 'ACTIVE' || inc.resolved) {
+          return;
+        }
+        if (
+          msg.eventId &&
+          inc.id !== msg.eventId &&
+          inc.eventId !== msg.eventId &&
+          inc.incidentId !== msg.eventId
+        ) {
+          return;
+        }
+
+        if (msg.choice === 'INTERACTIVE_FIX') {
+          this.completeInteractiveMalfunction(room, inc, player);
+          return;
+        }
+
+        let outcomeText = '';
         if (msg.choice === 'EMERGENCY_REPAIR') {
           const canUseKey = room.keys >= 1 && room.money < inc.emergencyRepairCost + 10;
           if (canUseKey) {
             room.keys -= 1;
             const dmg = inc.reducedDamage;
             room.integrity = Math.max(1, room.integrity - dmg);
+            outcomeText = `${player.name} contuvo «${inc.title}» con 1 Llave (-${dmg}% INT, avería evitada).`;
             this.addLog(room, {
               playerId: player.id,
               playerName: player.name,
-              text: `${player.name} contuvo «${inc.title}» con 1 Llave (-${dmg}% INT, avería evitada).`,
+              text: outcomeText,
               integrityDelta: -dmg,
               variant: 'repair',
             });
@@ -1316,15 +1408,17 @@ export class FortunariumServer {
               player.stats.totalMoneyGenerated - player.stats.totalMoneyLost;
             const dmg = inc.reducedDamage;
             room.integrity = Math.max(1, room.integrity - dmg);
+            outcomeText = `${player.name} realizó reparación de emergencia en «${inc.title}» (-${inc.emergencyRepairCost} CR, -${dmg}% INT).`;
             this.addLog(room, {
               playerId: player.id,
               playerName: player.name,
-              text: `${player.name} realizó reparación de emergencia en «${inc.title}» (-${inc.emergencyRepairCost} CR, -${dmg}% INT).`,
+              text: outcomeText,
               moneyDelta: -inc.emergencyRepairCost,
               integrityDelta: -dmg,
               variant: 'repair',
             });
           }
+          player.stats.repairsCount = (player.stats.repairsCount || 0) + 1;
         } else {
           // ABSORB_IMPACT
           const dmg = inc.integrityDamage;
@@ -1333,20 +1427,29 @@ export class FortunariumServer {
           if (inc.inflictedModifierId) {
             this.applyTemporaryModifier(room, inc.inflictedModifierId, player);
           }
+          outcomeText = `La máquina absorbió «${inc.title}» (-${dmg}% Integridad${
+            inc.inflictedModifierId
+              ? ` y efecto «${FORTUNARIUM_MODIFIERS_CATALOG[inc.inflictedModifierId].name}»`
+              : ''
+          }).`;
           this.addLog(room, {
             playerId: player.id,
             playerName: player.name,
-            text: `La máquina absorbió «${inc.title}» (-${dmg}% Integridad${
-              inc.inflictedModifierId
-                ? ` y efecto «${FORTUNARIUM_MODIFIERS_CATALOG[inc.inflictedModifierId].name}»`
-                : ''
-            }).`,
+            text: outcomeText,
             integrityDelta: -dmg,
             variant: 'hazard',
           });
         }
 
+        inc.state = 'RESOLVED';
+        inc.resolved = true;
+        inc.resolvedAt = Date.now();
+        inc.resolvedByPlayerId = player.id;
+        inc.resolvedByPlayerName = player.name;
         room.activeIncident = null;
+        room.activeMalfunction = null;
+        room.lastMalfunctionResolvedAt = Date.now();
+        room.spinsSinceLastIncident = 0;
 
         if (room.integrity <= 0) {
           room.phase = 'DEFEAT';
@@ -1358,6 +1461,16 @@ export class FortunariumServer {
         }
 
         this.evaluateBankruptcyOrQuota(room);
+        this.broadcastMessage(room, {
+          type: 'MALFUNCTION_RESOLVED',
+          eventId: inc.eventId,
+          incidentType: inc.type,
+          title: inc.title,
+          resolvedByPlayerId: player.id,
+          resolvedByPlayerName: player.name,
+          outcomeText,
+          state: this.serializeRoom(room),
+        });
         this.broadcastRoomState(room);
         break;
       }
@@ -1612,7 +1725,9 @@ export class FortunariumServer {
           room.quotaProgress = room.money;
           room.repairsUsedInQuota = 0;
           room.overdriveSpins = 0;
+          room.malfunctionsInCurrentQuota = 0;
           room.activeIncident = null;
+          room.activeMalfunction = null;
           room.activeRoulette = null;
           room.readyForNextRoundPlayerIds = [];
           room.offeredUpgradeIds = [];
@@ -1670,8 +1785,11 @@ export class FortunariumServer {
         room.isSpinning = false;
         room.activeEvent = null;
         room.activeIncident = null;
+        room.activeMalfunction = null;
         room.activeRoulette = null;
         room.overdriveSpins = 0;
+        room.malfunctionsInCurrentQuota = 0;
+        room.malfunctionsInMatch = 0;
         room.defeatCause = null;
         room.endReason = null;
         this.broadcastRoomState(room);
@@ -1695,6 +1813,16 @@ export class FortunariumServer {
 
       case 'DEV_TRIGGER_INCIDENT': {
         this.triggerRandomIncident(room, player, msg.incidentType);
+        this.broadcastRoomState(room);
+        break;
+      }
+
+      case 'DEV_FORCE_INCIDENT': {
+        if (msg.incidentType === 'ruleta_efectos') {
+          this.triggerEffectRoulette(room, 'RULETA DE PRUEBA DEV', false, player);
+        } else {
+          this.triggerRandomIncident(room, player, msg.incidentType);
+        }
         this.broadcastRoomState(room);
         break;
       }
@@ -1742,24 +1870,98 @@ export class FortunariumServer {
     }
   }
 
+  private completeInteractiveMalfunction(
+    room: ServerFortunariumRoom,
+    inc: FortunariumActiveIncident,
+    player: FortunariumPlayer
+  ) {
+    // Strictly idempotent: only the first player to complete resolution wins
+    if (inc.state !== 'ACTIVE' || inc.resolved) {
+      return;
+    }
+
+    inc.state = 'RESOLVED';
+    inc.resolved = true;
+    inc.resolvedAt = Date.now();
+    inc.resolvedByPlayerId = player.id;
+    inc.resolvedByPlayerName = player.name;
+
+    const bonusInt = inc.stabilizeIntegrityBonus ?? 2;
+    const actualStabilized = Math.min(
+      bonusInt,
+      Math.max(0, room.maxIntegrity - room.integrity)
+    );
+    if (actualStabilized > 0) {
+      room.integrity += actualStabilized;
+      player.stats.integrityRepaired += actualStabilized;
+    }
+    player.stats.repairsCount = (player.stats.repairsCount || 0) + 1;
+    this.recordMatchParticipantSnapshot(room, player);
+
+    const outcomeText =
+      actualStabilized > 0
+        ? `🔧 ${player.name} reparó «${inc.title}» (+${actualStabilized}% Integridad estabilizada).`
+        : `🔧 ${player.name} reparó «${inc.title}» sin daños en el chasis.`;
+
+    inc.outcomeText = outcomeText;
+    inc.outcomeVariant = 'positive';
+
+    room.activeIncident = null;
+    room.activeMalfunction = null;
+    room.lastMalfunctionResolvedAt = Date.now();
+    room.spinsSinceLastIncident = 0;
+
+    this.addLog(room, {
+      playerId: player.id,
+      playerName: player.name,
+      text: outcomeText,
+      integrityDelta: actualStabilized > 0 ? actualStabilized : undefined,
+      variant: 'repair',
+    });
+
+    this.evaluateBankruptcyOrQuota(room);
+    room.stateVersion += 1;
+    const serialized = this.serializeRoom(room);
+    this.broadcastMessage(room, {
+      type: 'MALFUNCTION_RESOLVED',
+      eventId: inc.eventId,
+      incidentType: inc.type,
+      title: inc.title,
+      resolvedByPlayerId: player.id,
+      resolvedByPlayerName: player.name,
+      outcomeText,
+      state: serialized,
+    });
+    this.broadcastRoomState(room);
+  }
+
   private triggerRandomIncident(
     room: ServerFortunariumRoom,
     player: FortunariumPlayer,
     forcedType?: FortunariumIncidentType
   ) {
-    const allTypes: FortunariumIncidentType[] = [
-      'chispazo',
-      'sobrecalentamiento',
-      'atasco_engranajes',
-      'fuga_aceite',
-      'cortocircuito',
-      'vibracion_critica',
-      'ruleta_averiada',
-    ];
-    const chosenType =
-      forcedType || allTypes[Math.floor(Math.random() * allTypes.length)];
+    // Map legacy Spanish incident IDs to the 8 canonical interactive malfunction types
+    const legacyAliasMap: Partial<Record<FortunariumIncidentType, FortunariumIncidentType>> = {
+      chispazo: 'electrical_interference',
+      cortocircuito: 'fuse_failure',
+      sobrecalentamiento: 'overheating_warning',
+      atasco_engranajes: 'mechanical_obstruction',
+      fuga_aceite: 'loose_cable',
+      vibracion_critica: 'stuck_controls',
+    };
 
-    if (chosenType === 'ruleta_averiada') {
+    const canonicalPool: FortunariumIncidentType[] = [
+      'blackout',
+      'fuse_failure',
+      'loose_cable',
+      'crt_interference',
+      'electrical_interference',
+      'stuck_controls',
+      'overheating_warning',
+      'mechanical_obstruction',
+    ];
+
+    if (forcedType === 'ruleta_averiada') {
       room.integrity = Math.max(1, room.integrity - 4);
       this.triggerEffectRoulette(
         room,
@@ -1770,6 +1972,16 @@ export class FortunariumServer {
       return;
     }
 
+    let chosenType: FortunariumIncidentType;
+    if (forcedType) {
+      chosenType = legacyAliasMap[forcedType] || forcedType;
+    } else {
+      const eligiblePool = canonicalPool.filter((t) => t !== room.lastMalfunctionType);
+      const pool = eligiblePool.length > 0 ? eligiblePool : canonicalPool;
+      chosenType = pool[Math.floor(Math.random() * pool.length)];
+    }
+    room.lastMalfunctionType = chosenType;
+
     const baseRepair = calculateRepairCost({
       round: room.round,
       repairsUsedInQuota: room.repairsUsedInQuota || 0,
@@ -1778,89 +1990,385 @@ export class FortunariumServer {
       upgrades: room.upgrades,
       activeModifiers: room.activeModifiers,
     });
-    const emergencyRepairCost = Math.max(12, Math.round(baseRepair * 0.58));
+    const emergencyRepairCost = Math.max(12, Math.round(baseRepair * 0.55));
     const overdriveBonusDmg = Math.min(8, (room.overdriveSpins || 0) * 2);
 
-    const incidentConfigs: Record<
-      Exclude<FortunariumIncidentType, 'ruleta_averiada'>,
-      {
-        title: string;
-        description: string;
-        baseDmg: number;
-        reducedDamage: number;
-        inflictedModifierId?: FortunariumModifierId;
-      }
-    > = {
-      chispazo: {
-        title: '¡CHISPAZO EN RELÉ PRINCIPAL!',
-        description:
-          'Un arco voltaico sacude el cuadro superior. Podéis aislar el cable ahora o absorber la descarga.',
-        baseDmg: 10 + overdriveBonusDmg,
-        reducedDamage: 2,
-        inflictedModifierId: 'cableado_quemado',
-      },
-      sobrecalentamiento: {
-        title: '¡BOBINAS AL ROJO VIVO!',
-        description:
-          'El motor echa humo espeso por la rejilla lateral. Purgad el circuito o el chasis sufrirá recalentamiento.',
-        baseDmg: 12 + overdriveBonusDmg,
-        reducedDamage: 3,
-        inflictedModifierId: 'recalentamiento',
-      },
-      atasco_engranajes: {
-        title: '¡ATASCO EN ENGRANAJES CENTRALES!',
-        description:
-          'Un diente de latón bloquea la tracción del rodillo 3. Lubricad de urgencia o los rodillos quedarán oxidados.',
-        baseDmg: 11 + overdriveBonusDmg,
-        reducedDamage: 2,
-        inflictedModifierId: 'rodillos_oxidados',
-      },
-      fuga_aceite: {
-        title: '¡FUGA DE PRESIÓN HIDRÁULICA!',
-        description:
-          'Una junta reventada gotea sobre el cajón de monedas. Sellad la válvula o habrá fuga de créditos.',
-        baseDmg: 9 + overdriveBonusDmg,
-        reducedDamage: 2,
-        inflictedModifierId: 'fuga_creditos',
-      },
-      cortocircuito: {
-        title: '¡CORTOCIRCUITO EN SELECTOR DE APUESTA!',
-        description:
-          'El conmutador de potencia chisporrotea sin control. Reparad el puente o forzará la apuesta mínima.',
-        baseDmg: 12 + overdriveBonusDmg,
-        reducedDamage: 3,
-        inflictedModifierId: 'apuesta_forzada',
-      },
-      vibracion_critica: {
-        title: '¡VIBRACIÓN CRÍTICA DEL CHASIS!',
-        description:
-          'Los pernos traseros ceden bajo la tensión. Apretad los anclajes o la máquina entrará en mala racha.',
-        baseDmg: 13 + overdriveBonusDmg,
-        reducedDamage: 3,
-        inflictedModifierId: 'mala_racha',
-      },
+    type MalfunctionBlueprint = {
+      title: string;
+      subtitle: string;
+      description: string;
+      instructionHint: string;
+      visualEffect: FortunariumMalfunctionVisualEffect;
+      baseDmg: number;
+      reducedDamage: number;
+      stabilizeBonus: number;
+      inflictedModifierId?: FortunariumModifierId;
+      targetFrequencyLabel?: string;
+      jammedReelIndex?: number | null;
+      controls: FortunariumIncidentControl[];
     };
 
-    const cfg = incidentConfigs[chosenType];
+    const buildBlueprint = (type: FortunariumIncidentType): MalfunctionBlueprint => {
+      switch (type) {
+        case 'blackout':
+          return {
+            title: '¡CAÍDA DE TENSIÓN / APAGÓN PARCIAL!',
+            subtitle: 'CUADRO DE DISTRIBUCIÓN PRINCIPAL',
+            description:
+              'Los tres disyuntores del panel interno han saltado por un pico de corriente. Restableced los interruptores para devolver la energía al chasis.',
+            instructionHint: 'Reactiva los 3 disyuntores [OFF → ON] (cualquier jugador puede pulsarlos)',
+            visualEffect: 'blackout',
+            baseDmg: 10 + overdriveBonusDmg,
+            reducedDamage: 2,
+            stabilizeBonus: 2,
+            inflictedModifierId: 'cableado_quemado',
+            controls: [
+              {
+                id: 'breaker_a',
+                label: 'DISYUNTOR A · LÍNEA 220V',
+                sublabel: 'Circuito de iluminación y CRT',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'CAÍDO [OFF]',
+                variant: 'danger',
+              },
+              {
+                id: 'breaker_b',
+                label: 'DISYUNTOR B · TRACCIÓN',
+                sublabel: 'Motor de rodillos centrales',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'CAÍDO [OFF]',
+                variant: 'danger',
+              },
+              {
+                id: 'breaker_c',
+                label: 'DISYUNTOR C · RELÉ LÓGICO',
+                sublabel: 'Placa de validación de premios',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'CAÍDO [OFF]',
+                variant: 'danger',
+              },
+            ],
+          };
+
+        case 'fuse_failure': {
+          // Pick 2 blown fuses out of 4
+          const indices = [0, 1, 2, 3];
+          const firstBlown = indices.splice(Math.floor(Math.random() * indices.length), 1)[0];
+          const secondBlown = indices[Math.floor(Math.random() * indices.length)];
+          const blownSet = new Set([firstBlown, secondBlown]);
+          return {
+            title: '¡FALLO DE FUSIBLES EN PUENTE!',
+            subtitle: 'CAJA DE FUSIBLES CERÁMICOS',
+            description:
+              'Dos fusibles cerámicos se han fundido en el puente de potencia. Sustituid los fusibles quemados antes de que el corto afecte al selector.',
+            instructionHint: 'Haz clic en los 2 fusibles marcados como FUNDIDO para reemplazarlos',
+            visualEffect: 'sparks',
+            baseDmg: 11 + overdriveBonusDmg,
+            reducedDamage: 2,
+            stabilizeBonus: 2,
+            inflictedModifierId: 'apuesta_forzada',
+            controls: [0, 1, 2, 3].map((idx) => {
+              const isBlown = blownSet.has(idx);
+              return {
+                id: `fuse_${idx + 1}`,
+                label: `FUSIBLE F-${idx + 1} (15A)`,
+                sublabel: isBlown ? 'Filamento fundido · Sustituir' : 'Filamento intacto',
+                currentValue: isBlown ? 0 : 1,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: !isBlown,
+                isCorrectTarget: isBlown,
+                statusText: isBlown ? '🔥 FUNDIDO' : 'INTACTO ✓',
+                variant: isBlown ? 'danger' : 'neutral',
+              };
+            }),
+          };
+        }
+
+        case 'loose_cable':
+          return {
+            title: '¡CABLE DE DATOS DESCONECTADO!',
+            subtitle: 'BUS INTERNO DEL CHASIS',
+            description:
+              'La vibración ha soltado los conectores del bus principal. Volved a acoplar las dos tomas sueltas para evitar fugas en el depósito.',
+            instructionHint: 'Acopla los 2 conectores desacoplados del bus interno',
+            visualEffect: 'cable_loose',
+            baseDmg: 9 + overdriveBonusDmg,
+            reducedDamage: 2,
+            stabilizeBonus: 2,
+            inflictedModifierId: 'fuga_creditos',
+            controls: [
+              {
+                id: 'cable_j1',
+                label: 'TOMA J1 · BUS DE DATOS',
+                sublabel: 'Cinta plana de 24 pines suelta',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'SUELTO · ACOPLAR',
+                variant: 'primary',
+              },
+              {
+                id: 'cable_j2',
+                label: 'TOMA J2 · LÍNEA DE CAJA',
+                sublabel: 'Conector Molex desacoplado',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'SUELTO · ACOPLAR',
+                variant: 'primary',
+              },
+            ],
+          };
+
+        case 'crt_interference': {
+          const channels = [
+            { id: 'sync_50', label: '50.0 Hz · CANAL A', sub: 'Sincronismo auxiliar PAL' },
+            { id: 'sync_60', label: '60.0 Hz · CANAL B', sub: 'Sincronismo nominal NTSC' },
+            { id: 'sync_75', label: '75.0 Hz · CANAL C', sub: 'Sincronismo alta frecuencia' },
+          ];
+          const targetIdx = Math.floor(Math.random() * channels.length);
+          const target = channels[targetIdx];
+          return {
+            title: '¡INTERFERENCIA EN MONITOR CRT!',
+            subtitle: `DESINCRONIZACIÓN H-SYNC · OBJETIVO: ${target.label}`,
+            description:
+              'El barrido horizontal del tubo CRT pierde estabilidad. Seleccionad la frecuencia de sincronismo objetivo para fijar la imagen.',
+            instructionHint: `Pulsa la frecuencia objetivo: ${target.label}`,
+            visualEffect: 'crt_glitch',
+            baseDmg: 9 + overdriveBonusDmg,
+            reducedDamage: 2,
+            stabilizeBonus: 2,
+            inflictedModifierId: 'mal_contacto',
+            targetFrequencyLabel: target.label,
+            controls: channels.map((ch, idx) => {
+              const isTarget = idx === targetIdx;
+              return {
+                id: ch.id,
+                label: ch.label,
+                sublabel: isTarget ? '🎯 FRECUENCIA OBJETIVO REQUERIDA' : ch.sub,
+                currentValue: isTarget ? 0 : 1,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: !isTarget,
+                isCorrectTarget: isTarget,
+                statusText: isTarget ? 'SINTONIZAR AHORA' : 'CANAL SECUNDARIO',
+                variant: isTarget ? 'bonus' : 'neutral',
+              };
+            }),
+          };
+        }
+
+        case 'electrical_interference':
+          return {
+            title: '¡INTERFERENCIA ELÉCTRICA EN PLACA!',
+            subtitle: 'SOBRECARGA DE CONDENSADORES',
+            description:
+              'Una descarga estática recorre el cuadro de relés. Descargad los tres condensadores saturados a tierra antes de que salte el arco.',
+            instructionHint: 'Pulsa los 3 condensadores saturados para derivar la carga a tierra',
+            visualEffect: 'sparks',
+            baseDmg: 10 + overdriveBonusDmg,
+            reducedDamage: 2,
+            stabilizeBonus: 2,
+            inflictedModifierId: 'cableado_quemado',
+            controls: [
+              {
+                id: 'cap_1',
+                label: 'CONDENSADOR C-01',
+                sublabel: 'Sobrecarga estática · 480V',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: '⚡ DESCARGAR',
+                variant: 'danger',
+              },
+              {
+                id: 'cap_2',
+                label: 'CONDENSADOR C-02',
+                sublabel: 'Sobrecarga estática · 510V',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: '⚡ DESCARGAR',
+                variant: 'danger',
+              },
+              {
+                id: 'cap_3',
+                label: 'CONDENSADOR C-03',
+                sublabel: 'Sobrecarga estática · 495V',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: '⚡ DESCARGAR',
+                variant: 'danger',
+              },
+            ],
+          };
+
+        case 'stuck_controls':
+          return {
+            title: '¡CONTROLES ATASCADOS / TRINQUETE TRABADO!',
+            subtitle: 'ACTUADOR MECÁNICO PRINCIPAL',
+            description:
+              'El solenoide de disparo se ha quedado encasquillado a mitad de recorrido. Aplicad 3 impulsos mecánicos para liberar el trinquete.',
+            instructionHint: 'Pulsa 3 veces el liberador mecánico (entre todos los jugadores)',
+            visualEffect: 'jammed',
+            baseDmg: 11 + overdriveBonusDmg,
+            reducedDamage: 2,
+            stabilizeBonus: 2,
+            inflictedModifierId: 'mala_racha',
+            controls: [
+              {
+                id: 'unjam_latch',
+                label: 'LIBERAR TRINQUETE MECÁNICO',
+                sublabel: 'Golpe seco de desbloqueo en solenoide (3 impulsos)',
+                currentValue: 0,
+                targetValue: 3,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'BLOQUEADO · PULSAR',
+                variant: 'primary',
+              },
+            ],
+          };
+
+        case 'overheating_warning':
+          return {
+            title: '¡ALERTA DE SOBRECALENTAMIENTO!',
+            subtitle: 'TEMPERATURA CRÍTICA EN BOBINAS',
+            description:
+              'Las bobinas del motor expulsan vapor por la rejilla lateral. Abrid las dos válvulas de purga térmica para evacuar el calor.',
+            instructionHint: 'Abre las 2 válvulas de purga térmica para refrigerar el chasis',
+            visualEffect: 'overheat',
+            baseDmg: 12 + overdriveBonusDmg,
+            reducedDamage: 3,
+            stabilizeBonus: 2,
+            inflictedModifierId: 'recalentamiento',
+            controls: [
+              {
+                id: 'purge_north',
+                label: 'VÁLVULA TÉRMICA SUPERIOR',
+                sublabel: 'Conducto de extracción de bobinas',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'CERRADA · ABRIR PURGA',
+                variant: 'danger',
+              },
+              {
+                id: 'purge_south',
+                label: 'VÁLVULA TÉRMICA INFERIOR',
+                sublabel: 'Rejilla de ventilación del motor',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'CERRADA · ABRIR PURGA',
+                variant: 'danger',
+              },
+            ],
+          };
+
+        case 'mechanical_obstruction':
+        default:
+          return {
+            title: '¡OBSTRUCCIÓN MECÁNICA EN RODILLOS!',
+            subtitle: 'TRACCIÓN DEL RODILLO CENTRAL',
+            description:
+              'Una esquirla metálica bloquea la corona dentada del rodillo 3. Extraed el fragmento y reajustad el tensor para liberar el giro.',
+            instructionHint: 'Extrae la pieza atascada y bloquea el tensor de tracción',
+            visualEffect: 'jammed',
+            baseDmg: 11 + overdriveBonusDmg,
+            reducedDamage: 2,
+            stabilizeBonus: 2,
+            inflictedModifierId: 'rodillos_oxidados',
+            jammedReelIndex: 2,
+            controls: [
+              {
+                id: 'extract_debris',
+                label: 'CORONA DENTADA · RODILLO 3',
+                sublabel: 'Retirar esquirla metálica del engranaje',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'ATASCADO · EXTRAER',
+                variant: 'danger',
+              },
+              {
+                id: 'lock_tensioner',
+                label: 'TENSOR DE TRACCIÓN CENTRAL',
+                sublabel: 'Calibrar presión de giro tras el bloqueo',
+                currentValue: 0,
+                targetValue: 1,
+                activatedByPlayerIds: [],
+                completed: false,
+                statusText: 'DESAJUSTADO · FIJAR',
+                variant: 'primary',
+              },
+            ],
+          };
+      }
+    };
+
+    const bp = buildBlueprint(chosenType);
+    const now = Date.now();
+    const eventId = `malf_${now}_${Math.random().toString(36).slice(2, 6)}`;
+
     const incident: FortunariumActiveIncident = {
-      id: `inc_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      id: eventId,
+      eventId,
+      incidentId: eventId,
       type: chosenType,
-      title: cfg.title,
-      description: cfg.description,
-      integrityDamage: cfg.baseDmg,
+      state: 'ACTIVE',
+      startedAt: now,
+      resolvedAt: null,
+      resolvedByPlayerId: null,
+      resolvedByPlayerName: null,
+      category: 'hazard',
+      title: bp.title,
+      subtitle: bp.subtitle,
+      description: bp.description,
+      instructionHint: bp.instructionHint,
+      visualEffect: bp.visualEffect,
+      integrityDamage: bp.baseDmg,
       emergencyRepairCost,
-      reducedDamage: cfg.reducedDamage,
-      inflictedModifierId: cfg.inflictedModifierId,
+      reducedDamage: bp.reducedDamage,
+      stabilizeIntegrityBonus: bp.stabilizeBonus,
+      inflictedModifierId: bp.inflictedModifierId,
       targetPlayerId: player.id,
       targetPlayerName: player.name,
-      timestamp: Date.now(),
+      quotaTriggered: room.round,
+      timestamp: now,
+      jammedReelIndex: bp.jammedReelIndex ?? null,
+      targetFrequencyLabel: bp.targetFrequencyLabel,
+      controls: bp.controls,
+      resolved: false,
+      outcomeText: null,
+      outcomeVariant: null,
     };
 
     room.activeIncident = incident;
+    room.activeMalfunction = incident;
     this.addLog(room, {
       playerId: player.id,
       playerName: player.name,
-      text: `⚠️ INCIDENTE MECÁNICO: ${cfg.title}`,
+      text: `⚠️ AVERÍA EN LA MÁQUINA: ${bp.title}`,
       variant: 'hazard',
     });
   }
@@ -1985,7 +2493,9 @@ export class FortunariumServer {
     const overdriveBonusKeys = (room.overdriveSpins || 0) >= 3 ? 1 : 0;
     const hadOverdrive = room.overdriveSpins || 0;
     room.overdriveSpins = 0;
+    room.malfunctionsInCurrentQuota = 0;
     room.activeIncident = null;
+    room.activeMalfunction = null;
     room.activeRoulette = null;
 
     if (overdriveBonusKeys > 0) {
@@ -2115,9 +2625,14 @@ export class FortunariumServer {
     room.upgradeHistory = [];
     room.overdriveSpins = 0;
     room.spinsSinceLastIncident = 0;
+    room.lastMalfunctionResolvedAt = 0;
+    room.malfunctionsInCurrentQuota = 0;
+    room.malfunctionsInMatch = 0;
+    room.lastMalfunctionType = null;
     room.activeModifiers = [];
     room.activeEvent = null;
     room.activeIncident = null;
+    room.activeMalfunction = null;
     room.activeRoulette = null;
     room.readyForNextRoundPlayerIds = [];
     room.defeatCause = null;

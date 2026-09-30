@@ -12,6 +12,7 @@ import {
   FortunariumDevScenario,
   FortunariumModifierId,
   FortunariumIncidentType,
+  FortunariumMalfunctionResolvedPayload,
   FortunariumSpecialEffectLog,
   FortunariumWildSubstitution,
   FortunariumPatternType,
@@ -92,7 +93,12 @@ interface FortunariumMachineViewProps {
     triggerSource?: 'button' | 'lever'
   ) => void;
   onDevGrantModifier?: (modifierId: FortunariumModifierId, targetPlayerId?: string) => void;
-  onResolveIncident?: (choice: 'EMERGENCY_REPAIR' | 'ABSORB_IMPACT') => void;
+  onResolveIncident?: (
+    choice: 'EMERGENCY_REPAIR' | 'ABSORB_IMPACT' | 'INTERACTIVE_FIX',
+    eventId?: string
+  ) => void;
+  onInteractIncident?: (incidentId: string, controlId: string) => void;
+  lastResolvedMalfunction?: FortunariumMalfunctionResolvedPayload | null;
   onDismissRoulette?: () => void;
   onDevTriggerIncident?: (incidentType?: FortunariumIncidentType) => void;
   onDevTriggerRoulette?: () => void;
@@ -342,6 +348,8 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   onSpinSlot,
   onDevGrantModifier,
   onResolveIncident,
+  onInteractIncident,
+  lastResolvedMalfunction,
   onDismissRoulette,
   onDevTriggerIncident,
   onDevTriggerRoulette,
@@ -368,6 +376,17 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
   const [simReport, setSimReport] = useState<FortunariumSimulationReport | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [isAudioMuted, setIsAudioMuted] = useState(() => fortunariumAudio.getSettings().muted);
+  const lastPlayedMalfunctionSoundIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (
+      lastResolvedMalfunction &&
+      lastResolvedMalfunction.eventId !== lastPlayedMalfunctionSoundIdRef.current
+    ) {
+      lastPlayedMalfunctionSoundIdRef.current = lastResolvedMalfunction.eventId;
+      fortunariumAudio.playSpecialSymbolCue('positive');
+    }
+  }, [lastResolvedMalfunction]);
 
   // Garage Door Intro State & Inter-Quota Transition (Part H)
   const [introSeenMatchId, setIntroSeenMatchId] = useState<string | null>(() =>
@@ -3068,72 +3087,242 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
       `}</style>
 
       {/* ===================================================================== */}
-      {/* 2B. INTERACTIVE MACHINE INCIDENT OVERLAY (`roomState.activeIncident`) */}
+      {/* 2A-BIS. SHARED MALFUNCTION RESOLVED CONFIRMATION BANNER              */}
       {/* ===================================================================== */}
-      {roomState.activeIncident && !isBusy && (
-        <div className="fixed inset-0 z-[76] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-[#1c0c0b] border-[3px] border-amber-500 p-5 sm:p-6 shadow-[0_24px_60px_rgba(0,0,0,0.95),0_0_32px_rgba(245,158,11,0.3)] flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-2">
-              <span className="px-3 py-1 rounded bg-rose-950 border border-rose-500/70 text-xs font-mono font-black text-rose-200 uppercase tracking-wider flex items-center gap-1.5">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
-                INCIDENTE MECÁNICO EN VIVO
-              </span>
-              {roomState.activeIncident.targetPlayerName && (
-                <span className="text-xs font-mono font-bold text-amber-300">
-                  Operador: {roomState.activeIncident.targetPlayerName}
-                </span>
-              )}
+      {lastResolvedMalfunction && !roomState.activeIncident && (
+        <div className="fixed top-16 inset-x-4 max-w-lg mx-auto z-[78] pointer-events-none flex justify-center">
+          <div className="w-full rounded-xl bg-[#071219]/95 border-2 border-emerald-400/80 px-4 py-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.9),0_0_24px_rgba(16,185,129,0.28)] flex items-center justify-between gap-3 backdrop-blur-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[10px] font-mono font-black uppercase tracking-widest text-emerald-300">
+                  AVERÍA COMPARTIDA RESUELTA POR {lastResolvedMalfunction.resolvedByPlayerName}
+                </div>
+                <div className="text-xs font-mono text-slate-100 truncate">
+                  {lastResolvedMalfunction.outcomeText}
+                </div>
+              </div>
             </div>
-
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-fortunarium text-amber-300 tracking-wide">
-                {roomState.activeIncident.title}
-              </h2>
-              <p className="text-xs sm:text-sm text-stone-200 mt-1.5 leading-relaxed">
-                {roomState.activeIncident.description}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  fortunariumAudio.playButtonClick();
-                  onResolveIncident?.('EMERGENCY_REPAIR');
-                }}
-                className="fort-arcade-btn p-3.5 rounded-xl bg-emerald-950/90 hover:bg-emerald-900 border-2 border-emerald-400 text-left flex flex-col justify-between gap-2 cursor-pointer"
-              >
-                <div className="text-sm font-black text-emerald-200">
-                  🔧 Reparación de Emergencia
-                </div>
-                <div className="text-xs text-emerald-100/90">
-                  Contiene la avería al instante ({roomState.activeIncident.emergencyRepairCost} CR o 1 🔑 si falta saldo) y reduce el impacto a -{roomState.activeIncident.reducedDamage}% INT.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  fortunariumAudio.playButtonClick();
-                  onResolveIncident?.('ABSORB_IMPACT');
-                }}
-                className="fort-arcade-btn p-3.5 rounded-xl bg-rose-950/90 hover:bg-rose-900 border-2 border-rose-500 text-left flex flex-col justify-between gap-2 cursor-pointer"
-              >
-                <div className="text-sm font-black text-rose-200">
-                  ⚡ Absorber Descarga
-                </div>
-                <div className="text-xs text-rose-100/90">
-                  No gasta créditos, pero el chasis sufre -{roomState.activeIncident.integrityDamage}% Integridad
-                  {roomState.activeIncident.inflictedModifierId
-                    ? ` y aplica «${FORTUNARIUM_MODIFIERS_CATALOG[roomState.activeIncident.inflictedModifierId]?.name || roomState.activeIncident.inflictedModifierId}»`
-                    : ''}
-                  .
-                </div>
-              </button>
-            </div>
+            <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/50 text-[10px] font-mono font-black text-emerald-300 shrink-0">
+              ESTABLE ✓
+            </span>
           </div>
         </div>
       )}
+
+      {/* ===================================================================== */}
+      {/* 2B. SHARED INTERACTIVE MALFUNCTION OVERLAY (`roomState.activeIncident`) */}
+      {/* ===================================================================== */}
+      {roomState.activeIncident &&
+        roomState.activeIncident.state !== 'RESOLVED' &&
+        !roomState.activeIncident.resolved &&
+        !isBusy &&
+        (() => {
+          const inc = roomState.activeIncident;
+          const controls = inc.controls || [];
+          const actionableControls = controls.filter((c) => c.isCorrectTarget !== false);
+          const completedActionable = actionableControls.filter((c) => c.completed).length;
+          const totalActionable = actionableControls.length;
+          const isBlackout = inc.visualEffect === 'blackout' || inc.type === 'blackout';
+          const isCrtGlitch =
+            inc.visualEffect === 'crt_glitch' || inc.type === 'crt_interference';
+          const isOverheat =
+            inc.visualEffect === 'overheat' ||
+            inc.type === 'overheating_warning' ||
+            inc.type === 'sobrecalentamiento';
+
+          return (
+            <div
+              className={`fixed inset-0 z-[76] flex items-center justify-center p-3 sm:p-4 transition-colors ${
+                isBlackout
+                  ? 'bg-black/92 backdrop-blur-md'
+                  : 'bg-[#04070e]/85 backdrop-blur-md'
+              }`}
+            >
+              {isCrtGlitch && (
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-30"
+                  style={{
+                    backgroundImage:
+                      'repeating-linear-gradient(0deg, rgba(0,240,255,0.14) 0px, rgba(0,240,255,0.14) 2px, transparent 2px, transparent 6px)',
+                  }}
+                />
+              )}
+
+              <div
+                className={`fort-cyber-modal relative w-full max-w-xl rounded-2xl p-4 sm:p-6 flex flex-col gap-4 border-2 ${
+                  isOverheat
+                    ? 'border-orange-500/85 shadow-[0_24px_60px_rgba(0,0,0,0.95),0_0_36px_rgba(249,115,22,0.32)]'
+                    : isCrtGlitch
+                    ? 'border-cyan-400/85 shadow-[0_24px_60px_rgba(0,0,0,0.95),0_0_36px_rgba(0,240,255,0.28)]'
+                    : 'border-[#FF2A6D]/85 shadow-[0_24px_60px_rgba(0,0,0,0.95),0_0_36px_rgba(255,42,109,0.3)]'
+                }`}
+              >
+                {/* Header bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded bg-[#260814] border border-[#FF2A6D]/70 text-[11px] font-mono font-black text-[#FF2A6D] uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                      AVERÍA EN MÁQUINA COMPARTIDA
+                    </span>
+                    {inc.subtitle && (
+                      <span className="text-[10px] font-mono font-bold text-cyan-300/90 uppercase tracking-wider hidden sm:inline">
+                        · {inc.subtitle}
+                      </span>
+                    )}
+                  </div>
+
+                  {totalActionable > 0 && (
+                    <span className="px-2.5 py-0.5 rounded bg-slate-900 border border-cyan-500/40 text-[11px] font-mono font-black text-cyan-300 tabular-nums">
+                      REPARACIÓN: {completedActionable}/{totalActionable}
+                    </span>
+                  )}
+                </div>
+
+                {/* Title & concise description */}
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-fortunarium text-amber-300 tracking-wide">
+                    {inc.title}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-200 mt-1 leading-relaxed">
+                    {inc.description}
+                  </p>
+                  {inc.instructionHint && (
+                    <div className="mt-2.5 px-3 py-2 rounded-xl bg-cyan-950/45 border border-cyan-400/45 text-xs font-mono font-bold text-cyan-200 flex items-center justify-between gap-2">
+                      <span>🔧 {inc.instructionHint}</span>
+                      <span className="text-[10px] text-emerald-300 font-black uppercase shrink-0">
+                        GRATIS · +{inc.stabilizeIntegrityBonus ?? 2}% INT
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Interactive shared hardware controls */}
+                {controls.length > 0 ? (
+                  <div
+                    className={`grid gap-2.5 ${
+                      controls.length === 1
+                        ? 'grid-cols-1'
+                        : controls.length === 3
+                        ? 'grid-cols-1 sm:grid-cols-3'
+                        : 'grid-cols-1 sm:grid-cols-2'
+                    }`}
+                  >
+                    {controls.map((ctrl) => {
+                      const isDone = ctrl.completed;
+                      const isDistractor = ctrl.isCorrectTarget === false;
+                      const progressPct =
+                        ctrl.targetValue > 0
+                          ? Math.min(100, Math.round((ctrl.currentValue / ctrl.targetValue) * 100))
+                          : 100;
+
+                      return (
+                        <button
+                          key={ctrl.id}
+                          type="button"
+                          disabled={isDone}
+                          onClick={() => {
+                            if (isDone) return;
+                            fortunariumAudio.playButtonClick();
+                            if (onInteractIncident) {
+                              onInteractIncident(inc.eventId || inc.id, ctrl.id);
+                            } else {
+                              onResolveIncident?.('INTERACTIVE_FIX', inc.eventId || inc.id);
+                            }
+                          }}
+                          className={`p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-2 ${
+                            isDone && !isDistractor
+                              ? 'bg-emerald-950/55 border-emerald-400/75 text-emerald-100 cursor-default'
+                              : isDistractor
+                              ? 'bg-slate-900/75 border-slate-700/70 text-slate-400 cursor-default opacity-75'
+                              : ctrl.variant === 'bonus'
+                              ? 'fort-arcade-btn bg-cyan-950/80 hover:bg-cyan-900/90 border-cyan-400 text-cyan-100 cursor-pointer shadow-[0_0_18px_rgba(0,240,255,0.2)]'
+                              : ctrl.variant === 'primary'
+                              ? 'fort-arcade-btn bg-amber-950/80 hover:bg-amber-900/85 border-amber-400 text-amber-100 cursor-pointer shadow-[0_0_18px_rgba(250,204,21,0.2)]'
+                              : 'fort-arcade-btn bg-rose-950/85 hover:bg-rose-900/90 border-[#FF2A6D] text-rose-100 cursor-pointer shadow-[0_0_18px_rgba(255,42,109,0.25)]'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-mono font-black uppercase tracking-wide">
+                              {ctrl.label}
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-black shrink-0 ${
+                                isDone && !isDistractor
+                                  ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-400/40'
+                                  : isDistractor
+                                  ? 'bg-slate-800 text-slate-400'
+                                  : 'bg-amber-400/20 text-amber-300 border border-amber-400/50'
+                              }`}
+                            >
+                              {ctrl.targetValue > 1
+                                ? `${ctrl.currentValue}/${ctrl.targetValue}`
+                                : ctrl.statusText || (isDone ? 'OK ✓' : 'ACTUAR')}
+                            </span>
+                          </div>
+
+                          {ctrl.sublabel && (
+                            <div className="text-[11px] text-slate-300/90 leading-snug">
+                              {ctrl.sublabel}
+                            </div>
+                          )}
+
+                          {ctrl.targetValue > 1 && (
+                            <div className="w-full h-2 rounded-full bg-black/60 overflow-hidden border border-slate-700">
+                              <div
+                                className="h-full bg-gradient-to-r from-amber-400 to-emerald-400 transition-all duration-150"
+                                style={{ width: `${progressPct}%` }}
+                              />
+                            </div>
+                          )}
+
+                          {ctrl.activatedByPlayerNames && ctrl.activatedByPlayerNames.length > 0 && (
+                            <div className="text-[10px] font-mono text-emerald-300 truncate">
+                              ✓ {ctrl.activatedByPlayerNames.join(', ')}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {/* Secondary options footer (Emergency Containment or Absorb Impact) */}
+                <div className="pt-2 border-t border-slate-800/90 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Si un jugador resuelve la avería, desaparece al instante para toda la sala.
+                  </span>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fortunariumAudio.playButtonClick();
+                        onResolveIncident?.('EMERGENCY_REPAIR', inc.eventId || inc.id);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-emerald-500/50 text-[11px] font-mono font-bold text-emerald-300 cursor-pointer transition"
+                      title={`Contiene al instante por ${inc.emergencyRepairCost} CR (o 1 Llave) y reduce el impacto a -${inc.reducedDamage}% INT`}
+                    >
+                      🔧 Auto-Contener ({inc.emergencyRepairCost} CR)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fortunariumAudio.playButtonClick();
+                        onResolveIncident?.('ABSORB_IMPACT', inc.eventId || inc.id);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900/80 border border-rose-500/50 text-[11px] font-mono font-bold text-rose-200 cursor-pointer transition"
+                      title={`Ignora la reparación y sufre -${inc.integrityDamage}% Integridad`}
+                    >
+                      ⚡ Absorber (-{inc.integrityDamage}% INT)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       {/* ===================================================================== */}
       {/* 2C. EFFECT ROULETTE OVERLAY (`roomState.activeRoulette`)              */}
@@ -4172,16 +4361,42 @@ export const FortunariumMachineView: React.FC<FortunariumMachineViewProps> = ({
                   Simular 100.000 Tiradas
                 </button>
                 {onDevTriggerIncident && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onDevTriggerIncident();
-                      setShowDevModal(false);
-                    }}
-                    className="px-3 py-2 rounded-xl bg-rose-900/80 hover:bg-rose-800 border border-rose-500/50 text-rose-100 font-mono text-xs font-bold cursor-pointer"
-                  >
-                    ⚡ Probar Incidente
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDevTriggerIncident();
+                        setShowDevModal(false);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-rose-900/80 hover:bg-rose-800 border border-rose-500/50 text-rose-100 font-mono text-xs font-bold cursor-pointer"
+                    >
+                      ⚡ Avería Aleatoria
+                    </button>
+                    {(
+                      [
+                        { id: 'blackout', label: '🔌 Apagón' },
+                        { id: 'fuse_failure', label: '🔥 Fusibles' },
+                        { id: 'loose_cable', label: '🔗 Cable Suelto' },
+                        { id: 'crt_interference', label: '📺 Sincro CRT' },
+                        { id: 'electrical_interference', label: '⚡ Condensadores' },
+                        { id: 'stuck_controls', label: '⚙️ Trinquete' },
+                        { id: 'overheating_warning', label: '🌡️ Purga Térmica' },
+                        { id: 'mechanical_obstruction', label: '🔩 Engranaje' },
+                      ] as { id: FortunariumIncidentType; label: string }[]
+                    ).map((malf) => (
+                      <button
+                        key={malf.id}
+                        type="button"
+                        onClick={() => {
+                          onDevTriggerIncident(malf.id);
+                          setShowDevModal(false);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-rose-500/40 text-rose-200 font-mono text-[11px] font-bold cursor-pointer"
+                      >
+                        {malf.label}
+                      </button>
+                    ))}
+                  </>
                 )}
                 {onDevTriggerRoulette && (
                   <button

@@ -11,6 +11,7 @@ import {
   FortunariumDevScenario,
   FortunariumModifierId,
   FortunariumIncidentType,
+  FortunariumMalfunctionResolvedPayload,
 } from '../types/fortunarium';
 import {
   createOnlineRoom,
@@ -71,8 +72,12 @@ export function useFortunariumSocket({
     variant?: 'info' | 'warning' | 'danger' | 'success';
   } | null>(null);
   const [spinEvent, setSpinEvent] = useState<FortunariumSpinResult | null>(null);
+  const [lastResolvedMalfunction, setLastResolvedMalfunction] =
+    useState<FortunariumMalfunctionResolvedPayload | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const resolvedMalfunctionIdsRef = useRef<Set<string>>(new Set());
+  const resolvedMalfunctionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lifecycleStateRef = useRef<ExplicitSocketLifecycleState>('IDLE');
   const connectAbortRef = useRef<AbortController | null>(null);
   const connectAttemptIdRef = useRef<number>(0);
@@ -195,6 +200,33 @@ export function useFortunariumSocket({
           msg.spinResult.stateVersion || msg.state.stateVersion || 0;
         setRoomState(msg.state);
         setSpinEvent(msg.spinResult);
+      } else if (msg.type === 'MALFUNCTION_RESOLVED') {
+        if (msg.state) {
+          latestStateVersionRef.current = Math.max(
+            latestStateVersionRef.current,
+            msg.state.stateVersion || 0
+          );
+          setRoomState(msg.state);
+        }
+        // Client-side idempotency guard: never trigger two animations for the same eventId
+        if (!resolvedMalfunctionIdsRef.current.has(msg.eventId)) {
+          resolvedMalfunctionIdsRef.current.add(msg.eventId);
+          if (resolvedMalfunctionTimerRef.current) {
+            clearTimeout(resolvedMalfunctionTimerRef.current);
+          }
+          setLastResolvedMalfunction({
+            eventId: msg.eventId,
+            incidentType: msg.incidentType,
+            title: msg.title,
+            resolvedByPlayerId: msg.resolvedByPlayerId,
+            resolvedByPlayerName: msg.resolvedByPlayerName,
+            outcomeText: msg.outcomeText,
+            timestamp: Date.now(),
+          });
+          resolvedMalfunctionTimerRef.current = setTimeout(() => {
+            setLastResolvedMalfunction(null);
+          }, 3600);
+        }
       } else if (msg.type === 'CURSOR_UPDATE') {
         const cursorPacket: FortunariumRemoteCursor = {
           playerId: msg.playerId,
@@ -563,8 +595,18 @@ export function useFortunariumSocket({
   );
 
   const resolveIncident = useCallback(
-    (choice: 'EMERGENCY_REPAIR' | 'ABSORB_IMPACT') => {
-      sendMessage({ type: 'RESOLVE_INCIDENT', choice });
+    (
+      choice: 'EMERGENCY_REPAIR' | 'ABSORB_IMPACT' | 'INTERACTIVE_FIX',
+      eventId?: string
+    ) => {
+      sendMessage({ type: 'RESOLVE_INCIDENT', choice, eventId });
+    },
+    [sendMessage]
+  );
+
+  const interactIncident = useCallback(
+    (incidentId: string, controlId: string) => {
+      sendMessage({ type: 'INTERACT_INCIDENT', incidentId, controlId });
     },
     [sendMessage]
   );
@@ -659,6 +701,8 @@ export function useFortunariumSocket({
     spinSlot,
     devGrantModifier,
     resolveIncident,
+    interactIncident,
+    lastResolvedMalfunction,
     dismissRoulette,
     devTriggerIncident,
     devTriggerRoulette,

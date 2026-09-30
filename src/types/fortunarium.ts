@@ -244,6 +244,14 @@ export interface FortunariumInstalledUpgradeRecord {
 }
 
 export type FortunariumIncidentType =
+  | 'blackout'
+  | 'electrical_interference'
+  | 'stuck_controls'
+  | 'loose_cable'
+  | 'crt_interference'
+  | 'fuse_failure'
+  | 'overheating_warning'
+  | 'mechanical_obstruction'
   | 'chispazo'
   | 'sobrecalentamiento'
   | 'atasco_engranajes'
@@ -252,6 +260,16 @@ export type FortunariumIncidentType =
   | 'vibracion_critica'
   | 'ruleta_averiada';
 
+export type FortunariumMalfunctionState = 'ACTIVE' | 'RESOLVED';
+
+export type FortunariumMalfunctionVisualEffect =
+  | 'blackout'
+  | 'crt_glitch'
+  | 'sparks'
+  | 'overheat'
+  | 'jammed'
+  | 'cable_loose';
+
 export interface FortunariumIncidentControl {
   id: string;
   label: string;
@@ -259,34 +277,56 @@ export interface FortunariumIncidentControl {
   currentValue: number;
   targetValue: number;
   activatedByPlayerIds: string[];
+  activatedByPlayerNames?: string[];
   completed: boolean;
-  variant?: 'primary' | 'danger' | 'bonus';
+  isCorrectTarget?: boolean;
+  statusText?: string;
+  variant?: 'primary' | 'danger' | 'bonus' | 'neutral';
 }
 
 export interface FortunariumActiveIncident {
-  id?: string;
+  id: string;
+  eventId: string;
   incidentId?: string;
   type: FortunariumIncidentType;
+  state: FortunariumMalfunctionState;
+  startedAt: number;
+  resolvedAt?: number | null;
+  resolvedByPlayerId?: string | null;
+  resolvedByPlayerName?: string | null;
   category?: 'hazard' | 'positive' | 'choice';
   title: string;
   subtitle?: string;
-  description?: string;
+  description: string;
+  instructionHint?: string;
+  visualEffect?: FortunariumMalfunctionVisualEffect;
   integrityDamage: number;
   emergencyRepairCost: number;
   reducedDamage: number;
+  stabilizeIntegrityBonus?: number;
   inflictedModifierId?: FortunariumModifierId;
   targetPlayerId?: string;
   targetPlayerName?: string;
   quotaTriggered?: number;
-  startedAt?: number;
-  timestamp?: number;
+  timestamp: number;
   jammedReelIndex?: number | null;
-  controls?: FortunariumIncidentControl[];
+  targetFrequencyLabel?: string;
+  controls: FortunariumIncidentControl[];
   resolved?: boolean;
   outcomeText?: string | null;
   outcomeVariant?: 'positive' | 'negative' | 'neutral' | null;
   collectedCoins?: number;
   leakedCoins?: number;
+}
+
+export interface FortunariumMalfunctionResolvedPayload {
+  eventId: string;
+  incidentType: FortunariumIncidentType;
+  title: string;
+  resolvedByPlayerId: string;
+  resolvedByPlayerName: string;
+  outcomeText: string;
+  timestamp: number;
 }
 
 export interface FortunariumEffectRouletteState {
@@ -464,6 +504,7 @@ export interface FortunariumRoomState {
 
   activeEvent: FortunariumActiveEvent | null;
   activeIncident?: FortunariumActiveIncident | null;
+  activeMalfunction?: FortunariumActiveIncident | null;
   activeRoulette?: FortunariumActiveRoulette | null;
   lastIncidentSpin?: number;
   readyForNextRoundPlayerIds: string[];
@@ -567,7 +608,8 @@ export type FortunariumClientMessage =
     }
   | {
       type: 'RESOLVE_INCIDENT';
-      choice: 'EMERGENCY_REPAIR' | 'ABSORB_IMPACT';
+      choice: 'EMERGENCY_REPAIR' | 'ABSORB_IMPACT' | 'INTERACTIVE_FIX';
+      eventId?: string;
     }
   | {
       type: 'DISMISS_ROULETTE';
@@ -659,6 +701,16 @@ export type FortunariumServerMessage =
       color: string;
       x: number;
       y: number;
+    }
+  | {
+      type: 'MALFUNCTION_RESOLVED';
+      eventId: string;
+      incidentType: FortunariumIncidentType;
+      title: string;
+      resolvedByPlayerId: string;
+      resolvedByPlayerName: string;
+      outcomeText: string;
+      state: FortunariumRoomState;
     }
   | {
       type: 'NOTIFICATION';

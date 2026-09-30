@@ -1225,6 +1225,10 @@ export function calculateIncidentProbability(params: {
   integrity: number;
   maxIntegrity?: number;
   spinsSinceLastIncident: number;
+  totalSpinsInMatch?: number;
+  msSinceLastIncident?: number;
+  malfunctionsInQuota?: number;
+  malfunctionsInMatch?: number;
   activeModifiers?: FortunariumActiveModifier[];
   playerId?: string;
 }): number {
@@ -1234,37 +1238,86 @@ export function calculateIncidentProbability(params: {
     integrity,
     maxIntegrity = 100,
     spinsSinceLastIncident,
+    totalSpinsInMatch,
+    msSinceLastIncident,
+    malfunctionsInQuota = 0,
+    malfunctionsInMatch = 0,
     activeModifiers = [],
     playerId,
   } = params;
 
-  // Quota 1 has no random incidents unless players push into Overdrive
-  if (round <= 1 && overdriveSpins === 0) {
+  const integrityRatio = Math.max(0, Math.min(1, integrity / Math.max(1, maxIntegrity)));
+
+  // Initial grace period at the start of a match (when totalSpinsInMatch is provided)
+  if (totalSpinsInMatch !== undefined && totalSpinsInMatch < 6 && overdriveSpins === 0) {
     return 0;
   }
 
-  // Minimum spacing cooldown (shorter cooldown only when pushing deep into Overdrive)
-  const minCooldown = overdriveSpins >= 3 ? 2 : 4;
-  if (spinsSinceLastIncident < minCooldown) {
+  // Quota 1 has no random malfunctions unless players push into Overdrive or drop below 65% integrity
+  if (round <= 1 && overdriveSpins === 0 && integrityRatio > 0.65) {
     return 0;
   }
 
-  let prob =
-    round <= 1
-      ? 0.02
-      : round === 2
-      ? 0.06
-      : Math.min(0.18, 0.09 + (round - 3) * 0.015);
+  // A healthy machine (>= 90% integrity) outside Overdrive operates smoothly without random malfunctions
+  if (integrityRatio >= 0.9 && overdriveSpins === 0) {
+    return 0;
+  }
+
+  // Long spin-spacing cooldown so malfunctions remain occasional
+  const minSpinCooldown =
+    overdriveSpins >= 3
+      ? 6
+      : overdriveSpins > 0
+      ? 8
+      : integrityRatio <= 0.35
+      ? 10
+      : 14;
+  if (spinsSinceLastIncident < minSpinCooldown) {
+    return 0;
+  }
+
+  // Long time-based cooldown when timestamps are tracked (normal play requires >= 2.5 min between malfunctions)
+  if (msSinceLastIncident !== undefined && overdriveSpins === 0) {
+    const minCooldownMs = integrityRatio <= 0.3 ? 95_000 : 150_000;
+    if (msSinceLastIncident < minCooldownMs) {
+      return 0;
+    }
+  }
+
+  // Anti-streak protection: prevent multiple malfunctions in the same quota during normal play
+  if (overdriveSpins === 0) {
+    if (malfunctionsInQuota >= 2) {
+      return 0;
+    }
+    if (malfunctionsInQuota === 1 && integrityRatio > 0.35) {
+      return 0;
+    }
+  }
+
+  // Base probability weighted primarily by chassis integrity deterioration
+  let prob = 0;
+  if (integrityRatio >= 0.9) {
+    prob = 0;
+  } else if (integrityRatio >= 0.75) {
+    prob = 0.014; // 1.4% per eligible spin
+  } else if (integrityRatio >= 0.55) {
+    prob = 0.032; // 3.2% per eligible spin
+  } else if (integrityRatio >= 0.35) {
+    prob = 0.062; // 6.2% per eligible spin
+  } else {
+    prob = 0.105; // 10.5% per eligible spin when chassis is critically worn
+  }
+
+  // Subtle quota escalation (capped at +2%)
+  if (round >= 3) {
+    prob += Math.min(0.02, (round - 2) * 0.004);
+  }
 
   // Overdrive pressure curve
-  if (overdriveSpins === 1) prob += 0.06;
-  else if (overdriveSpins === 2) prob += 0.14;
-  else if (overdriveSpins === 3) prob += 0.24;
-  else if (overdriveSpins >= 4) prob += Math.min(0.42, 0.24 + (overdriveSpins - 3) * 0.08);
-
-  // Damaged machine instability
-  if (integrity / Math.max(1, maxIntegrity) <= 0.45) {
-    prob += 0.05;
+  if (overdriveSpins === 1) prob += 0.025;
+  else if (overdriveSpins === 2) prob += 0.055;
+  else if (overdriveSpins >= 3) {
+    prob += Math.min(0.14, 0.08 + (overdriveSpins - 3) * 0.025);
   }
 
   // Mano Negra player-specific debuff
@@ -1274,10 +1327,19 @@ export function calculateIncidentProbability(params: {
       (!m.targetPlayerId || !playerId || m.targetPlayerId === playerId)
   );
   if (hasManoNegra) {
-    prob += 0.07;
+    prob += 0.035;
   }
 
-  return Number(Math.min(0.6, prob).toFixed(3));
+  // Anti-streak dampening across the quota & match
+  if (malfunctionsInQuota >= 1 && overdriveSpins === 0) {
+    prob *= 0.25;
+  }
+  if (malfunctionsInMatch >= 2) {
+    prob /= 1 + malfunctionsInMatch * 0.35;
+  }
+
+  const maxCap = overdriveSpins > 0 ? 0.24 : 0.14;
+  return Number(Math.min(maxCap, prob).toFixed(4));
 }
 
 export function isBigWinSpin(params: {
@@ -2354,6 +2416,54 @@ export function runCanonicalPatternUnitTests(): {
       name: 'Pantalla Completa / Jackpot canónico (15 casillas idénticas)',
       passed: ok,
       details: `Jackpot=${fullGrid.isJackpot}, Líneas=${fullGrid.winLines.length}, Celdas=${fullGrid.winningCells.length}`,
+    });
+  }
+
+  // Test 24: Malfunction Rarity, Healthy Immunity, Cooldown & Integrity Weighting
+  {
+    const healthyProb = calculateIncidentProbability({
+      round: 3,
+      integrity: 96,
+      maxIntegrity: 100,
+      spinsSinceLastIncident: 25,
+    });
+    const cooldownBlockedProb = calculateIncidentProbability({
+      round: 3,
+      integrity: 45,
+      maxIntegrity: 100,
+      spinsSinceLastIncident: 5,
+    });
+    const moderateWearProb = calculateIncidentProbability({
+      round: 3,
+      integrity: 68,
+      maxIntegrity: 100,
+      spinsSinceLastIncident: 18,
+    });
+    const criticalWearProb = calculateIncidentProbability({
+      round: 3,
+      integrity: 24,
+      maxIntegrity: 100,
+      spinsSinceLastIncident: 18,
+    });
+    const antiStreakProb = calculateIncidentProbability({
+      round: 3,
+      integrity: 68,
+      maxIntegrity: 100,
+      spinsSinceLastIncident: 18,
+      malfunctionsInQuota: 1,
+    });
+    const ok =
+      healthyProb === 0 &&
+      cooldownBlockedProb === 0 &&
+      antiStreakProb === 0 &&
+      moderateWearProb > 0 &&
+      criticalWearProb > moderateWearProb &&
+      criticalWearProb <= 0.14;
+    results.push({
+      id: 'T24',
+      name: 'Averías ocasionales: inmunidad >=90% INT, cooldown y peso por desgaste',
+      passed: ok,
+      details: `96%=${healthyProb}, cooldown=${cooldownBlockedProb}, 68%=${moderateWearProb}, 24%=${criticalWearProb}, antiStreak=${antiStreakProb}`,
     });
   }
 
