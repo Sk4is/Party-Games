@@ -12,6 +12,7 @@ import { LaCriptaCursorOverlay } from './LaCriptaCursorOverlay';
 import { LaCriptaTopBar, LaCriptaPartyHud } from './LaCriptaPartyHud';
 import { LaCriptaLobbyView } from './LaCriptaLobbyView';
 import { LaCriptaThreeDoorsScene } from './LaCriptaThreeDoorsScene';
+import { CriptaContextualPanelMode } from './LaCriptaSidePanels';
 import { LaCriptaCrtOverlay } from './LaCriptaCrtOverlay';
 import {
   LaCriptaInventoryFullModal,
@@ -222,6 +223,45 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
   const [enemyAnimStates, setEnemyAnimStates] = useState<
     Record<string, 'idle' | 'hit' | 'lunge' | 'death'>
   >({});
+
+  // Unified Contextual Side Panel State (only ONE panel open at a time)
+  const [contextualPanelMode, setContextualPanelMode] =
+    useState<CriptaContextualPanelMode>('NONE');
+  const [inspectedPlayerId, setInspectedPlayerId] = useState<string | null>(null);
+  const [inspectedEnemyId, setInspectedEnemyId] = useState<string | null>(null);
+
+  const handleCloseContextualPanel = useCallback(() => {
+    setContextualPanelMode('NONE');
+    setInspectedPlayerId(null);
+    setInspectedEnemyId(null);
+  }, []);
+
+  const handleToggleInventory = useCallback(() => {
+    setContextualPanelMode((prev) => {
+      if (prev === 'INVENTORY') return 'NONE';
+      setInspectedPlayerId(null);
+      setInspectedEnemyId(null);
+      return 'INVENTORY';
+    });
+  }, []);
+
+  const handleInspectPlayer = useCallback((targetPlayerId: string) => {
+    setContextualPanelMode((prevMode) => {
+      if (prevMode === 'PLAYER_INSPECTION' && inspectedPlayerId === targetPlayerId) {
+        setInspectedPlayerId(null);
+        return 'NONE';
+      }
+      setInspectedPlayerId(targetPlayerId);
+      setInspectedEnemyId(null);
+      return 'PLAYER_INSPECTION';
+    });
+  }, [inspectedPlayerId]);
+
+  const handleInspectEnemy = useCallback((enemyId: string) => {
+    setInspectedEnemyId(enemyId);
+    setInspectedPlayerId(null);
+    setContextualPanelMode('ENEMY_INSPECTION');
+  }, []);
 
   useEffect(() => {
     const batch = expeditionState?.lastEventBatch;
@@ -507,6 +547,12 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
             onShopBuyItem={sendShopBuyItem}
             onShopBuyRelic={sendShopBuyRelic}
             onSelectedEnemyChange={setSelectedTargetEnemyId}
+            contextualPanelMode={contextualPanelMode}
+            inspectedPlayerId={inspectedPlayerId}
+            inspectedEnemyId={inspectedEnemyId}
+            onOpenInventory={handleToggleInventory}
+            onInspectEnemy={handleInspectEnemy}
+            onCloseContextualPanel={handleCloseContextualPanel}
             onReturnToLobby={returnToLobby}
             onRerollExpedition={startExpedition}
           />
@@ -523,6 +569,12 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
           activeVisualEvents={activeVisualEvents}
           onUseConsumable={sendUseInventoryItem}
           selectedTargetEnemyId={selectedTargetEnemyId}
+          onOpenInventory={handleToggleInventory}
+          isInventoryOpen={contextualPanelMode === 'INVENTORY'}
+          onInspectPlayer={handleInspectPlayer}
+          inspectedPlayerId={
+            contextualPanelMode === 'PLAYER_INSPECTION' ? inspectedPlayerId : null
+          }
         />
       )}
     </div>

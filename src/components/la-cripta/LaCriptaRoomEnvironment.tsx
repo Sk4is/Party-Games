@@ -1,234 +1,46 @@
 import React from 'react';
 import {
   CriptaDungeonDefinition,
+  CriptaDungeonId,
   CriptaDungeonRoom,
   CriptaRoomEnemy,
 } from '../../types/laCripta';
+import { LaCriptaArticulatedCreatureSprite } from './LaCriptaCreatureArtSystem';
 
 interface LaCriptaEnemyPixelSpriteProps {
   enemy: CriptaRoomEnemy;
+  dungeonId?: CriptaDungeonId | null;
   isTargeted?: boolean;
   animState?: 'idle' | 'hit' | 'lunge' | 'death';
   totalVisibleEnemies?: number;
+  enemyIndex?: number;
   customSizePx?: number;
 }
 
 /**
- * Crisp 28x28 pixel-art enemy & boss sprite renderer.
- * Scaled up for the Left Creature Portrait Stage (45–70% stage presence).
+ * High-Resolution 64x64 Articulated Pixel-Art Creature & Boss Renderer.
+ * Delegates to LaCriptaArticulatedCreatureSprite for biome-specific silhouettes,
+ * multi-part anatomical breathing, desynchronized idle variants, and combat choreography.
  */
 export const LaCriptaEnemyPixelSprite: React.FC<LaCriptaEnemyPixelSpriteProps> = ({
   enemy,
+  dungeonId,
   isTargeted = false,
   animState = 'idle',
   totalVisibleEnemies = 1,
+  enemyIndex = 0,
   customSizePx,
 }) => {
-  const baseSizePx = enemy.isFinalBoss
-    ? 268
-    : enemy.isMiniboss || enemy.isBoss
-    ? 244
-    : enemy.isElite
-    ? 216
-    : 196;
-  const crowdScale =
-    totalVisibleEnemies >= 3 ? 0.68 : totalVisibleEnemies === 2 ? 0.82 : 1;
-  const sizePx = customSizePx || Math.round(baseSizePx * crowdScale);
-  const accent = enemy.enrageTriggered
-    ? '#FF4D6D'
-    : enemy.accentColor || '#E7A54A';
-  const arch = enemy.spriteArchetype;
-
-  const animClass =
-    animState === 'death'
-      ? 'animate-cripta-enemy-death'
-      : animState === 'hit'
-      ? 'animate-cripta-enemy-hit'
-      : animState === 'lunge'
-      ? 'animate-cripta-enemy-lunge'
-      : 'animate-cripta-sprite-idle';
-
   return (
-    <svg
-      width={sizePx}
-      height={sizePx}
-      viewBox="0 0 28 28"
-      shapeRendering="crispEdges"
-      className={`transition-transform duration-200 select-none drop-shadow-[0_10px_18px_rgba(0,0,0,0.92)] ${animClass} ${
-        isTargeted ? 'scale-105' : ''
-      }`}
-    >
-      {/* Ground shadow & Enrage Crimson Ring */}
-      <rect x="5" y="25" width="18" height="2" fill="#050408" opacity="0.85" />
-      {enemy.enrageTriggered && (
-        <g opacity="0.85">
-          <rect x="3" y="24" width="22" height="1" fill="#C93B5B" />
-          <rect x="2" y="10" width="1" height="10" fill="#FFD166" />
-          <rect x="25" y="10" width="1" height="10" fill="#FFD166" />
-        </g>
-      )}
-
-      {/* Miniboss / Boss / Elite Crown or Horns */}
-      {(enemy.isBoss || enemy.isMiniboss) && (
-        <g>
-          <rect x="6" y="1" width="2" height="4" fill="#FFD166" />
-          <rect x="13" y="0" width="2" height="5" fill="#E7A54A" />
-          <rect x="20" y="1" width="2" height="4" fill="#FFD166" />
-          <rect
-            x="6"
-            y="4"
-            width="16"
-            height="2"
-            fill={enemy.enrageTriggered ? '#C93B5B' : '#8F263D'}
-          />
-        </g>
-      )}
-      {enemy.isElite && !enemy.isBoss && !enemy.isMiniboss && (
-        <g>
-          <rect x="6" y="3" width="3" height="2" fill={accent} />
-          <rect x="19" y="3" width="3" height="2" fill={accent} />
-        </g>
-      )}
-
-      {/* Archetype Group 1: Undead / Skeleton / Executioner / Bone Colossus */}
-      {(arch === 'skeleton_warrior' ||
-        arch === 'executioner' ||
-        arch === 'chained_wraith' ||
-        arch === 'bone_colossus') && (
-        <g>
-          {/* Skull Head */}
-          <rect x="10" y="5" width="8" height="6" fill="#D9D0BC" />
-          <rect x="11" y="11" width="6" height="2" fill="#B8AC93" />
-          {/* Glowing Eyes */}
-          <rect x="11" y="7" width="2" height="2" fill="#0B0A0E" />
-          <rect x="15" y="7" width="2" height="2" fill="#0B0A0E" />
-          <rect x="11" y="7" width="1" height="1" fill={accent} />
-          <rect x="15" y="7" width="1" height="1" fill={accent} />
-          {/* Ribcage & Armor */}
-          <rect x="8" y="13" width="12" height="7" fill="#282039" />
-          <rect x="10" y="14" width="8" height="1" fill="#D9D0BC" />
-          <rect x="10" y="16" width="8" height="1" fill="#D9D0BC" />
-          <rect x="10" y="18" width="8" height="1" fill="#D9D0BC" />
-          {/* Heavy Cleaver / Greatsword */}
-          <rect x="3" y="6" width="3" height="12" fill="#9A96A4" />
-          <rect x="4" y="6" width="1" height="10" fill="#D9D0BC" />
-          <rect x="2" y="18" width="5" height="2" fill="#E7A54A" />
-          {/* Shield */}
-          <rect x="20" y="13" width="5" height="8" fill="#4A3830" />
-          <rect x="21" y="14" width="3" height="6" fill={accent} />
-          {/* Legs */}
-          <rect x="10" y="20" width="3" height="5" fill="#B8AC93" />
-          <rect x="15" y="20" width="3" height="5" fill="#B8AC93" />
-        </g>
-      )}
-
-      {/* Archetype Group 2: Beasts / Spores / Serpent / Swarm / Frost Wolf / Goblin */}
-      {(arch === 'plague_bloom' ||
-        arch === 'deep_serpent' ||
-        arch === 'mine_stalker' ||
-        arch === 'sewer_abomination' ||
-        arch === 'chitin_drone' ||
-        arch === 'frost_wolf' ||
-        arch === 'goblin_raider') && (
-        <g>
-          {/* Hood / Carapace / Beast Crest */}
-          <rect x="8" y="5" width="12" height="7" fill={accent} />
-          <rect x="9" y="7" width="10" height="6" fill="#1E1826" />
-          {/* Fierce Eyes & Fangs */}
-          <rect x="10" y="8" width="2" height="2" fill="#E7A54A" />
-          <rect x="16" y="8" width="2" height="2" fill="#E7A54A" />
-          <rect x="11" y="11" width="1" height="2" fill="#D9D0BC" />
-          <rect x="16" y="11" width="1" height="2" fill="#D9D0BC" />
-          {/* Hunched Torso */}
-          <rect x="7" y="13" width="14" height="8" fill="#2A2334" />
-          <rect x="9" y="14" width="10" height="5" fill={accent} opacity="0.65" />
-          {/* Claws / Jagged Blades */}
-          <rect x="3" y="12" width="4" height="6" fill="#D9D0BC" />
-          <rect x="21" y="12" width="4" height="6" fill="#D9D0BC" />
-          {/* Legs */}
-          <rect x="9" y="21" width="4" height="4" fill="#1A1520" />
-          <rect x="15" y="21" width="4" height="4" fill="#1A1520" />
-        </g>
-      )}
-
-      {/* Archetype Group 3: Construct / Arcane / Crystal / Void / Blood / Mirror */}
-      {(arch === 'iron_golem' ||
-        arch === 'wisp_phantom' ||
-        arch === 'arcane_archivist' ||
-        arch === 'astral_weaver' ||
-        arch === 'crystal_sentinel' ||
-        arch === 'blood_acolyte' ||
-        arch === 'sand_mummy' ||
-        arch === 'mirror_doppel' ||
-        arch === 'void_herald') && (
-        <g>
-          {/* Arcane Halo / Monolith Helm */}
-          <rect x="9" y="4" width="10" height="8" fill="#282039" />
-          <rect x="10" y="5" width="8" height="6" fill={accent} />
-          <rect x="12" y="7" width="4" height="2" fill="#0B0A0E" />
-          <rect x="13" y="7" width="2" height="2" fill="#FFFFFF" />
-          {/* Robed / Armored Body */}
-          <rect x="7" y="12" width="14" height="10" fill="#19111D" />
-          <rect x="9" y="13" width="10" height="8" fill="#282039" />
-          <rect x="12" y="14" width="4" height="5" fill={accent} />
-          {/* Floating Staff / Scepter */}
-          <rect x="4" y="5" width="2" height="18" fill="#D8C6A0" />
-          <rect x="3" y="3" width="4" height="4" fill={accent} />
-          {/* Floating Orb on Right */}
-          <rect x="22" y="9" width="4" height="4" fill={accent} />
-          <rect x="23" y="10" width="2" height="2" fill="#FFFFFF" />
-          {/* Base */}
-          <rect x="9" y="22" width="10" height="3" fill="#120D17" />
-        </g>
-      )}
-
-      {/* Archetype Group 4: Final Boss Phase 1 (Malkorath, Soberano Encadenado) */}
-      {arch === 'final_boss_phase1' && (
-        <g>
-          {/* Runic Chains Binding Shoulders */}
-          <rect x="1" y="9" width="26" height="2" fill="#E7A54A" />
-          <rect x="3" y="15" width="22" height="2" fill="#E7A54A" />
-          {/* Armored Sovereign Helm */}
-          <rect x="8" y="4" width="12" height="7" fill="#2A1C3B" />
-          <rect x="9" y="5" width="10" height="5" fill="#D8C6A0" />
-          <rect x="10" y="7" width="3" height="2" fill="#C93B5B" />
-          <rect x="15" y="7" width="3" height="2" fill="#C93B5B" />
-          {/* Heavy Obsidian Mantle & Core Seal */}
-          <rect x="5" y="11" width="18" height="11" fill="#19111D" />
-          <rect x="7" y="12" width="14" height="9" fill="#3D2754" />
-          <rect x="11" y="13" width="6" height="6" fill="#E7A54A" />
-          <rect x="12" y="14" width="4" height="4" fill="#8F263D" />
-          {/* Dual Runeblades */}
-          <rect x="2" y="6" width="3" height="16" fill="#D9D0BC" />
-          <rect x="23" y="6" width="3" height="16" fill="#D9D0BC" />
-          {/* Base */}
-          <rect x="8" y="22" width="12" height="3" fill="#0B0A0E" />
-        </g>
-      )}
-
-      {/* Archetype Group 5: Final Boss Phase 2 (El Corazón Desatado de la Cripta) */}
-      {arch === 'final_boss_phase2' && (
-        <g>
-          {/* Unfurled Abyssal Wings */}
-          <rect x="0" y="4" width="7" height="16" fill="#541826" />
-          <rect x="2" y="6" width="5" height="12" fill="#C93B5B" />
-          <rect x="21" y="4" width="7" height="16" fill="#541826" />
-          <rect x="21" y="6" width="5" height="12" fill="#C93B5B" />
-          {/* Crowned Eclipse Head */}
-          <rect x="9" y="3" width="10" height="7" fill="#160E20" />
-          <rect x="10" y="5" width="3" height="2" fill="#FFD166" />
-          <rect x="15" y="5" width="3" height="2" fill="#FFD166" />
-          {/* Exposed Pulsing Heart Core */}
-          <rect x="7" y="10" width="14" height="12" fill="#2A1221" />
-          <rect x="9" y="11" width="10" height="10" fill="#C93B5B" />
-          <rect x="11" y="13" width="6" height="6" fill="#FFD166" />
-          <rect x="13" y="15" width="2" height="2" fill="#FFFFFF" />
-          {/* Shattered Chain Fragments */}
-          <rect x="4" y="21" width="4" height="2" fill="#E7A54A" />
-          <rect x="20" y="21" width="4" height="2" fill="#E7A54A" />
-        </g>
-      )}
-    </svg>
+    <LaCriptaArticulatedCreatureSprite
+      enemy={enemy}
+      dungeonId={dungeonId}
+      isTargeted={isTargeted}
+      animState={animState}
+      totalVisibleEnemies={totalVisibleEnemies}
+      enemyIndex={enemyIndex}
+      customSizePx={customSizePx}
+    />
   );
 };
 

@@ -795,6 +795,7 @@ export interface CriptaDungeonRoom {
   activeTurnPlayerId?: string | null;
   currentTurnAp?: number;
   maxTurnAp?: number;
+  consumableUsedThisTurn?: boolean;
   lastPlayedCardTitle?: string | null;
   lastPlayedByPlayerName?: string | null;
   actedPlayerIdsThisRound?: string[];

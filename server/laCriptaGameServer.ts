@@ -1162,15 +1162,29 @@ export class LaCriptaServer {
       return;
     }
 
-    // In round-based combat, using an item counts as the player's normal action for the round!
+    // In sequential turn combat, using a consumable from MOCHILA does NOT spend AP or end the player's turn (max 1 per turn)!
     if (inCombat) {
-      this.handleLockRoundAction(ws, room, player, {
-        actionType: 'ITEM',
-        itemSlotIndex: idx,
-        targetPlayerId,
-        targetEnemyId,
-      });
-      return;
+      if (room.isResolvingRound || activeRoom.combatRoundPhase !== 'PLAYER_PHASE') {
+        this.sendError(ws, 'Disponible en tu turno.');
+        return;
+      }
+
+      const livingConnected = room.players
+        .filter((p) => p.isConnected && !p.isDead && p.hp > 0)
+        .sort((a, b) => a.seatIndex - b.seatIndex);
+      const currentTurnPlayer =
+        livingConnected.find((p) => p.id === activeRoom.activeTurnPlayerId) ||
+        livingConnected[0];
+
+      if (currentTurnPlayer && player.id !== currentTurnPlayer.id) {
+        this.sendError(ws, `Disponible en tu turno (Turno actual: ${currentTurnPlayer.name}).`);
+        return;
+      }
+
+      if (activeRoom.consumableUsedThisTurn) {
+        this.sendError(ws, 'Ya has utilizado un consumible en este turno.');
+        return;
+      }
     }
 
     const visualEvents: CriptaVisualEvent[] = [];
@@ -1186,6 +1200,20 @@ export class LaCriptaServer {
     );
     if (logText) {
       activeRoom.outcomeLog = logText;
+    }
+
+    if (inCombat) {
+      activeRoom.consumableUsedThisTurn = true;
+      activeRoom.lastPlayedByPlayerName = player.name;
+      activeRoom.lastPlayedCardTitle = def.name.toUpperCase();
+      this.checkAndResolveCombatVictoryIfCleared(
+        room,
+        activeRoom,
+        player,
+        logText ? [logText] : [],
+        visualEvents,
+        Date.now()
+      );
     }
 
     this.emitVisualEventBatch(room, visualEvents, player.id, 'USE_ITEM');
@@ -2499,12 +2527,7 @@ export class LaCriptaServer {
     const currentAp =
       typeof activeRoom.currentTurnAp === 'number' ? activeRoom.currentTurnAp : maxAp;
 
-    const apCost =
-      payload.actionType === 'PASS'
-        ? 0
-        : payload.actionType === 'WEAPON_SPECIAL'
-        ? 2
-        : 1;
+    const apCost = payload.actionType === 'PASS' ? 0 : 1;
 
     if (payload.actionType !== 'PASS' && currentAp < apCost) {
       this.sendError(
@@ -2602,6 +2625,7 @@ export class LaCriptaServer {
         activeRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, activeRoom);
         activeRoom.currentTurnAp = 2;
         activeRoom.maxTurnAp = 2;
+        activeRoom.consumableUsedThisTurn = false;
       }
       this.syncLegacyNodes(room);
       this.broadcastRoomState(room);
@@ -2640,6 +2664,7 @@ export class LaCriptaServer {
       activeRoom.activeCombatActorId = null;
       activeRoom.currentTurnAp = 2;
       activeRoom.maxTurnAp = 2;
+      activeRoom.consumableUsedThisTurn = false;
       activeRoom.combatRoundPhase = 'PLAYER_PHASE';
       activeRoom.combatBannerText = `TURNO DE ${nextPlayer.name.toUpperCase()}`;
       this.syncLegacyNodes(room);
@@ -4031,6 +4056,7 @@ export class LaCriptaServer {
     activeRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, activeRoom);
     activeRoom.currentTurnAp = 2;
     activeRoom.maxTurnAp = 2;
+    activeRoom.consumableUsedThisTurn = false;
     const firstTurnPlayer = room.players.find((p) => p.id === activeRoom.activeTurnPlayerId);
     activeRoom.combatBannerText = firstTurnPlayer
       ? `RONDA ${nextRound} — TURNO DE ${firstTurnPlayer.name.toUpperCase()}`

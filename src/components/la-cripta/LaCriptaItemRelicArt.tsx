@@ -19,6 +19,7 @@ import {
   getEquippedWeaponForPlayer,
 } from '../../data/la-cripta/criptaEquipmentAndEvents';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
+import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
 
 /**
  * Original 16x16 Pixel-Art SVG Icons for the 12 Normal Consumable Items (No emojis).
@@ -367,37 +368,52 @@ export const LaCriptaGroundDropsOverlay: React.FC<{
         const isRelic = drop.kind === 'RELIC';
 
         return (
-          <button
+          <LaCriptaPixelTooltip
             key={drop.id}
-            type="button"
-            onClick={() => {
-              laCriptaAudio.playGoldChange(true);
-              onClaimDrop(drop.id);
-            }}
-            className={`pointer-events-auto group px-2.5 py-1.5 border-2 flex items-center gap-2 transition-all cursor-pointer animate-bounce shadow-[0_0_18px_rgba(0,0,0,0.9)] ${
-              isRelic
-                ? 'bg-[#221233]/95 hover:bg-[#2F1A46] border-[#FFD166]'
-                : 'bg-[#171122]/95 hover:bg-[#241B35] border-[#E7A54A]'
-            }`}
-            title={
+            title={title}
+            category={isRelic ? 'RELIQUIA CAÍDA' : 'BOTÍN DE SALA'}
+            description={
               itemDef
-                ? `Recoger ${itemDef.name}: ${itemDef.description}`
+                ? itemDef.description
                 : relicDef
-                ? `Reclamar Reliquia ${relicDef.name}: ${relicDef.description}`
-                : 'Recoger botín'
+                ? relicDef.description
+                : 'Haz clic para recoger este objeto del suelo.'
             }
+            footerLabel="CLIC PARA RECOGER"
+            borderColor={isRelic ? '#FFD166' : '#E7A54A'}
+            icon={
+              itemDef ? (
+                <LaCriptaItemPixelIcon itemId={itemDef.id} size={16} />
+              ) : relicDef ? (
+                <LaCriptaRelicPixelIcon relicId={relicDef.id} size={16} />
+              ) : undefined
+            }
+            className="pointer-events-auto inline-flex"
           >
-            {itemDef && <LaCriptaItemPixelIcon itemId={itemDef.id} size={20} />}
-            {relicDef && <LaCriptaRelicPixelIcon relicId={relicDef.id} size={20} />}
-            <div className="text-left">
-              <div className="text-[8px] font-cripta-pixel uppercase tracking-wider text-[#D8C6A0]">
-                {isRelic ? '✦ RELIQUIA CAÍDA' : 'BOTÍN EN EL SUELO'}
+            <button
+              type="button"
+              onClick={() => {
+                laCriptaAudio.playGoldChange(true);
+                onClaimDrop(drop.id);
+              }}
+              className={`group px-2.5 py-1.5 border-2 flex items-center gap-2 transition-all cursor-pointer animate-bounce shadow-[0_0_18px_rgba(0,0,0,0.9)] ${
+                isRelic
+                  ? 'bg-[#221233]/95 hover:bg-[#2F1A46] border-[#FFD166]'
+                  : 'bg-[#171122]/95 hover:bg-[#241B35] border-[#E7A54A]'
+              }`}
+            >
+              {itemDef && <LaCriptaItemPixelIcon itemId={itemDef.id} size={20} />}
+              {relicDef && <LaCriptaRelicPixelIcon relicId={relicDef.id} size={20} />}
+              <div className="text-left">
+                <div className="text-[8px] font-cripta-pixel uppercase tracking-wider text-[#D8C6A0]">
+                  {isRelic ? '✦ RELIQUIA CAÍDA' : 'BOTÍN EN EL SUELO'}
+                </div>
+                <div className="font-cripta-pixel text-[10px] font-bold text-[#FFD166]">
+                  RECOGER: {title.toUpperCase()}
+                </div>
               </div>
-              <div className="font-cripta-pixel text-[10px] font-bold text-[#FFD166]">
-                RECOGER: {title.toUpperCase()}
-              </div>
-            </div>
-          </button>
+            </button>
+          </LaCriptaPixelTooltip>
         );
       })}
     </div>
@@ -973,21 +989,29 @@ export const LaCriptaPartyRelicsBar: React.FC<{
           const rDef = CRIPTA_RELICS_REGISTRY[acq.relicId];
           if (!rDef) return null;
           return (
-            <button
+            <LaCriptaPixelTooltip
               key={`${acq.relicId}_${idx}`}
-              type="button"
-              onClick={() => {
-                laCriptaAudio.playStoneClick();
-                onInspectRelic?.(acq);
-              }}
-              title={`${rDef.name}: ${rDef.description}`}
-              className="group inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#1F142E] hover:bg-[#2C1B40] border border-[#FFD166]/70 hover:border-[#FFD166] transition-colors cursor-pointer"
+              title={rDef.name}
+              category={rDef.ownershipType === 'PARTY' ? 'RELIQUIA DE GRUPO' : 'RELIQUIA'}
+              description={rDef.description}
+              footerLabel="CLIC PARA VER DETALLES"
+              borderColor="#FFD166"
+              icon={<LaCriptaRelicPixelIcon relicId={acq.relicId} size={14} />}
             >
-              <LaCriptaRelicPixelIcon relicId={acq.relicId} size={16} />
-              <span className="text-[9px] font-cripta-pixel font-bold text-[#FFD166]">
-                {rDef.name}
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  laCriptaAudio.playStoneClick();
+                  onInspectRelic?.(acq);
+                }}
+                className="group inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#1F142E] hover:bg-[#2C1B40] border border-[#FFD166]/70 hover:border-[#FFD166] transition-colors cursor-pointer"
+              >
+                <LaCriptaRelicPixelIcon relicId={acq.relicId} size={16} />
+                <span className="text-[9px] font-cripta-pixel font-bold text-[#FFD166]">
+                  {rDef.name}
+                </span>
+              </button>
+            </LaCriptaPixelTooltip>
           );
         })}
       </div>

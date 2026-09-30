@@ -25,6 +25,7 @@ import {
 import {
   CRIPTA_ITEMS_REGISTRY,
   CRIPTA_RELICS_REGISTRY,
+  NORMAL_INVENTORY_MAX_SLOTS,
   playerHasRelic,
 } from '../../data/la-cripta/criptaItemsAndRelics';
 import {
@@ -32,6 +33,7 @@ import {
   computePlayerEffectiveStats,
   CRIPTA_WEAPONS_REGISTRY,
   estimatePlayerActionDamage,
+  formatDamageRange,
   getEquippedWeaponForPlayer,
   WEAPON_UPGRADE_MAX_LEVEL,
 } from '../../data/la-cripta/criptaEquipmentAndEvents';
@@ -60,6 +62,12 @@ import {
   LaCriptaNonCombatStagePortrait,
   LaCriptaPlayableCard,
 } from './LaCriptaEncounterCards';
+import {
+  CriptaContextualPanelMode,
+  LaCriptaBackpackPixelIcon,
+  LaCriptaContextualSidePanel,
+} from './LaCriptaSidePanels';
+import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
 import { CRIPTA_STATUS_EFFECTS_REGISTRY } from '../../data/la-cripta/criptaStatusEffects';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 
@@ -144,6 +152,12 @@ interface LaCriptaThreeDoorsSceneProps {
   onShopBuyItem?: (offerId: string) => void;
   onShopBuyRelic?: () => void;
   onSelectedEnemyChange?: (enemyId: string | null) => void;
+  contextualPanelMode?: CriptaContextualPanelMode;
+  inspectedPlayerId?: string | null;
+  inspectedEnemyId?: string | null;
+  onOpenInventory?: () => void;
+  onInspectEnemy?: (enemyId: string) => void;
+  onCloseContextualPanel?: () => void;
   onReturnToLobby: () => void;
   onRerollExpedition: () => void;
 }
@@ -170,13 +184,17 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   onShopBuyItem,
   onShopBuyRelic,
   onSelectedEnemyChange,
+  contextualPanelMode = 'NONE',
+  inspectedPlayerId = null,
+  inspectedEnemyId = null,
+  onOpenInventory,
+  onInspectEnemy,
+  onCloseContextualPanel,
   onReturnToLobby,
   onRerollExpedition,
 }) => {
   const [hoveredDoorId, setHoveredDoorId] = useState<CriptaDungeonId | null>(null);
   const [selectedEnemyId, setSelectedEnemyId] = useState<string | null>(null);
-  const [inspectedEnemyId, setInspectedEnemyId] = useState<string | null>(null);
-  const [selectedConsumableIdx, setSelectedConsumableIdx] = useState<number>(0);
 
   useEffect(() => {
     onSelectedEnemyChange?.(selectedEnemyId);
@@ -235,7 +253,11 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
     const activeTargetEnemy =
       livingEnemies.find((e) => e.id === selectedEnemyId) || livingEnemies[0] || null;
     const inspectedEnemy =
-      activeRoom.enemies.find((e) => e.id === inspectedEnemyId) || null;
+      activeRoom.enemies.find((e) => e.id === inspectedEnemyId) ||
+      activeTargetEnemy ||
+      null;
+    const inspectedPlayer =
+      expeditionState.players.find((p) => p.id === inspectedPlayerId) || me || null;
     const discoveredAbilityIds = expeditionState.discoveredEnemyAbilityIds || [];
 
     const iAmDead = Boolean(
@@ -280,35 +302,6 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
     const mySpecialCd = me?.weaponSpecialCooldown || 0;
     const myAbilityCd = (me as { abilityCooldown?: number })?.abilityCooldown || 0;
     const myInventory = me?.normalInventory || [];
-    const myConsumables = myInventory
-      .map((rawSlot, idx) => {
-        const itemId =
-          typeof rawSlot === 'string'
-            ? rawSlot
-            : (rawSlot as { itemId?: string })?.itemId;
-        const def = itemId
-          ? CRIPTA_ITEMS_REGISTRY[itemId as keyof typeof CRIPTA_ITEMS_REGISTRY]
-          : undefined;
-        return {
-          itemId: itemId as keyof typeof CRIPTA_ITEMS_REGISTRY,
-          idx,
-          def,
-        };
-      })
-      .filter(
-        (
-          entry
-        ): entry is {
-          itemId: keyof typeof CRIPTA_ITEMS_REGISTRY;
-          idx: number;
-          def: NonNullable<typeof entry.def>;
-        } => Boolean(entry.def)
-      );
-
-    const activeConsumableEntry =
-      myConsumables[selectedConsumableIdx % Math.max(1, myConsumables.length)] ||
-      myConsumables[0] ||
-      null;
 
     const attackEst =
       me && activeTargetEnemy
@@ -475,7 +468,18 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   </span>
                 </div>
 
-                <h1 className="mt-1.5 font-cripta-display text-xl sm:text-2xl xl:text-3xl font-black uppercase tracking-wider text-[#F5EFE6] leading-tight drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]">
+                <h1
+                  onClick={() => {
+                    if (activeTargetEnemy && onInspectEnemy) {
+                      laCriptaAudio.playStoneClick();
+                      onInspectEnemy(activeTargetEnemy.id);
+                    }
+                  }}
+                  className={`mt-1.5 font-cripta-display text-xl sm:text-2xl xl:text-3xl font-black uppercase tracking-wider text-[#F5EFE6] leading-tight drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] ${
+                    activeTargetEnemy ? 'cursor-pointer hover:text-[#FFD166] transition-colors' : ''
+                  }`}
+                  title={activeTargetEnemy ? 'Haz clic para examinar criatura' : undefined}
+                >
                   {activeTargetEnemy
                     ? activeTargetEnemy.name
                     : activeRoom.title}
@@ -485,29 +489,26 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                     <span
                       className={`px-1.5 py-0.5 border text-[9px] font-cripta-pixel font-bold uppercase ${
-                        activeTargetEnemy.tier === 'BOSS'
+                        activeTargetEnemy.isFinalBoss || activeTargetEnemy.isBoss
                           ? 'bg-[#2A0E19] border-[#FF4D6D] text-[#FFD166]'
-                          : activeTargetEnemy.tier === 'MINIBOSS'
+                          : activeTargetEnemy.isMiniboss
                           ? 'bg-[#26142A] border-[#E7A54A] text-[#FFD166]'
-                          : activeTargetEnemy.tier === 'ELITE'
+                          : activeTargetEnemy.isElite
                           ? 'bg-[#22162B] border-[#C77DFF] text-[#E0AAFF]'
                           : 'bg-[#140F1C] border-[#4A3B5C] text-[#D8C6A0]'
                       }`}
                     >
-                      {activeTargetEnemy.tier === 'BOSS'
+                      {activeTargetEnemy.isFinalBoss || activeTargetEnemy.isBoss
                         ? 'SOBERANO DEL ABISMO'
-                        : activeTargetEnemy.tier === 'MINIBOSS'
+                        : activeTargetEnemy.isMiniboss
                         ? 'MINIJFE DE LA MAZMORRA'
-                        : activeTargetEnemy.tier === 'ELITE'
+                        : activeTargetEnemy.isElite
                         ? 'CRIATURA ÉLITE'
                         : 'CRIATURA DE CRIPTA'}
                     </span>
-                    {activeTargetEnemy.Passives &&
-                      activeTargetEnemy.Passives.length > 0 && (
-                        <span className="text-[9px] font-cripta-pixel text-[#D8C6A0]/80">
-                          ✦ {activeTargetEnemy.Passives[0]}
-                        </span>
-                      )}
+                    <span className="text-[9px] font-cripta-pixel text-[#D8C6A0]/80">
+                      · {activeTargetEnemy.title}
+                    </span>
                   </div>
                 ) : (
                   <p className="mt-0.5 text-[10px] font-cripta-pixel text-[#D8C6A0]/75 uppercase tracking-wider">
@@ -516,20 +517,32 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                 )}
               </div>
 
-              {/* Inspect / Lore Button when enemy is active */}
-              {activeTargetEnemy && (
+              {/* Inspect / Examinar Button when enemy is active */}
+              {activeTargetEnemy && onInspectEnemy && (
                 <button
                   type="button"
-                  onClick={() =>
-                    setInspectedEnemyId((prev) =>
-                      prev === activeTargetEnemy.id ? null : activeTargetEnemy.id
-                    )
-                  }
-                  className="px-2.5 py-1.5 bg-[#120D1A]/90 hover:bg-[#1D1528] border border-[#4A3B5C] hover:border-[#E7A54A] text-[9px] font-cripta-pixel text-[#D8C6A0] hover:text-[#FFD166] flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
-                  title="Inspeccionar bestiario y habilidades"
+                  onClick={() => {
+                    laCriptaAudio.playStoneClick();
+                    if (
+                      contextualPanelMode === 'ENEMY_INSPECTION' &&
+                      inspectedEnemyId === activeTargetEnemy.id &&
+                      onCloseContextualPanel
+                    ) {
+                      onCloseContextualPanel();
+                    } else {
+                      onInspectEnemy(activeTargetEnemy.id);
+                    }
+                  }}
+                  className={`px-2.5 py-1.5 border text-[9px] font-cripta-pixel flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+                    contextualPanelMode === 'ENEMY_INSPECTION' &&
+                    inspectedEnemyId === activeTargetEnemy.id
+                      ? 'bg-[#2A1C12] border-[#FFD166] text-[#FFD166]'
+                      : 'bg-[#120D1A]/90 hover:bg-[#1D1528] border-[#4A3B5C] hover:border-[#E7A54A] text-[#D8C6A0] hover:text-[#FFD166]'
+                  }`}
+                  title="Examinar estadísticas, debilidades, resistencias y ataques"
                 >
                   <Eye className="w-3.5 h-3.5 text-[#E7A54A]" />
-                  <span>BESTIARIO</span>
+                  <span>EXAMINAR</span>
                 </button>
               )}
             </div>
@@ -538,7 +551,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
             <div className="relative z-20 flex-1 min-h-[200px] flex flex-col items-center justify-center my-2">
               {visibleRoomEnemies.length > 0 ? (
                 <div className="w-full flex flex-wrap items-end justify-center gap-4 sm:gap-6">
-                  {visibleRoomEnemies.map((enemy) => {
+                  {visibleRoomEnemies.map((enemy, enemyIdx) => {
                     const isDead = enemy.hp <= 0;
                     const isTargeted = activeTargetEnemy?.id === enemy.id && !isDead;
                     const animState =
@@ -553,7 +566,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     // Dynamic commanding size based on enemy count and tier
                     const spriteSize =
                       visibleRoomEnemies.length === 1
-                        ? enemy.tier === 'BOSS' || enemy.tier === 'MINIBOSS'
+                        ? enemy.isBoss || enemy.isFinalBoss || enemy.isMiniboss
                           ? 256
                           : 232
                         : visibleRoomEnemies.length === 2
@@ -569,12 +582,14 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           if (!isDead) {
                             laCriptaAudio.playDoorHover();
                             setSelectedEnemyId(enemy.id);
+                            onInspectEnemy?.(enemy.id);
                           }
                         }}
                         onKeyDown={(e) => {
                           if (!isDead && (e.key === 'Enter' || e.key === ' ')) {
                             e.preventDefault();
                             setSelectedEnemyId(enemy.id);
+                            onInspectEnemy?.(enemy.id);
                           }
                         }}
                         className={`group relative flex flex-col items-center transition-all duration-300 outline-none ${
@@ -603,7 +618,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                                 : 'bg-[#0E0A14]/80 border-[#3E2F4B] text-[#D8C6A0]/60 group-hover:text-[#D8C6A0]'
                             }`}
                           >
-                            {isTargeted ? '◆ OBJETIVO ACTIVO ◆' : 'CLIC PARA APUNTAR'}
+                            {isTargeted ? '◆ OBJETIVO ACTIVO ◆' : 'CLIC: OBJETIVO + EXAMINAR'}
                           </div>
                         )}
 
@@ -616,9 +631,11 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           )}
                           <LaCriptaEnemyPixelSprite
                             enemy={enemy}
+                            dungeonId={chosenDungeon.id}
                             isTargeted={isTargeted}
                             animState={animState}
                             totalVisibleEnemies={visibleRoomEnemies.length}
+                            enemyIndex={enemyIdx}
                             customSizePx={spriteSize}
                           />
                         </div>
@@ -642,9 +659,9 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             </div>
                             <div className="mt-0.5 flex items-center justify-between text-[8px] font-cripta-pixel text-[#D8C6A0]">
                               <span>
-                                HP {enemy.hp}/{enemy.maxHp}
+                                PV {enemy.hp}/{enemy.maxHp}
                               </span>
-                              <span>DEF {enemy.defense}</span>
+                              <span>DEF {enemy.armor || 0}</span>
                             </div>
                           </div>
                         )}
@@ -685,19 +702,13 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   {(() => {
                     const approxRange = computeEnemyApproxDamageRange(
                       activeTargetEnemy,
-                      expeditionState.floor || 1
+                      currentRoomIndex
                     );
                     const telegraphedLabel =
-                      activeTargetEnemy.telegraphedAbilityName ||
-                      (activeTargetEnemy.nextIntent === 'HEAVY'
-                        ? 'GOLPE DEVASTADOR'
-                        : activeTargetEnemy.nextIntent === 'AOE'
-                        ? 'BARRIDO DE ÁREA'
-                        : activeTargetEnemy.nextIntent === 'DEBUFF'
-                        ? 'MALDICIÓN OSCURA'
-                        : activeTargetEnemy.nextIntent === 'BUFF'
-                        ? 'GUARDIA FÉRREA'
-                        : 'ATAQUE DIRECTO');
+                      activeTargetEnemy.preparedTelegraphLabel ||
+                      activeTargetEnemy.abilityName ||
+                      activeTargetEnemy.intent ||
+                      'ATAQUE DIRECTO';
 
                     return (
                       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#291E36]">
@@ -710,25 +721,48 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-[10px] font-cripta-pixel">
-                          <span className="px-2 py-0.5 bg-[#1B1224] border border-[#4A3B5C] text-[#FF8FA3] font-bold">
-                            ⚔ {approxRange.min}–{approxRange.max} DAÑO
-                          </span>
-                          <span className="px-2 py-0.5 bg-[#140E1C] border border-[#3E2F4B] text-[#7BDFF2]">
-                            🛡 DEF {activeTargetEnemy.defense}
-                          </span>
+                          <LaCriptaPixelTooltip
+                            title="Amenaza de Daño"
+                            category="INTENCIÓN ENEMIGA"
+                            description="Rango aproximado de daño antes de aplicar la defensa y mitigación del aventurero objetivo."
+                            borderColor="#C93B5B"
+                          >
+                            <span className="px-2 py-0.5 bg-[#1B1224] border border-[#4A3B5C] text-[#FF8FA3] font-bold cursor-help">
+                              ~{approxRange.min}–{approxRange.max} DAÑO
+                            </span>
+                          </LaCriptaPixelTooltip>
+                          <LaCriptaPixelTooltip
+                            title="Defensa de la Criatura"
+                            category="ARMADURA"
+                            description="Reduce el daño físico directo que recibe esta criatura. Haz clic en la criatura para ver sus debilidades y resistencias."
+                            borderColor="#7BDFF2"
+                          >
+                            <span className="px-2 py-0.5 bg-[#140E1C] border border-[#3E2F4B] text-[#7BDFF2] cursor-help">
+                              DEF {activeTargetEnemy.armor || 0}
+                            </span>
+                          </LaCriptaPixelTooltip>
                         </div>
                       </div>
                     );
                   })()}
 
                   {/* Commanding Enemy Health Bar */}
-                  <div>
+                  <div
+                    onClick={() => {
+                      if (onInspectEnemy) {
+                        laCriptaAudio.playStoneClick();
+                        onInspectEnemy(activeTargetEnemy.id);
+                      }
+                    }}
+                    className="cursor-pointer"
+                    title="Haz clic para examinar estadísticas, debilidades y resistencias"
+                  >
                     <div className="flex items-center justify-between text-xs font-cripta-pixel mb-1">
                       <span className="text-[#F5EFE6] font-bold uppercase">
                         SALUD DE {activeTargetEnemy.name}
                       </span>
                       <span className="text-[#FFD166] font-bold">
-                        {activeTargetEnemy.hp} / {activeTargetEnemy.maxHp} HP
+                        {activeTargetEnemy.hp} / {activeTargetEnemy.maxHp} PV
                       </span>
                     </div>
                     <div className="h-4 w-full bg-[#160F20] border-2 border-[#3E2F4B] overflow-hidden relative">
@@ -750,17 +784,31 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   </div>
 
                   {/* Active Status Effects on Target Enemy */}
-                  {activeTargetEnemy.statusEffects &&
-                    activeTargetEnemy.statusEffects.length > 0 && (
-                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#261C33]">
-                        {activeTargetEnemy.statusEffects.map((st, idx) => (
-                          <LaCriptaStatusEffectBadge
-                            key={`${st.id}_${idx}`}
-                            effect={st}
-                          />
-                        ))}
-                      </div>
-                    )}
+                  {(Boolean(activeTargetEnemy.poisonStacks && activeTargetEnemy.poisonStacks > 0) ||
+                    Boolean(activeTargetEnemy.vulnerableTurns && activeTargetEnemy.vulnerableTurns > 0) ||
+                    Boolean(activeTargetEnemy.isDefending)) && (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#261C33]">
+                      {Boolean(activeTargetEnemy.poisonStacks && activeTargetEnemy.poisonStacks > 0) && (
+                        <LaCriptaStatusEffectBadge
+                          effectType="POISON"
+                          turnsRemaining={activeTargetEnemy.poisonStacks || 1}
+                          stacks={activeTargetEnemy.poisonStacks}
+                        />
+                      )}
+                      {Boolean(activeTargetEnemy.vulnerableTurns && activeTargetEnemy.vulnerableTurns > 0) && (
+                        <LaCriptaStatusEffectBadge
+                          effectType="MARKED"
+                          turnsRemaining={activeTargetEnemy.vulnerableTurns || 1}
+                        />
+                      )}
+                      {Boolean(activeTargetEnemy.isDefending) && (
+                        <LaCriptaStatusEffectBadge
+                          effectType="SHIELDED"
+                          turnsRemaining={activeTargetEnemy.defendingRoundsRemaining || 1}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Non-combat / Cleared Room Stage Footer */
@@ -774,101 +822,11 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     </div>
                   </div>
                   <div className="px-2.5 py-1 bg-[#161022] border border-[#3E2F4B] text-[9px] font-cripta-pixel text-[#D8C6A0]">
-                    PISO {expeditionState.floor || 1}
+                    PUERTA {Math.min(3, completedDoorCount + 1)}/3
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Bestiary Inspect Modal Overlay inside Left Stage */}
-            {inspectedEnemy && (
-              <div className="absolute inset-4 z-40 bg-[#0D0914]/98 border-2 border-[#E7A54A] p-4 flex flex-col justify-between overflow-y-auto shadow-[0_0_50px_rgba(0,0,0,0.95)]">
-                <div>
-                  <div className="flex items-start justify-between gap-2 border-b border-[#3E2F4B] pb-2.5">
-                    <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#E7A54A] uppercase tracking-widest">
-                        REGISTRO DEL BESTIARIO
-                      </div>
-                      <h3 className="font-cripta-display text-lg font-black text-[#F5EFE6] uppercase">
-                        {inspectedEnemy.name}
-                      </h3>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setInspectedEnemyId(null)}
-                      className="p-1 bg-[#1A1324] border border-[#4A3B5C] text-[#D8C6A0] hover:text-[#FFD166] cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-center font-cripta-pixel text-[10px]">
-                    <div className="p-2 bg-[#150F1E] border border-[#2E2238]">
-                      <div className="text-[#D8C6A0]/65">VIDA</div>
-                      <div className="text-[#FF8FA3] font-bold mt-0.5">
-                        {inspectedEnemy.hp}/{inspectedEnemy.maxHp}
-                      </div>
-                    </div>
-                    <div className="p-2 bg-[#150F1E] border border-[#2E2238]">
-                      <div className="text-[#D8C6A0]/65">ATAQUE</div>
-                      <div className="text-[#FFD166] font-bold mt-0.5">
-                        {inspectedEnemy.attack}
-                      </div>
-                    </div>
-                    <div className="p-2 bg-[#150F1E] border border-[#2E2238]">
-                      <div className="text-[#D8C6A0]/65">DEFENSA</div>
-                      <div className="text-[#7BDFF2] font-bold mt-0.5">
-                        {inspectedEnemy.defense}
-                      </div>
-                    </div>
-                  </div>
-
-                  {(() => {
-                    const aiProfile = buildEnemyAiProfileForArchetype(
-                      inspectedEnemy.archetypeId,
-                      inspectedEnemy.name,
-                      inspectedEnemy.tier === 'MINIBOSS' ? 'BOSS' : inspectedEnemy.tier
-                    );
-                    return (
-                      <div className="mt-3 space-y-2">
-                        <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/80 uppercase tracking-wider">
-                          TÉCNICAS CONOCIDAS:
-                        </div>
-                        {aiProfile.abilities.map((ab) => {
-                          const isKnown =
-                            discoveredAbilityIds.includes(ab.id) ||
-                            inspectedEnemy.tier === 'BOSS' ||
-                            inspectedEnemy.tier === 'MINIBOSS';
-                          return (
-                            <div
-                              key={ab.id}
-                              className="p-2 bg-[#140E1C] border border-[#2E2238] text-[10px] font-cripta-pixel"
-                            >
-                              <div className="font-bold text-[#FFD166]">
-                                {isKnown ? ab.name : '??? (Técnica Oculta)'}
-                              </div>
-                              <div className="text-[#D8C6A0]/80 mt-0.5">
-                                {isKnown
-                                  ? ab.description
-                                  : 'Observa a la criatura en combate para descubrir su patrón.'}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setInspectedEnemyId(null)}
-                  className="mt-3 w-full py-2 bg-[#E7A54A] text-[#09070D] font-cripta-pixel text-[10px] font-bold uppercase tracking-widest cursor-pointer"
-                >
-                  CERRAR BESTIARIO
-                </button>
-              </div>
-            )}
           </section>
 
           {/* =================================================================
@@ -1026,7 +984,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     </div>
                   )}
 
-                  {/* THE 5 TACTICAL COMBAT CARDS */}
+                  {/* THE 4 TACTICAL COMBAT CARDS (Inventory consumables live in MOCHILA drawer) */}
                   <div className="w-full flex flex-wrap items-stretch justify-center gap-3.5 sm:gap-4">
                     {/* CARD 1: BASIC WEAPON ATTACK (1 AP) */}
                     <LaCriptaPlayableCard
@@ -1034,12 +992,24 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       categoryLabel="ATAQUE DE ARMA"
                       costLabel="1 AP"
                       cooldownLabel={`NV.${myWeaponLv}`}
-                      summary={
+                      headlineValue={
                         attackEst
-                          ? `Inflige ${attackEst.minDamage}–${attackEst.maxDamage} de daño físico a ${
+                          ? `${formatDamageRange(attackEst.min, attackEst.max)} DAÑO`
+                          : '4–6 DAÑO'
+                      }
+                      summary={`Golpe directo contra ${
+                        activeTargetEnemy?.name || 'objetivo'
+                      }.`}
+                      tooltipDescription={
+                        myWeapon
+                          ? `${myWeapon.specialEffectText} Escala con ${myWeapon.scalingStat}. Daño estimado contra ${
                               activeTargetEnemy?.name || 'objetivo'
-                            }.`
-                          : 'Golpe directo con tu arma equipada.'
+                            }: ${
+                              attackEst
+                                ? formatDamageRange(attackEst.min, attackEst.max)
+                                : '4–6'
+                            } PV.`
+                          : 'Ataque físico básico con tu arma equipada.'
                       }
                       accentColor="crimson"
                       disabled={!isMyTurn || currentTurnAp < 1}
@@ -1058,14 +1028,16 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       categoryLabel="DEFENSA TÁCTICA"
                       costLabel="1 AP"
                       cooldownLabel="SIEMPRE LISTA"
-                      summary="Reduce un 45% el daño recibido en esta ronda y refuerza tu postura."
+                      headlineValue="+45% GUARDIA"
+                      summary="Mitiga el daño enemigo durante esta ronda."
+                      tooltipDescription="Adopta una postura defensiva que reduce un 45% todo el daño recibido en esta ronda y refuerza tu armadura temporal."
                       accentColor="cyan"
                       disabled={!isMyTurn || currentTurnAp < 1}
                       illustration={
                         <LaCriptaCardPixelIllustration kind="DEFEND_SHIELD" />
                       }
                       onClick={() => submitPlayerCombatChoice('DEFEND')}
-                      footerBadge="+45% MITIGACIÓN"
+                      footerBadge="POSTURA DEFENSIVA"
                     />
 
                     {/* CARD 3: WEAPON SPECIAL TECHNIQUE (1 AP) */}
@@ -1075,21 +1047,33 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         categoryLabel="TÉCNICA DE ARMA"
                         costLabel="1 AP"
                         cooldownLabel={
-                          mySpecialCd > 0 ? `CD: ${mySpecialCd} RONDAS` : 'LISTA'
+                          mySpecialCd > 0 ? `CD: ${mySpecialCd}T` : 'LISTA'
+                        }
+                        headlineValue={
+                          specialEst
+                            ? `${formatDamageRange(specialEst.min, specialEst.max)} ${
+                                myWeapon.specialAttack?.targetRule === 'ALL_ENEMIES'
+                                  ? 'DAÑO · ÁREA'
+                                  : myWeapon.specialAttack?.targetRule === 'CLEAVE_2' ||
+                                    myWeapon.specialAttack?.targetRule === 'CHAIN_2'
+                                  ? 'DAÑO · 2 OBJ.'
+                                  : 'DAÑO'
+                              }`
+                            : '6–9 DAÑO'
                         }
                         summary={
-                          specialEst
-                            ? `${
-                                (
-                                  myWeapon.specialAttack?.description ||
-                                  myWeapon.specialEffectText ||
-                                  'Técnica especial'
-                                ).split('.')[0]
-                              }. (${specialEst.minDamage}–${specialEst.maxDamage} daño)`
-                            : myWeapon.specialAttack?.description ||
-                              myWeapon.specialEffectText ||
-                              'Técnica especial de tu arma.'
+                          (
+                            myWeapon.specialAttack?.description ||
+                            myWeapon.specialEffectText ||
+                            'Técnica especial de arma.'
+                          ).split('.')[0] + '.'
                         }
+                        tooltipDescription={`${
+                          myWeapon.specialAttack?.description ||
+                          myWeapon.specialEffectText
+                        } Recarga: ${
+                          myWeapon.specialAttack?.cooldownRounds || 2
+                        } rondas.`}
                         accentColor="amber"
                         disabled={!isMyTurn || currentTurnAp < 1 || mySpecialCd > 0}
                         illustration={
@@ -1098,8 +1082,8 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         onClick={() => submitPlayerCombatChoice('WEAPON_SPECIAL')}
                         footerBadge={
                           mySpecialCd > 0
-                            ? `EN ENFRIAMIENTO (${mySpecialCd})`
-                            : 'TÉCNICA ESPECIAL'
+                            ? `ENFRIAMIENTO (${mySpecialCd}T)`
+                            : `CD: ${myWeapon.specialAttack?.cooldownRounds || 2} RONDAS`
                         }
                       />
                     )}
@@ -1111,15 +1095,23 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         categoryLabel={`HABILIDAD · ${myCharDef.className || myCharDef.name}`}
                         costLabel="1 AP"
                         cooldownLabel={
-                          myAbilityCd > 0 ? `CD: ${myAbilityCd} RONDAS` : 'LISTA'
+                          myAbilityCd > 0 ? `CD: ${myAbilityCd}T` : 'LISTA'
+                        }
+                        headlineValue={
+                          myCharDef.abilities[0].kind === 'HEAL'
+                            ? `+${myCharDef.abilities[0].power} PV GRUPO`
+                            : myCharDef.abilities[0].kind === 'DEFEND'
+                            ? `+${myCharDef.abilities[0].power} ESCUDO`
+                            : abilityEst
+                            ? `${formatDamageRange(abilityEst.min, abilityEst.max)} PODER`
+                            : `${myCharDef.abilities[0].power} PODER`
                         }
                         summary={
-                          abilityEst
-                            ? `${
-                                (myCharDef.abilities[0].description || '').split('.')[0]
-                              }. (${abilityEst.minDamage}–${abilityEst.maxDamage} poder)`
-                            : myCharDef.abilities[0].description
+                          (myCharDef.abilities[0].description || '').split('.')[0] + '.'
                         }
+                        tooltipDescription={`${myCharDef.abilities[0].description} Recarga: ${
+                          myCharDef.abilities[0].cooldownTurns || 2
+                        } rondas.`}
                         accentColor="purple"
                         disabled={!isMyTurn || currentTurnAp < 1 || myAbilityCd > 0}
                         illustration={
@@ -1134,74 +1126,39 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         }
                         footerBadge={
                           myAbilityCd > 0
-                            ? `RECARGANDO (${myAbilityCd})`
+                            ? `RECARGANDO (${myAbilityCd}T)`
                             : `CD: ${myCharDef.abilities[0].cooldownTurns || 2} RONDAS`
                         }
                       />
                     )}
-
-                    {/* CARD 5: USE CONSUMABLE ITEM (1 AP) */}
-                    {activeConsumableEntry ? (
-                      <LaCriptaPlayableCard
-                        title={activeConsumableEntry.def.name}
-                        categoryLabel="CONSUMIBLE DE MOCHILA"
-                        costLabel="1 AP"
-                        cooldownLabel={
-                          myConsumables.length > 1
-                            ? `${(selectedConsumableIdx % myConsumables.length) + 1}/${
-                                myConsumables.length
-                              } MOCHILA`
-                            : 'EN MOCHILA'
-                        }
-                        summary={activeConsumableEntry.def.description}
-                        accentColor="emerald"
-                        disabled={!isMyTurn || currentTurnAp < 1}
-                        illustration={
-                          <LaCriptaCardPixelIllustration
-                            kind="USE_CONSUMABLE"
-                            itemId={activeConsumableEntry.itemId}
-                          />
-                        }
-                        onClick={() =>
-                          submitPlayerCombatChoice(
-                            'USE_ITEM',
-                            activeConsumableEntry.idx
-                          )
-                        }
-                        footerBadge="USAR OBJETO"
-                      />
-                    ) : (
-                      <LaCriptaPlayableCard
-                        title="Sin Consumibles"
-                        categoryLabel="MOCHILA"
-                        costLabel="1 AP"
-                        cooldownLabel="VACÍO"
-                        summary="No llevas pociones ni pergaminos en tu mochila ahora mismo."
-                        accentColor="slate"
-                        disabled={true}
-                        illustration={
-                          <LaCriptaCardPixelIllustration kind="USE_CONSUMABLE" />
-                        }
-                        onClick={() => {}}
-                        footerBadge="MOCHILA VACÍA"
-                      />
-                    )}
                   </div>
 
-                  {/* Secondary Bottom Strip under Combat Cards: Switch Consumable + End Turn Button */}
+                  {/* Secondary Bottom Strip under Combat Cards: Dedicated MOCHILA Control + End Turn Button */}
                   <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
-                    {myConsumables.length > 1 && (
+                    {onOpenInventory && (
                       <button
                         type="button"
-                        onClick={() =>
-                          setSelectedConsumableIdx(
-                            (prev) => (prev + 1) % myConsumables.length
-                          )
-                        }
-                        className="px-3 py-1.5 bg-[#151020] hover:bg-[#1F172E] border border-[#4A3B5C] text-[10px] font-cripta-pixel text-[#D8C6A0] hover:text-[#FFD166] cursor-pointer"
+                        onClick={() => {
+                          laCriptaAudio.playStoneClick();
+                          onOpenInventory();
+                        }}
+                        className={`px-3.5 py-2 border font-cripta-pixel text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
+                          contextualPanelMode === 'INVENTORY'
+                            ? 'bg-[#2C1E12] border-[#FFD166] text-[#FFD166] shadow-[0_0_12px_rgba(255,209,102,0.35)]'
+                            : 'bg-[#171122] hover:bg-[#231934] border-[#E7A54A]/70 hover:border-[#FFD166] text-[#F5EFE6]'
+                        }`}
                       >
-                        CAMBIAR CONSUMIBLE ({(selectedConsumableIdx % myConsumables.length) + 1}/
-                        {myConsumables.length})
+                        <LaCriptaBackpackPixelIcon size={15} />
+                        <span>
+                          MOCHILA ({myInventory.length}/{NORMAL_INVENTORY_MAX_SLOTS})
+                        </span>
+                        {!activeRoom.consumableUsedThisTurn &&
+                          myInventory.length > 0 &&
+                          isMyTurn && (
+                            <span className="px-1.5 py-0.2 bg-[#14291D] border border-[#5EA87A] text-[8px] text-[#8EE6AE]">
+                              ACCIÓN LIBRE
+                            </span>
+                          )}
                       </button>
                     )}
 
@@ -1687,6 +1644,23 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                 RONDA {activeRoom.roundNumber || 1}
               </div>
             </div>
+
+            {/* UNIFIED SLIDE-IN CONTEXTUAL SIDE PANEL (MOCHILA / PLAYER / ENEMY) */}
+            <LaCriptaContextualSidePanel
+              mode={contextualPanelMode}
+              onClose={() => onCloseContextualPanel?.()}
+              localPlayer={me || null}
+              inspectedPlayer={inspectedPlayer}
+              inspectedEnemy={inspectedEnemy}
+              activeRoom={activeRoom}
+              partyRelics={expeditionState.partyRelics || []}
+              discoveredAbilityIds={discoveredAbilityIds}
+              isMyTurnInCombat={isMyTurn}
+              hasActiveCombat={hasActiveCombat}
+              selectedTargetEnemyId={activeTargetEnemy?.id || null}
+              onSelectTargetEnemy={(enemyId) => setSelectedEnemyId(enemyId)}
+              onUseConsumable={onUseConsumable}
+            />
           </section>
         </div>
       </div>

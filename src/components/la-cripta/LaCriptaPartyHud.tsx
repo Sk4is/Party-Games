@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Copy, Check, Volume2, VolumeX, LogOut, Crown, Sparkles, Swords } from 'lucide-react';
 import {
   CriptaAcquiredRelic,
+  CriptaCharacterId,
   CriptaExpeditionState,
   CriptaSpriteAnimationState,
   CriptaVisualEvent,
@@ -10,7 +11,6 @@ import {
   CRIPTA_CHARACTERS_CATALOG,
   CRIPTA_DUNGEONS_REGISTRY,
 } from '../../data/la-cripta/criptaCatalog';
-import { CRIPTA_ITEMS_REGISTRY } from '../../data/la-cripta/criptaItemsAndRelics';
 import {
   computePlayerEffectiveStats,
   CRIPTA_ACCESSORIES_REGISTRY,
@@ -26,13 +26,49 @@ import {
 import { LaCriptaFloatingEventBadge } from './LaCriptaVisualFeedback';
 import {
   LaCriptaPartyRelicsBar,
-  LaCriptaPlayerInventoryBar,
   LaCriptaRelicDetailModal,
 } from './LaCriptaItemRelicArt';
 import {
   LaCriptaRoomTypeIcon,
   ROOM_TYPE_LABELS,
 } from './LaCriptaRoomProgressTracker';
+import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
+
+export const LaCriptaPixelPortrait: React.FC<{
+  characterId: CriptaCharacterId;
+  size?: number;
+}> = ({ characterId }) => (
+  <div className="flex items-center justify-center overflow-hidden">
+    <LaCriptaPixelSprite
+      characterId={characterId}
+      animationState="idle"
+      size="hud"
+    />
+  </div>
+);
+
+/**
+ * Compact pixel-art backpack icon for the Bottom HUD MOCHILA control.
+ */
+const HudBackpackPixelIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 16 16"
+    shapeRendering="crispEdges"
+    className="shrink-0 select-none"
+  >
+    <rect x="6" y="1" width="4" height="1" fill="#8C583A" />
+    <rect x="5" y="2" width="1" height="2" fill="#8C583A" />
+    <rect x="10" y="2" width="1" height="2" fill="#8C583A" />
+    <rect x="3" y="4" width="10" height="10" fill="#6E4228" />
+    <rect x="4" y="5" width="8" height="8" fill="#8C583A" />
+    <rect x="3" y="4" width="10" height="4" fill="#52301C" />
+    <rect x="7" y="7" width="2" height="3" fill="#FFD166" />
+    <rect x="5" y="9" width="2" height="2" fill="#E7A54A" />
+    <rect x="9" y="9" width="2" height="2" fill="#E7A54A" />
+  </svg>
+);
 
 interface LaCriptaPartyHudProps {
   expeditionState: CriptaExpeditionState;
@@ -41,8 +77,16 @@ interface LaCriptaPartyHudProps {
   onReturnToLobby?: () => void;
   playerAnimationStates?: Record<string, CriptaSpriteAnimationState>;
   activeVisualEvents?: CriptaVisualEvent[];
-  onUseConsumable?: (slotIndex: number, targetEnemyId?: string, targetPlayerId?: string) => void;
+  onUseConsumable?: (
+    slotIndex: number,
+    targetEnemyId?: string,
+    targetPlayerId?: string
+  ) => void;
   selectedTargetEnemyId?: string | null;
+  onOpenInventory?: () => void;
+  isInventoryOpen?: boolean;
+  onInspectPlayer?: (playerId: string) => void;
+  inspectedPlayerId?: string | null;
 }
 
 /**
@@ -108,7 +152,6 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
         {/* LEFT ZONE: Brand + Room Code + Dungeon Name */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-base animate-cripta-torch select-none">🕯️</span>
             <span className="font-cripta-display text-sm sm:text-base font-extrabold tracking-widest text-[#D8C6A0]">
               LA CRIPTA
             </span>
@@ -117,7 +160,7 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
           <button
             type="button"
             onClick={handleCopyCode}
-            title="Copiar código de expedición"
+            aria-label="Copiar código de expedición"
             className="group inline-flex items-center gap-1 px-2 py-0.5 bg-[#16101E] hover:bg-[#282039] border border-[#D8C6A0]/30 hover:border-[#E7A54A] text-[11px] font-cripta-pixel text-[#D9D0BC] transition-colors cursor-pointer shrink-0"
           >
             <span className="text-[#E7A54A] font-bold tracking-widest">{displayCode}</span>
@@ -160,40 +203,52 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
 
               return (
                 <React.Fragment key={rm.id}>
-                  <div
+                  <LaCriptaPixelTooltip
                     title={
                       isRevealed
-                        ? `Sala ${rm.roomNumber}: ${ROOM_TYPE_LABELS[rm.type] || rm.type} — ${rm.title}`
-                        : `Sala ${rm.roomNumber}: Cámara desconocida`
+                        ? `Sala ${rm.roomNumber}: ${ROOM_TYPE_LABELS[rm.type] || rm.type}`
+                        : `Sala ${rm.roomNumber}`
                     }
-                    className={`w-6 h-6 border flex items-center justify-center transition-all ${
-                      isCurrent
-                        ? 'bg-[#261812] border-[#FFD166] scale-110 shadow-[0_0_10px_rgba(255,209,102,0.45)]'
-                        : isCleared
-                        ? 'bg-[#112219] border-[#5EA87A]/70 opacity-85'
-                        : isFinalNode
-                        ? 'bg-[#210D16] border-[#C93B5B]/80'
-                        : 'bg-[#09070D] border-[#282039] opacity-60'
-                    }`}
+                    category={isCurrent ? 'SALA ACTUAL' : isCleared ? 'COMPLETADA' : 'RUTA'}
+                    description={
+                      isRevealed
+                        ? `${rm.title} — ${rm.subtitle}`
+                        : 'Cámara aún envuelta en las sombras de la mazmorra.'
+                    }
+                    borderColor={
+                      isCurrent ? '#FFD166' : isCleared ? '#5EA87A' : '#7656A8'
+                    }
                   >
-                    {isRevealed || isFinalNode ? (
-                      <LaCriptaRoomTypeIcon
-                        type={rm.type}
-                        color={
-                          isCurrent
-                            ? '#FFD166'
-                            : isCleared
-                            ? '#5EA87A'
-                            : isFinalNode
-                            ? '#C93B5B'
-                            : '#D8C6A0'
-                        }
-                        size={12}
-                      />
-                    ) : (
-                      <span className="font-cripta-mono text-[9px] text-[#D8C6A0]/50">?</span>
-                    )}
-                  </div>
+                    <div
+                      className={`w-6 h-6 border flex items-center justify-center transition-all cursor-help ${
+                        isCurrent
+                          ? 'bg-[#261812] border-[#FFD166] scale-110 shadow-[0_0_10px_rgba(255,209,102,0.45)]'
+                          : isCleared
+                          ? 'bg-[#112219] border-[#5EA87A]/70 opacity-85'
+                          : isFinalNode
+                          ? 'bg-[#210D16] border-[#C93B5B]/80'
+                          : 'bg-[#09070D] border-[#282039] opacity-60'
+                      }`}
+                    >
+                      {isRevealed || isFinalNode ? (
+                        <LaCriptaRoomTypeIcon
+                          type={rm.type}
+                          color={
+                            isCurrent
+                              ? '#FFD166'
+                              : isCleared
+                              ? '#5EA87A'
+                              : isFinalNode
+                              ? '#C93B5B'
+                              : '#D8C6A0'
+                          }
+                          size={12}
+                        />
+                      ) : (
+                        <span className="font-cripta-mono text-[9px] text-[#D8C6A0]/50">?</span>
+                      )}
+                    </div>
+                  </LaCriptaPixelTooltip>
                   {idx < roomSequence.length - 1 && (
                     <span
                       className={`w-2.5 h-0.5 ${
@@ -219,13 +274,18 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
           )}
 
           {expeditionState.phase !== 'LOBBY' && (
-            <div
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#1D140C] border border-[#E7A54A] font-cripta-mono text-xs font-extrabold text-[#FFD166]"
-              title="Oro compartido del grupo"
+            <LaCriptaPixelTooltip
+              title="Oro de Expedición"
+              category="TESORO COMPARTIDO"
+              description="Oro acumulado por el grupo. Se emplea en el Mercader, en la Forja de armas y en rituales de resurrección."
+              footerLabel={`DISPONIBLE: ${expeditionState.partyGold ?? 0} ORO`}
+              borderColor="#E7A54A"
             >
-              <span>🪙</span>
-              <span>{expeditionState.partyGold ?? 0} ORO</span>
-            </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#1D140C] border border-[#E7A54A] font-cripta-mono text-xs font-extrabold text-[#FFD166] cursor-help">
+                <span>◆</span>
+                <span>{expeditionState.partyGold ?? 0} ORO</span>
+              </div>
+            </LaCriptaPixelTooltip>
           )}
 
           {expeditionState.phase !== 'LOBBY' && isHost && onReturnToLobby && (
@@ -244,8 +304,8 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
           <button
             type="button"
             onClick={handleToggleMute}
+            aria-label={muted ? 'Activar sonido' : 'Silenciar sonido'}
             className="p-1.5 bg-[#16101E] hover:bg-[#282039] border border-[#282039] hover:border-[#D8C6A0]/40 text-[#D8C6A0] transition-colors cursor-pointer"
-            title={muted ? 'Activar sonido' : 'Silenciar sonido'}
           >
             {muted ? (
               <VolumeX className="w-3.5 h-3.5 text-[#8F263D]" />
@@ -272,17 +332,19 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
 };
 
 /**
- * Clean Full-Width Bottom Party HUD (Section 15):
- * Highlights the active turn player with golden frame & AP badge, and shows each hero's
- * portrait, name, class, HP bar, shield, status effects, and 3-slot inventory.
+ * Clean Full-Width Bottom Party HUD:
+ * Highlights the active turn player with golden frame & AP badge, allows clicking any player portrait
+ * to open Player Inspection, and provides a dedicated MOCHILA button for the local player.
  */
 export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
   expeditionState,
   currentPlayerId,
   playerAnimationStates = {},
   activeVisualEvents = [],
-  onUseConsumable,
-  selectedTargetEnemyId,
+  onOpenInventory,
+  isInventoryOpen = false,
+  onInspectPlayer,
+  inspectedPlayerId = null,
 }) => {
   const orderedPlayers = [...expeditionState.players].sort((a, b) => a.seatIndex - b.seatIndex);
   const playerCount = orderedPlayers.length;
@@ -349,6 +411,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
             !isDead && hasLivingEnemies && activeCombatActorId === player.id;
           const isTargetedByEnemy =
             !isDead && hasLivingEnemies && activeTargetedPlayerIds.includes(player.id);
+          const isInspected = inspectedPlayerId === player.id;
 
           const playerEvents = activeVisualEvents.filter(
             (ev) =>
@@ -378,14 +441,23 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
           const accDef = player.equippedAccessoryId
             ? CRIPTA_ACCESSORIES_REGISTRY[player.equippedAccessoryId]
             : null;
-          const items = player.inventoryItems || [];
           const normalInv = player.normalInventory || [];
 
           return (
             <div
               key={player.id}
+              onClick={() => {
+                if (onInspectPlayer) {
+                  laCriptaAudio.playStoneClick();
+                  onInspectPlayer(player.id);
+                }
+              }}
               className={`relative flex items-center gap-2.5 px-2.5 sm:px-3 py-1.5 border-2 transition-all duration-150 ${
-                isDead
+                onInspectPlayer ? 'cursor-pointer' : ''
+              } ${
+                isInspected
+                  ? 'bg-[#261B38] -translate-y-1.5 ring-2 ring-[#FFD166]'
+                  : isDead
                   ? 'bg-[#0F090E]'
                   : isTargetedByEnemy
                   ? 'bg-[#2E0D18] -translate-y-1 ring-2 ring-[#E03E52]/70'
@@ -393,10 +465,12 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   ? 'bg-[#231912] -translate-y-1'
                   : isCurrentlyActing || animState === 'attack' || animState === 'cast'
                   ? 'bg-[#22182E] -translate-y-1'
-                  : 'bg-[#130E19]'
+                  : 'bg-[#130E19] hover:bg-[#191222]'
               }`}
               style={{
-                borderColor: isDead
+                borderColor: isInspected
+                  ? '#FFD166'
+                  : isDead
                   ? '#8F263D'
                   : isTargetedByEnemy
                   ? '#E03E52'
@@ -439,12 +513,12 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   }`}
                 >
                   {isTargetedByEnemy ? (
-                    <span>🎯 ¡OBJETIVO!</span>
+                    <span>◆ ¡OBJETIVO!</span>
                   ) : isActiveTurnPlayer ? (
                     <>
                       <Swords className="w-2.5 h-2.5" />
                       <span>
-                        {isMe ? 'TU TURNO' : 'EN TURNO'} · ⚡{currentTurnAp}/{maxTurnAp} AP
+                        {isMe ? 'TU TURNO' : 'EN TURNO'} · ◆{currentTurnAp}/{maxTurnAp} AP
                       </span>
                     </>
                   ) : combatRoundPhase === 'PLAYER_PHASE' && hasActedThisRound ? (
@@ -457,51 +531,65 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                 </div>
               )}
 
-              {/* Animated Pixel Character Bust */}
-              <div
-                className="relative w-12 h-12 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-[#09070D] border-2 overflow-visible"
-                style={{
-                  borderColor: isDead
-                    ? '#8F263D'
-                    : isTargetedByEnemy
-                    ? '#E03E52'
-                    : isActiveTurnPlayer
-                    ? '#FFD166'
-                    : player.color,
-                }}
+              {/* Animated Pixel Character Bust (Click inspects player) */}
+              <LaCriptaPixelTooltip
+                title={`${player.name} (${charDef?.className || 'Aventurero'})`}
+                category={isDead ? 'CAÍDO' : 'INSPECCIONAR HÉROE'}
+                description={
+                  eqWeapon && effStats
+                    ? `Arma: ${eqWeapon.weapon.name} Nv.${eqWeapon.level} · ATQ ${effStats.attack} · DEF ${effStats.defense} · MAG ${effStats.magic}${
+                        armorDef ? ` · ${armorDef.name}` : ''
+                      }${accDef ? ` · ${accDef.name}` : ''}`
+                    : 'Haz clic para inspeccionar atributos, equipo, técnicas y mochila.'
+                }
+                footerLabel="CLIC PARA ABRIR FICHA DE INSPECCIÓN"
+                borderColor={charDef?.accentColor || '#E7A54A'}
               >
-                {charId && charDef ? (
-                  <div
-                    className={`-mt-2.5 sm:-mt-3 pointer-events-none transition-all ${
-                      isDead ? 'grayscale opacity-35' : ''
-                    }`}
-                  >
-                    <LaCriptaPixelSprite
-                      characterId={charId}
-                      animationState={isDead ? 'idle' : animState}
-                      size="hud"
-                    />
-                  </div>
-                ) : (
-                  <span className="font-cripta-pixel text-base text-[#D8C6A0]/40">?</span>
-                )}
+                <div
+                  className="relative w-12 h-12 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-[#09070D] border-2 overflow-visible"
+                  style={{
+                    borderColor: isDead
+                      ? '#8F263D'
+                      : isTargetedByEnemy
+                      ? '#E03E52'
+                      : isActiveTurnPlayer
+                      ? '#FFD166'
+                      : player.color,
+                  }}
+                >
+                  {charId && charDef ? (
+                    <div
+                      className={`-mt-2.5 sm:-mt-3 pointer-events-none transition-all ${
+                        isDead ? 'grayscale opacity-35' : ''
+                      }`}
+                    >
+                      <LaCriptaPixelSprite
+                        characterId={charId}
+                        animationState={isDead ? 'idle' : animState}
+                        size="hud"
+                      />
+                    </div>
+                  ) : (
+                    <span className="font-cripta-pixel text-base text-[#D8C6A0]/40">?</span>
+                  )}
 
-                {isDead && (
-                  <div className="absolute inset-0 bg-[#1A080E]/80 flex flex-col items-center justify-center">
-                    <LaCriptaFallenSoulIcon size={16} />
-                    <span className="text-[7px] font-cripta-pixel font-bold text-[#C93B5B]">
-                      CAÍDO
-                    </span>
-                  </div>
-                )}
+                  {isDead && (
+                    <div className="absolute inset-0 bg-[#1A080E]/80 flex flex-col items-center justify-center">
+                      <LaCriptaFallenSoulIcon size={16} />
+                      <span className="text-[7px] font-cripta-pixel font-bold text-[#C93B5B]">
+                        CAÍDO
+                      </span>
+                    </div>
+                  )}
 
-                <span
-                  className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border border-[#0B0A0E]"
-                  style={{ backgroundColor: player.color }}
-                />
-              </div>
+                  <span
+                    className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border border-[#0B0A0E]"
+                    style={{ backgroundColor: player.color }}
+                  />
+                </div>
+              </LaCriptaPixelTooltip>
 
-              {/* Right HUD Module: Player Name, Class, HP Strip, Statuses & 3-Slot Inventory */}
+              {/* Right HUD Module: Player Name, Class, HP Strip, Statuses & Dedicated MOCHILA Control */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5 min-w-0">
@@ -514,15 +602,8 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                     </span>
                     {charDef && (
                       <span
-                        className="font-cripta-pixel text-[10px] font-bold uppercase truncate cursor-help"
+                        className="font-cripta-pixel text-[10px] font-bold uppercase truncate"
                         style={{ color: isDead ? '#C93B5B' : charDef.accentColor }}
-                        title={
-                          eqWeapon && effStats
-                            ? `${charDef.className} · Arma: ${eqWeapon.weapon.name} +${eqWeapon.level} (${eqWeapon.scaledMin}–${eqWeapon.scaledMax}) · ATQ ${effStats.attack} · DEF ${effStats.defense} · MAG ${effStats.magic}${
-                                armorDef ? ` · ${armorDef.name}` : ''
-                              }${accDef ? ` · ${accDef.name}` : ''}`
-                            : charDef.className
-                        }
                       >
                         · {charDef.className}
                       </span>
@@ -534,9 +615,17 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
 
                   {charDef && (
                     <div className="flex items-center gap-1.5 shrink-0 font-cripta-mono text-[10px]">
-                      <span className="text-[#69A8A5]" title="Armadura / Escudo">
-                        🛡{player.armor}
-                      </span>
+                      <LaCriptaPixelTooltip
+                        title="Armadura y Defensa"
+                        category="PROTECCIÓN"
+                        description="Mitiga el daño físico recibido de los ataques enemigos."
+                        footerLabel={`ARMADURA: ${player.armor}`}
+                        borderColor="#69A8A5"
+                      >
+                        <span className="text-[#69A8A5] cursor-help">
+                          DEF {player.armor}
+                        </span>
+                      </LaCriptaPixelTooltip>
                       <span className={isDead ? 'text-[#C93B5B] font-bold' : 'text-[#FFD166] font-bold'}>
                         {isDead ? `0/${player.maxHp}` : `${player.hp}/${player.maxHp}`} PV
                       </span>
@@ -551,7 +640,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                       isDead ? 'text-[#8F263D]' : 'text-[#C93B5B]'
                     }`}
                   >
-                    {isDead ? '☠' : '♥'}
+                    {isDead ? '†' : '♥'}
                   </span>
                   <div className="flex items-center gap-0.5 flex-1">
                     {Array.from({ length: hpSegmentsTotal }).map((_, segIdx) => {
@@ -570,8 +659,11 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   </div>
                 </div>
 
-                {/* Statuses & Compact 3-Slot Inventory */}
-                <div className="mt-1 flex items-center justify-between gap-1 min-h-[18px]">
+                {/* Statuses & Dedicated MOCHILA / INSPECT Controls */}
+                <div
+                  className="mt-1 flex items-center justify-between gap-1 min-h-[20px]"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <div className="flex flex-wrap items-center gap-1 min-w-0">
                     {!player.isConnected ? (
                       <span className="text-[8px] font-cripta-pixel text-[#C93B5B]">
@@ -584,48 +676,62 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                     ) : (
                       <>
                         {player.isDefendingThisRound && (
-                          <span className="px-1 py-0.1 bg-[#112328] border border-[#69A8A5] text-[8px] font-cripta-pixel text-[#69A8A5]">
-                            🛡 GUARDIA
-                          </span>
+                          <LaCriptaPixelTooltip
+                            title="Guardia Firme"
+                            category="DEFENSA"
+                            description="Postura defensiva activa: reduce un 45% el daño recibido en esta ronda."
+                            footerLabel="ACTIVO ESTA RONDA"
+                            borderColor="#69A8A5"
+                          >
+                            <span className="px-1 py-0.1 bg-[#112328] border border-[#69A8A5] text-[8px] font-cripta-pixel text-[#69A8A5] cursor-help">
+                              GUARDIA
+                            </span>
+                          </LaCriptaPixelTooltip>
                         )}
-                        {player.statuses.slice(0, 3).map((st) => (
-                          <LaCriptaStatusEffectBadge key={st.id} status={st} compact />
+                        {player.statuses.slice(0, 4).map((st) => (
+                          <LaCriptaStatusEffectBadge key={st.id} status={st} />
                         ))}
-                        {items.length > 0 && normalInv.length === 0 && (
-                          <span className="px-1 py-0.1 bg-[#1D1526] border border-[#E7A54A]/60 text-[8px] font-cripta-pixel text-[#E7A54A] truncate max-w-[72px]">
-                            ✦ {items[items.length - 1]}
-                          </span>
-                        )}
                       </>
                     )}
                   </div>
 
+                  {/* Right Side: Dedicated MOCHILA Button for Local Player (or Inspect Pill for Teammate) */}
                   <div className="flex items-center gap-1 shrink-0">
-                    {charDef && (
-                      <LaCriptaPlayerInventoryBar
-                        slots={normalInv}
-                        isLocalPlayer={isMe}
-                        inCombat={hasLivingEnemies}
-                        canUseNow={Boolean(
-                          isMe &&
-                            !isDead &&
-                            isExploreOrBossPhase &&
-                            (!hasLivingEnemies ||
-                              (isActiveTurnPlayer && currentTurnAp >= 1))
-                        )}
-                        onUseSlot={(slotIdx) => {
-                          if (!onUseConsumable) return;
-                          const itemId = normalInv[slotIdx];
-                          if (!itemId) return;
-                          const itemDef = CRIPTA_ITEMS_REGISTRY[itemId];
-                          laCriptaAudio.playHeroSelect();
-                          if (itemDef?.targetType === 'ENEMY' || itemDef?.category === 'OFFENSIVE') {
-                            onUseConsumable(slotIdx, currentPlayerId, selectedTargetEnemyId || undefined);
-                          } else {
-                            onUseConsumable(slotIdx, currentPlayerId, undefined);
-                          }
+                    {charDef && isExploreOrBossPhase && isMe && onOpenInventory && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          laCriptaAudio.playStoneClick();
+                          onOpenInventory();
                         }}
-                      />
+                        className={`px-2 py-0.5 border font-cripta-pixel text-[9px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+                          isInventoryOpen
+                            ? 'bg-[#2A1D10] border-[#FFD166] text-[#FFD166] shadow-[0_0_10px_rgba(255,209,102,0.35)]'
+                            : 'bg-[#1A1325] hover:bg-[#261B36] border-[#E7A54A]/80 text-[#F4EBD9]'
+                        }`}
+                      >
+                        <HudBackpackPixelIcon size={12} />
+                        <span>MOCHILA</span>
+                        <span className="px-1 bg-[#09070D] border border-[#4A3B5C] text-[#FFD166] font-cripta-mono text-[9px]">
+                          {normalInv.length}
+                        </span>
+                      </button>
+                    )}
+
+                    {charDef && isExploreOrBossPhase && !isMe && onInspectPlayer && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          laCriptaAudio.playStoneClick();
+                          onInspectPlayer(player.id);
+                        }}
+                        className="px-1.5 py-0.5 bg-[#161021] hover:bg-[#231A34] border border-[#4A3B5C] text-[8px] font-cripta-pixel text-[#D8C6A0] hover:text-[#FFD166] flex items-center gap-1 cursor-pointer"
+                      >
+                        <HudBackpackPixelIcon size={11} />
+                        <span>{normalInv.length}</span>
+                      </button>
                     )}
 
                     {!isSolo && votedDoorId && expeditionState.phase === 'THREE_DOORS' && (

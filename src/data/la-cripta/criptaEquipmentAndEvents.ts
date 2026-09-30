@@ -630,14 +630,256 @@ export function computePlayerEffectiveStats(player: CriptaPlayer): {
   };
 }
 
+export interface CriptaEnemyTraitEntry {
+  id: 'SAGRADO' | 'MAGICO' | 'FISICO' | 'CONTUNDENTE' | 'PERFORANTE' | 'ALQUIMICO' | 'VENENO';
+  label: string;
+  modifierText: string;
+  multiplierDelta: number; // e.g. +0.25 for +25% weakness, -0.20 for resistance
+  iconKind: 'holy' | 'arcane' | 'blunt' | 'pierce' | 'alchemy' | 'poison' | 'slash';
+}
+
+/**
+ * Canonical enemy weakness & resistance profile derived from creature archetype.
+ * Used both by Enemy Inspection UI AND by the authoritative combat damage resolver!
+ */
+export function getEnemyWeaknessAndResistanceProfile(enemy: CriptaRoomEnemy): {
+  weaknesses: CriptaEnemyTraitEntry[];
+  resistances: CriptaEnemyTraitEntry[];
+} {
+  const arch = enemy.spriteArchetype;
+
+  if (arch === 'skeleton_warrior' || arch === 'bone_colossus') {
+    return {
+      weaknesses: [
+        {
+          id: 'CONTUNDENTE',
+          label: 'CONTUNDENTE',
+          modifierText: '+25% daño',
+          multiplierDelta: 0.25,
+          iconKind: 'blunt',
+        },
+        {
+          id: 'SAGRADO',
+          label: 'SAGRADO',
+          modifierText: '+20% daño',
+          multiplierDelta: 0.2,
+          iconKind: 'holy',
+        },
+      ],
+      resistances: [
+        {
+          id: 'PERFORANTE',
+          label: 'PERFORANTE',
+          modifierText: '-20% daño',
+          multiplierDelta: -0.2,
+          iconKind: 'pierce',
+        },
+        {
+          id: 'VENENO',
+          label: 'VENENO',
+          modifierText: 'Resistente',
+          multiplierDelta: -0.25,
+          iconKind: 'poison',
+        },
+      ],
+    };
+  }
+
+  if (arch === 'chained_wraith' || arch === 'mirror_doppelganger' || arch === 'lich_sovereign') {
+    return {
+      weaknesses: [
+        {
+          id: 'SAGRADO',
+          label: 'SAGRADO',
+          modifierText: '+25% daño',
+          multiplierDelta: 0.25,
+          iconKind: 'holy',
+        },
+        {
+          id: 'MAGICO',
+          label: 'ARCANO',
+          modifierText: '+15% daño',
+          multiplierDelta: 0.15,
+          iconKind: 'arcane',
+        },
+      ],
+      resistances: [
+        {
+          id: 'FISICO',
+          label: 'CORTE FÍSICO',
+          modifierText: '-20% daño',
+          multiplierDelta: -0.2,
+          iconKind: 'slash',
+        },
+      ],
+    };
+  }
+
+  if (arch === 'fungal_beast' || arch === 'bat_swarm') {
+    return {
+      weaknesses: [
+        {
+          id: 'ALQUIMICO',
+          label: 'FUEGO / ALQUIMIA',
+          modifierText: '+25% daño',
+          multiplierDelta: 0.25,
+          iconKind: 'alchemy',
+        },
+        {
+          id: 'FISICO',
+          label: 'TAJO AFILADO',
+          modifierText: '+15% daño',
+          multiplierDelta: 0.15,
+          iconKind: 'slash',
+        },
+      ],
+      resistances: [
+        {
+          id: 'VENENO',
+          label: 'VENENO',
+          modifierText: 'Resistente (-25%)',
+          multiplierDelta: -0.25,
+          iconKind: 'poison',
+        },
+      ],
+    };
+  }
+
+  if (arch === 'Stone_gargoyle') {
+    return {
+      weaknesses: [
+        {
+          id: 'CONTUNDENTE',
+          label: 'CONTUNDENTE / PICO',
+          modifierText: '+25% daño',
+          multiplierDelta: 0.25,
+          iconKind: 'blunt',
+        },
+        {
+          id: 'MAGICO',
+          label: 'MAGIA',
+          modifierText: '+20% daño',
+          multiplierDelta: 0.2,
+          iconKind: 'arcane',
+        },
+      ],
+      resistances: [
+        {
+          id: 'PERFORANTE',
+          label: 'FLECHAS / DAGAS',
+          modifierText: '-25% daño',
+          multiplierDelta: -0.25,
+          iconKind: 'pierce',
+        },
+      ],
+    };
+  }
+
+  // Default for cultist_acolyte, inquisitor_lord, crypt_warden, etc.
+  return {
+    weaknesses: [
+      {
+        id: 'PERFORANTE',
+        label: 'PERFORANTE',
+        modifierText: '+20% daño',
+        multiplierDelta: 0.2,
+        iconKind: 'pierce',
+      },
+      {
+        id: 'FISICO',
+        label: 'ACERO',
+        modifierText: '+15% daño',
+        multiplierDelta: 0.15,
+        iconKind: 'slash',
+      },
+    ],
+    resistances: [
+      {
+        id: 'MAGICO',
+        label: 'SOMBRA / ARCANO',
+        modifierText: '-15% daño',
+        multiplierDelta: -0.15,
+        iconKind: 'arcane',
+      },
+    ],
+  };
+}
+
+export function computeWeaponVsEnemyTraitMultiplier(
+  player: CriptaPlayer,
+  actionType: 'ATTACK' | 'WEAPON_SPECIAL' | 'ABILITY',
+  enemy: CriptaRoomEnemy
+): number {
+  const eq = getEquippedWeaponForPlayer(player);
+  const charId = player.characterId || player.selectedCharacterId || 'caballero';
+  const fam = eq.weapon.family;
+  const profile = getEnemyWeaknessAndResistanceProfile(enemy);
+
+  const activeTags = new Set<CriptaEnemyTraitEntry['id']>();
+  if (fam === 'MACE' || charId === 'clerigo') {
+    activeTags.add('SAGRADO');
+    activeTags.add('CONTUNDENTE');
+  }
+  if (fam === 'PICKAXE' || fam === 'AXE') {
+    activeTags.add('CONTUNDENTE');
+    activeTags.add('FISICO');
+  }
+  if (fam === 'SWORD') {
+    activeTags.add('FISICO');
+  }
+  if (fam === 'DAGGER' || fam === 'BOW' || charId === 'picaro' || charId === 'cazador') {
+    activeTags.add('PERFORANTE');
+  }
+  if (fam === 'STAFF' || (actionType === 'ABILITY' && charId === 'mago')) {
+    activeTags.add('MAGICO');
+  }
+  if (fam === 'ALCHEMICAL' || charId === 'alquimista') {
+    activeTags.add('ALQUIMICO');
+  }
+
+  let delta = 0;
+  for (const w of profile.weaknesses) {
+    if (activeTags.has(w.id)) {
+      delta = Math.max(delta, w.multiplierDelta);
+    }
+  }
+  if (delta === 0) {
+    for (const r of profile.resistances) {
+      if (activeTags.has(r.id)) {
+        delta = Math.min(delta, r.multiplierDelta);
+      }
+    }
+  }
+  return 1 + delta;
+}
+
+export function formatDamageRange(
+  min?: number | null,
+  max?: number | null,
+  targetCount = 1
+): string | null {
+  if (typeof min !== 'number' || Number.isNaN(min)) return null;
+  const safeMin = Math.max(1, Math.round(min));
+  const safeMax =
+    typeof max === 'number' && !Number.isNaN(max)
+      ? Math.max(safeMin, Math.round(max))
+      : safeMin;
+  const base = safeMin === safeMax ? `${safeMin}` : `~${safeMin}–${safeMax}`;
+  return targetCount > 1 ? `${base} × ${targetCount}` : base;
+}
+
 /**
  * Computes the enemy's approximate damage range and magic resistance for Enemy Inspection (Sections 5 & 6).
  */
-export function computeEnemyApproxDamageRange(enemy: CriptaRoomEnemy): {
+export function computeEnemyApproxDamageRange(
+  enemy: CriptaRoomEnemy,
+  _floor?: number
+): {
   min: number;
   max: number;
   magicRes: number;
 } {
+  const safeArmor = typeof enemy.armor === 'number' ? enemy.armor : enemy.defense || 0;
   if (typeof enemy.approxMinDamage === 'number' && typeof enemy.approxMaxDamage === 'number') {
     return {
       min: enemy.approxMinDamage,
@@ -645,7 +887,7 @@ export function computeEnemyApproxDamageRange(enemy: CriptaRoomEnemy): {
       magicRes:
         typeof enemy.magicResistance === 'number'
           ? enemy.magicResistance
-          : Math.max(0, Math.floor(enemy.armor * 0.4)),
+          : Math.max(0, Math.floor(safeArmor * 0.4)),
     };
   }
   const effectiveAtk = Math.max(3, enemy.attack + (enemy.attackBuffBonus || 0));
@@ -654,7 +896,7 @@ export function computeEnemyApproxDamageRange(enemy: CriptaRoomEnemy): {
   const magicRes =
     typeof enemy.magicResistance === 'number'
       ? enemy.magicResistance
-      : Math.max(0, Math.floor(enemy.armor * 0.4));
+      : Math.max(0, Math.floor(safeArmor * 0.4));
   return { min, max, magicRes };
 }
 
@@ -671,6 +913,8 @@ export function estimatePlayerActionDamage(
 ): {
   min: number;
   max: number;
+  minDamage: number;
+  maxDamage: number;
   targetCount: number;
   affectedEnemyIds: string[];
   label: string;
@@ -735,6 +979,11 @@ export function estimatePlayerActionDamage(
     statusMult += eq.weapon.undeadBonusPct / 100;
   }
 
+  if (targetEnemy) {
+    const traitMult = computeWeaponVsEnemyTraitMultiplier(player, actionType, targetEnemy);
+    statusMult *= traitMult;
+  }
+
   if (targetEnemy && (targetEnemy.vulnerableTurns || 0) > 0) {
     statusMult += 0.22;
   }
@@ -750,9 +999,11 @@ export function estimatePlayerActionDamage(
 
   let enemyMitigation = 1;
   if (targetEnemy) {
+    const baseArmor =
+      typeof targetEnemy.armor === 'number' ? targetEnemy.armor : targetEnemy.defense || 0;
     const rawDef = isMagical
       ? computeEnemyApproxDamageRange(targetEnemy).magicRes
-      : targetEnemy.armor +
+      : baseArmor +
         (targetEnemy.armorBuffBonus || 0) +
         ((targetEnemy.defendingRoundsRemaining || 0) > 0 ? 3 : 0);
     const effectiveDef = Math.max(0, rawDef - armorPierce);
@@ -772,6 +1023,8 @@ export function estimatePlayerActionDamage(
   return {
     min,
     max,
+    minDamage: min,
+    maxDamage: max,
     targetCount,
     affectedEnemyIds: affectedEnemies.map((e) => e.id),
     label,

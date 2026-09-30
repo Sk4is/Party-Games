@@ -10,6 +10,8 @@ import {
   LaCriptaItemPixelIcon,
   LaCriptaRelicPixelIcon,
 } from './LaCriptaItemRelicArt';
+import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
+import { LaCriptaAnimatedStageNpc } from './LaCriptaCreatureArtSystem';
 
 export type CriptaCardVisualTheme =
   | 'ATTACK'
@@ -405,11 +407,14 @@ export interface LaCriptaPlayableCardProps {
   title: string;
   categoryLabel: string;
   costLabel: string;
+  headlineValue?: string | null;
   effectPrimary?: string;
   effectSecondary?: string;
   summary?: string;
   footerBadge?: string;
   cooldownLabel?: string;
+  tooltipDescription?: string;
+  tooltipFooter?: string;
   theme?: CriptaCardVisualTheme;
   accentColor?: 'crimson' | 'cyan' | 'amber' | 'purple' | 'emerald' | 'slate';
   artKind?: CriptaCardArtKind;
@@ -442,11 +447,14 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   title,
   categoryLabel,
   costLabel,
+  headlineValue,
   effectPrimary,
   effectSecondary,
   summary,
   footerBadge,
   cooldownLabel,
+  tooltipDescription,
+  tooltipFooter,
   theme,
   accentColor,
   artKind = 'SWORD_SLASH',
@@ -466,12 +474,12 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   const resolvedPrimary = effectPrimary || footerBadge || categoryLabel;
   const resolvedSecondary = effectSecondary || summary;
 
-  return (
+  const cardElement = (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`group relative w-[166px] sm:w-[186px] xl:w-[198px] min-h-[246px] sm:min-h-[272px] border-2 flex flex-col justify-between text-left transition-all duration-150 select-none ${
+      className={`group relative w-[168px] sm:w-[188px] xl:w-[202px] h-[272px] sm:h-[292px] border-2 flex flex-col justify-between text-left transition-all duration-150 select-none ${
         disabled
           ? 'opacity-40 grayscale-[35%] cursor-not-allowed'
           : selected
@@ -490,7 +498,7 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
     >
       {/* Top Cost Badge & Optional Cooldown/Risk Badge */}
       <div
-        className="w-full px-2.5 py-1.5 border-b flex items-center justify-between gap-1"
+        className="w-full px-2.5 py-1.5 border-b flex items-center justify-between gap-1 shrink-0"
         style={{
           backgroundColor: pal.headerBg,
           borderColor: `${pal.border}66`,
@@ -521,21 +529,21 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
       </div>
 
       {/* Card Category + Title */}
-      <div className="px-2.5 pt-2 pb-1 text-center">
+      <div className="px-2.5 pt-1.5 pb-1 text-center shrink-0">
         <div
           className="font-cripta-pixel text-[8px] uppercase tracking-widest truncate mb-0.5"
           style={{ color: pal.accentText }}
         >
           {categoryLabel}
         </div>
-        <div className="font-cripta-display text-xs sm:text-sm font-black text-[#F4EBD9] uppercase tracking-wide leading-tight line-clamp-2">
+        <div className="font-cripta-display text-xs sm:text-sm font-black text-[#F4EBD9] uppercase tracking-wide leading-tight line-clamp-2 min-h-[30px] flex items-center justify-center">
           {title}
         </div>
       </div>
 
       {/* Central Pixel-Art Illustration Frame */}
       <div
-        className="mx-2.5 my-1 flex-1 min-h-[84px] sm:min-h-[96px] border flex items-center justify-center relative overflow-hidden"
+        className="mx-2.5 my-0.5 flex-1 min-h-[76px] sm:min-h-[86px] border flex items-center justify-center relative overflow-hidden"
         style={{
           backgroundColor: pal.artBg,
           borderColor: `${pal.border}55`,
@@ -555,21 +563,26 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
         </div>
       </div>
 
-      {/* Bottom Concise Effect Summary */}
-      <div className="px-2.5 pt-1.5 pb-2.5 text-center flex flex-col gap-1">
+      {/* Bottom Deliberate Hierarchy: Headline Number -> Concise Copy -> Target/Status Footer */}
+      <div className="px-2.5 pt-1 pb-2 text-center flex flex-col justify-end gap-0.5 shrink-0">
+        {headlineValue && (
+          <div className="font-cripta-mono text-xs sm:text-sm font-black text-[#FFD166] tracking-wide uppercase leading-tight">
+            {headlineValue}
+          </div>
+        )}
         {resolvedSecondary && (
-          <div className="font-cripta-pixel text-[9px] text-[#D8C6A0]/90 leading-snug line-clamp-3">
+          <div className="font-cripta-pixel text-[9px] text-[#E8DFCE]/90 leading-snug line-clamp-2 min-h-[24px] flex items-center justify-center">
             {resolvedSecondary}
           </div>
         )}
         <div
-          className="font-cripta-mono text-[10px] font-extrabold tracking-wider uppercase leading-snug"
+          className="mt-0.5 pt-1 border-t border-[#2A1F38]/80 font-cripta-mono text-[9px] font-extrabold tracking-wider uppercase leading-snug truncate"
           style={{ color: pal.accentText }}
         >
           {resolvedPrimary}
         </div>
         {voterBadges.length > 0 && (
-          <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
+          <div className="mt-0.5 flex flex-wrap items-center justify-center gap-1">
             {voterBadges.map((v) => (
               <span
                 key={v.id}
@@ -584,6 +597,23 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
       </div>
     </button>
   );
+
+  if (tooltipDescription) {
+    return (
+      <LaCriptaPixelTooltip
+        title={title}
+        category={categoryLabel}
+        description={tooltipDescription}
+        footerLabel={tooltipFooter || `${costLabel}${resolvedTopRight ? ` · ${resolvedTopRight}` : ''}`}
+        borderColor={pal.border}
+        accentColor={pal.accentText}
+      >
+        {cardElement}
+      </LaCriptaPixelTooltip>
+    );
+  }
+
+  return cardElement;
 };
 
 export const LaCriptaCardPixelIllustration: React.FC<{
@@ -637,7 +667,7 @@ export const LaCriptaNonCombatStagePortrait: React.FC<{
   dungeon: CriptaDungeonDefinition;
   sizePx?: number;
 }> = ({ room, dungeon }) => {
-  return <LaCriptaStageSubjectPortrait room={room} dungeon={dungeon} />;
+  return <LaCriptaAnimatedStageNpc room={room} dungeon={dungeon} />;
 };
 
 /**
@@ -647,133 +677,7 @@ export const LaCriptaStageSubjectPortrait: React.FC<{
   room: CriptaDungeonRoom;
   dungeon: CriptaDungeonDefinition;
 }> = ({ room, dungeon }) => {
-  const rType: CriptaCanonicalRoomType = room.type;
-  const subArch = room.encounterSubject?.archetype;
-
-  return (
-    <div className="relative flex flex-col items-center justify-center select-none">
-      <svg
-        width={228}
-        height={212}
-        viewBox="0 0 48 44"
-        shapeRendering="crispEdges"
-        className="drop-shadow-[0_14px_26px_rgba(0,0,0,0.95)] animate-cripta-sprite-idle"
-      >
-        {/* Ground Stone Dais */}
-        <rect x="6" y="37" width="36" height="4" fill={dungeon.palette.stoneLight} />
-        <rect x="4" y="40" width="40" height="3" fill={dungeon.palette.stoneDark} />
-        <rect x="10" y="36" width="28" height="1" fill={dungeon.palette.highlight} opacity="0.5" />
-
-        {rType === 'SHOP' && (
-          <g>
-            {/* Hooded Crypt Merchant & Golden Lantern */}
-            <rect x="16" y="8" width="16" height="10" fill="#2A1D3D" />
-            <rect x="18" y="11" width="12" height="7" fill="#0B0812" />
-            <rect x="20" y="13" width="2" height="2" fill="#FFD166" />
-            <rect x="26" y="13" width="2" height="2" fill="#FFD166" />
-            <rect x="13" y="18" width="22" height="19" fill="#3B2854" />
-            <rect x="17" y="19" width="14" height="18" fill="#241734" />
-            <rect x="22" y="18" width="4" height="19" fill="#E7A54A" />
-            {/* Hanging Lantern */}
-            <rect x="8" y="14" width="5" height="8" fill="#E7A54A" />
-            <rect x="9" y="16" width="3" height="4" fill="#FFF3C4" />
-            {/* Merchant Sack */}
-            <rect x="33" y="25" width="8" height="12" fill="#6E472B" />
-            <rect x="35" y="23" width="4" height="2" fill="#FFD166" />
-          </g>
-        )}
-
-        {(rType === 'TREASURE' || rType === 'LOOT') && (
-          <g>
-            {/* Large Ornate Runic Chest */}
-            <rect x="10" y="16" width="28" height="21" fill="#5E3A24" />
-            <rect x="10" y="14" width="28" height="4" fill="#E7A54A" />
-            <rect x="10" y="24" width="28" height="3" fill="#E7A54A" />
-            <rect x="21" y="21" width="6" height="8" fill="#FFD166" />
-            <rect x="23" y="23" width="2" height="4" fill="#0B0A0E" />
-            <rect x="14" y="9" width="3" height="3" fill="#FFD166" />
-            <rect x="23" y="6" width="3" height="3" fill="#FFF3C4" />
-            <rect x="32" y="9" width="3" height="3" fill="#FFD166" />
-          </g>
-        )}
-
-        {rType === 'REST' && (
-          <g>
-            {/* Large Sanctuary Bonfire & Campaign Anvil */}
-            <rect x="12" y="31" width="16" height="6" fill="#5E3A24" />
-            <rect x="14" y="18" width="12" height="14" fill="#C93B5B" />
-            <rect x="16" y="12" width="8" height="17" fill="#E7A54A" />
-            <rect x="18" y="16" width="4" height="11" fill="#FFF3C4" />
-            {/* Anvil next to fire */}
-            <rect x="30" y="26" width="11" height="5" fill="#69A8A5" />
-            <rect x="32" y="31" width="7" height="6" fill="#324B52" />
-            <rect x="19" y="7" width="2" height="3" fill="#FFD166" />
-          </g>
-        )}
-
-        {rType === 'SHRINE' && (
-          <g>
-            {/* Tall Gothic Altar Statue & Chalice */}
-            <rect x="16" y="8" width="16" height="29" fill="#3A304D" />
-            <rect x="19" y="11" width="10" height="26" fill="#261E35" />
-            <rect x="20" y="4" width="8" height="6" fill="#E7A54A" />
-            <rect x="22" y="15" width="4" height="12" fill="#FFD166" />
-            <rect x="18" y="19" width="12" height="4" fill="#FFD166" />
-          </g>
-        )}
-
-        {(rType === 'TRAP' || rType === 'PUZZLE') && (
-          <g>
-            {/* Ancient Runic Obelisk & Mechanism */}
-            <rect x="15" y="7" width="18" height="30" fill="#282039" />
-            <rect x="18" y="10" width="12" height="24" fill="#181224" />
-            <rect x="22" y="13" width="4" height="18" fill={dungeon.palette.highlight} />
-            <rect x="19" y="19" width="10" height="4" fill="#FFD166" />
-            <rect x="9" y="26" width="4" height="11" fill="#9A96A4" />
-            <rect x="35" y="26" width="4" height="11" fill="#9A96A4" />
-          </g>
-        )}
-
-        {(rType === 'EVENT' || rType === 'DECISION' || rType === 'SECRET') && (
-          <g>
-            {subArch === 'INJURED_HOUND' ? (
-              <>
-                {/* Loyal Crypt Hound Portrait */}
-                <rect x="14" y="20" width="20" height="12" fill="#5A4638" />
-                <rect x="28" y="14" width="9" height="9" fill="#6E5645" />
-                <rect x="33" y="16" width="2" height="2" fill="#FFD166" />
-                <rect x="15" y="32" width="4" height="5" fill="#423328" />
-                <rect x="28" y="32" width="4" height="5" fill="#423328" />
-                <rect x="26" y="19" width="4" height="10" fill="#E7A54A" />
-              </>
-            ) : (
-              <>
-                {/* Mysterious Hooded Pilgrim / Spectral Figure */}
-                <rect x="17" y="7" width="14" height="10" fill="#2E2240" />
-                <rect x="19" y="10" width="10" height="7" fill="#0B0812" />
-                <rect x="21" y="12" width="2" height="2" fill={dungeon.palette.highlight} />
-                <rect x="25" y="12" width="2" height="2" fill={dungeon.palette.highlight} />
-                <rect x="15" y="17" width="18" height="20" fill="#3B2C52" />
-                <rect x="22" y="17" width="4" height="20" fill="#E7A54A" />
-                <rect x="35" y="9" width="2" height="28" fill="#8C583A" />
-                <rect x="34" y="6" width="4" height="4" fill="#FFD166" />
-              </>
-            )}
-          </g>
-        )}
-
-        {(rType === 'COMBAT' || rType === 'ELITE' || rType === 'MINIBOSS' || rType === 'BOSS') && (
-          <g>
-            {/* Cleared Chamber Victory Spoils Banner & Sword in Stone */}
-            <rect x="22" y="8" width="4" height="22" fill="#D9D0BC" />
-            <rect x="17" y="14" width="14" height="3" fill="#E7A54A" />
-            <rect x="16" y="29" width="16" height="8" fill="#3A304D" />
-            <rect x="19" y="31" width="10" height="4" fill="#FFD166" />
-          </g>
-        )}
-      </svg>
-    </div>
-  );
+  return <LaCriptaAnimatedStageNpc room={room} dungeon={dungeon} />;
 };
 
 export const LaCriptaBiomeStageBackdrop: React.FC<{

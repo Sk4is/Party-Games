@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   CriptaPlayerStatusEffect,
   CriptaStatusEffectType,
 } from '../../types/laCripta';
 import { CRIPTA_STATUS_EFFECTS_REGISTRY } from '../../data/la-cripta/criptaStatusEffects';
+import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
 
 interface LaCriptaStatusPixelIconProps {
   effectType: CriptaStatusEffectType;
@@ -203,32 +204,63 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 interface LaCriptaStatusEffectBadgeProps {
-  status: CriptaPlayerStatusEffect;
+  status?: CriptaPlayerStatusEffect;
+  effect?: CriptaPlayerStatusEffect;
+  effectType?: CriptaStatusEffectType;
+  turnsRemaining?: number;
+  stacks?: number;
+  compactIconOnly?: boolean;
 }
 
 export const LaCriptaStatusEffectBadge: React.FC<LaCriptaStatusEffectBadgeProps> = ({
   status,
+  effect,
+  effectType: propEffectType,
+  turnsRemaining,
+  stacks,
+  compactIconOnly = false,
 }) => {
-  const [hovered, setHovered] = useState(false);
+  const resolved: CriptaPlayerStatusEffect | null =
+    status ||
+    effect ||
+    (propEffectType
+      ? {
+          id: `enemy_${propEffectType}`,
+          effectType: propEffectType,
+          label: CRIPTA_STATUS_EFFECTS_REGISTRY[propEffectType]?.name || propEffectType,
+          remainingTurns: turnsRemaining ?? 1,
+          stacks: stacks ?? 1,
+          isPositive: CRIPTA_STATUS_EFFECTS_REGISTRY[propEffectType]?.category === 'BUFF',
+        }
+      : null);
+  if (!resolved) return null;
 
   const effectType: CriptaStatusEffectType =
-    status.effectType ||
-    (status.code === 'LUZ' ? 'TORCH_LIGHT' : 'BLESSED');
+    resolved.effectType ||
+    (resolved.code === 'LUZ' ? 'TORCH_LIGHT' : 'BLESSED');
 
   const def =
     CRIPTA_STATUS_EFFECTS_REGISTRY[effectType] ||
     CRIPTA_STATUS_EFFECTS_REGISTRY.TORCH_LIGHT;
 
-  const isPermanent = def.durationRule === 'EXPEDITION' || status.remainingTurns >= 50;
+  const isPermanent =
+    def.durationRule === 'EXPEDITION' || resolved.remainingTurns >= 50;
+
+  const footerText = isPermanent
+    ? 'DURACIÓN: EXPEDICIÓN'
+    : `RESTANTE: ${resolved.remainingTurns} ${
+        resolved.remainingTurns === 1 ? 'TURNO' : 'TURNOS'
+      }${resolved.stacks > 1 ? ` · CARGAS: ${resolved.stacks}` : ''}`;
 
   return (
-    <div
-      className="relative inline-flex"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocus={() => setHovered(true)}
-      onBlur={() => setHovered(false)}
-      tabIndex={0}
+    <LaCriptaPixelTooltip
+      title={def.name}
+      category={CATEGORY_LABELS[def.category] || 'ESTADO'}
+      description={def.description}
+      footerLabel={footerText}
+      borderColor={def.visualTreatment.color}
+      accentColor={def.visualTreatment.color}
+      icon={<LaCriptaStatusPixelIcon effectType={effectType} size={12} />}
     >
       <div
         className="inline-flex items-center gap-1 px-1.5 py-0.5 border text-[8px] sm:text-[9px] font-cripta-pixel cursor-help transition-transform hover:scale-105"
@@ -239,53 +271,16 @@ export const LaCriptaStatusEffectBadge: React.FC<LaCriptaStatusEffectBadgeProps>
         }}
       >
         <LaCriptaStatusPixelIcon effectType={effectType} size={10} />
-        <span className="font-bold tracking-wider">{def.code}</span>
-        {status.stacks > 1 && (
-          <span className="text-[#FFF3C4]">x{status.stacks}</span>
+        {!compactIconOnly && (
+          <span className="font-bold tracking-wider">{def.code}</span>
         )}
-        {!isPermanent && status.remainingTurns > 0 && (
-          <span className="text-[#D9D0BC]/90">{status.remainingTurns}T</span>
+        {resolved.stacks > 1 && (
+          <span className="text-[#FFF3C4]">x{resolved.stacks}</span>
+        )}
+        {!isPermanent && resolved.remainingTurns > 0 && (
+          <span className="text-[#D9D0BC]/90">{resolved.remainingTurns}T</span>
         )}
       </div>
-
-      {/* Rich Dark-Fantasy Pixel Tooltip */}
-      {hovered && (
-        <div
-          role="tooltip"
-          className="pointer-events-none absolute bottom-full left-0 mb-2 w-56 sm:w-64 p-2.5 bg-[#09070D] border-2 shadow-[0_10px_28px_rgba(0,0,0,0.95)] z-50 text-left"
-          style={{ borderColor: def.visualTreatment.color }}
-        >
-          <div className="flex items-center justify-between gap-2 border-b border-[#282039] pb-1 mb-1">
-            <div className="flex items-center gap-1.5">
-              <LaCriptaStatusPixelIcon effectType={effectType} size={12} />
-              <span
-                className="font-cripta-pixel text-[11px] font-bold uppercase"
-                style={{ color: def.visualTreatment.color }}
-              >
-                {def.name}
-              </span>
-            </div>
-            <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 uppercase">
-              {CATEGORY_LABELS[def.category] || 'ESTADO'}
-            </span>
-          </div>
-
-          <p className="text-[10px] font-cripta-pixel text-[#D9D0BC] leading-snug">
-            {def.description}
-          </p>
-
-          <div className="mt-1.5 pt-1 border-t border-[#282039]/80 flex items-center justify-between text-[9px] font-cripta-pixel text-[#E7A54A]">
-            <span>
-              {isPermanent
-                ? 'DURACIÓN: EXPEDICIÓN'
-                : `RESTANTE: ${status.remainingTurns} ${
-                    status.remainingTurns === 1 ? 'TURNO' : 'TURNOS'
-                  }`}
-            </span>
-            {status.stacks > 1 && <span>CARGAS: {status.stacks}</span>}
-          </div>
-        </div>
-      )}
-    </div>
+    </LaCriptaPixelTooltip>
   );
 };
