@@ -139,7 +139,7 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
     expeditionState.phase === 'FINAL_BOSS_COMBAT';
 
   return (
-    <header className="relative z-30 w-full border-b border-[#282039] bg-[#09070D]/95 backdrop-blur-md shrink-0">
+    <header className="relative z-20 w-full border-b border-[#282039]/90 bg-[#07050B]/68 shrink-0">
       {inspectedRelic && (
         <LaCriptaRelicDetailModal
           relic={inspectedRelic}
@@ -386,7 +386,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
   return (
     <aside
       aria-label={isSolo ? 'Panel del aventurero' : 'Grupo de aventureros'}
-      className="relative z-30 w-full border-t border-[#E7A54A]/35 bg-[#09070D]/95 py-2 px-3 sm:px-5 shadow-[0_-10px_30px_rgba(0,0,0,0.92)] select-none shrink-0"
+      className="relative z-20 w-full border-t border-[#E7A54A]/35 bg-[#07050B]/70 py-2 px-3 sm:px-5 shadow-[0_-8px_24px_rgba(0,0,0,0.75)] select-none shrink-0"
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-[#E7A54A]/50 to-transparent" />
 

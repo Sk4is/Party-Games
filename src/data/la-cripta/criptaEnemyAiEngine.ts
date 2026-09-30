@@ -942,6 +942,10 @@ export function chooseEnemyTacticalAction(
 
   // 2. Filter abilities by cooldowns, charge limits, and tactical conditions
   const selfHpRatio = enemy.hp / Math.max(1, enemy.maxHp);
+  const maxAllowedHealsForEnemy =
+    enemy.isBoss || enemy.isFinalBoss || enemy.isMiniboss || enemy.isElite ? 2 : 1;
+  const totalHealsUsedSoFar = memory.abilityChargesUsed['__total_heals__'] || 0;
+
   const validAbilities = allAbilities.filter((ab) => {
     const cd = memory.abilityCooldowns[ab.id] || 0;
     if (cd > 0) return false;
@@ -955,10 +959,24 @@ export function chooseEnemyTacticalAction(
       return false;
     }
 
+    if (ab.actionKind === 'HEAL_SELF' || ab.actionKind === 'HEAL_ALLY') {
+      // Anti-stalemate & strict healing cap: no healing after Round 5, max 1-2 heals total, min 3-round cooldown
+      if (roundNum >= 6) return false;
+      if (totalHealsUsedSoFar >= maxAllowedHealsForEnemy) return false;
+      if (typeof enemy.healUsesRemaining === 'number' && enemy.healUsesRemaining <= 0) {
+        return false;
+      }
+      if ((enemy.healCooldownRounds || 0) > 0) return false;
+      if ((enemy.totalHealedThisCombat || 0) >= Math.round(enemy.maxHp * 0.26)) {
+        return false;
+      }
+    }
+
     if (ab.actionKind === 'HEAL_ALLY') {
       const woundedAllies = livingEnemies.filter(
         (e) =>
-          (e.maxHp - e.hp) / Math.max(1, e.maxHp) >= (ab.minAllyMissingHpRatio ?? 0.25)
+          (e.maxHp - e.hp) / Math.max(1, e.maxHp) >= (ab.minAllyMissingHpRatio ?? 0.32) &&
+          (e.totalHealedThisCombat || 0) < Math.round(e.maxHp * 0.26)
       );
       if (woundedAllies.length === 0) return false;
     }

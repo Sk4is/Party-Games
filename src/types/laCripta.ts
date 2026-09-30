@@ -34,6 +34,18 @@ export interface CriptaAbilityPlaceholder {
   id: string;
   name: string;
   type: 'ACTIVA' | 'PASIVA' | 'COOPERATIVA';
+  kind?: 'DAMAGE' | 'DEFEND' | 'HEAL' | 'DEBUFF' | 'BUFF' | 'UTILITY';
+  category?: CriptaActionCategory;
+  targetRule?: CriptaActionTargetRule;
+  apCost?: number;
+  dealsDamage?: boolean;
+  healsParty?: boolean;
+  power?: number;
+  shieldBonus?: number;
+  armorBreak?: number;
+  statusToApply?: CriptaStatusEffectType;
+  statusStacks?: number;
+  cleansesNegativeStatus?: boolean;
   description: string;
   cooldownTurns?: number;
 }
@@ -384,6 +396,23 @@ export type CriptaPlayerRoundActionType =
   | 'DEFEND'
   | 'PASS';
 
+export type CriptaActionCategory =
+  | 'ATTACK'
+  | 'DEFEND'
+  | 'HEAL'
+  | 'BUFF'
+  | 'DEBUFF'
+  | 'UTILITY'
+  | 'SUMMON_OR_SPECIAL';
+
+export type CriptaActionTargetRule =
+  | 'ENEMY_SINGLE'
+  | 'ENEMY_MULTI'
+  | 'ALL_ENEMIES'
+  | 'SELF'
+  | 'ALLY_SINGLE'
+  | 'ALL_ALLIES';
+
 export type CriptaWeaponId =
   | 'espada_oxidada'
   | 'baston_ceniza'
@@ -401,20 +430,32 @@ export type CriptaWeaponId =
   | 'ballesta_de_asedio'
   | 'simbolo_del_alba'
   | 'catalizador_esporas'
-  | 'pico_de_minero_runico';
+  | 'pico_de_minero_runico'
+  | 'alabarda_del_juramento'
+  | 'cetro_del_eclipse'
+  | 'estoque_carmesi'
+  | 'guadana_del_verdugo'
+  | 'relicario_serafin'
+  | 'martillo_del_juicio'
+  | 'canon_de_azufre'
+  | 'guantelete_mutageno';
 
 export type CriptaArmorId =
   | 'jubon_desgastado'
   | 'cota_de_malla_cripta'
   | 'coraza_del_sepulturero'
   | 'tunica_del_astrologo'
-  | 'armadura_escamas_fungicas';
+  | 'armadura_escamas_fungicas'
+  | 'manto_de_sombra_real'
+  | 'placas_del_juramento';
 
 export type CriptaAccessoryId =
   | 'anillo_del_boticario'
   | 'colgante_de_cristal'
   | 'sello_del_cazador'
-  | 'espejo_roto_accesorio';
+  | 'espejo_roto_accesorio'
+  | 'amuleto_rompeescudos'
+  | 'reloj_de_arena_astral';
 
 export type CriptaWeaponFamily =
   | 'SWORD'
@@ -425,19 +466,29 @@ export type CriptaWeaponFamily =
   | 'STAFF'
   | 'MACE'
   | 'ALCHEMICAL'
-  | 'PICKAXE';
+  | 'PICKAXE'
+  | 'HALBERD'
+  | 'RELIC_TOME';
 
 export interface CriptaWeaponSpecialAttack {
   id: string;
   name: string;
   description: string;
-  targetRule: 'SINGLE' | 'CLEAVE_2' | 'CHAIN_2' | 'ALL_ENEMIES';
+  category?: CriptaActionCategory;
+  apCost?: number;
+  dealsDamage?: boolean;
+  targetRule: 'SINGLE' | 'CLEAVE_2' | 'CHAIN_2' | 'ALL_ENEMIES' | 'SELF' | 'ALL_ALLIES';
   cooldownRounds: number;
   damageMultiplier: number;
   secondaryMultiplier?: number;
   appliesStatus?: CriptaStatusEffectType;
+  statusStacks?: number;
   partyHealBase?: number;
+  partyShieldBase?: number;
   armorPierce?: number;
+  armorBreak?: number;
+  lifestealFraction?: number;
+  bonusVsDebuffedPct?: number;
 }
 
 export interface CriptaWeaponDefinition {
@@ -569,6 +620,10 @@ export type CriptaRoomEnemy = {
   approxMinDamage?: number;
   approxMaxDamage?: number;
   magicResistance?: number;
+  healUsesRemaining?: number;
+  healCooldownRounds?: number;
+  totalHealedThisCombat?: number;
+  counterStanceActive?: boolean;
   spriteArchetype:
     | 'skeleton_warrior'
     | 'plague_bloom'
@@ -701,7 +756,12 @@ export interface CriptaRoomGroundDrop {
 
 export interface CriptaShopSlot {
   id: string;
+  slotId?: string;
   kind: 'ITEM' | 'RELIC' | 'WEAPON' | 'ARMOR' | 'ACCESSORY' | 'FORGE_UPGRADE';
+  name?: string;
+  category?: string;
+  rarity?: string;
+  description?: string;
   itemId?: CriptaItemId;
   relicId?: CriptaRelicId;
   weaponId?: CriptaWeaponId;
@@ -709,6 +769,7 @@ export interface CriptaShopSlot {
   accessoryId?: CriptaAccessoryId;
   priceGold: number;
   soldOut: boolean;
+  sold?: boolean;
   buyerName?: string;
 }
 
@@ -762,6 +823,30 @@ export interface CriptaRoomInteractiveOption {
   resolved: boolean;
 }
 
+export type CriptaMinigameKind =
+  | 'RUNE_MEMORY'
+  | 'LOCKPICK_TUMBLER'
+  | 'TRAP_STEPPING_STONES'
+  | 'SOUL_WHEEL';
+
+export interface CriptaRoomMinigameState {
+  kind: CriptaMinigameKind;
+  title: string;
+  instructions: string;
+  completed: boolean;
+  failed: boolean;
+  step: number;
+  maxSteps: number;
+  attemptsLeft: number;
+  targetPattern: number[];
+  currentProgress: number[];
+  lastOutcomeText?: string;
+  rewardGold?: number;
+  rewardRelicId?: CriptaRelicId;
+  rewardItemId?: CriptaItemId;
+  rewardWeaponId?: CriptaWeaponId;
+}
+
 export interface CriptaDungeonRoom {
   id: string;
   index: number; // 0-indexed position in sequence
@@ -777,6 +862,13 @@ export interface CriptaDungeonRoom {
   narrative: string;
   outcomeLog: string | null;
   biomeVariant: number;
+  minigame?: CriptaRoomMinigameState;
+  shopRerollCount?: number;
+  shopSlots?: CriptaShopSlot[];
+  roundNumber?: number;
+  hasSecretEntrance?: boolean;
+  secretDiscovered?: boolean;
+  secretClueText?: string;
   encounterSubject?: {
     archetype: CriptaEncounterSubjectArchetype;
     name: string;
@@ -993,6 +1085,10 @@ export interface CriptaPlayer {
   equippedWeaponId?: CriptaWeaponId | null;
   weaponUpgradeLevel?: 1 | 2 | 3;
   weaponSpecialCooldown?: number;
+  abilityCooldown?: number;
+  abilityCooldowns?: Record<string, number>;
+  basicAttackUsedThisTurn?: boolean;
+  learnedTechniqueIds?: string[];
   /** Equipped Armor & Accessory slots */
   equippedArmorId?: CriptaArmorId | null;
   equippedAccessoryId?: CriptaAccessoryId | null;
@@ -1196,6 +1292,14 @@ export type CriptaClientMessage =
   | {
       type: 'ROOM_PUZZLE_INPUT';
       runeIndex: number;
+    }
+  | {
+      type: 'ROOM_MINIGAME_ACTION';
+      actionIndex: number;
+      precisionScore?: number;
+    }
+  | {
+      type: 'SHOP_REROLL';
     }
   | {
       type: 'ROOM_DISCOVER_SECRET';

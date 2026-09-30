@@ -6,7 +6,10 @@ import {
   CriptaSpriteAnimationState,
   CriptaVisualEvent,
 } from '../../types/laCripta';
-import { CRIPTA_CURSOR_COLORS } from '../../data/la-cripta/criptaCatalog';
+import {
+  CRIPTA_CURSOR_COLORS,
+  CRIPTA_DUNGEONS_REGISTRY,
+} from '../../data/la-cripta/criptaCatalog';
 import { useLaCriptaSocket } from '../../hooks/useLaCriptaSocket';
 import { LaCriptaCursorOverlay } from './LaCriptaCursorOverlay';
 import { LaCriptaTopBar, LaCriptaPartyHud } from './LaCriptaPartyHud';
@@ -14,6 +17,10 @@ import { LaCriptaLobbyView } from './LaCriptaLobbyView';
 import { LaCriptaThreeDoorsScene } from './LaCriptaThreeDoorsScene';
 import { CriptaContextualPanelMode } from './LaCriptaSidePanels';
 import { LaCriptaCrtOverlay } from './LaCriptaCrtOverlay';
+import {
+  LaCriptaForegroundBiomeParticles,
+  LaCriptaFullScreenBiomeAtmosphere,
+} from './LaCriptaEncounterCards';
 import {
   LaCriptaInventoryFullModal,
   LaCriptaRelicRevealBanner,
@@ -433,15 +440,74 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
       expeditionState.phase !== 'RUN_VICTORY'
   );
 
+  const activeAtmosphereDungeon = useMemo(() => {
+    if (!expeditionState) return CRIPTA_DUNGEONS_REGISTRY.catacumbas_del_rey;
+    if (
+      expeditionState.phase === 'FINAL_BOSS_ENTRANCE' ||
+      expeditionState.phase === 'FINAL_BOSS_COMBAT'
+    ) {
+      return (
+        CRIPTA_DUNGEONS_REGISTRY.el_abismo ||
+        CRIPTA_DUNGEONS_REGISTRY.catacumbas_del_rey
+      );
+    }
+    if (
+      expeditionState.selectedDungeonId &&
+      CRIPTA_DUNGEONS_REGISTRY[expeditionState.selectedDungeonId]
+    ) {
+      return CRIPTA_DUNGEONS_REGISTRY[expeditionState.selectedDungeonId];
+    }
+    const firstOffered = expeditionState.offeredDungeons?.[0];
+    if (firstOffered && CRIPTA_DUNGEONS_REGISTRY[firstOffered]) {
+      return CRIPTA_DUNGEONS_REGISTRY[firstOffered];
+    }
+    return CRIPTA_DUNGEONS_REGISTRY.catacumbas_del_rey;
+  }, [
+    expeditionState?.phase,
+    expeditionState?.selectedDungeonId,
+    expeditionState?.offeredDungeons,
+  ]);
+
+  const activeAtmosphereRoomType = useMemo(() => {
+    if (!expeditionState) return undefined;
+    if (expeditionState.phase === 'FINAL_BOSS_COMBAT') return 'BOSS' as const;
+    const seq = expeditionState.roomSequence || [];
+    const idx = expeditionState.currentRoomIndex ?? 0;
+    const room =
+      expeditionState.inSecretRoom && expeditionState.discoveredSecretRoom
+        ? expeditionState.discoveredSecretRoom
+        : seq[idx];
+    return room?.type;
+  }, [
+    expeditionState?.phase,
+    expeditionState?.roomSequence,
+    expeditionState?.currentRoomIndex,
+    expeditionState?.inSecretRoom,
+    expeditionState?.discoveredSecretRoom,
+  ]);
+
   return (
     <div
       onPointerMove={handlePointerMove}
-      className={`relative w-full bg-[#0B0A0E] text-[#D9D0BC] flex flex-col justify-between overflow-x-hidden selection:bg-[#E7A54A] selection:text-[#0B0A0E] ${
+      className={`relative w-full bg-[#06080D] text-[#D9D0BC] flex flex-col justify-between overflow-x-hidden selection:bg-[#E7A54A] selection:text-[#0B0A0E] ${
         isFullViewportGame
           ? 'h-[100dvh] max-h-[100dvh] overflow-hidden'
           : 'min-h-screen'
       }`}
     >
+      {/* 1-4. FULL-VIEWPORT BIOME ATMOSPHERE + DISTANT PARTICLES + MIST/LIGHT + MID-DISTANCE PARTICLES */}
+      {isFullViewportGame && activeAtmosphereDungeon && (
+        <LaCriptaFullScreenBiomeAtmosphere
+          dungeon={activeAtmosphereDungeon}
+          roomType={activeAtmosphereRoomType}
+        />
+      )}
+
+      {/* 7. VERY RARE SUBTLE FOREGROUND PARTICLES (3-5 low-opacity particles crossing in front of UI, behind modals/tooltips) */}
+      {isFullViewportGame && activeAtmosphereDungeon && (
+        <LaCriptaForegroundBiomeParticles dungeon={activeAtmosphereDungeon} />
+      )}
+
       {/* Subtle Fantasy Arcade CRT Scanline Overlay (pointer-events: none) */}
       <LaCriptaCrtOverlay />
 

@@ -1,11 +1,15 @@
 import type {
   CriptaCanonicalRoomType,
+  CriptaCharacterId,
   CriptaDungeonId,
   CriptaDungeonLengthTier,
   CriptaDungeonRoom,
+  CriptaRelicId,
   CriptaRoomEnemy,
   CriptaRoomInteractiveOption,
+  CriptaRoomMinigameState,
   CriptaRoomNode,
+  CriptaWeaponId,
 } from '../../types/laCripta';
 import { CRIPTA_DUNGEONS_REGISTRY } from './criptaCatalog';
 import {
@@ -690,9 +694,9 @@ function buildInteractiveOptionsForRoom(
         {
           id: `opt_${roomIndex}_rest_heal`,
           label: 'DESCANSAR JUNTO A LA HOGUERA DE ALMAS',
-          subtitle: 'El fuego cálido disipa las aflicciones y reanima a los caídos',
-          effectText: 'REVIVE ALIADOS CAÍDOS (50% PV) · CURA +30% VIDA Y PURIFICA ESTADOS',
-          isReviveOption: true,
+          subtitle: 'El fuego cálido restaura la vitalidad y disipa las aflicciones',
+          effectText: 'CURA +35% VIDA MÁXIMA · PURIFICA ESTADOS NEGATIVOS Y OTORGA ESCUDO (+4)',
+          isReviveOption: false,
           riskLabel: 'PARECE SEGURO',
           ownershipScope: 'GRUPO',
           iconKey: 'flame',
@@ -711,16 +715,27 @@ function buildInteractiveOptionsForRoom(
           usedByPlayerIds: [],
           resolved: false,
         },
+        {
+          id: `opt_${roomIndex}_rest_train`,
+          label: 'ENTRENAR TÉCNICA Y TEMPLE TÁCTICO',
+          subtitle: 'Practicar maniobras de guardia y coordinación junto a las brasas',
+          effectText: '+1 ATAQUE · +1 DEFENSA · OTORGA BENDECIDO (2 TURNOS) A TODO EL GRUPO',
+          riskLabel: 'PARECE SEGURO',
+          ownershipScope: 'GRUPO',
+          iconKey: 'shield',
+          usedByPlayerIds: [],
+          resolved: false,
+        },
       ];
 
     case 'SHRINE':
       return [
         {
           id: `opt_${roomIndex}_shrine_blessing`,
-          label: 'PLEGARIA DE RESURRECCIÓN Y GRACIA',
-          subtitle: 'Invocar la luz del santuario sobre vivos y caídos',
-          effectText: 'REVIVE CAÍDOS (60% PV) · +1 MAGIA · +18 VIDA, PURIFICA Y OTORGA BENDECIDO',
-          isReviveOption: true,
+          label: 'PLEGARIA DE LUZ Y AMPARO SAGRADO',
+          subtitle: 'Invocar la gracia del santuario para bendecir y sanar al grupo',
+          effectText: '+1 MAGIA · CURA +18 VIDA · PURIFICA AFLICCIONES Y OTORGA BENDECIDO (2T)',
+          isReviveOption: false,
           recommendedClass: 'clerigo',
           recommendedStat: 'MAGIA',
           recommendedStatLevel: 6,
@@ -754,18 +769,6 @@ function buildInteractiveOptionsForRoom(
           costGold: 24,
           ownershipScope: 'GRUPO',
           iconKey: 'potion',
-          usedByPlayerIds: [],
-          resolved: false,
-        },
-        {
-          id: `opt_${roomIndex}_shop_revive`,
-          label: 'CENIZA DEL FÉNIX SEPULCRAL',
-          subtitle: 'Reliquia de resurrección y amparo sagrado',
-          effectText: 'REVIVE A TODOS LOS ALIADOS CAÍDOS (60% PV) Y OTORGA ESCUDO AL GRUPO',
-          costGold: 20,
-          isReviveOption: true,
-          ownershipScope: 'GRUPO',
-          iconKey: 'flame',
           usedByPlayerIds: [],
           resolved: false,
         },
@@ -822,10 +825,10 @@ function buildInteractiveOptionsForRoom(
         },
         {
           id: `opt_${roomIndex}_event_respect`,
-          label: 'ROMPER LAS CADENAS Y FORJAR ALIANZA',
-          subtitle: 'Liberar al prisionero o reclamar el acero del pedestal',
-          effectText: 'REVIVE ALIADOS CAÍDOS (45% PV) · EQUIPA ARMA NUEVA Y MEJORA EXPEDICIÓN',
-          isReviveOption: true,
+          label: 'RECLAMAR EL ACERO DEL PEDESTAL',
+          subtitle: 'Romper el sello marcial y tomar el armamento consagrado',
+          effectText: 'EQUIPA ARMA NUEVA DE CLASE · +1 ATAQUE Y ESCUDO DE COMBATE',
+          isReviveOption: false,
           grantsWeaponId: droppedWeaponId,
           recommendedClass: 'caballero',
           recommendedStat: 'ATAQUE',
@@ -889,8 +892,8 @@ function buildInteractiveOptionsForRoom(
           id: `opt_${roomIndex}_secret_hoard`,
           label: `RECLAMAR TESORO PROHIBIDO DE ${dungeon.name}`,
           subtitle: 'Cámara oculta intacta durante siglos',
-          effectText: 'REVIVE CAÍDOS · EQUIPA ARMA RARA · MEJORA ARMA · +60 ORO Y +20 VIDA',
-          isReviveOption: true,
+          effectText: 'EQUIPA ARMA RARA · MEJORA ARMA · +60 ORO · +20 VIDA Y RELIQUIA',
+          isReviveOption: false,
           isWeaponUpgradeOption: true,
           grantsWeaponId: droppedWeaponId,
           riskLabel: 'PARECE SEGURO',
@@ -906,6 +909,99 @@ function buildInteractiveOptionsForRoom(
   }
 }
 
+const RUNES_ORDER_NAMES = ['SOL', 'LUNA', 'VACIO', 'SANGRE'] as const;
+
+function buildRoomMinigameForRoom(
+  dungeonId: CriptaDungeonId,
+  roomType: CriptaCanonicalRoomType,
+  roomIndex: number,
+  rng: () => number,
+  droppedWeaponId: CriptaWeaponId
+): CriptaRoomMinigameState | undefined {
+  const p0 = Math.floor(rng() * 4) % 4;
+  const p1 = (p0 + 1 + (Math.floor(rng() * 3) % 3)) % 4;
+  const p2 = (p1 + 1 + (Math.floor(rng() * 3) % 3)) % 4;
+
+  if (roomType === 'PUZZLE') {
+    const runeClue = `${RUNES_ORDER_NAMES[p0]} → ${RUNES_ORDER_NAMES[p1]} → ${RUNES_ORDER_NAMES[p2]}`;
+    return {
+      kind: 'RUNE_MEMORY',
+      title: 'OBELISCO DE MEMORIA RÚNICA',
+      instructions: `Inscripción del Altar: "${runeClue}". Pulsa los 4 glifos en el orden exacto para desbloquear la reliquia.`,
+      completed: false,
+      failed: false,
+      step: 0,
+      maxSteps: 3,
+      attemptsLeft: 2,
+      targetPattern: [p0, p1, p2],
+      currentProgress: [],
+      rewardGold: 36,
+    };
+  }
+
+  if (roomType === 'TREASURE') {
+    const sweetSpot0 = 1 + (Math.floor(rng() * 3) % 3); // 1..3
+    const sweetSpot1 = 1 + ((sweetSpot0 + 1) % 3);
+    const sweetSpot2 = 1 + ((sweetSpot1 + 1) % 3);
+    return {
+      kind: 'LOCKPICK_TUMBLER',
+      title: 'CERROJO MAESTRO DE TRES PERNOS',
+      instructions:
+        'Alinea los 3 pernos del cofre deteniendo el tensor en la Zona Dorada para obtener Botín Maestro (+Reliquia y +Arma de Clase).',
+      completed: false,
+      failed: false,
+      step: 0,
+      maxSteps: 3,
+      attemptsLeft: 2,
+      targetPattern: [sweetSpot0, sweetSpot1, sweetSpot2],
+      currentProgress: [],
+      rewardGold: 45,
+      rewardWeaponId: droppedWeaponId,
+    };
+  }
+
+  if (roomType === 'TRAP') {
+    const safeTile0 = Math.floor(rng() * 3) % 3;
+    const safeTile1 = (safeTile0 + 1 + (roomIndex % 2)) % 3;
+    const safeTile2 = (safeTile1 + 1) % 3;
+    return {
+      kind: 'TRAP_STEPPING_STONES',
+      title: 'PASO DE LOSAS DE PRESIÓN',
+      instructions: `Pista de losas grabadas: Columna ${safeTile0 + 1} → Columna ${
+        safeTile1 + 1
+      } → Columna ${safeTile2 + 1}. Cruza los 3 tramos sin activar las cuchillas.`,
+      completed: false,
+      failed: false,
+      step: 0,
+      maxSteps: 3,
+      attemptsLeft: 2,
+      targetPattern: [safeTile0, safeTile1, safeTile2],
+      currentProgress: [],
+      rewardGold: 30,
+    };
+  }
+
+  if (roomType === 'EVENT' || roomType === 'SHRINE') {
+    return {
+      kind: 'SOUL_WHEEL',
+      title: 'RUEDA DEL CÁLIZ ABISAL',
+      instructions:
+        'Haz girar la Rueda de las Ánimas y detenla en el Sello Dorado para reclamar una bendición mayor o reliquia.',
+      completed: false,
+      failed: false,
+      step: 0,
+      maxSteps: 1,
+      attemptsLeft: 1,
+      targetPattern: [dungeonId.length % 4],
+      currentProgress: [],
+      rewardGold: 35,
+      rewardWeaponId: droppedWeaponId,
+    };
+  }
+
+  return undefined;
+}
+
 export interface GeneratedProceduralDungeon {
   dungeonId: CriptaDungeonId;
   seed: number;
@@ -919,7 +1015,10 @@ export function generateProceduralDungeon(
   dungeonId: CriptaDungeonId,
   seed: number,
   playerCount = 1,
-  hasDiscountRelic = false
+  hasDiscountRelic = false,
+  preferredClassIds: CriptaCharacterId[] = [],
+  excludedRelicIds: CriptaRelicId[] = [],
+  excludedWeaponIds: CriptaWeaponId[] = []
 ): GeneratedProceduralDungeon {
   const dungeon = CRIPTA_DUNGEONS_REGISTRY[dungeonId];
   const config = DUNGEON_GENERATION_CONFIGS[dungeonId] || DUNGEON_GENERATION_CONFIGS.catacumbas_del_rey;
@@ -1056,15 +1155,41 @@ export function generateProceduralDungeon(
         : [];
     const shopInventory =
       rType === 'SHOP'
-        ? generateShopInventoryForRoom(seed, idx, hasDiscountRelic)
+        ? generateShopInventoryForRoom(
+            seed,
+            idx,
+            hasDiscountRelic,
+            preferredClassIds,
+            excludedRelicIds,
+            excludedWeaponIds,
+            0
+          )
         : undefined;
 
-    // 3-rune sequence for PUZZLE rooms
+    const roomDroppedWeaponId = pickWeaponDropForDungeon(
+      dungeonId,
+      idx,
+      rType === 'TREASURE' || rType === 'SECRET',
+      preferredClassIds
+    );
+
+    const minigame = buildRoomMinigameForRoom(
+      dungeonId,
+      rType,
+      idx,
+      rng,
+      roomDroppedWeaponId
+    );
+
+    // 3-rune sequence for PUZZLE rooms (matching RUNE_MEMORY minigame pattern)
     const puzzleRunes =
-      rType === 'PUZZLE'
+      rType === 'PUZZLE' && minigame
         ? {
-            sequence: [0, 1, 2],
+            sequence: minigame.targetPattern.map(
+              (pIdx) => RUNES_ORDER_NAMES[pIdx] || 'SOL'
+            ) as unknown as number[],
             currentInput: [],
+            attemptsLeft: 2,
             solved: false,
           }
         : undefined;
@@ -1115,7 +1240,10 @@ export function generateProceduralDungeon(
       options,
       groundDrops: [],
       shopInventory,
+      shopSlots: shopInventory,
+      shopRerollCount: rType === 'SHOP' ? 0 : undefined,
       shopPurchaseHistory: rType === 'SHOP' ? [] : undefined,
+      minigame,
       puzzleRunes,
       combatTurn: isCombatLike ? 1 : undefined,
       combatRoundPhase: isCombatLike ? 'PLAYER_PHASE' : undefined,

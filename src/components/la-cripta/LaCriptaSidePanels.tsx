@@ -765,33 +765,46 @@ export const LaCriptaContextualSidePanel: React.FC<
                           </div>
                           <div className="text-right shrink-0 font-cripta-pixel text-[9px]">
                             <div className="text-[#FF8FA3] font-bold">
-                              {formatDamageRange(specialDmgEst.min, specialDmgEst.max)}
+                              {eqWeapon.weapon.specialAttack.dealsDamage === false
+                                ? `+${eqWeapon.weapon.specialAttack.partyHealBase || 14} PV`
+                                : formatDamageRange(specialDmgEst.min, specialDmgEst.max)}
                             </div>
                             <div className="text-[#D8C6A0]/65">
-                              CD {eqWeapon.weapon.specialAttack.cooldownRounds}
+                              {(inspectedPlayer.weaponSpecialCooldown || 0) > 0
+                                ? `RECARGA: ${inspectedPlayer.weaponSpecialCooldown}T`
+                                : `CD ${eqWeapon.weapon.specialAttack.cooldownRounds}T`}
                             </div>
                           </div>
                         </div>
 
                         {/* Class Abilities */}
-                        {(charDef?.abilities || []).map((ab) => (
-                          <div
-                            key={ab.id}
-                            className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2"
-                          >
-                            <div className="min-w-0">
-                              <div className="font-cripta-display text-xs font-bold text-[#C8A6F5] uppercase">
-                                {ab.name}
+                        {(charDef?.abilities || []).map((ab) => {
+                          const liveCd = inspectedPlayer.abilityCooldowns?.[ab.id] || 0;
+                          return (
+                            <div
+                              key={ab.id}
+                              className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0">
+                                <div className="font-cripta-display text-xs font-bold text-[#C8A6F5] uppercase">
+                                  {ab.name}
+                                </div>
+                                <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/80">
+                                  {ab.description}
+                                </div>
                               </div>
-                              <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/80">
-                                {ab.description}
-                              </div>
+                              <span
+                                className={`px-1.5 py-0.5 border text-[8px] font-cripta-pixel shrink-0 ${
+                                  liveCd > 0
+                                    ? 'bg-[#2A141D] border-[#C93B5B] text-[#FF8FA3]'
+                                    : 'bg-[#1F162E] border-[#4A3B5C] text-[#D8C6A0]'
+                                }`}
+                              >
+                                {liveCd > 0 ? `RECARGA ${liveCd}T` : `CD ${ab.cooldownTurns}T`}
+                              </span>
                             </div>
-                            <span className="px-1.5 py-0.5 bg-[#1F162E] border border-[#4A3B5C] text-[8px] font-cripta-pixel text-[#D8C6A0] shrink-0">
-                              CD {ab.cooldownTurns}
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -973,6 +986,7 @@ export const LaCriptaContextualSidePanel: React.FC<
                       <div className="absolute inset-0 opacity-65 pointer-events-none">
                         <LaCriptaBiomeStageBackdrop
                           dungeon={resolvedDungeon}
+                          transparentSkybox={false}
                           isBossOrMiniboss={Boolean(
                             inspectedEnemy.isBoss ||
                               inspectedEnemy.isFinalBoss ||

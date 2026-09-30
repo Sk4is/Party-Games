@@ -2,6 +2,7 @@ import type {
   CriptaAccessoryId,
   CriptaAcquiredRelic,
   CriptaArmorId,
+  CriptaCharacterId,
   CriptaDungeonId,
   CriptaDungeonRoom,
   CriptaItemDefinition,
@@ -505,118 +506,456 @@ export function rollEnemyLootDrop(
 export function generateShopInventoryForRoom(
   seed: number,
   roomIndex: number,
-  hasDiscountRelic = false
+  hasDiscountRelic = false,
+  preferredClassIds: CriptaCharacterId[] = [],
+  excludedRelicIds: CriptaRelicId[] = [],
+  excludedWeaponIds: CriptaWeaponId[] = [],
+  rerollStep = 0
 ): CriptaShopSlot[] {
-  const stepBase = roomIndex * 131 + 43;
+  const stepBase = roomIndex * 131 + rerollStep * 271 + 43;
   const discountMult = hasDiscountRelic ? 0.75 : 1;
 
-  // Slot 1: Healing (Venda or Poción de Curación)
-  const healPool: CriptaItemId[] = ['venda', 'pocion_curacion', 'pocion_mayor'];
-  const hId = healPool[Math.floor(pseudoRandom(seed, stepBase + 1) * healPool.length)];
+  // Slot 1: Healing or Recovery Consumable
+  const healPool: CriptaItemId[] = ['venda', 'pocion_curacion', 'pocion_mayor', 'sal_purificadora'];
+  const hId =
+    healPool[
+      (Math.floor(pseudoRandom(seed, stepBase + 1) * healPool.length) + rerollStep) %
+        healPool.length
+    ];
   const hDef = CRIPTA_ITEMS_REGISTRY[hId];
 
-  // Slot 2: Cleanse (Antídoto, Tónico, Ungüento, Sal)
-  const cleansePool: CriptaItemId[] = [
+  // Slot 2: Tactical Utility / Cleanse / Elixir / Bomb Consumable (never identical to Slot 1)
+  const tacticalItemPool: CriptaItemId[] = [
     'antidoto',
     'tonico_claridad',
     'unguento_igneo',
-    'sal_purificadora',
+    'elixir_fuerza',
+    'elixir_hierro',
+    'elixir_arcano',
+    'bomba_humo',
+    'frasco_volatil',
   ];
-  const cId = cleansePool[Math.floor(pseudoRandom(seed, stepBase + 2) * cleansePool.length)];
+  const cId =
+    tacticalItemPool[
+      (Math.floor(pseudoRandom(seed, stepBase + 2) * tacticalItemPool.length) +
+        rerollStep * 2) %
+        tacticalItemPool.length
+    ];
   const cDef = CRIPTA_ITEMS_REGISTRY[cId];
 
-  // Slot 3: Weapon for sale
-  const shopWeaponPool: Array<{ id: CriptaWeaponId; price: number }> = [
-    { id: 'espada_del_sepulcro', price: 56 },
-    { id: 'vara_de_cristal_astral', price: 58 },
-    { id: 'hojas_colmillo_venenoso', price: 58 },
-    { id: 'arco_de_espinas', price: 58 },
-    { id: 'pico_de_minero_runico', price: 52 },
-    { id: 'espadon_del_rey_hundido', price: 78 },
-    { id: 'hacha_forja_infernal', price: 76 },
-    { id: 'grimorio_prohibido_arma', price: 80 },
-    { id: 'ballesta_de_asedio', price: 76 },
-    { id: 'simbolo_del_alba', price: 76 },
-    { id: 'catalizador_esporas', price: 74 },
+  // Slot 3: Class-aware Weapon for sale (drawn from full 19 non-starter weapons)
+  const shopWeaponPool: Array<{
+    id: CriptaWeaponId;
+    name: string;
+    rarity: string;
+    description: string;
+    classes: CriptaCharacterId[];
+    price: number;
+  }> = [
+    {
+      id: 'espada_del_sepulcro',
+      name: 'Espada del Sepulcro',
+      rarity: 'POCO COMÚN',
+      description: '6–8 DAÑO (ATQ) · +20% vs No-Muertos · Técnica: Tajo Consagrado.',
+      classes: ['caballero'],
+      price: 56,
+    },
+    {
+      id: 'espadon_del_rey_hundido',
+      name: 'Espadón del Rey Hundido',
+      rarity: 'RARA',
+      description: '7–10 DAÑO (ATQ) · +2 ATQ · Técnica: Marea del Rey Hundido (2 obj.).',
+      classes: ['caballero'],
+      price: 78,
+    },
+    {
+      id: 'hacha_forja_infernal',
+      name: 'Hacha de la Forja Infernal',
+      rarity: 'RARA',
+      description: '7–9 DAÑO (ATQ) · Aplica Quemadura · Técnica: Hendidura Ígnea.',
+      classes: ['caballero', 'cazador'],
+      price: 76,
+    },
+    {
+      id: 'alabarda_del_juramento',
+      name: 'Alabarda del Juramento',
+      rarity: 'LEGENDARIA',
+      description: '8–12 DAÑO (ATQ) · +3 ATQ, +2 DEF · Técnica: Barrido del Bastión (Área + Escudo).',
+      classes: ['caballero'],
+      price: 96,
+    },
+    {
+      id: 'vara_de_cristal_astral',
+      name: 'Vara de Cristal Astral',
+      rarity: 'POCO COMÚN',
+      description: '5–8 DAÑO (MAG) · +1 MAG, +8% Crítico · Técnica: Rayo Prismático.',
+      classes: ['mago', 'clerigo'],
+      price: 58,
+    },
+    {
+      id: 'grimorio_prohibido_arma',
+      name: 'Códice de las Sombras',
+      rarity: 'RARA',
+      description: '6–9 DAÑO (MAG) · +2 MAG · Técnica: Tormenta del Vacío (Área).',
+      classes: ['mago', 'alquimista'],
+      price: 80,
+    },
+    {
+      id: 'cetro_del_eclipse',
+      name: 'Cetro del Eclipse Abisal',
+      rarity: 'LEGENDARIA',
+      description: '8–11 DAÑO (MAG) · +3 MAG, +12% Crítico · Técnica: Supernova del Umbral.',
+      classes: ['mago'],
+      price: 98,
+    },
+    {
+      id: 'hojas_colmillo_venenoso',
+      name: 'Hojas Colmillo Venenoso',
+      rarity: 'POCO COMÚN',
+      description: '5–7 DAÑO (ATQ) · +12% Crítico, aplica Veneno · Técnica: Doble Colmillo.',
+      classes: ['picaro'],
+      price: 58,
+    },
+    {
+      id: 'estoque_carmesi',
+      name: 'Estoque Carmesí',
+      rarity: 'RARA',
+      description: '7–10 DAÑO (ATQ) · +2 ATQ, +18% Crítico · Técnica: Estocada Imperial (Perfora DEF).',
+      classes: ['picaro'],
+      price: 84,
+    },
+    {
+      id: 'guadana_del_verdugo',
+      name: 'Guadaña de Sombra Real',
+      rarity: 'LEGENDARIA',
+      description: '9–12 DAÑO (ATQ) · +3 ATQ, +20% Crítico · Técnica: Cosecha de Sombras.',
+      classes: ['picaro', 'cazador'],
+      price: 98,
+    },
+    {
+      id: 'arco_de_espinas',
+      name: 'Arco de Espinas Vivas',
+      rarity: 'POCO COMÚN',
+      description: '6–8 DAÑO (ATQ) · Aplica Sangrado · Técnica: Lluvia de Espinas (2 obj.).',
+      classes: ['cazador'],
+      price: 58,
+    },
+    {
+      id: 'ballesta_de_asedio',
+      name: 'Ballesta de Asedio',
+      rarity: 'RARA',
+      description: '7–10 DAÑO (ATQ) · +2 ATQ · Técnica: Virote Perforante (Ignora 3 DEF).',
+      classes: ['cazador', 'picaro'],
+      price: 76,
+    },
+    {
+      id: 'canon_de_azufre',
+      name: 'Cañón de Azufre Rúnico',
+      rarity: 'LEGENDARIA',
+      description: '9–13 DAÑO (ATQ) · +3 ATQ, +15% Crítico · Técnica: Andanada de Asedio (Área).',
+      classes: ['cazador'],
+      price: 96,
+    },
+    {
+      id: 'martillo_del_juicio',
+      name: 'Martillo del Juicio Consagrado',
+      rarity: 'POCO COMÚN',
+      description: '6–8 DAÑO (MAG) · +2 DEF, +25% vs No-Muertos · Técnica: Sentencia de Luz.',
+      classes: ['clerigo', 'caballero'],
+      price: 62,
+    },
+    {
+      id: 'simbolo_del_alba',
+      name: 'Cetro del Alba Sagrada',
+      rarity: 'RARA',
+      description: '6–8 DAÑO (MAG) · +2 MAG, +25% Curación · Técnica: Luz del Alba (Daño + Cura).',
+      classes: ['clerigo'],
+      price: 76,
+    },
+    {
+      id: 'relicario_serafin',
+      name: 'Relicario del Serafín',
+      rarity: 'LEGENDARIA',
+      description: '7–10 DAÑO (MAG) · +3 MAG, +35% Curación · Técnica: Milagro del Sol Negro.',
+      classes: ['clerigo'],
+      price: 95,
+    },
+    {
+      id: 'catalizador_esporas',
+      name: 'Catalizador Micótico',
+      rarity: 'RARA',
+      description: '6–8 DAÑO (MAG) · +2 MAG, +25% Pociones · Técnica: Bomba Micótica (Área).',
+      classes: ['alquimista'],
+      price: 74,
+    },
+    {
+      id: 'guantelete_mutageno',
+      name: 'Inyector de Mutágeno Real',
+      rarity: 'LEGENDARIA',
+      description: '7–11 DAÑO (MAG) · +3 MAG, +35% Pociones · Técnica: Cataclismo Químico.',
+      classes: ['alquimista'],
+      price: 94,
+    },
+    {
+      id: 'pico_de_minero_runico',
+      name: 'Pico de Minero Rúnico',
+      rarity: 'POCO COMÚN',
+      description: '6–8 DAÑO (ATQ) · +1 ATQ, +1 DEF · Técnica: Golpe Sísmico (Rompe armadura).',
+      classes: ['caballero', 'cazador', 'alquimista'],
+      price: 52,
+    },
   ];
+
+  const unownedWeaponPool = shopWeaponPool.filter(
+    (w) => !excludedWeaponIds.includes(w.id)
+  );
+  const classMatchedWeapons =
+    preferredClassIds.length > 0
+      ? unownedWeaponPool.filter((w) =>
+          w.classes.some((c) => preferredClassIds.includes(c))
+        )
+      : [];
+  const candidateWeaponPool =
+    classMatchedWeapons.length > 0
+      ? classMatchedWeapons
+      : unownedWeaponPool.length > 0
+      ? unownedWeaponPool
+      : shopWeaponPool;
+
   const wPick =
-    shopWeaponPool[Math.floor(pseudoRandom(seed, stepBase + 3) * shopWeaponPool.length)];
+    candidateWeaponPool[
+      (Math.floor(pseudoRandom(seed, stepBase + 3) * candidateWeaponPool.length) +
+        rerollStep) %
+        candidateWeaponPool.length
+    ];
 
   // Slot 4: Armor or Accessory for sale
   const shopGearPool: Array<
-    | { kind: 'ARMOR'; armorId: CriptaArmorId; price: number }
-    | { kind: 'ACCESSORY'; accessoryId: CriptaAccessoryId; price: number }
+    | {
+        kind: 'ARMOR';
+        armorId: CriptaArmorId;
+        name: string;
+        rarity: string;
+        description: string;
+        price: number;
+      }
+    | {
+        kind: 'ACCESSORY';
+        accessoryId: CriptaAccessoryId;
+        name: string;
+        rarity: string;
+        description: string;
+        price: number;
+      }
   > = [
-    { kind: 'ARMOR', armorId: 'cota_de_malla_cripta', price: 48 },
-    { kind: 'ARMOR', armorId: 'coraza_del_sepulturero', price: 66 },
-    { kind: 'ARMOR', armorId: 'tunica_del_astrologo', price: 64 },
-    { kind: 'ARMOR', armorId: 'armadura_escamas_fungicas', price: 52 },
-    { kind: 'ACCESSORY', accessoryId: 'anillo_del_boticario', price: 44 },
-    { kind: 'ACCESSORY', accessoryId: 'colgante_de_cristal', price: 56 },
-    { kind: 'ACCESSORY', accessoryId: 'sello_del_cazador', price: 56 },
-    { kind: 'ACCESSORY', accessoryId: 'espejo_roto_accesorio', price: 46 },
+    {
+      kind: 'ARMOR',
+      armorId: 'cota_de_malla_cripta',
+      name: 'Cota de Malla de Cripta',
+      rarity: 'POCO COMÚN',
+      description: '+2 DEFENSA y +6 VIDA MÁXIMA para resistir emboscadas.',
+      price: 48,
+    },
+    {
+      kind: 'ARMOR',
+      armorId: 'coraza_del_sepulturero',
+      name: 'Coraza del Sepulturero',
+      rarity: 'RARA',
+      description: '+2 DEFENSA, +8 VIDA MÁXIMA y resistencia a Maldición.',
+      price: 66,
+    },
+    {
+      kind: 'ARMOR',
+      armorId: 'tunica_del_astrologo',
+      name: 'Túnica del Astrólogo',
+      rarity: 'RARA',
+      description: '+2 MAGIA, +1 DEFENSA y +5 VIDA MÁXIMA.',
+      price: 64,
+    },
+    {
+      kind: 'ARMOR',
+      armorId: 'armadura_escamas_fungicas',
+      name: 'Escamas del Jardín',
+      rarity: 'POCO COMÚN',
+      description: '+2 DEFENSA, +6 VIDA MÁXIMA y resistencia al Veneno.',
+      price: 52,
+    },
+    {
+      kind: 'ARMOR',
+      armorId: 'manto_de_sombra_real',
+      name: 'Manto de Sombra Real',
+      rarity: 'RARA',
+      description: '+2 DEFENSA, +7 VIDA MÁXIMA y protección contra Sangrado.',
+      price: 68,
+    },
+    {
+      kind: 'ARMOR',
+      armorId: 'placas_del_juramento',
+      name: 'Placas del Juramento',
+      rarity: 'RARA',
+      description: '+3 DEFENSA y +10 VIDA MÁXIMA de acero pesado.',
+      price: 74,
+    },
+    {
+      kind: 'ACCESSORY',
+      accessoryId: 'anillo_del_boticario',
+      name: 'Anillo del Boticario',
+      rarity: 'POCO COMÚN',
+      description: '+1 MAGIA y +20% efectividad de pociones y elixires.',
+      price: 44,
+    },
+    {
+      kind: 'ACCESSORY',
+      accessoryId: 'colgante_de_cristal',
+      name: 'Colgante de Cristal',
+      rarity: 'RARA',
+      description: '+2 MAGIA para amplificar hechizos y plegarias.',
+      price: 56,
+    },
+    {
+      kind: 'ACCESSORY',
+      accessoryId: 'sello_del_cazador',
+      name: 'Anillo del Acechador',
+      rarity: 'RARA',
+      description: '+2 ATAQUE y +10% probabilidad de golpe Crítico.',
+      price: 56,
+    },
+    {
+      kind: 'ACCESSORY',
+      accessoryId: 'amuleto_rompeescudos',
+      name: 'Amuleto Rompeescudos',
+      rarity: 'RARA',
+      description: '+2 ATAQUE y +1 DEFENSA para quebrar corazas.',
+      price: 60,
+    },
+    {
+      kind: 'ACCESSORY',
+      accessoryId: 'reloj_de_arena_astral',
+      name: 'Reloj de Arena Astral',
+      rarity: 'RARA',
+      description: '+2 MAGIA y +8% Crítico en técnicas arcanas.',
+      price: 62,
+    },
   ];
   const gPick =
-    shopGearPool[Math.floor(pseudoRandom(seed, stepBase + 5) * shopGearPool.length)];
+    shopGearPool[
+      (Math.floor(pseudoRandom(seed, stepBase + 5) * shopGearPool.length) +
+        rerollStep) %
+        shopGearPool.length
+    ];
+
+  const slot1Id = `shop_${roomIndex}_slot_1_${rerollStep}`;
+  const slot2Id = `shop_${roomIndex}_slot_2_${rerollStep}`;
+  const slotWeaponId = `shop_${roomIndex}_slot_weapon_${rerollStep}`;
+  const slotGearId = `shop_${roomIndex}_slot_gear_${rerollStep}`;
+  const slotForgeId = `shop_${roomIndex}_slot_forge_${rerollStep}`;
+  const slotRelicId = `shop_${roomIndex}_slot_relic_${rerollStep}`;
 
   const slots: CriptaShopSlot[] = [
     {
-      id: `shop_${roomIndex}_slot_1`,
+      id: slot1Id,
+      slotId: slot1Id,
       kind: 'ITEM',
       itemId: hId,
+      name: hDef.name,
+      category: 'CONSUMIBLE · CURACIÓN',
+      rarity: RARITY_BADGE_COLORS[hDef.rarity]?.label || 'COMÚN',
+      description: hDef.description,
       priceGold: Math.max(10, Math.round(hDef.basePrice * discountMult)),
       soldOut: false,
+      sold: false,
     },
     {
-      id: `shop_${roomIndex}_slot_2`,
+      id: slot2Id,
+      slotId: slot2Id,
       kind: 'ITEM',
       itemId: cId,
+      name: cDef.name,
+      category: 'CONSUMIBLE · TÁCTICO',
+      rarity: RARITY_BADGE_COLORS[cDef.rarity]?.label || 'POCO COMÚN',
+      description: cDef.description,
       priceGold: Math.max(12, Math.round(cDef.basePrice * discountMult)),
       soldOut: false,
+      sold: false,
     },
     {
-      id: `shop_${roomIndex}_slot_weapon`,
+      id: slotWeaponId,
+      slotId: slotWeaponId,
       kind: 'WEAPON',
       weaponId: wPick.id,
+      name: wPick.name,
+      category: `ARMA · ${wPick.classes.map((c) => c.toUpperCase()).join('/')}`,
+      rarity: wPick.rarity,
+      description: wPick.description,
       priceGold: Math.max(38, Math.round(wPick.price * discountMult)),
       soldOut: false,
+      sold: false,
     },
     gPick.kind === 'ARMOR'
       ? {
-          id: `shop_${roomIndex}_slot_gear`,
+          id: slotGearId,
+          slotId: slotGearId,
           kind: 'ARMOR',
           armorId: gPick.armorId,
+          name: gPick.name,
+          category: 'ARMADURA PERSONAL',
+          rarity: gPick.rarity,
+          description: gPick.description,
           priceGold: Math.max(34, Math.round(gPick.price * discountMult)),
           soldOut: false,
+          sold: false,
         }
       : {
-          id: `shop_${roomIndex}_slot_gear`,
+          id: slotGearId,
+          slotId: slotGearId,
           kind: 'ACCESSORY',
           accessoryId: gPick.accessoryId,
+          name: gPick.name,
+          category: 'ACCESORIO PERSONAL',
+          rarity: gPick.rarity,
+          description: gPick.description,
           priceGold: Math.max(34, Math.round(gPick.price * discountMult)),
           soldOut: false,
+          sold: false,
         },
     {
-      id: `shop_${roomIndex}_slot_forge`,
+      id: slotForgeId,
+      slotId: slotForgeId,
       kind: 'FORGE_UPGRADE',
-      priceGold: Math.max(32, Math.round(45 * discountMult)),
+      name: 'Yunque del Mercader',
+      category: 'MEJORA DE ARMA',
+      rarity: 'FORJA',
+      description: 'Templa tu arma equipada al siguiente nivel (+Daño base y +Escalado).',
+      priceGold: Math.max(30, Math.round(42 * discountMult)),
       soldOut: false,
+      sold: false,
     },
   ];
 
-  // Slot 6: Expensive Relic Pedestal (Requirement 19)
-  const relicIdx = Math.floor(
-    pseudoRandom(seed, stepBase + 7) * ALL_CRIPTA_RELIC_IDS.length
+  // Slot 6: Unowned Relic on Pedestal
+  const unownedRelics = ALL_CRIPTA_RELIC_IDS.filter(
+    (r) => !excludedRelicIds.includes(r)
   );
-  const relicId = ALL_CRIPTA_RELIC_IDS[relicIdx % ALL_CRIPTA_RELIC_IDS.length];
+  const relicPool = unownedRelics.length > 0 ? unownedRelics : ALL_CRIPTA_RELIC_IDS;
+  const relicIdx =
+    (Math.floor(pseudoRandom(seed, stepBase + 7) * relicPool.length) + rerollStep) %
+    relicPool.length;
+  const relicId = relicPool[relicIdx];
   const relicDef = CRIPTA_RELICS_REGISTRY[relicId];
 
   slots.push({
-    id: `shop_${roomIndex}_slot_relic`,
+    id: slotRelicId,
+    slotId: slotRelicId,
     kind: 'RELIC',
     relicId,
-    priceGold: Math.max(75, Math.round(relicDef.basePrice * discountMult)),
+    name: relicDef.name,
+    category:
+      relicDef.ownershipType === 'PARTY' ? 'RELIQUIA DE GRUPO' : 'RELIQUIA PERSONAL',
+    rarity: relicDef.rarity === 'LEGENDARY' ? 'LEGENDARIA' : 'RARA',
+    description: relicDef.description,
+    priceGold: Math.max(68, Math.round(relicDef.basePrice * discountMult)),
     soldOut: false,
+    sold: false,
   });
 
   return slots;

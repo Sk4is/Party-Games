@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   CriptaCanonicalRoomType,
   CriptaDungeonDefinition,
@@ -1043,29 +1043,617 @@ export function getBiomeVisualProfile(dungeonId?: string): CriptaBiomeVisualProf
   }
 }
 
-export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
-  dungeon: CriptaDungeonDefinition;
-  roomType?: CriptaRoomType;
-}> = ({ dungeon, roomType }) => {
-  const [tick, setTick] = useState(0);
+type CriptaParticleShape =
+  | 'pixel_dust'
+  | 'bone_speck'
+  | 'candle_mote'
+  | 'spore_orb'
+  | 'firefly'
+  | 'ember'
+  | 'spark'
+  | 'pixel_bubble'
+  | 'snowflake'
+  | 'ice_crystal'
+  | 'magic_mote'
+  | 'crystal_shard'
+  | 'pixel_leaf'
+  | 'drip_streak'
+  | 'void_fragment';
+
+type CriptaParticleMotionProfile =
+  | 'CATACOMBS_DUST_AND_CANDLES'
+  | 'GARDEN_SPORES_AND_FIREFLIES'
+  | 'FORGE_EMBERS_AND_SPARKS'
+  | 'SUNKEN_BUBBLES_AND_CAUSTICS'
+  | 'FROZEN_SNOW_AND_ICE'
+  | 'ARCANE_ORBITAL_MOTES'
+  | 'CRYSTAL_SHIMMER_DUST'
+  | 'FOREST_LEAVES_AND_FIREFLIES'
+  | 'MIASMA_BUBBLES_AND_DRIPS'
+  | 'DRIFTING_ASH_AND_SAND'
+  | 'ABYSS_VOID_FRAGMENTS';
+
+interface CriptaAmbientParticleInstance {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  swayAmpX: number;
+  swayAmpY: number;
+  swayFreq: number;
+  swayPhase: number;
+  pulseFreq: number;
+  pulsePhase: number;
+  baseAlpha: number;
+  size: number;
+  color: string;
+  secondaryColor: string;
+  shape: CriptaParticleShape;
+  rotSpeed: number;
+  rotPhase: number;
+}
+
+function getBiomeMotionProfile(dungeonId?: string): CriptaParticleMotionProfile {
+  switch (dungeonId) {
+    case 'jardin_podrido':
+      return 'GARDEN_SPORES_AND_FIREFLIES';
+    case 'forja_infernal':
+    case 'fortaleza_goblin':
+      return 'FORGE_EMBERS_AND_SPARKS';
+    case 'templo_sumergido':
+      return 'SUNKEN_BUBBLES_AND_CAUSTICS';
+    case 'cavernas_heladas':
+      return 'FROZEN_SNOW_AND_ICE';
+    case 'biblioteca_prohibida':
+    case 'torre_del_astrologo':
+      return 'ARCANE_ORBITAL_MOTES';
+    case 'cripta_de_cristal':
+    case 'palacio_de_los_espejos':
+    case 'minas_abandonadas':
+      return 'CRYSTAL_SHIMMER_DUST';
+    case 'bosque_de_los_susurros':
+    case 'la_colmena':
+      return 'FOREST_LEAVES_AND_FIREFLIES';
+    case 'alcantarillas_imperiales':
+    case 'santuario_de_sangre':
+      return 'MIASMA_BUBBLES_AND_DRIPS';
+    case 'prision_maldita':
+    case 'castillo_del_verdugo':
+    case 'ciudad_sepultada':
+      return 'DRIFTING_ASH_AND_SAND';
+    case 'el_abismo':
+      return 'ABYSS_VOID_FRAGMENTS';
+    case 'catacumbas_del_rey':
+    case 'cementerio_de_gigantes':
+    default:
+      return 'CATACOMBS_DUST_AND_CANDLES';
+  }
+}
+
+function createBiomeParticle(
+  index: number,
+  width: number,
+  height: number,
+  layer: 'far' | 'mid' | 'foreground',
+  motionProfile: CriptaParticleMotionProfile,
+  palette: CriptaBiomeVisualProfile
+): CriptaAmbientParticleInstance {
+  // Deterministic-seeded initial distribution mixed with smooth organic variance
+  const seedA = ((index * 73 + 19) % 101) / 101;
+  const seedB = ((index * 137 + 43) % 107) / 107;
+  const seedC = ((index * 211 + 71) % 113) / 113;
+
+  const speedScale = layer === 'far' ? 0.56 : layer === 'mid' ? 1.0 : 1.24;
+  const minAlpha =
+    layer === 'far' ? 0.12 : layer === 'mid' ? 0.26 : 0.08;
+  const maxAlpha =
+    layer === 'far' ? 0.28 : layer === 'mid' ? 0.54 : 0.17;
+  const baseAlpha = minAlpha + seedA * (maxAlpha - minAlpha);
+
+  const baseSize =
+    layer === 'far'
+      ? seedB > 0.65
+        ? 3
+        : 2
+      : layer === 'mid'
+      ? seedB > 0.72
+        ? 4
+        : seedB > 0.3
+        ? 3
+        : 2
+      : seedB > 0.5
+      ? 4
+      : 3;
+
+  const isSecondary = index % 3 === 0;
+  const primaryColor = isSecondary ? palette.particleSecondary : palette.particlePrimary;
+  const secondaryColor = isSecondary ? palette.particlePrimary : palette.accentPrimary;
+
+  let vx = 0;
+  let vy = 0;
+  let swayAmpX = 12;
+  let swayAmpY = 4;
+  let swayFreq = 0.75 + seedC * 0.65;
+  let pulseFreq = 1.1 + seedA * 1.2;
+  let shape: CriptaParticleShape = 'pixel_dust';
+  let rotSpeed = 0;
+
+  switch (motionProfile) {
+    case 'GARDEN_SPORES_AND_FIREFLIES': {
+      // Spores & fireflies float smoothly upward with wide sinusoidal horizontal drift
+      const isFirefly = index % 4 === 0;
+      vx = (-6 + seedA * 12) * speedScale;
+      vy = (isFirefly ? -7 - seedB * 9 : -10 - seedB * 14) * speedScale;
+      swayAmpX = (isFirefly ? 24 : 16) + seedC * 16;
+      swayAmpY = isFirefly ? 10 + seedA * 8 : 4;
+      swayFreq = 0.55 + seedB * 0.65;
+      pulseFreq = isFirefly ? 1.8 + seedC * 1.4 : 1.0 + seedA * 0.9;
+      shape = isFirefly ? 'firefly' : 'spore_orb';
+      break;
+    }
+    case 'FORGE_EMBERS_AND_SPARKS': {
+      // Embers & sparks rise rapidly upward with thermal diagonal drafts
+      const isSpark = index % 4 === 0;
+      vx = (8 + seedA * 18) * speedScale;
+      vy = (isSpark ? -34 - seedB * 26 : -18 - seedB * 22) * speedScale;
+      swayAmpX = 10 + seedC * 14;
+      swayAmpY = 3 + seedA * 4;
+      swayFreq = 1.35 + seedB * 1.2;
+      pulseFreq = 2.2 + seedC * 1.8;
+      shape = isSpark ? 'spark' : 'ember';
+      break;
+    }
+    case 'SUNKEN_BUBBLES_AND_CAUSTICS': {
+      // Bubbles rise gently upward with classic aquatic side-to-side wobble
+      const isBubble = index % 3 !== 0;
+      vx = (-4 + seedA * 8) * speedScale;
+      vy = (isBubble ? -14 - seedB * 16 : -5 + seedB * 8) * speedScale;
+      swayAmpX = 12 + seedC * 12;
+      swayAmpY = 5 + seedA * 5;
+      swayFreq = 1.0 + seedB * 0.85;
+      pulseFreq = 1.2 + seedC * 0.9;
+      shape = isBubble ? 'pixel_bubble' : 'magic_mote';
+      break;
+    }
+    case 'FROZEN_SNOW_AND_ICE': {
+      // Smooth diagonal snowfall and glinting ice crystals
+      const isCrystal = index % 4 === 0;
+      vx = (-14 - seedA * 16) * speedScale;
+      vy = (isCrystal ? 12 + seedB * 14 : 20 + seedB * 22) * speedScale;
+      swayAmpX = 14 + seedC * 14;
+      swayAmpY = 3 + seedA * 4;
+      swayFreq = 0.85 + seedB * 0.7;
+      pulseFreq = isCrystal ? 2.4 + seedC * 1.6 : 1.1 + seedA * 0.7;
+      shape = isCrystal ? 'ice_crystal' : 'snowflake';
+      break;
+    }
+    case 'ARCANE_ORBITAL_MOTES': {
+      // Weightless floating arcane motes & paper dust
+      const isStar = index % 3 === 0;
+      vx = (-6 + seedA * 12) * speedScale;
+      vy = (-8 + seedB * 11) * speedScale;
+      swayAmpX = 18 + seedC * 18;
+      swayAmpY = 12 + seedA * 12;
+      swayFreq = 0.6 + seedB * 0.55;
+      pulseFreq = 1.5 + seedC * 1.4;
+      shape = isStar ? 'magic_mote' : 'candle_mote';
+      break;
+    }
+    case 'CRYSTAL_SHIMMER_DUST': {
+      // Suspended crystal particles with slow drift and periodic twinkle
+      vx = (-5 + seedA * 10) * speedScale;
+      vy = (-7 + seedB * 10) * speedScale;
+      swayAmpX = 12 + seedC * 14;
+      swayAmpY = 9 + seedA * 9;
+      swayFreq = 0.5 + seedB * 0.5;
+      pulseFreq = 2.0 + seedC * 1.8;
+      shape = index % 2 === 0 ? 'crystal_shard' : 'ice_crystal';
+      break;
+    }
+    case 'FOREST_LEAVES_AND_FIREFLIES': {
+      // Small pixel leaves drifting diagonally downward with pendulum sway + rising fireflies
+      const isLeaf = index % 3 !== 0;
+      vx = (isLeaf ? 10 + seedA * 14 : -6 + seedA * 12) * speedScale;
+      vy = (isLeaf ? 11 + seedB * 14 : -9 - seedB * 10) * speedScale;
+      swayAmpX = (isLeaf ? 22 : 16) + seedC * 16;
+      swayAmpY = 6 + seedA * 6;
+      swayFreq = 0.7 + seedB * 0.6;
+      pulseFreq = isLeaf ? 0.9 + seedC * 0.6 : 1.9 + seedC * 1.3;
+      shape = isLeaf ? 'pixel_leaf' : 'firefly';
+      rotSpeed = isLeaf ? (seedA > 0.5 ? 0.8 : -0.8) : 0;
+      break;
+    }
+    case 'MIASMA_BUBBLES_AND_DRIPS': {
+      // Rising miasma/blood bubbles + occasional smooth liquid droplets falling
+      const isDrip = index % 5 === 0 && layer !== 'foreground';
+      vx = (isDrip ? 0 : -5 + seedA * 10) * speedScale;
+      vy = (isDrip ? 36 + seedB * 24 : -11 - seedB * 14) * speedScale;
+      swayAmpX = isDrip ? 1.5 : 13 + seedC * 12;
+      swayAmpY = isDrip ? 0 : 4 + seedA * 4;
+      swayFreq = 0.85 + seedB * 0.7;
+      pulseFreq = 1.3 + seedC * 1.1;
+      shape = isDrip ? 'drip_streak' : index % 2 === 0 ? 'pixel_bubble' : 'spore_orb';
+      break;
+    }
+    case 'DRIFTING_ASH_AND_SAND': {
+      // Wind-carried ash, sand and warm torch embers
+      const isEmber = index % 4 === 0;
+      vx = (11 + seedA * 16) * speedScale;
+      vy = (isEmber ? -14 - seedB * 14 : 6 + seedB * 12) * speedScale;
+      swayAmpX = 14 + seedC * 14;
+      swayAmpY = 5 + seedA * 5;
+      swayFreq = 0.8 + seedB * 0.7;
+      pulseFreq = isEmber ? 2.0 + seedC * 1.4 : 1.0 + seedA * 0.8;
+      shape = isEmber ? 'ember' : index % 2 === 0 ? 'bone_speck' : 'pixel_dust';
+      break;
+    }
+    case 'ABYSS_VOID_FRAGMENTS': {
+      // Anti-gravity rising void fragments and abyssal motes
+      const isVoidShard = index % 2 === 0;
+      vx = (-8 + seedA * 16) * speedScale;
+      vy = (-15 - seedB * 20) * speedScale;
+      swayAmpX = 16 + seedC * 18;
+      swayAmpY = 7 + seedA * 7;
+      swayFreq = 0.75 + seedB * 0.75;
+      pulseFreq = 1.6 + seedC * 1.5;
+      shape = isVoidShard ? 'void_fragment' : 'magic_mote';
+      rotSpeed = isVoidShard ? (seedB > 0.5 ? 0.65 : -0.65) : 0;
+      break;
+    }
+    case 'CATACOMBS_DUST_AND_CANDLES':
+    default: {
+      // Bone dust & crypt ash drifting gently downward/diagonally + warm candle motes rising
+      const isCandleMote = index % 4 === 0;
+      vx = (isCandleMote ? -4 + seedA * 8 : 4 + seedA * 9) * speedScale;
+      vy = (isCandleMote ? -10 - seedB * 11 : 7 + seedB * 11) * speedScale;
+      swayAmpX = 12 + seedC * 14;
+      swayAmpY = 4 + seedA * 4;
+      swayFreq = 0.55 + seedB * 0.55;
+      pulseFreq = isCandleMote ? 1.7 + seedC * 1.2 : 0.95 + seedA * 0.7;
+      shape = isCandleMote
+        ? 'candle_mote'
+        : index % 2 === 0
+        ? 'bone_speck'
+        : 'pixel_dust';
+      break;
+    }
+  }
+
+  return {
+    x: seedA * width,
+    y: seedB * height,
+    vx,
+    vy,
+    swayAmpX,
+    swayAmpY,
+    swayFreq,
+    swayPhase: seedC * Math.PI * 2,
+    pulseFreq,
+    pulsePhase: seedA * Math.PI * 2,
+    baseAlpha,
+    size: baseSize,
+    color: primaryColor,
+    secondaryColor,
+    shape,
+    rotSpeed,
+    rotPhase: seedB * Math.PI * 2,
+  };
+}
+
+function drawCrispPixelParticle(
+  ctx: CanvasRenderingContext2D,
+  p: CriptaAmbientParticleInstance,
+  x: number,
+  y: number,
+  alpha: number,
+  timeSec: number
+) {
+  if (alpha <= 0.01) return;
+  ctx.save();
+  ctx.translate(x, y);
+  if (p.rotSpeed !== 0) {
+    ctx.rotate(p.rotPhase + timeSec * p.rotSpeed);
+  }
+
+  const s = p.size;
+  const half = -s * 0.5;
+
+  switch (p.shape) {
+    case 'spore_orb':
+    case 'firefly':
+    case 'candle_mote': {
+      // Soft outer pixel halo (still crisp pixel geometry) + bright pixel core
+      const haloSize = s + 2;
+      ctx.globalAlpha = alpha * 0.36;
+      ctx.fillStyle = p.secondaryColor;
+      ctx.fillRect(-haloSize * 0.5, -haloSize * 0.5, haloSize, haloSize);
+
+      ctx.globalAlpha = Math.min(1, alpha * 1.15);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(half, half, s, s);
+      break;
+    }
+    case 'ember': {
+      // Warm orange pixel jacket + hot yellow-white pixel center
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.fillStyle = p.secondaryColor;
+      ctx.fillRect(half - 1, half - 1, s + 2, s + 2);
+
+      ctx.globalAlpha = Math.min(1, alpha * 1.2);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(half, half, s, s);
+      break;
+    }
+    case 'spark': {
+      // Crisp 2x4 or 2x3 vertical/diagonal pixel streak
+      ctx.globalAlpha = Math.min(1, alpha * 1.15);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-1, -s, 2, s + 1);
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.fillStyle = p.secondaryColor;
+      ctx.fillRect(-1, 1, 2, s);
+      break;
+    }
+    case 'pixel_bubble': {
+      // Crisp hollow pixel bubble ring with 1px specular highlight
+      const b = Math.max(3, s + 1);
+      const hb = -b * 0.5;
+      ctx.globalAlpha = alpha * 0.75;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(hb + 1, hb, b - 2, 1);
+      ctx.fillRect(hb + 1, hb + b - 1, b - 2, 1);
+      ctx.fillRect(hb, hb + 1, 1, b - 2);
+      ctx.fillRect(hb + b - 1, hb + 1, 1, b - 2);
+      // Specular pixel dot
+      ctx.globalAlpha = Math.min(1, alpha * 1.15);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(hb + 1, hb + 1, 1, 1);
+      break;
+    }
+    case 'snowflake':
+    case 'ice_crystal':
+    case 'magic_mote':
+    case 'crystal_shard': {
+      // Pixel cross / diamond glint
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.fillStyle = p.secondaryColor;
+      ctx.fillRect(-1, -s, 2, s * 2);
+      ctx.fillRect(-s, -1, s * 2, 2);
+
+      ctx.globalAlpha = Math.min(1, alpha * 1.15);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(half, half, s, s);
+      break;
+    }
+    case 'pixel_leaf': {
+      // Crisp 4x2 stepped pixel leaf cluster
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-2, -1, 3, 2);
+      ctx.fillStyle = p.secondaryColor;
+      ctx.fillRect(0, 0, 2, 2);
+      break;
+    }
+    case 'drip_streak': {
+      // Falling liquid pixel drop (2x5)
+      ctx.globalAlpha = alpha * 0.45;
+      ctx.fillStyle = p.secondaryColor;
+      ctx.fillRect(-1, -5, 2, 3);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-1, -2, 2, 3);
+      break;
+    }
+    case 'void_fragment': {
+      // Jagged dark-core pixel shard with glowing rim
+      ctx.globalAlpha = alpha * 0.75;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(half - 1, half, s + 2, s);
+      ctx.fillRect(half, half - 1, s, s + 2);
+      ctx.globalAlpha = Math.min(1, alpha * 1.1);
+      ctx.fillStyle = '#12071F';
+      ctx.fillRect(-1, -1, 2, 2);
+      break;
+    }
+    case 'bone_speck': {
+      // Stepped 3x2 pixel bone/ash grain
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(half, half, s, Math.max(2, s - 1));
+      ctx.globalAlpha = alpha * 0.65;
+      ctx.fillStyle = p.secondaryColor;
+      ctx.fillRect(half + 1, half + 1, Math.max(1, s - 1), 1);
+      break;
+    }
+    case 'pixel_dust':
+    default: {
+      // Classic 2x2 / 3x3 crisp pixel dust square
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(half, half, s, s);
+      break;
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * 60 FPS Continuous Hardware-Accelerated Canvas Particle Renderer.
+ * Renders crisp pixel-art particle shapes moving with fluid sub-pixel velocity,
+ * sinusoidal drift, and smooth alpha fade-in/fade-out.
+ */
+const LaCriptaSmoothParticleLayer: React.FC<{
+  dungeonId: string;
+  layer: 'far' | 'mid' | 'foreground';
+  className?: string;
+}> = ({ dungeonId, layer, className = '' }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    const id = window.setInterval(() => {
-      setTick((t) => (t + 1) % 24);
-    }, 340);
-    return () => window.clearInterval(id);
-  }, []);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
+    const palette = getBiomeVisualProfile(dungeonId);
+    const motionProfile = getBiomeMotionProfile(dungeonId);
+
+    let width = Math.max(320, canvas.clientWidth || window.innerWidth);
+    let height = Math.max(240, canvas.clientHeight || window.innerHeight);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+    const updateCanvasSize = () => {
+      if (!canvas) return;
+      width = Math.max(320, canvas.clientWidth || window.innerWidth);
+      height = Math.max(240, canvas.clientHeight || window.innerHeight);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    updateCanvasSize();
+
+    const isMobile = width < 768;
+    const count =
+      layer === 'far'
+        ? isMobile
+          ? 11
+          : 18
+        : layer === 'mid'
+        ? isMobile
+          ? 13
+          : 22
+        : isMobile
+        ? 3
+        : 5;
+
+    const particles: CriptaAmbientParticleInstance[] = Array.from(
+      { length: count },
+      (_, idx) =>
+        createBiomeParticle(idx, width, height, layer, motionProfile, palette)
+    );
+
+    let rafId = 0;
+    let lastTime = performance.now();
+    let elapsedSec = 0;
+
+    const renderFrame = (now: number) => {
+      const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
+      lastTime = now;
+      elapsedSec += dt;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const margin = 24;
+      const spanW = width + margin * 2;
+      const spanH = height + margin * 2;
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        // Smooth wrap-around outside viewport margins so particles never pop abruptly
+        if (p.x < -margin) p.x += spanW;
+        else if (p.x > width + margin) p.x -= spanW;
+
+        if (p.y < -margin) p.y += spanH;
+        else if (p.y > height + margin) p.y -= spanH;
+
+        const swayX =
+          Math.sin(elapsedSec * p.swayFreq + p.swayPhase) * p.swayAmpX;
+        const swayY =
+          Math.cos(elapsedSec * (p.swayFreq * 0.85) + p.swayPhase) * p.swayAmpY;
+
+        const drawX = p.x + swayX;
+        const drawY = p.y + swayY;
+
+        // Smooth continuous pulse + soft fade near top/bottom screen edges
+        const pulseWave =
+          0.72 + 0.28 * Math.sin(elapsedSec * p.pulseFreq + p.pulsePhase);
+        const verticalNorm = Math.max(0, Math.min(1, drawY / Math.max(1, height)));
+        const edgeFade =
+          verticalNorm < 0.08
+            ? verticalNorm / 0.08
+            : verticalNorm > 0.92
+            ? (1 - verticalNorm) / 0.08
+            : 1;
+
+        const finalAlpha = p.baseAlpha * pulseWave * Math.max(0, Math.min(1, edgeFade));
+
+        drawCrispPixelParticle(ctx, p, drawX, drawY, finalAlpha, elapsedSec);
+      }
+
+      rafId = window.requestAnimationFrame(renderFrame);
+    };
+
+    rafId = window.requestAnimationFrame(renderFrame);
+
+    const handleResize = () => {
+      updateCanvasSize();
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [dungeonId, layer]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-0 w-full h-full block select-none ${className}`}
+    />
+  );
+};
+
+/**
+ * Layer 3 — VERY RARE SUBTLE FOREGROUND PARTICLES (3-5 particles across the whole screen,
+ * low opacity 0.08-0.17, pointer-events: none, rendered in front of enemies/cards/UI
+ * and behind modals/tooltips).
+ */
+export const LaCriptaForegroundBiomeParticles: React.FC<{
+  dungeon: CriptaDungeonDefinition;
+}> = ({ dungeon }) => {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden select-none z-25">
+      <LaCriptaSmoothParticleLayer dungeonId={dungeon.id} layer="foreground" />
+    </div>
+  );
+};
+
+export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
+  dungeon: CriptaDungeonDefinition;
+  roomType?: CriptaCanonicalRoomType;
+}> = ({ dungeon, roomType }) => {
   const id = dungeon.id;
   const p = getBiomeVisualProfile(id);
-  const pulse = tick % 4 === 0 ? 1 : tick % 2 === 0 ? 0.86 : 0.72;
-  const driftY = (tick % 8) - 4;
-  const driftX = ((tick + 3) % 6) - 3;
   const isBoss = roomType === 'BOSS' || roomType === 'MINIBOSS';
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden select-none z-0">
-      {/* Base Full-Viewport Biome Gradient */}
+      <style>{`
+        @keyframes criptaMistDriftA {
+          0% { transform: translate3d(-4%, 0px, 0) scale(1.04); opacity: 0.34; }
+          50% { transform: translate3d(4%, -6px, 0) scale(1.09); opacity: 0.56; }
+          100% { transform: translate3d(-4%, 0px, 0) scale(1.04); opacity: 0.34; }
+        }
+        @keyframes criptaMistDriftB {
+          0% { transform: translate3d(5%, 4px, 0) scale(1.06); opacity: 0.26; }
+          50% { transform: translate3d(-5%, -4px, 0) scale(1.02); opacity: 0.48; }
+          100% { transform: translate3d(5%, 4px, 0) scale(1.06); opacity: 0.26; }
+        }
+        @keyframes criptaTorchBreathe {
+          0%, 100% { transform: scale(1) translate3d(0, 0, 0); opacity: 0.78; }
+          35% { transform: scale(1.04) translate3d(0, -2px, 0); opacity: 0.94; }
+          70% { transform: scale(0.98) translate3d(0, 1px, 0); opacity: 0.84; }
+        }
+      `}</style>
+
+      {/* 1. BIOME BACKGROUND: Base Full-Viewport Gradient */}
       <div
         className="absolute inset-0"
         style={{
@@ -1073,7 +1661,7 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
         }}
       />
 
-      {/* Full-Screen Pixel-Art World Canvas (320x180 crispEdges) */}
+      {/* 1B. BIOME BACKGROUND: Full-Screen Pixel-Art World Architecture (320x180 crispEdges) */}
       <svg
         viewBox="0 0 320 180"
         preserveAspectRatio="xMidYMid slice"
@@ -1159,22 +1747,22 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
                 <rect x={rx} y={12} width={3} height={26 + (idx % 3) * 14} fill="#16301c" />
                 <rect x={rx + 1} y={18} width={2} height={22 + (idx % 2) * 12} fill="#254a2d" />
                 <rect
-                  x={rx + (tick % 2 === idx % 2 ? 1 : 0)}
+                  x={rx}
                   y={36 + (idx % 3) * 12}
                   width={2}
                   height={4}
                   fill="#4ade80"
-                  opacity={pulse * 0.75}
+                  opacity={0.75}
                 />
               </g>
             ))}
             {[28, 92, 154, 212, 268].map((mx, idx) => (
               <g key={mx}>
                 <rect x={mx} y={131} width={12} height={4} fill="#15803d" />
-                <rect x={mx + 2} y={129} width={8} height={2} fill="#4ade80" opacity={pulse} />
+                <rect x={mx + 2} y={129} width={8} height={2} fill="#4ade80" opacity={0.9} />
                 <rect x={mx + 4} y={135} width={4} height={4} fill="#bbf7d0" opacity={0.7} />
                 {idx % 2 === 0 && (
-                  <rect x={mx + 3} y={130} width={2} height={1} fill="#fef08a" opacity={pulse} />
+                  <rect x={mx + 3} y={130} width={2} height={1} fill="#fef08a" opacity={0.9} />
                 )}
               </g>
             ))}
@@ -1183,78 +1771,72 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
 
         {(id === 'catacumbas_del_rey' || id === 'cementerio_de_gigantes') && (
           <g>
-            {[36, 108, 188, 264].map((tx, idx) => {
-              const flicker = (tick + idx) % 3 === 0 ? 1 : 0.7;
-              return (
-                <g key={tx}>
-                  <rect x={tx - 8} y={32} width={20} height={80} fill={p.wallDark} opacity={0.7} />
-                  <rect x={tx - 6} y={34} width={16} height={4} fill={p.wallLight} opacity={0.35} />
-                  <rect x={tx} y={58} width={4} height={10} fill="#334155" />
-                  <rect x={tx - 1} y={56} width={6} height={2} fill="#475569" />
-                  <rect
-                    x={tx - 1}
-                    y={50 - (tick % 2)}
-                    width={6}
-                    height={6}
-                    fill={p.accentPrimary}
-                    opacity={flicker}
-                  />
-                  <rect
-                    x={tx}
-                    y={52 - (tick % 2)}
-                    width={4}
-                    height={4}
-                    fill="#e0f2fe"
-                    opacity={flicker}
-                  />
-                </g>
-              );
-            })}
+            {[36, 108, 188, 264].map((tx) => (
+              <g key={tx}>
+                <rect x={tx - 8} y={32} width={20} height={80} fill={p.wallDark} opacity={0.7} />
+                <rect x={tx - 6} y={34} width={16} height={4} fill={p.wallLight} opacity={0.35} />
+                <rect x={tx} y={58} width={4} height={10} fill="#334155" />
+                <rect x={tx - 1} y={56} width={6} height={2} fill="#475569" />
+                <rect
+                  x={tx - 1}
+                  y={50}
+                  width={6}
+                  height={6}
+                  fill={p.accentPrimary}
+                  opacity={0.88}
+                />
+                <rect
+                  x={tx}
+                  y={52}
+                  width={4}
+                  height={4}
+                  fill="#e0f2fe"
+                  opacity={0.92}
+                />
+              </g>
+            ))}
           </g>
         )}
 
         {(id === 'prision_maldita' || id === 'castillo_del_verdugo') && (
           <g>
-            {[24, 72, 134, 196, 248, 292].map((cx, idx) => {
-              const sway = (tick + idx) % 4 === 0 ? 1 : 0;
-              return (
-                <g key={cx}>
-                  <rect x={cx + sway} y={10} width={2} height={42 + (idx % 3) * 16} fill="#334155" />
-                  <rect x={cx + sway} y={16} width={1} height={36 + (idx % 3) * 16} fill="#64748b" />
-                  {idx % 2 === 0 && (
-                    <g>
-                      <rect x={cx - 5 + sway} y={52 + (idx % 2) * 12} width={12} height={16} fill="#1e293b" />
-                      <rect x={cx - 3 + sway} y={54 + (idx % 2) * 12} width={2} height={12} fill="#475569" />
-                      <rect x={cx + 3 + sway} y={54 + (idx % 2) * 12} width={2} height={12} fill="#475569" />
-                      <rect
-                        x={cx - 1 + sway}
-                        y={60 + (idx % 2) * 12}
-                        width={4}
-                        height={3}
-                        fill={p.accentPrimary}
-                        opacity={pulse}
-                      />
-                    </g>
-                  )}
-                </g>
-              );
-            })}
+            {[24, 72, 134, 196, 248, 292].map((cx, idx) => (
+              <g key={cx}>
+                <rect x={cx} y={10} width={2} height={42 + (idx % 3) * 16} fill="#334155" />
+                <rect x={cx} y={16} width={1} height={36 + (idx % 3) * 16} fill="#64748b" />
+                {idx % 2 === 0 && (
+                  <g>
+                    <rect x={cx - 5} y={52 + (idx % 2) * 12} width={12} height={16} fill="#1e293b" />
+                    <rect x={cx - 3} y={54 + (idx % 2) * 12} width={2} height={12} fill="#475569" />
+                    <rect x={cx + 3} y={54 + (idx % 2) * 12} width={2} height={12} fill="#475569" />
+                    <rect
+                      x={cx - 1}
+                      y={60 + (idx % 2) * 12}
+                      width={4}
+                      height={3}
+                      fill={p.accentPrimary}
+                      opacity={0.85}
+                    />
+                  </g>
+                )}
+              </g>
+            ))}
           </g>
         )}
 
         {(id === 'forja_infernal' || id === 'fortaleza_goblin') && (
           <g>
             <rect x={0} y={135} width={320} height={4} fill="#7c2d12" />
-            <rect x={0} y={136} width={320} height={2} fill="#f97316" opacity={pulse} />
-            {[22, 84, 148, 216, 278].map((lx, idx) => (
+            <rect x={0} y={136} width={320} height={2} fill="#f97316" opacity={0.9} />
+            {[22, 84, 148, 216, 278].map((lx) => (
               <rect
                 key={lx}
-                x={lx + ((tick + idx) % 3)}
+                x={lx}
                 y={136}
                 width={18}
                 height={2}
                 fill="#fde047"
-                opacity={pulse}
+                opacity={0.88}
               />
             ))}
           </g>
@@ -1271,7 +1853,7 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
                   width={4}
                   height={8}
                   fill={p.accentPrimary}
-                  opacity={pulse * 0.85}
+                  opacity={0.82}
                 />
                 <rect
                   x={hx + 3}
@@ -1279,7 +1861,7 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
                   width={2}
                   height={4}
                   fill={p.particlePrimary}
-                  opacity={pulse}
+                  opacity={0.9}
                 />
               </g>
             ))}
@@ -1291,16 +1873,16 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
           id === 'santuario_de_sangre') && (
           <g>
             <rect x={0} y={134} width={320} height={8} fill={p.wallMid} opacity={0.85} />
-            <rect x={0} y={135} width={320} height={2} fill={p.accentPrimary} opacity={pulse * 0.75} />
-            {[16, 68, 124, 182, 238, 288].map((wx, idx) => (
+            <rect x={0} y={135} width={320} height={2} fill={p.accentPrimary} opacity={0.75} />
+            {[16, 68, 124, 182, 238, 288].map((wx) => (
               <rect
                 key={wx}
-                x={wx + ((tick + idx * 2) % 6)}
+                x={wx}
                 y={137}
                 width={14}
                 height={1}
                 fill={p.particlePrimary}
-                opacity={pulse}
+                opacity={0.85}
               />
             ))}
           </g>
@@ -1328,7 +1910,7 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
                   width={2}
                   height={16}
                   fill={p.particlePrimary}
-                  opacity={pulse}
+                  opacity={0.9}
                 />
               </g>
             ))}
@@ -1340,67 +1922,63 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
           id === 'ciudad_sepultada' ||
           id === 'el_abismo') && (
           <g>
-            {[42, 118, 194, 268].map((ax, idx) => {
-              const floatOff = ((tick + idx * 2) % 4) - 2;
-              return (
-                <g key={ax}>
-                  <rect
-                    x={ax}
-                    y={44 + floatOff}
-                    width={6}
-                    height={14}
-                    fill={p.accentPrimary}
-                    opacity={pulse * 0.65}
-                  />
-                  <rect
-                    x={ax + 2}
-                    y={46 + floatOff}
-                    width={2}
-                    height={10}
-                    fill={p.particlePrimary}
-                    opacity={pulse}
-                  />
-                </g>
-              );
-            })}
+            {[42, 118, 194, 268].map((ax) => (
+              <g key={ax}>
+                <rect
+                  x={ax}
+                  y={44}
+                  width={6}
+                  height={14}
+                  fill={p.accentPrimary}
+                  opacity={0.62}
+                />
+                <rect
+                  x={ax + 2}
+                  y={46}
+                  width={2}
+                  height={10}
+                  fill={p.particlePrimary}
+                  opacity={0.88}
+                />
+              </g>
+            ))}
           </g>
         )}
-
-        {/* Animated Full-Screen Environmental Particles */}
-        {Array.from({ length: 24 }).map((_, idx) => {
-          const baseX = (idx * 13 + 9) % 310;
-          const baseY = 18 + ((idx * 19) % 116);
-          const px = (baseX + driftX * (idx % 2 === 0 ? 1 : -1) + 320) % 320;
-          const py = (baseY + driftY * (idx % 3 === 0 ? -1 : 1) + 140) % 140;
-          const isSecondary = idx % 3 === 0;
-          const size = idx % 5 === 0 ? 3 : 2;
-          return (
-            <rect
-              key={idx}
-              x={px}
-              y={py}
-              width={size}
-              height={size}
-              fill={isSecondary ? p.particleSecondary : p.particlePrimary}
-              opacity={((tick + idx) % 4 === 0 ? 0.9 : 0.45) * pulse}
-            />
-          );
-        })}
       </svg>
 
-      {/* Ambient Biome Radial Glows */}
+      {/* 2. LAYER 1 — DISTANT PARTICLES (Far Background: small, slow, low opacity 0.12-0.28) */}
+      <LaCriptaSmoothParticleLayer dungeonId={id} layer="far" />
+
+      {/* 3. MIST / ENVIRONMENTAL LIGHT LAYER (Smooth continuous 60 FPS GPU-interpolated drift & breathing) */}
       <div
-        className="absolute inset-0 transition-opacity duration-500"
+        className="absolute inset-0"
         style={{
-          background: `radial-gradient(circle at 28% 54%, ${
-            isBoss ? 'rgba(244,63,94,0.26)' : p.glowColor
-          }, transparent 58%), radial-gradient(circle at 76% 42%, ${p.glowColor}, transparent 62%)`,
-          opacity: pulse,
+          background: `radial-gradient(ellipse 68% 42% at 26% 62%, ${p.glowColor}, transparent 70%), radial-gradient(ellipse 58% 38% at 78% 36%, ${p.glowColor}, transparent 72%)`,
+          animation: 'criptaMistDriftA 18s ease-in-out infinite',
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(ellipse 80% 26% at 50% 84%, ${p.glowColor}, transparent 76%)`,
+          animation: 'criptaMistDriftB 24s ease-in-out infinite',
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(circle at 24% 48%, ${
+            isBoss ? 'rgba(244,63,94,0.28)' : p.glowColor
+          }, transparent 56%), radial-gradient(circle at 74% 44%, ${p.glowColor}, transparent 60%)`,
+          animation: 'criptaTorchBreathe 5.4s ease-in-out infinite',
         }}
       />
 
+      {/* 4. LAYER 2 — MID-DISTANCE PARTICLES (Behind enemies, NPCs, cards & UI: opacity 0.25-0.55) */}
+      <LaCriptaSmoothParticleLayer dungeonId={id} layer="mid" />
+
       {/* Subtle Edge Vignette so UI floats cleanly over the living world */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_48%,rgba(2,4,8,0.68)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_52%,rgba(2,4,8,0.62)_100%)]" />
     </div>
   );
 };
@@ -1408,41 +1986,52 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
 export const LaCriptaBiomeStageBackdrop: React.FC<{
   dungeon: CriptaDungeonDefinition;
   isBossOrMiniboss?: boolean;
-}> = ({ dungeon, isBossOrMiniboss = false }) => {
+  transparentSkybox?: boolean;
+}> = ({ dungeon, isBossOrMiniboss = false, transparentSkybox = true }) => {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const id = window.setInterval(() => {
       setTick((t) => (t + 1) % 24);
-    }, 340);
+    }, 420);
     return () => window.clearInterval(id);
   }, []);
 
   const biomeId = dungeon.id;
   const p = getBiomeVisualProfile(biomeId);
-  const flicker = tick % 3 === 0 ? 1 : tick % 3 === 1 ? 0.86 : 0.94;
+  const flicker = tick % 3 === 0 ? 1 : tick % 3 === 1 ? 0.88 : 0.94;
   const pulseY = tick % 4 === 1 || tick % 4 === 2 ? -1 : 0;
-  const driftX = (tick % 6) - 2;
-  const particleLift = tick % 8;
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden select-none">
-      {/* Deep Biome Atmospheric Gradient */}
+      {/* When used inside standalone Enemy Inspection sheet, provide self-contained biome skybox;
+          when used on the main Encounter Stage, keep skybox translucent so the unified full-screen
+          biome atmosphere and 60 FPS particle layers flow seamlessly behind the creature/NPC! */}
+      {!transparentSkybox ? (
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(180deg, ${p.bgTop} 0%, ${p.bgMid} 58%, ${p.bgBottom} 100%)`,
+          }}
+        />
+      ) : (
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(180deg, rgba(6,8,13,0.12) 0%, rgba(6,8,13,0.04) 64%, rgba(6,8,13,0.42) 100%)`,
+          }}
+        />
+      )}
+
       <div
-        className="absolute inset-0 transition-opacity duration-500"
+        className="absolute inset-0 transition-opacity duration-700"
         style={{
-          background: `linear-gradient(180deg, ${p.bgTop} 0%, ${p.bgMid} 58%, ${p.bgBottom} 100%)`,
-        }}
-      />
-      <div
-        className="absolute inset-0 transition-opacity duration-500"
-        style={{
-          background: `radial-gradient(ellipse at 50% 46%, ${p.glowColor} 0%, transparent 72%)`,
+          background: `radial-gradient(ellipse at 50% 54%, ${p.glowColor} 0%, transparent 70%)`,
           opacity: flicker,
         }}
       />
 
-      {/* Full-Stage Pixel Art Biome Architecture, Props, Lighting & Ambient Particles */}
+      {/* Full-Stage Pixel Art Biome Architectural Framing, Pedestal & Props (NO container-bound low-FPS particles) */}
       <svg
         viewBox="0 0 160 120"
         preserveAspectRatio="none"
@@ -1464,17 +2053,17 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
         <rect x="139" y="52" width="11" height="1" fill="#09070E" opacity="0.6" />
 
         {/* Upper Gothic Arch Silhouette */}
-        <rect x="0" y="0" width="160" height="9" fill={p.bgBottom} opacity="0.9" />
+        <rect x="0" y="0" width="160" height="9" fill={p.bgBottom} opacity="0.82" />
         <rect x="24" y="9" width="112" height="3" fill={p.wallLight} opacity="0.45" />
 
         {/* BIOME-SPECIFIC ARCHITECTURAL PROPS & LIVING DETAILS */}
         {biomeId === 'jardin_podrido' && (
           <g>
-            <rect x="28" y="9" width="3" height={22 + (tick % 2)} fill="#1D3622" />
+            <rect x="28" y="9" width="3" height="22" fill="#1D3622" />
             <rect x="30" y="20" width="2" height="15" fill="#355E3B" />
             <rect x="46" y="9" width="2" height="16" fill="#234229" />
             <rect x="114" y="9" width="2" height="19" fill="#234229" />
-            <rect x="128" y="9" width="3" height={25 - (tick % 2)} fill="#1D3622" />
+            <rect x="128" y="9" width="3" height="24" fill="#1D3622" />
             <rect x="127" y="24" width="2" height="14" fill="#355E3B" />
 
             <rect x="25" y="66" width="5" height="20" fill="#5A4D41" />
@@ -1526,8 +2115,8 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
             <rect x="31" y="24" width="12" height="4" fill={p.wallMid} />
             <rect x="129" y="12" width="9" height="74" fill={p.wallDark} />
             <rect x="117" y="28" width="12" height="4" fill={p.wallMid} />
-            <rect x={18 + driftX * 2} y="76" width="48" height="4" fill={p.accentPrimary} opacity="0.28" />
-            <rect x={92 - driftX * 2} y="78" width="46" height="4" fill={p.accentPrimary} opacity="0.28" />
+            <rect x="18" y="76" width="48" height="4" fill={p.accentPrimary} opacity="0.24" />
+            <rect x="92" y="78" width="46" height="4" fill={p.accentPrimary} opacity="0.24" />
           </g>
         )}
 
@@ -1549,11 +2138,9 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
           <g>
             <rect x="26" y="34" width="16" height="12" fill={p.wallDark} />
             <rect x="31" y="46" width="4" height="40" fill={p.accentPrimary} opacity="0.55" />
-            <rect x="32" y={48 + particleLift * 4} width="2" height="4" fill={p.particlePrimary} />
 
             <rect x="118" y="34" width="16" height="12" fill={p.wallDark} />
             <rect x="123" y="46" width="4" height="40" fill={p.accentPrimary} opacity="0.55" />
-            <rect x="124" y={48 + ((particleLift + 4) % 8) * 4} width="2" height="4" fill={p.particlePrimary} />
           </g>
         )}
 
@@ -1616,25 +2203,8 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
           opacity={0.92 * flicker}
         />
 
-        {/* Animated Floating Particles Across Stage */}
-        {Array.from({ length: 10 }).map((_, idx) => {
-          const px = (24 + idx * 12 + driftX * (idx % 2 === 0 ? 1 : -1)) % 144;
-          const py = (68 - ((particleLift + idx * 2) % 8) * 6 + 80) % 80;
-          return (
-            <rect
-              key={idx}
-              x={px}
-              y={py}
-              width="2"
-              height="2"
-              fill={idx % 2 === 0 ? p.particlePrimary : p.particleSecondary}
-              opacity={0.75 * flicker}
-            />
-          );
-        })}
-
         {/* Creature Stage Stone Pedestal / Ground Plane */}
-        <rect x="0" y="88" width="160" height="32" fill={p.floorDark} opacity="0.95" />
+        <rect x="0" y="88" width="160" height="32" fill={p.floorDark} opacity="0.92" />
         <rect x="12" y="84" width="136" height="5" fill={p.floorMid} opacity="0.9" />
         <rect x="20" y="83" width="120" height="1" fill={p.floorLight} opacity="0.65" />
         <rect x="38" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
@@ -1665,7 +2235,7 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
       </svg>
 
       {/* Vignette Framing */}
-      <div className="absolute inset-0 shadow-[inset_0_0_55px_rgba(4,4,8,0.85)]" />
+      <div className="absolute inset-0 shadow-[inset_0_0_45px_rgba(4,4,8,0.72)]" />
     </div>
   );
 };
