@@ -680,6 +680,731 @@ export const LaCriptaStageSubjectPortrait: React.FC<{
   return <LaCriptaAnimatedStageNpc room={room} dungeon={dungeon} />;
 };
 
+export interface CriptaBiomeVisualProfile {
+  bgTop: string;
+  bgMid: string;
+  bgBottom: string;
+  wallDark: string;
+  wallMid: string;
+  wallLight: string;
+  floorDark: string;
+  floorMid: string;
+  floorLight: string;
+  accentPrimary: string;
+  accentSecondary: string;
+  glowColor: string;
+  particlePrimary: string;
+  particleSecondary: string;
+}
+
+export function getBiomeVisualProfile(dungeonId?: string): CriptaBiomeVisualProfile {
+  switch (dungeonId) {
+    case 'jardin_podrido':
+      return {
+        bgTop: '#061109',
+        bgMid: '#0d1f12',
+        bgBottom: '#050b06',
+        wallDark: '#0c1c10',
+        wallMid: '#16301c',
+        wallLight: '#254a2d',
+        floorDark: '#09140b',
+        floorMid: '#152918',
+        floorLight: '#27472b',
+        accentPrimary: '#4ade80',
+        accentSecondary: '#a3e635',
+        glowColor: 'rgba(74, 222, 128, 0.24)',
+        particlePrimary: '#86efac',
+        particleSecondary: '#bef264',
+      };
+    case 'forja_infernal':
+      return {
+        bgTop: '#160604',
+        bgMid: '#280b06',
+        bgBottom: '#0e0302',
+        wallDark: '#1f0906',
+        wallMid: '#36110b',
+        wallLight: '#541b11',
+        floorDark: '#170604',
+        floorMid: '#2b0d08',
+        floorLight: '#4a180e',
+        accentPrimary: '#f97316',
+        accentSecondary: '#fbbf24',
+        glowColor: 'rgba(249, 115, 22, 0.28)',
+        particlePrimary: '#fdba74',
+        particleSecondary: '#fde047',
+      };
+    case 'templo_sumergido':
+      return {
+        bgTop: '#03101a',
+        bgMid: '#072235',
+        bgBottom: '#020910',
+        wallDark: '#071d2c',
+        wallMid: '#0e334c',
+        wallLight: '#194d70',
+        floorDark: '#051521',
+        floorMid: '#0c293d',
+        floorLight: '#184766',
+        accentPrimary: '#38bdf8',
+        accentSecondary: '#2dd4bf',
+        glowColor: 'rgba(56, 189, 248, 0.25)',
+        particlePrimary: '#7dd3fc',
+        particleSecondary: '#5eead4',
+      };
+    case 'minas_abandonadas':
+      return {
+        bgTop: '#110d08',
+        bgMid: '#1f170e',
+        bgBottom: '#090704',
+        wallDark: '#1c150d',
+        wallMid: '#2e2216',
+        wallLight: '#473522',
+        floorDark: '#140f0a',
+        floorMid: '#261d13',
+        floorLight: '#3d2f1f',
+        accentPrimary: '#f59e0b',
+        accentSecondary: '#38bdf8',
+        glowColor: 'rgba(245, 158, 11, 0.22)',
+        particlePrimary: '#fcd34d',
+        particleSecondary: '#7dd3fc',
+      };
+    case 'castillo_del_verdugo':
+      return {
+        bgTop: '#140609',
+        bgMid: '#240b11',
+        bgBottom: '#0a0305',
+        wallDark: '#1c0a0e',
+        wallMid: '#301219',
+        wallLight: '#4a1c27',
+        floorDark: '#14070a',
+        floorMid: '#260e14',
+        floorLight: '#3d1720',
+        accentPrimary: '#ef4444',
+        accentSecondary: '#fda4af',
+        glowColor: 'rgba(239, 68, 68, 0.24)',
+        particlePrimary: '#fca5a5',
+        particleSecondary: '#fecdd3',
+      };
+    case 'bosque_de_los_susurros':
+      return {
+        bgTop: '#071014',
+        bgMid: '#0f2129',
+        bgBottom: '#04090c',
+        wallDark: '#0d1b22',
+        wallMid: '#182f3a',
+        wallLight: '#264857',
+        floorDark: '#091419',
+        floorMid: '#13262f',
+        floorLight: '#213e4a',
+        accentPrimary: '#2dd4bf',
+        accentSecondary: '#a78bfa',
+        glowColor: 'rgba(45, 212, 191, 0.22)',
+        particlePrimary: '#5eead4',
+        particleSecondary: '#c4b5fd',
+      };
+    case 'alcantarillas_imperiales':
+      return {
+        bgTop: '#091108',
+        bgMid: '#142410',
+        bgBottom: '#050a04',
+        wallDark: '#111f0e',
+        wallMid: '#1f3619',
+        wallLight: '#315228',
+        floorDark: '#0d170a',
+        floorMid: '#192b14',
+        floorLight: '#2b4722',
+        accentPrimary: '#84cc16',
+        accentSecondary: '#4ade80',
+        glowColor: 'rgba(132, 204, 22, 0.25)',
+        particlePrimary: '#bef264',
+        particleSecondary: '#86efac',
+      };
+    case 'biblioteca_prohibida':
+      return {
+        bgTop: '#10081c',
+        bgMid: '#1e1035',
+        bgBottom: '#08040f',
+        wallDark: '#180d2b',
+        wallMid: '#2a184a',
+        wallLight: '#40266e',
+        floorDark: '#130921',
+        floorMid: '#23133d',
+        floorLight: '#371f5e',
+        accentPrimary: '#c084fc',
+        accentSecondary: '#fbbf24',
+        glowColor: 'rgba(192, 132, 252, 0.25)',
+        particlePrimary: '#d8b4fe',
+        particleSecondary: '#fde68a',
+      };
+    case 'torre_del_astrologo':
+      return {
+        bgTop: '#060a1c',
+        bgMid: '#0e1738',
+        bgBottom: '#030510',
+        wallDark: '#0b122e',
+        wallMid: '#162354',
+        wallLight: '#253980',
+        floorDark: '#080e24',
+        floorMid: '#121d47',
+        floorLight: '#1f3170',
+        accentPrimary: '#60a5fa',
+        accentSecondary: '#fde047',
+        glowColor: 'rgba(96, 165, 250, 0.26)',
+        particlePrimary: '#93c5fd',
+        particleSecondary: '#fef08a',
+      };
+    case 'la_colmena':
+      return {
+        bgTop: '#170f04',
+        bgMid: '#2b1c08',
+        bgBottom: '#0c0802',
+        wallDark: '#241706',
+        wallMid: '#3d280c',
+        wallLight: '#5c3d14',
+        floorDark: '#1a1105',
+        floorMid: '#302009',
+        floorLight: '#4d3310',
+        accentPrimary: '#f59e0b',
+        accentSecondary: '#a3e635',
+        glowColor: 'rgba(245, 158, 11, 0.26)',
+        particlePrimary: '#fcd34d',
+        particleSecondary: '#bef264',
+      };
+    case 'cripta_de_cristal':
+      return {
+        bgTop: '#08121f',
+        bgMid: '#10243d',
+        bgBottom: '#040a12',
+        wallDark: '#0d1e33',
+        wallMid: '#183559',
+        wallLight: '#275185',
+        floorDark: '#0a1729',
+        floorMid: '#142b4a',
+        floorLight: '#224573',
+        accentPrimary: '#67e8f9',
+        accentSecondary: '#e879f9',
+        glowColor: 'rgba(103, 232, 249, 0.27)',
+        particlePrimary: '#a5f3fc',
+        particleSecondary: '#f0abfc',
+      };
+    case 'prision_maldita':
+      return {
+        bgTop: '#0c0e12',
+        bgMid: '#171b24',
+        bgBottom: '#06070a',
+        wallDark: '#141820',
+        wallMid: '#242b38',
+        wallLight: '#374154',
+        floorDark: '#0f1218',
+        floorMid: '#1c222e',
+        floorLight: '#2e374a',
+        accentPrimary: '#fb923c',
+        accentSecondary: '#94a3b8',
+        glowColor: 'rgba(251, 146, 60, 0.20)',
+        particlePrimary: '#fdba74',
+        particleSecondary: '#cbd5e1',
+      };
+    case 'santuario_de_sangre':
+      return {
+        bgTop: '#170408',
+        bgMid: '#2b0810',
+        bgBottom: '#0c0204',
+        wallDark: '#24060d',
+        wallMid: '#400c18',
+        wallLight: '#631426',
+        floorDark: '#1a0409',
+        floorMid: '#330913',
+        floorLight: '#521020',
+        accentPrimary: '#f43f5e',
+        accentSecondary: '#fbbf24',
+        glowColor: 'rgba(244, 63, 94, 0.28)',
+        particlePrimary: '#fda4af',
+        particleSecondary: '#fde68a',
+      };
+    case 'ciudad_sepultada':
+      return {
+        bgTop: '#171108',
+        bgMid: '#2b2010',
+        bgBottom: '#0d0904',
+        wallDark: '#241b0d',
+        wallMid: '#3d2e18',
+        wallLight: '#5c4626',
+        floorDark: '#1c150a',
+        floorMid: '#332614',
+        floorLight: '#523d20',
+        accentPrimary: '#fbbf24',
+        accentSecondary: '#2dd4bf',
+        glowColor: 'rgba(251, 191, 36, 0.24)',
+        particlePrimary: '#fde68a',
+        particleSecondary: '#5eead4',
+      };
+    case 'palacio_de_los_espejos':
+      return {
+        bgTop: '#0d101c',
+        bgMid: '#1a2038',
+        bgBottom: '#070910',
+        wallDark: '#161b30',
+        wallMid: '#283154',
+        wallLight: '#3e4b80',
+        floorDark: '#111526',
+        floorMid: '#202745',
+        floorLight: '#34406e',
+        accentPrimary: '#e2e8f0',
+        accentSecondary: '#c084fc',
+        glowColor: 'rgba(226, 232, 240, 0.24)',
+        particlePrimary: '#f8fafc',
+        particleSecondary: '#e9d5ff',
+      };
+    case 'cavernas_heladas':
+      return {
+        bgTop: '#06131f',
+        bgMid: '#0d263d',
+        bgBottom: '#030a12',
+        wallDark: '#0b2033',
+        wallMid: '#153959',
+        wallLight: '#235887',
+        floorDark: '#081826',
+        floorMid: '#112e47',
+        floorLight: '#1e4a70',
+        accentPrimary: '#7dd3fc',
+        accentSecondary: '#e0f2fe',
+        glowColor: 'rgba(125, 211, 252, 0.26)',
+        particlePrimary: '#bae6fd',
+        particleSecondary: '#f0f9ff',
+      };
+    case 'fortaleza_goblin':
+      return {
+        bgTop: '#120e07',
+        bgMid: '#241b0e',
+        bgBottom: '#0a0704',
+        wallDark: '#1c150b',
+        wallMid: '#332614',
+        wallLight: '#4f3b20',
+        floorDark: '#140f08',
+        floorMid: '#261d10',
+        floorLight: '#3d2e1a',
+        accentPrimary: '#f97316',
+        accentSecondary: '#84cc16',
+        glowColor: 'rgba(249, 115, 22, 0.24)',
+        particlePrimary: '#fdba74',
+        particleSecondary: '#bef264',
+      };
+    case 'cementerio_de_gigantes':
+      return {
+        bgTop: '#0e1012',
+        bgMid: '#1c2024',
+        bgBottom: '#070809',
+        wallDark: '#171a1e',
+        wallMid: '#292e36',
+        wallLight: '#3f4752',
+        floorDark: '#121417',
+        floorMid: '#20242b',
+        floorLight: '#333945',
+        accentPrimary: '#cbd5e1',
+        accentSecondary: '#38bdf8',
+        glowColor: 'rgba(203, 213, 225, 0.20)',
+        particlePrimary: '#e2e8f0',
+        particleSecondary: '#7dd3fc',
+      };
+    case 'el_abismo':
+      return {
+        bgTop: '#080312',
+        bgMid: '#130726',
+        bgBottom: '#030108',
+        wallDark: '#100621',
+        wallMid: '#1f0c3d',
+        wallLight: '#331561',
+        floorDark: '#0b0417',
+        floorMid: '#180930',
+        floorLight: '#28104f',
+        accentPrimary: '#a855f7',
+        accentSecondary: '#f43f5e',
+        glowColor: 'rgba(168, 85, 247, 0.28)',
+        particlePrimary: '#d8b4fe',
+        particleSecondary: '#fda4af',
+      };
+    case 'catacumbas_del_rey':
+    default:
+      return {
+        bgTop: '#0a0d14',
+        bgMid: '#131926',
+        bgBottom: '#06080d',
+        wallDark: '#111622',
+        wallMid: '#1e273b',
+        wallLight: '#303e5c',
+        floorDark: '#0d111a',
+        floorMid: '#182030',
+        floorLight: '#28354f',
+        accentPrimary: '#38bdf8',
+        accentSecondary: '#fbbf24',
+        glowColor: 'rgba(56, 189, 248, 0.22)',
+        particlePrimary: '#7dd3fc',
+        particleSecondary: '#fde68a',
+      };
+  }
+}
+
+export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
+  dungeon: CriptaDungeonDefinition;
+  roomType?: CriptaRoomType;
+}> = ({ dungeon, roomType }) => {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setTick((t) => (t + 1) % 24);
+    }, 340);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const id = dungeon.id;
+  const p = getBiomeVisualProfile(id);
+  const pulse = tick % 4 === 0 ? 1 : tick % 2 === 0 ? 0.86 : 0.72;
+  const driftY = (tick % 8) - 4;
+  const driftX = ((tick + 3) % 6) - 3;
+  const isBoss = roomType === 'BOSS' || roomType === 'MINIBOSS';
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden select-none z-0">
+      {/* Base Full-Viewport Biome Gradient */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `linear-gradient(180deg, ${p.bgTop} 0%, ${p.bgMid} 58%, ${p.bgBottom} 100%)`,
+        }}
+      />
+
+      {/* Full-Screen Pixel-Art World Canvas (320x180 crispEdges) */}
+      <svg
+        viewBox="0 0 320 180"
+        preserveAspectRatio="xMidYMid slice"
+        shapeRendering="crispEdges"
+        className="absolute inset-0 h-full w-full opacity-90"
+        style={{ imageRendering: 'pixelated' }}
+      >
+        {/* Distant architectural masonry / cavern ribs spanning full width */}
+        {Array.from({ length: 16 }).map((_, col) => {
+          const x = col * 20;
+          const isPillar = col % 3 === 0;
+          return (
+            <g key={col}>
+              {isPillar && (
+                <>
+                  <rect x={x} y={0} width={10} height={142} fill={p.wallDark} opacity={0.85} />
+                  <rect x={x + 1} y={0} width={6} height={142} fill={p.wallMid} opacity={0.55} />
+                  <rect x={x + 2} y={14} width={2} height={116} fill={p.wallLight} opacity={0.32} />
+                </>
+              )}
+              <rect
+                x={x + (col % 2) * 4}
+                y={18 + (col % 4) * 24}
+                width={12}
+                height={6}
+                fill={p.wallMid}
+                opacity={0.32}
+              />
+              <rect
+                x={x + 2}
+                y={30 + ((col + 2) % 4) * 22}
+                width={10}
+                height={5}
+                fill={p.wallLight}
+                opacity={0.18}
+              />
+            </g>
+          );
+        })}
+
+        {/* Upper Ceiling Silhouette across full screen */}
+        <rect x={0} y={0} width={320} height={12} fill={p.bgBottom} opacity={0.88} />
+        {Array.from({ length: 32 }).map((_, i) => {
+          const h = 6 + ((i * 7) % 14);
+          return (
+            <g key={i}>
+              <rect x={i * 10} y={10} width={8} height={h} fill={p.wallDark} opacity={0.9} />
+              <rect x={i * 10 + 2} y={10 + h} width={4} height={5} fill={p.wallMid} opacity={0.65} />
+            </g>
+          );
+        })}
+
+        {/* Floor Composition spanning entire bottom of screen */}
+        <rect x={0} y={138} width={320} height={42} fill={p.floorDark} />
+        <rect x={0} y={138} width={320} height={3} fill={p.floorMid} opacity={0.85} />
+        <rect x={0} y={141} width={320} height={1} fill={p.floorLight} opacity={0.45} />
+        {Array.from({ length: 20 }).map((_, i) => (
+          <g key={i}>
+            <rect
+              x={i * 16 + (i % 2) * 3}
+              y={144 + (i % 3) * 9}
+              width={12}
+              height={4}
+              fill={p.floorMid}
+              opacity={0.65}
+            />
+            <rect
+              x={i * 16 + (i % 2) * 3 + 1}
+              y={144 + (i % 3) * 9}
+              width={8}
+              height={1}
+              fill={p.floorLight}
+              opacity={0.35}
+            />
+          </g>
+        ))}
+
+        {/* Biome-Specific Full-Screen Environmental Details */}
+        {id === 'jardin_podrido' && (
+          <g>
+            {[18, 54, 112, 168, 224, 276, 302].map((rx, idx) => (
+              <g key={rx}>
+                <rect x={rx} y={12} width={3} height={26 + (idx % 3) * 14} fill="#16301c" />
+                <rect x={rx + 1} y={18} width={2} height={22 + (idx % 2) * 12} fill="#254a2d" />
+                <rect
+                  x={rx + (tick % 2 === idx % 2 ? 1 : 0)}
+                  y={36 + (idx % 3) * 12}
+                  width={2}
+                  height={4}
+                  fill="#4ade80"
+                  opacity={pulse * 0.75}
+                />
+              </g>
+            ))}
+            {[28, 92, 154, 212, 268].map((mx, idx) => (
+              <g key={mx}>
+                <rect x={mx} y={131} width={12} height={4} fill="#15803d" />
+                <rect x={mx + 2} y={129} width={8} height={2} fill="#4ade80" opacity={pulse} />
+                <rect x={mx + 4} y={135} width={4} height={4} fill="#bbf7d0" opacity={0.7} />
+                {idx % 2 === 0 && (
+                  <rect x={mx + 3} y={130} width={2} height={1} fill="#fef08a" opacity={pulse} />
+                )}
+              </g>
+            ))}
+          </g>
+        )}
+
+        {(id === 'catacumbas_del_rey' || id === 'cementerio_de_gigantes') && (
+          <g>
+            {[36, 108, 188, 264].map((tx, idx) => {
+              const flicker = (tick + idx) % 3 === 0 ? 1 : 0.7;
+              return (
+                <g key={tx}>
+                  <rect x={tx - 8} y={32} width={20} height={80} fill={p.wallDark} opacity={0.7} />
+                  <rect x={tx - 6} y={34} width={16} height={4} fill={p.wallLight} opacity={0.35} />
+                  <rect x={tx} y={58} width={4} height={10} fill="#334155" />
+                  <rect x={tx - 1} y={56} width={6} height={2} fill="#475569" />
+                  <rect
+                    x={tx - 1}
+                    y={50 - (tick % 2)}
+                    width={6}
+                    height={6}
+                    fill={p.accentPrimary}
+                    opacity={flicker}
+                  />
+                  <rect
+                    x={tx}
+                    y={52 - (tick % 2)}
+                    width={4}
+                    height={4}
+                    fill="#e0f2fe"
+                    opacity={flicker}
+                  />
+                </g>
+              );
+            })}
+          </g>
+        )}
+
+        {(id === 'prision_maldita' || id === 'castillo_del_verdugo') && (
+          <g>
+            {[24, 72, 134, 196, 248, 292].map((cx, idx) => {
+              const sway = (tick + idx) % 4 === 0 ? 1 : 0;
+              return (
+                <g key={cx}>
+                  <rect x={cx + sway} y={10} width={2} height={42 + (idx % 3) * 16} fill="#334155" />
+                  <rect x={cx + sway} y={16} width={1} height={36 + (idx % 3) * 16} fill="#64748b" />
+                  {idx % 2 === 0 && (
+                    <g>
+                      <rect x={cx - 5 + sway} y={52 + (idx % 2) * 12} width={12} height={16} fill="#1e293b" />
+                      <rect x={cx - 3 + sway} y={54 + (idx % 2) * 12} width={2} height={12} fill="#475569" />
+                      <rect x={cx + 3 + sway} y={54 + (idx % 2) * 12} width={2} height={12} fill="#475569" />
+                      <rect
+                        x={cx - 1 + sway}
+                        y={60 + (idx % 2) * 12}
+                        width={4}
+                        height={3}
+                        fill={p.accentPrimary}
+                        opacity={pulse}
+                      />
+                    </g>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        )}
+
+        {(id === 'forja_infernal' || id === 'fortaleza_goblin') && (
+          <g>
+            <rect x={0} y={135} width={320} height={4} fill="#7c2d12" />
+            <rect x={0} y={136} width={320} height={2} fill="#f97316" opacity={pulse} />
+            {[22, 84, 148, 216, 278].map((lx, idx) => (
+              <rect
+                key={lx}
+                x={lx + ((tick + idx) % 3)}
+                y={136}
+                width={18}
+                height={2}
+                fill="#fde047"
+                opacity={pulse}
+              />
+            ))}
+          </g>
+        )}
+
+        {(id === 'la_colmena' || id === 'bosque_de_los_susurros') && (
+          <g>
+            {[30, 96, 164, 232, 286].map((hx, idx) => (
+              <g key={hx}>
+                <rect x={hx} y={14} width={8} height={28 + (idx % 2) * 14} fill={p.wallMid} />
+                <rect
+                  x={hx + 2}
+                  y={36 + (idx % 2) * 14}
+                  width={4}
+                  height={8}
+                  fill={p.accentPrimary}
+                  opacity={pulse * 0.85}
+                />
+                <rect
+                  x={hx + 3}
+                  y={38 + (idx % 2) * 14}
+                  width={2}
+                  height={4}
+                  fill={p.particlePrimary}
+                  opacity={pulse}
+                />
+              </g>
+            ))}
+          </g>
+        )}
+
+        {(id === 'templo_sumergido' ||
+          id === 'alcantarillas_imperiales' ||
+          id === 'santuario_de_sangre') && (
+          <g>
+            <rect x={0} y={134} width={320} height={8} fill={p.wallMid} opacity={0.85} />
+            <rect x={0} y={135} width={320} height={2} fill={p.accentPrimary} opacity={pulse * 0.75} />
+            {[16, 68, 124, 182, 238, 288].map((wx, idx) => (
+              <rect
+                key={wx}
+                x={wx + ((tick + idx * 2) % 6)}
+                y={137}
+                width={14}
+                height={1}
+                fill={p.particlePrimary}
+                opacity={pulse}
+              />
+            ))}
+          </g>
+        )}
+
+        {(id === 'cripta_de_cristal' ||
+          id === 'cavernas_heladas' ||
+          id === 'palacio_de_los_espejos' ||
+          id === 'minas_abandonadas') && (
+          <g>
+            {[24, 82, 146, 208, 272].map((cx, idx) => (
+              <g key={cx}>
+                <rect x={cx} y={116 - (idx % 2) * 8} width={8} height={24 + (idx % 2) * 8} fill={p.wallLight} />
+                <rect
+                  x={cx + 2}
+                  y={112 - (idx % 2) * 8}
+                  width={4}
+                  height={28 + (idx % 2) * 8}
+                  fill={p.accentPrimary}
+                  opacity={0.75}
+                />
+                <rect
+                  x={cx + 3}
+                  y={114 - (idx % 2) * 8}
+                  width={2}
+                  height={16}
+                  fill={p.particlePrimary}
+                  opacity={pulse}
+                />
+              </g>
+            ))}
+          </g>
+        )}
+
+        {(id === 'biblioteca_prohibida' ||
+          id === 'torre_del_astrologo' ||
+          id === 'ciudad_sepultada' ||
+          id === 'el_abismo') && (
+          <g>
+            {[42, 118, 194, 268].map((ax, idx) => {
+              const floatOff = ((tick + idx * 2) % 4) - 2;
+              return (
+                <g key={ax}>
+                  <rect
+                    x={ax}
+                    y={44 + floatOff}
+                    width={6}
+                    height={14}
+                    fill={p.accentPrimary}
+                    opacity={pulse * 0.65}
+                  />
+                  <rect
+                    x={ax + 2}
+                    y={46 + floatOff}
+                    width={2}
+                    height={10}
+                    fill={p.particlePrimary}
+                    opacity={pulse}
+                  />
+                </g>
+              );
+            })}
+          </g>
+        )}
+
+        {/* Animated Full-Screen Environmental Particles */}
+        {Array.from({ length: 24 }).map((_, idx) => {
+          const baseX = (idx * 13 + 9) % 310;
+          const baseY = 18 + ((idx * 19) % 116);
+          const px = (baseX + driftX * (idx % 2 === 0 ? 1 : -1) + 320) % 320;
+          const py = (baseY + driftY * (idx % 3 === 0 ? -1 : 1) + 140) % 140;
+          const isSecondary = idx % 3 === 0;
+          const size = idx % 5 === 0 ? 3 : 2;
+          return (
+            <rect
+              key={idx}
+              x={px}
+              y={py}
+              width={size}
+              height={size}
+              fill={isSecondary ? p.particleSecondary : p.particlePrimary}
+              opacity={((tick + idx) % 4 === 0 ? 0.9 : 0.45) * pulse}
+            />
+          );
+        })}
+      </svg>
+
+      {/* Ambient Biome Radial Glows */}
+      <div
+        className="absolute inset-0 transition-opacity duration-500"
+        style={{
+          background: `radial-gradient(circle at 28% 54%, ${
+            isBoss ? 'rgba(244,63,94,0.26)' : p.glowColor
+          }, transparent 58%), radial-gradient(circle at 76% 42%, ${p.glowColor}, transparent 62%)`,
+          opacity: pulse,
+        }}
+      />
+
+      {/* Subtle Edge Vignette so UI floats cleanly over the living world */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_48%,rgba(2,4,8,0.68)_100%)]" />
+    </div>
+  );
+};
+
 export const LaCriptaBiomeStageBackdrop: React.FC<{
   dungeon: CriptaDungeonDefinition;
   isBossOrMiniboss?: boolean;
@@ -694,6 +1419,7 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
   }, []);
 
   const biomeId = dungeon.id;
+  const p = getBiomeVisualProfile(biomeId);
   const flicker = tick % 3 === 0 ? 1 : tick % 3 === 1 ? 0.86 : 0.94;
   const pulseY = tick % 4 === 1 || tick % 4 === 2 ? -1 : 0;
   const driftX = (tick % 6) - 2;
@@ -705,7 +1431,14 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
       <div
         className="absolute inset-0 transition-opacity duration-500"
         style={{
-          background: `radial-gradient(ellipse at 50% 42%, ${dungeon.palette.glow}33 0%, ${dungeon.palette.fog}75 48%, ${dungeon.palette.stoneDark} 94%)`,
+          background: `linear-gradient(180deg, ${p.bgTop} 0%, ${p.bgMid} 58%, ${p.bgBottom} 100%)`,
+        }}
+      />
+      <div
+        className="absolute inset-0 transition-opacity duration-500"
+        style={{
+          background: `radial-gradient(ellipse at 50% 46%, ${p.glowColor} 0%, transparent 72%)`,
+          opacity: flicker,
         }}
       />
 
@@ -714,13 +1447,14 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
         viewBox="0 0 160 120"
         preserveAspectRatio="none"
         shapeRendering="crispEdges"
-        className="absolute inset-0 w-full h-full opacity-75"
+        className="absolute inset-0 w-full h-full opacity-85"
+        style={{ imageRendering: 'pixelated' }}
       >
         {/* Distant Vault Pillars & Layered Stonework */}
-        <rect x="8" y="0" width="13" height="92" fill={dungeon.palette.stone} opacity="0.52" />
-        <rect x="139" y="0" width="13" height="92" fill={dungeon.palette.stone} opacity="0.52" />
-        <rect x="21" y="0" width="4" height="88" fill={dungeon.palette.stoneDark} opacity="0.78" />
-        <rect x="135" y="0" width="4" height="88" fill={dungeon.palette.stoneDark} opacity="0.78" />
+        <rect x="8" y="0" width="13" height="92" fill={p.wallMid} opacity="0.65" />
+        <rect x="139" y="0" width="13" height="92" fill={p.wallMid} opacity="0.65" />
+        <rect x="21" y="0" width="4" height="88" fill={p.wallDark} opacity="0.85" />
+        <rect x="135" y="0" width="4" height="88" fill={p.wallDark} opacity="0.85" />
 
         {/* Brick Mortar & Crack Lines on Pillars */}
         <rect x="9" y="22" width="11" height="1" fill="#09070E" opacity="0.6" />
@@ -730,16 +1464,12 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
         <rect x="139" y="52" width="11" height="1" fill="#09070E" opacity="0.6" />
 
         {/* Upper Gothic Arch Silhouette */}
-        <rect x="0" y="0" width="160" height="9" fill="#07050A" opacity="0.86" />
-        <rect x="24" y="9" width="112" height="3" fill={dungeon.palette.stone} opacity="0.45" />
+        <rect x="0" y="0" width="160" height="9" fill={p.bgBottom} opacity="0.9" />
+        <rect x="24" y="9" width="112" height="3" fill={p.wallLight} opacity="0.45" />
 
-        {/* ================================================================ */}
-        {/* BIOME-SPECIFIC ARCHITECTURAL PROPS & LIVING DETAILS              */}
-        {/* ================================================================ */}
-
+        {/* BIOME-SPECIFIC ARCHITECTURAL PROPS & LIVING DETAILS */}
         {biomeId === 'jardin_podrido' && (
           <g>
-            {/* Hanging Overgrown Vines & Tangled Canopy Roots */}
             <rect x="28" y="9" width="3" height={22 + (tick % 2)} fill="#1D3622" />
             <rect x="30" y="20" width="2" height="15" fill="#355E3B" />
             <rect x="46" y="9" width="2" height="16" fill="#234229" />
@@ -747,42 +1477,30 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
             <rect x="128" y="9" width="3" height={25 - (tick % 2)} fill="#1D3622" />
             <rect x="127" y="24" width="2" height="14" fill="#355E3B" />
 
-            {/* Giant Background Bioluminescent Fungal Stalks (Left & Right) */}
             <rect x="25" y="66" width="5" height="20" fill="#5A4D41" />
             <rect x="27" y="66" width="2" height="20" fill="#8C7A68" />
             <rect x="18" y="58" width="19" height="8" fill="#4A2559" />
             <rect x="20" y="55" width="15" height="4" fill="#7A3E8F" />
             <rect x="22" y="59" width="11" height="2" fill="#A55CC2" />
-            {/* Glowing Fungal Cap Spots */}
             <rect x="22" y="57" width="3" height="2" fill="#B8FF66" opacity={flicker} />
             <rect x="29" y="60" width="3" height="2" fill="#D4FF80" opacity={flicker} />
             <rect x="20" y="65" width="15" height="2" fill="#2D1638" />
 
-            {/* Right Cluster of Glowing Toadstools */}
             <rect x="128" y="70" width="4" height="16" fill="#5A4D41" />
             <rect x="122" y="63" width="16" height="7" fill="#3D204A" />
             <rect x="124" y="61" width="12" height="3" fill="#7A3E8F" />
             <rect x="126" y="63" width="3" height="2" fill="#B8FF66" opacity={flicker} />
             <rect x="132" y="65" width="2" height="2" fill="#8CE65A" opacity={flicker} />
 
-            {/* Smaller Foreground Spore Bulbs on Floor */}
             <rect x="38" y="81" width="6" height="4" fill="#59306B" />
             <rect x="39" y="80" width="4" height="2" fill="#B8FF66" opacity={flicker} />
             <rect x="116" y="81" width="6" height="4" fill="#59306B" />
             <rect x="117" y="80" width="4" height="2" fill="#B8FF66" opacity={flicker} />
-
-            {/* Floating Bioluminescent Spore Particles */}
-            <rect x={34 + driftX} y={70 - particleLift * 4} width="2" height="2" fill="#B8FF66" opacity="0.8" />
-            <rect x={62 - driftX} y={64 - ((particleLift + 3) % 8) * 4} width="2" height="2" fill="#D4FF80" opacity="0.7" />
-            <rect x={98 + driftX} y={68 - ((particleLift + 5) % 8) * 4} width="2" height="2" fill="#B8FF66" opacity="0.75" />
-            <rect x={122 - driftX} y={60 - ((particleLift + 2) % 8) * 4} width="2" height="2" fill="#C285E6" opacity="0.75" />
-            <rect x={78} y={52 - particleLift * 3} width="1" height="1" fill="#E6FFB2" opacity="0.65" />
           </g>
         )}
 
-        {biomeId === 'catacumbas_reales' && (
+        {(biomeId === 'catacumbas_del_rey' || biomeId === 'cementerio_de_gigantes') && (
           <g>
-            {/* Recessed Skull Ossuary Niches in Walls */}
             <rect x="26" y="46" width="14" height="24" fill="#0B0912" />
             <rect x="28" y="50" width="4" height="4" fill="#9E927B" opacity="0.6" />
             <rect x="34" y="50" width="4" height="4" fill="#8A7E68" opacity="0.6" />
@@ -795,37 +1513,26 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
             <rect x="122" y="58" width="4" height="4" fill="#8A7E68" opacity="0.6" />
             <rect x="128" y="58" width="4" height="4" fill="#9E927B" opacity="0.6" />
 
-            {/* Hanging Crypt Chains & Necromantic Green Torch Sconces */}
             <rect x="44" y="12" width="2" height="18" fill="#4E4A59" />
             <rect x="114" y="12" width="2" height="22" fill="#4E4A59" />
             <rect x="29" y="25" width="6" height="6" fill="#5CE6A0" opacity={flicker} />
             <rect x="125" y="25" width="6" height="6" fill="#5CE6A0" opacity={flicker} />
-
-            {/* Rising Soul Wisps & Crypt Dust Motes */}
-            <rect x={42 + driftX} y={68 - particleLift * 4} width="2" height="3" fill="#5CE6A0" opacity="0.65" />
-            <rect x={112 - driftX} y={64 - ((particleLift + 4) % 8) * 4} width="2" height="3" fill="#5CE6A0" opacity="0.65" />
           </g>
         )}
 
-        {biomeId === 'bosque_susurrante' && (
+        {(biomeId === 'bosque_de_los_susurros' || biomeId === 'la_colmena') && (
           <g>
-            {/* Gnarled Deadwood Trunks & Hanging Briar Branches */}
-            <rect x="22" y="12" width="9" height="74" fill="#1E1714" />
-            <rect x="31" y="24" width="12" height="4" fill="#29201B" />
-            <rect x="129" y="12" width="9" height="74" fill="#1E1714" />
-            <rect x="117" y="28" width="12" height="4" fill="#29201B" />
-
-            {/* Drifting Ground Mist & Will-o'-Wisp Fireflies */}
-            <rect x={18 + driftX * 2} y="76" width="48" height="4" fill="#4B6B63" opacity="0.32" />
-            <rect x={92 - driftX * 2} y="78" width="46" height="4" fill="#4B6B63" opacity="0.32" />
-            <rect x={44 + driftX} y={62 - particleLift * 3} width="2" height="2" fill="#8CE6B8" opacity={flicker} />
-            <rect x={108 - driftX} y={58 - ((particleLift + 3) % 8) * 3} width="2" height="2" fill="#B8FFE0" opacity={flicker} />
+            <rect x="22" y="12" width="9" height="74" fill={p.wallDark} />
+            <rect x="31" y="24" width="12" height="4" fill={p.wallMid} />
+            <rect x="129" y="12" width="9" height="74" fill={p.wallDark} />
+            <rect x="117" y="28" width="12" height="4" fill={p.wallMid} />
+            <rect x={18 + driftX * 2} y="76" width="48" height="4" fill={p.accentPrimary} opacity="0.28" />
+            <rect x={92 - driftX * 2} y="78" width="46" height="4" fill={p.accentPrimary} opacity="0.28" />
           </g>
         )}
 
-        {biomeId === 'forja_infernal' && (
+        {(biomeId === 'forja_infernal' || biomeId === 'fortaleza_goblin') && (
           <g>
-            {/* Dwarf Smelter Crucible Pipes & Molten Lava Channels */}
             <rect x="26" y="12" width="8" height="72" fill="#2B2121" />
             <rect x="28" y="12" width="4" height="72" fill="#FF5926" opacity={flicker} />
             <rect x="30" y="12" width="1" height="72" fill="#FFD166" opacity={flicker} />
@@ -833,49 +1540,42 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
             <rect x="126" y="12" width="8" height="72" fill="#2B2121" />
             <rect x="128" y="12" width="4" height="72" fill="#FF5926" opacity={flicker} />
             <rect x="129" y="12" width="1" height="72" fill="#FFD166" opacity={flicker} />
-
-            {/* Rising Forge Sparks & Cinders */}
-            <rect x={38 + driftX} y={76 - particleLift * 6} width="2" height="2" fill="#FF8C3B" opacity="0.9" />
-            <rect x={76 - driftX} y={74 - ((particleLift + 3) % 8) * 6} width="2" height="2" fill="#FFD166" opacity="0.85" />
-            <rect x={118 + driftX} y={78 - ((particleLift + 5) % 8) * 6} width="2" height="2" fill="#FF5926" opacity="0.9" />
           </g>
         )}
 
-        {biomeId === 'alcantarillas_imperiales' && (
+        {(biomeId === 'alcantarillas_imperiales' ||
+          biomeId === 'templo_sumergido' ||
+          biomeId === 'santuario_de_sangre') && (
           <g>
-            {/* Iron Sewer Grates & Dripping Toxic Sluice Pipes */}
-            <rect x="26" y="34" width="16" height="12" fill="#1C2621" />
-            <rect x="28" y="34" width="2" height="12" fill="#3B4D43" />
-            <rect x="33" y="34" width="2" height="12" fill="#3B4D43" />
-            <rect x="38" y="34" width="2" height="12" fill="#3B4D43" />
-            {/* Dripping Acid Stream */}
-            <rect x="31" y="46" width="4" height="40" fill="#6EE64E" opacity="0.55" />
-            <rect x="32" y={48 + particleLift * 4} width="2" height="4" fill="#C4FF80" />
+            <rect x="26" y="34" width="16" height="12" fill={p.wallDark} />
+            <rect x="31" y="46" width="4" height="40" fill={p.accentPrimary} opacity="0.55" />
+            <rect x="32" y={48 + particleLift * 4} width="2" height="4" fill={p.particlePrimary} />
 
-            <rect x="118" y="34" width="16" height="12" fill="#1C2621" />
-            <rect x="123" y="46" width="4" height="40" fill="#6EE64E" opacity="0.55" />
-            <rect x="124" y={48 + ((particleLift + 4) % 8) * 4} width="2" height="4" fill="#C4FF80" />
-
-            {/* Rising Alchemical / Sewer Gas Bubbles */}
-            <rect x={46 + driftX} y={76 - particleLift * 4} width="3" height="3" fill="#80FF59" opacity="0.65" />
-            <rect x={112 - driftX} y={74 - ((particleLift + 3) % 8) * 4} width="3" height="3" fill="#80FF59" opacity="0.65" />
+            <rect x="118" y="34" width="16" height="12" fill={p.wallDark} />
+            <rect x="123" y="46" width="4" height="40" fill={p.accentPrimary} opacity="0.55" />
+            <rect x="124" y={48 + ((particleLift + 4) % 8) * 4} width="2" height="4" fill={p.particlePrimary} />
           </g>
         )}
 
-        {biomeId === 'cavernas_heladas' && (
+        {(biomeId === 'cavernas_heladas' ||
+          biomeId === 'cripta_de_cristal' ||
+          biomeId === 'minas_abandonadas' ||
+          biomeId === 'palacio_de_los_espejos') && (
           <g>
-            {/* Jagged Ceiling Icicles & Frozen Crystal Columns */}
-            <rect x="26" y="9" width="6" height="18" fill="#6EC2E6" opacity="0.8" />
-            <rect x="28" y="27" width="2" height="8" fill="#B8F2FF" opacity="0.9" />
-            <rect x="40" y="9" width="4" height="14" fill="#6EC2E6" opacity="0.75" />
-            <rect x="116" y="9" width="4" height="15" fill="#6EC2E6" opacity="0.75" />
-            <rect x="128" y="9" width="6" height="20" fill="#6EC2E6" opacity="0.8" />
-            <rect x="130" y="29" width="2" height="8" fill="#B8F2FF" opacity="0.9" />
+            <rect x="26" y="9" width="6" height="18" fill={p.accentPrimary} opacity="0.75" />
+            <rect x="28" y="27" width="2" height="8" fill={p.particlePrimary} opacity="0.9" />
+            <rect x="128" y="9" width="6" height="20" fill={p.accentPrimary} opacity="0.75" />
+            <rect x="130" y="29" width="2" height="8" fill={p.particlePrimary} opacity="0.9" />
+          </g>
+        )}
 
-            {/* Falling Snowflakes & Frost Crystals */}
-            <rect x={36 + driftX} y={18 + particleLift * 7} width="2" height="2" fill="#E0FAFF" opacity="0.85" />
-            <rect x={78 - driftX} y={14 + ((particleLift + 3) % 8) * 7} width="2" height="2" fill="#B8F2FF" opacity="0.8" />
-            <rect x={118 + driftX} y={20 + ((particleLift + 5) % 8) * 7} width="2" height="2" fill="#E0FAFF" opacity="0.85" />
+        {(biomeId === 'prision_maldita' || biomeId === 'castillo_del_verdugo') && (
+          <g>
+            <rect x="34" y="9" width="2" height="36" fill="#475569" />
+            <rect x="29" y="45" width="12" height="15" fill="#1e293b" />
+            <rect x="31" y="47" width="2" height="11" fill="#64748b" />
+            <rect x="37" y="47" width="2" height="11" fill="#64748b" />
+            <rect x="124" y="9" width="2" height="40" fill="#475569" />
           </g>
         )}
 
@@ -886,7 +1586,7 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
           y={27 + pulseY}
           width="6"
           height="5"
-          fill={dungeon.palette.highlight}
+          fill={p.accentPrimary}
           opacity={0.85 * flicker}
         />
         <rect
@@ -904,7 +1604,7 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
           y={27 + pulseY}
           width="6"
           height="5"
-          fill={dungeon.palette.highlight}
+          fill={p.accentPrimary}
           opacity={0.85 * flicker}
         />
         <rect
@@ -916,35 +1616,27 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
           opacity={0.92 * flicker}
         />
 
-        {/* Ambient Floating Motes for All Other Biomes */}
-        {biomeId !== 'jardin_podrido' &&
-          biomeId !== 'forja_infernal' &&
-          biomeId !== 'cavernas_heladas' && (
-            <g>
-              <rect
-                x={48 + driftX}
-                y={68 - particleLift * 4}
-                width="2"
-                height="2"
-                fill={dungeon.palette.glow}
-                opacity="0.65"
-              />
-              <rect
-                x={108 - driftX}
-                y={62 - ((particleLift + 4) % 8) * 4}
-                width="2"
-                height="2"
-                fill={dungeon.palette.highlight}
-                opacity="0.65"
-              />
-            </g>
-          )}
+        {/* Animated Floating Particles Across Stage */}
+        {Array.from({ length: 10 }).map((_, idx) => {
+          const px = (24 + idx * 12 + driftX * (idx % 2 === 0 ? 1 : -1)) % 144;
+          const py = (68 - ((particleLift + idx * 2) % 8) * 6 + 80) % 80;
+          return (
+            <rect
+              key={idx}
+              x={px}
+              y={py}
+              width="2"
+              height="2"
+              fill={idx % 2 === 0 ? p.particlePrimary : p.particleSecondary}
+              opacity={0.75 * flicker}
+            />
+          );
+        })}
 
         {/* Creature Stage Stone Pedestal / Ground Plane */}
-        <rect x="0" y="88" width="160" height="32" fill="#08060D" opacity="0.9" />
-        <rect x="12" y="84" width="136" height="5" fill={dungeon.palette.stone} opacity="0.82" />
-        <rect x="20" y="83" width="120" height="1" fill={dungeon.palette.highlight} opacity="0.45" />
-        {/* Carved Pedestal Stone Blocks */}
+        <rect x="0" y="88" width="160" height="32" fill={p.floorDark} opacity="0.95" />
+        <rect x="12" y="84" width="136" height="5" fill={p.floorMid} opacity="0.9" />
+        <rect x="20" y="83" width="120" height="1" fill={p.floorLight} opacity="0.65" />
         <rect x="38" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
         <rect x="80" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
         <rect x="122" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
@@ -957,23 +1649,23 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
               y="85"
               width="92"
               height="2"
-              fill={dungeon.palette.highlight}
-              opacity={0.8 * flicker}
+              fill={p.accentPrimary}
+              opacity={0.85 * flicker}
             />
             <rect
               x="46"
               y="88"
               width="68"
               height="1"
-              fill={dungeon.palette.glow}
-              opacity={0.9 * flicker}
+              fill={p.particlePrimary}
+              opacity={0.95 * flicker}
             />
           </>
         )}
       </svg>
 
       {/* Vignette Framing */}
-      <div className="absolute inset-0 shadow-[inset_0_0_65px_rgba(5,4,8,0.92)]" />
+      <div className="absolute inset-0 shadow-[inset_0_0_55px_rgba(4,4,8,0.85)]" />
     </div>
   );
 };

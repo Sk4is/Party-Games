@@ -2,13 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { X, Crosshair } from 'lucide-react';
 import {
   CriptaAcquiredRelic,
+  CriptaDungeonDefinition,
   CriptaDungeonRoom,
   CriptaItemId,
   CriptaPlayer,
   CriptaRoomEnemy,
   CriptaStatusEffectType,
 } from '../../types/laCripta';
-import { CRIPTA_CHARACTERS_CATALOG } from '../../data/la-cripta/criptaCatalog';
+import {
+  CRIPTA_CHARACTERS_CATALOG,
+  CRIPTA_DUNGEONS_REGISTRY,
+} from '../../data/la-cripta/criptaCatalog';
 import {
   CRIPTA_ITEMS_REGISTRY,
   NORMAL_INVENTORY_MAX_SLOTS,
@@ -34,6 +38,7 @@ import {
 import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
 import { LaCriptaPixelPortrait } from './LaCriptaPartyHud';
 import { LaCriptaEnemyPixelSprite } from './LaCriptaRoomEnvironment';
+import { LaCriptaBiomeStageBackdrop } from './LaCriptaEncounterCards';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 
 export type CriptaContextualPanelMode =
@@ -198,6 +203,7 @@ export interface LaCriptaContextualSidePanelProps {
   inspectedPlayer: CriptaPlayer | null;
   inspectedEnemy: CriptaRoomEnemy | null;
   activeRoom: CriptaDungeonRoom;
+  dungeon?: CriptaDungeonDefinition;
   partyRelics: CriptaAcquiredRelic[];
   discoveredAbilityIds: string[];
   isMyTurnInCombat: boolean;
@@ -220,6 +226,7 @@ export const LaCriptaContextualSidePanel: React.FC<
   inspectedPlayer,
   inspectedEnemy,
   activeRoom,
+  dungeon,
   partyRelics,
   discoveredAbilityIds,
   isMyTurnInCombat,
@@ -272,7 +279,11 @@ export const LaCriptaContextualSidePanel: React.FC<
             ? 'Inspección de Aventurero'
             : 'Examinar Criatura'
         }
-        className="relative z-10 w-full sm:w-[390px] md:w-[420px] max-h-[82dvh] lg:max-h-none lg:h-full bg-[#0E0A16]/98 border-t-2 sm:border-t-0 sm:border-l-2 border-[#E7A54A] shadow-[-16px_0_48px_rgba(0,0,0,0.92)] flex flex-col justify-between overflow-hidden animate-[slideInRight_240ms_cubic-bezier(0.16,1,0.3,1)]"
+        className={`relative z-10 w-full ${
+          mode === 'ENEMY_INSPECTION'
+            ? 'sm:w-[440px] md:w-[490px]'
+            : 'sm:w-[400px] md:w-[430px]'
+        } max-h-[88dvh] lg:max-h-none lg:h-full bg-[#0E0A16]/98 border-t-2 sm:border-t-0 sm:border-l-2 border-[#E7A54A] shadow-[-16px_0_48px_rgba(0,0,0,0.94)] flex flex-col justify-between overflow-hidden animate-[slideInRight_220ms_cubic-bezier(0.16,1,0.3,1)]`}
       >
         {/* ===================================================================
             MODE 1: MOCHILA (DEDICATED INVENTORY DRAWER)
@@ -844,7 +855,7 @@ export const LaCriptaContextualSidePanel: React.FC<
         )}
 
         {/* ===================================================================
-            MODE 3: ENEMY_INSPECTION (LIVE TACTICAL CREATURE EXAMINER)
+            MODE 3: ENEMY_INSPECTION (BESTIARY / CREATURE SHEET REDESIGN)
             =================================================================== */}
         {mode === 'ENEMY_INSPECTION' && inspectedEnemy && (
           <>
@@ -856,6 +867,8 @@ export const LaCriptaContextualSidePanel: React.FC<
                 buildEnemyAiProfileForArchetype(inspectedEnemy).aiProfile;
               const enemyDef = inspectedEnemy.armor || 0;
               const magicRes = inspectedEnemy.magicResistance || 0;
+              const resolvedDungeon =
+                dungeon || CRIPTA_DUNGEONS_REGISTRY.catacumbas_del_rey;
 
               // Collect statuses this creature can apply from its abilities & threats
               const statusCapabilities: Array<{
@@ -895,12 +908,19 @@ export const LaCriptaContextualSidePanel: React.FC<
                 selectedTargetEnemyId === inspectedEnemy.id ||
                 !selectedTargetEnemyId;
 
+              const spriteDisplaySize =
+                inspectedEnemy.isBoss ||
+                inspectedEnemy.isFinalBoss ||
+                inspectedEnemy.isMiniboss
+                  ? 224
+                  : 204;
+
               return (
                 <>
-                  {/* Header */}
-                  <div className="px-4 py-3 bg-[#171123] border-b-2 border-[#2E223D] flex items-center justify-between gap-2">
+                  {/* 1. PANEL HEADER: Category, Large Name, Subtitle & Close Button */}
+                  <div className="px-4 py-3.5 bg-[#171123] border-b-2 border-[#2E223D] flex items-start justify-between gap-3 shrink-0">
                     <div className="min-w-0">
-                      <div className="text-[9px] font-cripta-pixel text-[#E7A54A] uppercase tracking-widest">
+                      <div className="text-[9px] font-cripta-pixel font-bold text-[#E7A54A] uppercase tracking-widest">
                         {inspectedEnemy.isFinalBoss || inspectedEnemy.isBoss
                           ? 'SOBERANO DEL ABISMO'
                           : inspectedEnemy.isMiniboss
@@ -909,9 +929,13 @@ export const LaCriptaContextualSidePanel: React.FC<
                           ? 'CRIATURA ÉLITE'
                           : 'CRIATURA DE CRIPTA'}
                       </div>
-                      <h3 className="font-cripta-display text-base sm:text-lg font-black text-[#F5EFE6] uppercase truncate">
+                      <h3 className="mt-0.5 font-cripta-display text-lg sm:text-xl font-black text-[#F5EFE6] uppercase leading-tight tracking-wide">
                         {inspectedEnemy.name}
                       </h3>
+                      <div className="mt-0.5 text-[10px] font-cripta-pixel text-[#D8C6A0]/80 uppercase tracking-wider">
+                        {resolvedDungeon.name}
+                        {inspectedEnemy.title ? ` · ${inspectedEnemy.title}` : ''}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -924,7 +948,7 @@ export const LaCriptaContextualSidePanel: React.FC<
                               laCriptaAudio.playDoorHover();
                               onSelectTargetEnemy(inspectedEnemy.id);
                             }}
-                            className="px-2 py-1 bg-[#2A121D] hover:bg-[#3D1A2A] border border-[#FF4D6D] text-[9px] font-cripta-pixel font-bold text-[#FFD166] flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-1.5 bg-[#2A121D] hover:bg-[#3D1A2A] border border-[#FF4D6D] text-[9px] font-cripta-pixel font-bold text-[#FFD166] flex items-center gap-1 cursor-pointer transition-colors"
                           >
                             <Crosshair className="w-3 h-3" />
                             <span>FIJAR OBJETIVO</span>
@@ -934,64 +958,64 @@ export const LaCriptaContextualSidePanel: React.FC<
                         type="button"
                         onClick={onClose}
                         aria-label="Cerrar examen de enemigo"
-                        className="p-1.5 bg-[#221832] hover:bg-[#312247] border border-[#4A3B5C] hover:border-[#FFD166] text-[#D8C6A0] hover:text-[#FFD166] cursor-pointer"
+                        className="p-1.5 bg-[#221832] hover:bg-[#312247] border border-[#4A3B5C] hover:border-[#FFD166] text-[#D8C6A0] hover:text-[#FFD166] cursor-pointer transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Body */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {/* Creature Mini Portrait + Live Vitals */}
-                    <div className="p-3 bg-[#140E1E] border border-[#2E223D] flex items-center gap-4">
-                      <div className="w-20 h-20 bg-[#0B0811] border border-[#3E2F4B] flex items-center justify-center shrink-0 overflow-hidden">
-                        <LaCriptaEnemyPixelSprite
-                          enemy={inspectedEnemy}
-                          customSizePx={72}
+                  {/* SCROLLABLE BESTIARY SHEET CONTENT */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-5">
+                    {/* 2. DEDICATED LARGE ANIMATED SPRITE STAGE WITH SUBTLE BIOME BACKDROP */}
+                    <div className="relative w-full min-h-[205px] sm:min-h-[228px] bg-[#09060E] border-2 border-[#38294A] overflow-hidden flex flex-col items-center justify-center py-3 shadow-[inset_0_0_38px_rgba(0,0,0,0.9)]">
+                      {/* Subtle Biome-Specific Inspection Backdrop */}
+                      <div className="absolute inset-0 opacity-65 pointer-events-none">
+                        <LaCriptaBiomeStageBackdrop
+                          dungeon={resolvedDungeon}
+                          isBossOrMiniboss={Boolean(
+                            inspectedEnemy.isBoss ||
+                              inspectedEnemy.isFinalBoss ||
+                              inspectedEnemy.isMiniboss
+                          )}
                         />
                       </div>
 
-                      <div className="flex-1 grid grid-cols-3 gap-2 text-center font-cripta-pixel">
-                        <div className="p-1.5 bg-[#0D0914] border border-[#281E36]">
-                          <div className="text-[8px] text-[#D8C6A0]/65">PV</div>
-                          <div className="text-xs font-bold text-[#FF8FA3] mt-0.5">
-                            {inspectedEnemy.hp}/{inspectedEnemy.maxHp}
-                          </div>
-                        </div>
-                        <div className="p-1.5 bg-[#0D0914] border border-[#281E36]">
-                          <div className="text-[8px] text-[#D8C6A0]/65">DAÑO</div>
-                          <div className="text-xs font-bold text-[#FFD166] mt-0.5">
-                            ~{approxRange.min}–{approxRange.max}
-                          </div>
-                        </div>
-                        <div className="p-1.5 bg-[#0D0914] border border-[#281E36]">
-                          <div className="text-[8px] text-[#D8C6A0]/65">DEFENSA</div>
-                          <div className="text-xs font-bold text-[#7BDFF2] mt-0.5">
-                            {enemyDef}
-                            {magicRes > 0 ? ` · RM ${magicRes}` : ''}
-                          </div>
-                        </div>
+                      {/* Large Live Idle Creature Sprite (purely visual representation) */}
+                      <div className="relative z-10 flex items-center justify-center">
+                        <LaCriptaEnemyPixelSprite
+                          enemy={inspectedEnemy}
+                          dungeonId={resolvedDungeon.id}
+                          animState={inspectedEnemy.hp <= 0 ? 'death' : 'idle'}
+                          customSizePx={spriteDisplaySize}
+                        />
                       </div>
-                    </div>
 
-                    {/* ACTIVE STATUSES ON ENEMY */}
-                    {(Boolean(inspectedEnemy.poisonStacks && inspectedEnemy.poisonStacks > 0) ||
-                      Boolean(inspectedEnemy.vulnerableTurns && inspectedEnemy.vulnerableTurns > 0) ||
-                      Boolean(inspectedEnemy.isDefending)) && (
-                      <div>
-                        <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1.5">
-                          ESTADOS ACTIVOS EN LA CRIATURA
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {Boolean(inspectedEnemy.poisonStacks && inspectedEnemy.poisonStacks > 0) && (
+                      {/* Active Status Badges Floating at Bottom of Bestiary Stage if any */}
+                      {(Boolean(
+                        inspectedEnemy.poisonStacks &&
+                          inspectedEnemy.poisonStacks > 0
+                      ) ||
+                        Boolean(
+                          inspectedEnemy.vulnerableTurns &&
+                            inspectedEnemy.vulnerableTurns > 0
+                        ) ||
+                        Boolean(inspectedEnemy.isDefending)) && (
+                        <div className="relative z-20 mt-2 flex flex-wrap items-center justify-center gap-1.5 px-3">
+                          {Boolean(
+                            inspectedEnemy.poisonStacks &&
+                              inspectedEnemy.poisonStacks > 0
+                          ) && (
                             <LaCriptaStatusEffectBadge
                               effectType="POISON"
                               turnsRemaining={inspectedEnemy.poisonStacks || 1}
                               stacks={inspectedEnemy.poisonStacks}
                             />
                           )}
-                          {Boolean(inspectedEnemy.vulnerableTurns && inspectedEnemy.vulnerableTurns > 0) && (
+                          {Boolean(
+                            inspectedEnemy.vulnerableTurns &&
+                              inspectedEnemy.vulnerableTurns > 0
+                          ) && (
                             <LaCriptaStatusEffectBadge
                               effectType="MARKED"
                               turnsRemaining={inspectedEnemy.vulnerableTurns || 1}
@@ -1000,66 +1024,109 @@ export const LaCriptaContextualSidePanel: React.FC<
                           {Boolean(inspectedEnemy.isDefending) && (
                             <LaCriptaStatusEffectBadge
                               effectType="SHIELDED"
-                              turnsRemaining={inspectedEnemy.defendingRoundsRemaining || 1}
+                              turnsRemaining={
+                                inspectedEnemy.defendingRoundsRemaining || 1
+                              }
                             />
                           )}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
-                    {/* DEBILIDADES & RESISTENCIAS */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* 3. PRIMARY STATS: SALUD | DAÑO | DEFENSA */}
+                    <div className="grid grid-cols-3 gap-2.5 text-center font-cripta-pixel">
+                      {/* SALUD: Red/Pink Accent */}
+                      <div className="px-2.5 py-2.5 bg-[#170C14] border border-[#9E2A45] flex flex-col items-center justify-center">
+                        <span className="text-[9px] font-bold tracking-widest text-[#FF8FA3]/80 uppercase">
+                          SALUD
+                        </span>
+                        <span className="mt-1 font-cripta-mono text-sm sm:text-base font-black text-[#FF8FA3]">
+                          {Math.max(0, inspectedEnemy.hp)} / {inspectedEnemy.maxHp}
+                        </span>
+                      </div>
+
+                      {/* DAÑO: Warm Yellow/Orange Accent */}
+                      <div className="px-2.5 py-2.5 bg-[#19120B] border border-[#C88A32] flex flex-col items-center justify-center">
+                        <span className="text-[9px] font-bold tracking-widest text-[#FFD166]/80 uppercase">
+                          DAÑO
+                        </span>
+                        <span className="mt-1 font-cripta-mono text-sm sm:text-base font-black text-[#FFD166]">
+                          ~{approxRange.min}–{approxRange.max}
+                        </span>
+                      </div>
+
+                      {/* DEFENSA: Cyan/Blue-Grey Accent */}
+                      <div className="px-2.5 py-2.5 bg-[#0C151D] border border-[#3E7B96] flex flex-col items-center justify-center">
+                        <span className="text-[9px] font-bold tracking-widest text-[#7BDFF2]/80 uppercase">
+                          DEFENSA
+                        </span>
+                        <span className="mt-1 font-cripta-mono text-sm sm:text-base font-black text-[#7BDFF2]">
+                          {enemyDef}
+                          {magicRes > 0 ? ` · RM ${magicRes}` : ''}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 4 & 5. WEAKNESSES & RESISTANCES (2 Columns on wide screens, separate visual levels per item) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* DEBILIDADES */}
                       <div>
-                        <div className="text-[9px] font-cripta-pixel text-[#8EE6AE] uppercase tracking-widest mb-1.5">
+                        <div className="text-[10px] font-cripta-pixel font-bold text-[#8EE6AE] uppercase tracking-widest mb-2">
                           DEBILIDADES
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                           {traits.weaknesses.map((w) => (
                             <div
                               key={w.id}
-                              className="px-2.5 py-1.5 bg-[#12211A] border border-[#3B7A54] flex items-center justify-between text-[10px] font-cripta-pixel"
+                              className="p-2.5 bg-[#101E17] border border-[#3B7A54] flex flex-col gap-1 font-cripta-pixel"
                             >
-                              <span className="flex items-center gap-1.5 text-[#F5EFE6] font-bold">
-                                <LaCriptaTraitPixelIcon kind={w.iconKind} />
+                              <div className="flex items-center gap-2 text-xs font-bold text-[#F5EFE6] uppercase">
+                                <LaCriptaTraitPixelIcon kind={w.iconKind} size={14} />
                                 <span>{w.label}</span>
-                              </span>
-                              <span className="text-[#8EE6AE] font-bold">
-                                {w.modifierText}
-                              </span>
+                              </div>
+                              <div className="pl-5 text-[10px] font-bold text-[#8EE6AE] uppercase tracking-wider">
+                                {w.modifierText.includes('DAÑO')
+                                  ? w.modifierText
+                                  : `${w.modifierText} DAÑO RECIBIDO`}
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
 
+                      {/* RESISTENCIAS */}
                       <div>
-                        <div className="text-[9px] font-cripta-pixel text-[#FF8FA3] uppercase tracking-widest mb-1.5">
+                        <div className="text-[10px] font-cripta-pixel font-bold text-[#FF8FA3] uppercase tracking-widest mb-2">
                           RESISTENCIAS
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                           {traits.resistances.map((r) => (
                             <div
                               key={r.id}
-                              className="px-2.5 py-1.5 bg-[#22121A] border border-[#8F263D] flex items-center justify-between text-[10px] font-cripta-pixel"
+                              className="p-2.5 bg-[#1F1017] border border-[#8F263D] flex flex-col gap-1 font-cripta-pixel"
                             >
-                              <span className="flex items-center gap-1.5 text-[#F5EFE6] font-bold">
-                                <LaCriptaTraitPixelIcon kind={r.iconKind} />
+                              <div className="flex items-center gap-2 text-xs font-bold text-[#F5EFE6] uppercase">
+                                <LaCriptaTraitPixelIcon kind={r.iconKind} size={14} />
                                 <span>{r.label}</span>
-                              </span>
-                              <span className="text-[#FF8FA3] font-bold">
-                                {r.modifierText}
-                              </span>
+                              </div>
+                              <div className="pl-5 text-[10px] font-bold text-[#FF8FA3] uppercase tracking-wider">
+                                {r.modifierText === 'INMUNE' ||
+                                r.modifierText.includes('DAÑO')
+                                  ? r.modifierText
+                                  : `${r.modifierText} DAÑO RECIBIDO`}
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
                     </div>
 
-                    {/* ATAQUES CONOCIDOS */}
+                    {/* 6. ATAQUES DE LA CRIATURA (Known & Unknown Attacks with Comfortable Spacing) */}
                     <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1.5">
+                      <div className="text-[10px] font-cripta-pixel font-bold text-[#E7A54A] uppercase tracking-widest mb-2">
                         ATAQUES DE LA CRIATURA
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-2.5">
                         {(aiProfile.abilities || []).map((ab, idx) => {
                           const isKnown =
                             idx === 0 ||
@@ -1078,101 +1145,144 @@ export const LaCriptaContextualSidePanel: React.FC<
                             Math.round(approxRange.max * mult)
                           );
 
+                          const isSupportOrDefense =
+                            ab.actionKind === 'DEFEND_SELF' ||
+                            ab.actionKind === 'BUFF_ARMOR' ||
+                            ab.actionKind === 'HEAL_SELF' ||
+                            ab.actionKind === 'HEAL_ALLY';
+
+                          const attackCategoryLabel =
+                            ab.actionKind === 'HEAL_SELF' ||
+                            ab.actionKind === 'HEAL_ALLY'
+                              ? 'Curación · Apoyo'
+                              : ab.actionKind === 'DEFEND_SELF' ||
+                                ab.actionKind === 'BUFF_ARMOR'
+                              ? 'Defensa · Guardia'
+                              : ab.actionKind === 'AOE_ATTACK'
+                              ? 'Ataque de área'
+                              : ab.statusToApply
+                              ? 'Ataque · Aflicción'
+                              : 'Ataque físico';
+
+                          const statusName = ab.statusToApply
+                            ? CRIPTA_STATUS_EFFECTS_REGISTRY[ab.statusToApply]
+                                ?.name || ab.statusToApply
+                            : null;
+
                           const actionSummary =
                             ab.actionKind === 'AOE_ATTACK'
-                              ? 'Ataque de área contra todo el grupo.'
-                              : ab.actionKind === 'HEAL_SELF' || ab.actionKind === 'HEAL_ALLY'
-                              ? `Restaura ~${ab.healAmount || 12} PV.`
-                              : ab.actionKind === 'DEFEND_SELF' || ab.actionKind === 'BUFF_ARMOR'
-                              ? `Refuerza la defensa (+${ab.armorBonus || 3} DEF).`
-                              : ab.statusToApply
-                              ? `Golpe que aplica ${
-                                  CRIPTA_STATUS_EFFECTS_REGISTRY[ab.statusToApply]?.name ||
-                                  ab.statusToApply
-                                }.`
+                              ? `Impacta a todos los aventureros del grupo.${
+                                  statusName
+                                    ? ` Puede aplicar ${statusName} durante ${
+                                        ab.statusTurns || 2
+                                      } turnos.`
+                                    : ''
+                                }`
+                              : ab.actionKind === 'HEAL_SELF' ||
+                                ab.actionKind === 'HEAL_ALLY'
+                              ? `Restaura ~${ab.healAmount || 12} PV a un aliado.`
+                              : ab.actionKind === 'DEFEND_SELF' ||
+                                ab.actionKind === 'BUFF_ARMOR'
+                              ? `Alza su guardia y refuerza la defensa (+${
+                                  ab.armorBonus || 3
+                                } DEF).`
+                              : statusName
+                              ? `Puede aplicar ${statusName} durante ${
+                                  ab.statusTurns || 2
+                                } turnos.`
                               : 'Ataque directo contra un aventurero.';
+
+                          if (!isKnown) {
+                            return (
+                              <div
+                                key={ab.id}
+                                className="p-3 bg-[#120C1A] border border-dashed border-[#38294A] font-cripta-pixel space-y-1"
+                              >
+                                <div className="text-xs font-bold text-[#D8C6A0]/70 uppercase tracking-wider">
+                                  ???  ATAQUE NO OBSERVADO
+                                </div>
+                                <div className="text-[10px] text-[#D8C6A0]/55 leading-relaxed">
+                                  Se revelará cuando la criatura utilice esta técnica.
+                                </div>
+                              </div>
+                            );
+                          }
 
                           return (
                             <div
                               key={ab.id}
-                              className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2 text-[10px] font-cripta-pixel"
+                              className="p-3 bg-[#150F21] border border-[#342647] font-cripta-pixel space-y-1.5"
                             >
-                              <div className="min-w-0">
-                                <div className="font-bold text-[#FFD166] uppercase">
-                                  {isKnown ? ab.name : '??? (Ataque no observado)'}
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <div className="font-cripta-display text-xs sm:text-sm font-black text-[#FFD166] uppercase tracking-wide">
+                                    {ab.name}
+                                  </div>
+                                  <div className="text-[9px] text-[#D8C6A0]/70 uppercase tracking-wider">
+                                    {attackCategoryLabel}
+                                  </div>
                                 </div>
-                                <div className="text-[9px] text-[#D8C6A0]/80 mt-0.5">
-                                  {isKnown
-                                    ? actionSummary
-                                    : 'Se revelará cuando la criatura ejecute esta técnica.'}
-                                </div>
-                              </div>
-                              {ab.actionKind !== 'DEFEND_SELF' &&
-                                ab.actionKind !== 'BUFF_ARMOR' &&
-                                ab.actionKind !== 'HEAL_SELF' &&
-                                ab.actionKind !== 'HEAL_ALLY' && (
-                                  <span className="px-2 py-0.5 bg-[#24131D] border border-[#C93B5B] font-cripta-mono font-bold text-[#FF8FA3] shrink-0">
-                                    ~{abMin}–{abMax}
+
+                                {!isSupportOrDefense && (
+                                  <span className="px-2 py-0.5 bg-[#24131D] border border-[#C93B5B] font-cripta-mono text-[11px] font-bold text-[#FF8FA3] shrink-0">
+                                    ~{abMin}–{abMax} DAÑO
                                   </span>
                                 )}
+                              </div>
+
+                              <div className="text-[10px] text-[#E8DFCE] leading-relaxed">
+                                {actionSummary}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* EFECTOS QUE PUEDE APLICAR */}
+                    {/* 7. EFECTOS QUE PUEDE APLICAR (With Real Canonical Gameplay Description) */}
                     <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1.5">
+                      <div className="text-[10px] font-cripta-pixel font-bold text-[#D8C6A0] uppercase tracking-widest mb-2">
                         EFECTOS QUE PUEDE APLICAR
                       </div>
                       {statusCapabilities.length > 0 ? (
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="space-y-2">
                           {statusCapabilities.map((cap) => {
                             const stDef =
                               CRIPTA_STATUS_EFFECTS_REGISTRY[cap.statusType];
                             if (!stDef) return null;
                             return (
-                              <LaCriptaPixelTooltip
+                              <div
                                 key={cap.statusType}
-                                title={stDef.name}
-                                category="AMENAZA DE ESTADO"
-                                description={stDef.description}
-                                footerLabel={`DURACIÓN TÍPICA: ${cap.turns} TURNOS · VÍA ${cap.abilityName.toUpperCase()}`}
-                                borderColor={stDef.visualTreatment.color}
-                                accentColor={stDef.visualTreatment.color}
-                                icon={
-                                  <LaCriptaStatusPixelIcon
-                                    effectType={cap.statusType}
-                                    size={12}
-                                  />
-                                }
+                                className="p-2.5 border font-cripta-pixel space-y-1"
+                                style={{
+                                  backgroundColor: stDef.visualTreatment.bgTint,
+                                  borderColor: stDef.visualTreatment.borderColor,
+                                }}
                               >
-                                <div
-                                  className="px-2.5 py-1 border flex items-center gap-1.5 text-[10px] font-cripta-pixel cursor-help"
-                                  style={{
-                                    backgroundColor: stDef.visualTreatment.bgTint,
-                                    borderColor: stDef.visualTreatment.borderColor,
-                                    color: stDef.visualTreatment.color,
-                                  }}
-                                >
-                                  <LaCriptaStatusPixelIcon
-                                    effectType={cap.statusType}
-                                    size={12}
-                                  />
-                                  <span className="font-bold uppercase">
-                                    {stDef.name}
-                                  </span>
-                                  <span className="text-[#D9D0BC]">
-                                    · {cap.turns} turnos
+                                <div className="flex items-center justify-between gap-2">
+                                  <div
+                                    className="flex items-center gap-2 text-xs font-bold uppercase"
+                                    style={{ color: stDef.visualTreatment.color }}
+                                  >
+                                    <LaCriptaStatusPixelIcon
+                                      effectType={cap.statusType}
+                                      size={14}
+                                    />
+                                    <span>{stDef.name}</span>
+                                  </div>
+                                  <span className="px-1.5 py-0.5 bg-[#09070D]/80 border border-[#38294A] text-[9px] font-bold text-[#F5EFE6] uppercase">
+                                    {cap.turns} TURNOS
                                   </span>
                                 </div>
-                              </LaCriptaPixelTooltip>
+                                <div className="text-[10px] text-[#E8DFCE]/90 leading-relaxed">
+                                  {stDef.description}
+                                </div>
+                              </div>
                             );
                           })}
                         </div>
                       ) : (
-                        <div className="text-[10px] font-cripta-pixel text-[#D8C6A0]/55">
+                        <div className="p-2.5 bg-[#120D1A] border border-[#2A1F38] text-[10px] font-cripta-pixel text-[#D8C6A0]/60">
                           Ataques físicos directos sin estados alterados adicionales.
                         </div>
                       )}
@@ -1180,7 +1290,7 @@ export const LaCriptaContextualSidePanel: React.FC<
                   </div>
 
                   {/* Footer */}
-                  <div className="px-4 py-2.5 bg-[#140E1F] border-t border-[#2E223D] flex items-center justify-between text-[10px] font-cripta-pixel text-[#D8C6A0]/75">
+                  <div className="px-4 py-2.5 bg-[#140E1F] border-t border-[#2E223D] flex items-center justify-between text-[10px] font-cripta-pixel text-[#D8C6A0]/75 shrink-0">
                     <span>EXAMINAR NO CONSUME AP NI TURNO</span>
                     <span>ESC PARA CERRAR</span>
                   </div>

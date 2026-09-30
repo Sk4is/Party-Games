@@ -692,6 +692,7 @@ export function resolveCreatureVisualDefinition(
     return {
       creatureId: enemy.slug,
       family: 'TOWER_ARMILLARY_CONSTRUCT',
+      subVariant,
       biomeId: 'torre_del_astrologo',
       baseScale: 1.04 * tierScaleBoost,
       anchor: 'floating',
@@ -725,11 +726,12 @@ export function resolveCreatureVisualDefinition(
     return {
       creatureId: enemy.slug,
       family: 'HIVE_CHITIN_WARRIOR',
+      subVariant,
       biomeId: 'la_colmena',
-      baseScale: 1.0 * tierScaleBoost,
+      baseScale: 1.04 * tierScaleBoost,
       anchor: 'ground',
       rimLightColor: '#E7A54A',
-      shadowWidth: 38,
+      shadowWidth: 40,
       timing: {
         breathDurationMs: 1650,
         variantMinIntervalMs: 2700,
@@ -758,6 +760,7 @@ export function resolveCreatureVisualDefinition(
     return {
       creatureId: enemy.slug,
       family: 'CRYSTAL_PRISM_GOLEM',
+      subVariant,
       biomeId: 'cripta_de_cristal',
       baseScale: 1.06 * tierScaleBoost,
       anchor: 'ground',
@@ -791,11 +794,12 @@ export function resolveCreatureVisualDefinition(
     return {
       creatureId: enemy.slug,
       family: 'PRISON_SHACKLED_WRAITH',
+      subVariant,
       biomeId: 'prision_maldita',
-      baseScale: 1.02 * tierScaleBoost,
-      anchor: 'floating',
+      baseScale: 1.04 * tierScaleBoost,
+      anchor: subVariant === 'SHAMAN_CASTER' ? 'floating' : 'ground',
       rimLightColor: '#9B72CF',
-      shadowWidth: 34,
+      shadowWidth: 36,
       timing: {
         breathDurationMs: 2300,
         variantMinIntervalMs: 3200,
@@ -824,6 +828,7 @@ export function resolveCreatureVisualDefinition(
     return {
       creatureId: enemy.slug,
       family: 'BLOOD_MASKED_PRIEST',
+      subVariant,
       biomeId: 'santuario_de_sangre',
       baseScale: 1.02 * tierScaleBoost,
       anchor: 'ground',
@@ -857,6 +862,7 @@ export function resolveCreatureVisualDefinition(
     return {
       creatureId: enemy.slug,
       family: 'BURIED_SAND_MUMMY',
+      subVariant,
       biomeId: 'ciudad_sepultada',
       baseScale: 1.02 * tierScaleBoost,
       anchor: 'ground',
@@ -890,6 +896,7 @@ export function resolveCreatureVisualDefinition(
     return {
       creatureId: enemy.slug,
       family: 'MIRROR_SILVER_DUELIST',
+      subVariant,
       biomeId: 'palacio_de_los_espejos',
       baseScale: 1.02 * tierScaleBoost,
       anchor: 'ground',
@@ -3354,68 +3361,209 @@ function renderArticulatedCreatureFamily(
     // ========================================================================
     case 'WOODS_ANTLER_STAG':
     case 'WOODS_HOLLOW_WOODSMAN': {
+      const isWoodsman =
+        family === 'WOODS_HOLLOW_WOODSMAN' || def.subVariant === 'GUARDIAN';
+      const isDryadShaman = def.subVariant === 'SHAMAN_CASTER';
+
+      if (isDryadShaman) {
+        return (
+          <g>
+            {/* Root-Vine Skirt & Bark Legs */}
+            <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
+              <rect x="20" y="41" width="6" height="15" fill="#12151E" />
+              <rect x="21" y="42" width="4" height="13" fill={pal.primaryDark} />
+              <rect x="35" y="41" width="6" height="15" fill="#12151E" />
+              <rect x="36" y="42" width="4" height="13" fill={pal.primaryDark} />
+              <rect x="26" y="42" width="3" height="11" fill={pal.secondaryDark} />
+              <rect x="32" y="42" width="2" height="12" fill={pal.secondary} />
+            </g>
+            {/* Briar Mantle & Hollow Bark Torso with Wisp Heart */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="18" y="20" width="26" height="23" fill="#12151E" />
+              <rect x="19" y="21" width="24" height="21" fill={pal.primaryDark} />
+              <rect x="21" y="22" width="20" height="19" fill={pal.primary} />
+              <rect x="24" y="24" width="14" height="14" fill="#080B12" />
+              <rect
+                x="28"
+                y={26 - pose.breathPhase}
+                width="6"
+                height="8"
+                fill={pal.eyeGlow}
+              />
+              <rect x="29" y={27 - pose.breathPhase} width="3" height="5" fill="#FFFFFF" />
+              {/* Mossy Shoulder Boughs */}
+              <rect x="14" y="18" width="7" height="6" fill={pal.secondaryDark} />
+              <rect x="15" y="17" width="5" height="4" fill={pal.secondary} />
+              <rect x="41" y="18" width="7" height="6" fill={pal.secondaryDark} />
+              <rect x="42" y="17" width="5" height="4" fill={pal.secondary} />
+            </g>
+            {/* Left Hand Holding Hanging Soul-Lantern */}
+            <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY + pose.propY})`}>
+              <rect x="43" y="26" width="5" height="3" fill={pal.primaryLight} />
+              <rect x="45" y="29" width="1" height="6" fill={pal.metalLight} />
+              <rect x="42" y="35" width="7" height="9" fill={pal.metalDark} />
+              <rect x="43" y="36" width="5" height="7" fill={pal.eyeGlow} />
+              <rect x="44" y="38" width="3" height="3" fill="#FFFFFF" />
+            </g>
+            {/* Crowned Bark Visage & Antler Branches */}
+            <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+              <rect x="14" y="3" width="3" height="10" fill={pal.skinShadow} />
+              <rect x="17" y="6" width="5" height="2" fill={pal.skinOrBone} />
+              <rect x="45" y="3" width="3" height="10" fill={pal.skinShadow} />
+              <rect x="40" y="6" width="5" height="2" fill={pal.skinOrBone} />
+              <rect x="22" y="8" width="18" height="12" fill="#12151E" />
+              <rect x="23" y="9" width="16" height="10" fill={pal.skinShadow} />
+              <rect x="24" y="10" width="14" height="8" fill={pal.skinOrBone} />
+              {!pose.eyeBlink && (
+                <g>
+                  <rect x={26 + pose.eyeShiftX} y="13" width="3" height="3" fill={pal.eyeGlow} />
+                  <rect x={33 + pose.eyeShiftX} y="13" width="3" height="3" fill={pal.eyeGlow} />
+                  <rect x={27 + pose.eyeShiftX} y="13" width="1" height="1" fill="#FFFFFF" />
+                </g>
+              )}
+            </g>
+            {/* Gnarled Briar Staff */}
+            <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+              <rect x="11" y="7" width="3" height="46" fill="#3D2B1F" />
+              <rect x="12" y="7" width="1" height="45" fill="#6E4F3A" />
+              <rect x="8" y="4" width="9" height="7" fill={pal.secondaryDark} />
+              <rect x="10" y="5" width="5" height="5" fill={pal.eyeGlow} />
+            </g>
+          </g>
+        );
+      }
+
+      if (isWoodsman) {
+        return (
+          <g>
+            {/* Heavy Woodsman Boots & Bark Greaves */}
+            <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
+              <rect x="20" y="42" width="7" height="14" fill="#12151E" />
+              <rect x="21" y="43" width="5" height="12" fill={pal.primaryDark} />
+              <rect x="18" y="53" width="9" height="4" fill={pal.metalDark} />
+              <rect x="35" y="42" width="7" height="14" fill="#12151E" />
+              <rect x="36" y="43" width="5" height="12" fill={pal.primaryDark} />
+              <rect x="34" y="53" width="9" height="4" fill={pal.metalDark} />
+            </g>
+            {/* Broad Hollow Woodsman Coat, Moss Pauldrons & Ribcage */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="16" y="19" width="30" height="25" fill="#12151E" />
+              <rect x="18" y="20" width="26" height="23" fill={pal.primary} />
+              <rect x="22" y="23" width="18" height="16" fill="#080B12" />
+              <rect x="23" y="25" width="16" height="2" fill={pal.skinShadow} />
+              <rect x="24" y="29" width="14" height="2" fill={pal.skinShadow} />
+              <rect x="25" y="33" width="12" height="2" fill={pal.skinShadow} />
+              <rect
+                x="28"
+                y={26 - pose.breathPhase}
+                width="6"
+                height="8"
+                fill={pal.eyeGlow}
+              />
+              <rect x="14" y="17" width="8" height="7" fill={pal.secondaryDark} />
+              <rect x="15" y="18" width="6" height="4" fill={pal.secondary} />
+              <rect x="40" y="17" width="8" height="7" fill={pal.secondaryDark} />
+              <rect x="41" y="18" width="6" height="4" fill={pal.secondary} />
+            </g>
+            {/* Hooded Woodsman Skull with Moss Beard */}
+            <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+              <rect x="21" y="6" width="20" height="14" fill={pal.primaryDark} />
+              <rect x="23" y="8" width="16" height="11" fill="#080B12" />
+              <rect x="24" y="9" width="14" height="7" fill={pal.skinOrBone} />
+              {!pose.eyeBlink && (
+                <g fill={pal.eyeGlow}>
+                  <rect x={26 + pose.eyeShiftX} y="11" width="3" height="3" />
+                  <rect x={33 + pose.eyeShiftX} y="11" width="3" height="3" />
+                </g>
+              )}
+              <rect x="25" y="16" width="12" height="5" fill={pal.secondaryDark} />
+              <rect x="27" y="17" width="8" height="4" fill={pal.secondary} />
+            </g>
+            {/* Heavy Notched Lumberjack Felling Axe */}
+            <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+              <rect x="11" y="7" width="3" height="46" fill="#4E3828" />
+              <rect x="12" y="7" width="1" height="45" fill="#7D5B42" />
+              <rect x="2" y="9" width="11" height="14" fill="#12151E" />
+              <rect x="3" y="10" width="9" height="12" fill={pal.metal} />
+              <rect x="3" y="10" width="3" height="12" fill={pal.metalLight} />
+              <rect x="3" y="15" width="2" height="2" fill="#12151E" />
+            </g>
+          </g>
+        );
+      }
+
+      // SILHOUETTE C: WENDIGO / ANTLER STAG SKULL BEAST
       return (
         <g>
-          {/* Root-Clawed Hooves / Bark Legs */}
+          {/* Digitigrade Hooved Hind Legs */}
           <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
-            <rect x="22" y="42" width="5" height="15" fill={pal.primaryDark} />
-            <rect x="36" y="42" width="5" height="15" fill={pal.primaryDark} />
+            <rect x="21" y="41" width="6" height="15" fill="#12151E" />
+            <rect x="22" y="42" width="4" height="13" fill={pal.primaryDark} />
+            <rect x="20" y="54" width="6" height="3" fill={pal.skinShadow} />
+            <rect x="35" y="41" width="6" height="15" fill="#12151E" />
+            <rect x="36" y="42" width="4" height="13" fill={pal.primaryDark} />
+            <rect x="35" y="54" width="6" height="3" fill={pal.skinShadow} />
           </g>
-          {/* Hollow Ribcage / Split Tree-Trunk Torso with Cyan Soul Wisp */}
+          {/* Exposed Ribcage & Whispering Soul Flame */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect x="19" y="20" width="24" height="23" fill={pal.primary} />
-            <rect x="23" y="23" width="16" height="17" fill="#080B12" />
-            {/* Cyan Whispering Soul Flame Inside Hollow Chest */}
+            <rect x="18" y="19" width="26" height="24" fill="#12151E" />
+            <rect x="19" y="20" width="24" height="22" fill={pal.primary} />
+            <rect x="22" y="22" width="18" height="18" fill="#080B12" />
             <rect
               x="28"
-              y={26 - pose.breathPhase}
+              y={25 - pose.breathPhase}
               width="6"
-              height="9"
+              height="10"
               fill={pal.eyeGlow}
             />
-            <rect x="23" y="25" width="16" height="2" fill={pal.skinShadow} />
-            <rect x="23" y="30" width="16" height="2" fill={pal.skinShadow} />
+            <rect x="29" y={27 - pose.breathPhase} width="4" height="6" fill="#FFFFFF" />
+            <rect x="22" y="24" width="18" height="2" fill={pal.skinOrBone} />
+            <rect x="23" y="28" width="16" height="2" fill={pal.skinShadow} />
+            <rect x="24" y="32" width="14" height="2" fill={pal.skinShadow} />
           </g>
-          {/* Exposed Stag Skull with Towering Branching Antlers & Hanging Lantern */}
-          <g
-            transform={`translate(${pose.torsoX + pose.headX}, ${
-              pose.torsoY + pose.headY
-            })`}
-          >
-            {/* Left & Right Branching Bone Antlers */}
-            <rect x="11" y="2" width="3" height="11" fill={pal.skinOrBone} />
-            <rect x="14" y="5" width="7" height="2" fill={pal.skinOrBone} />
-            <rect x="15" y="1" width="2" height="5" fill={pal.skinShadow} />
-            <rect x="47" y="2" width="3" height="11" fill={pal.skinOrBone} />
-            <rect x="40" y="5" width="7" height="2" fill={pal.skinOrBone} />
-            <rect x="44" y="1" width="2" height="5" fill={pal.skinShadow} />
-            {/* Hanging Wisp Lantern from Left Antler */}
-            <rect
-              x={11 + pose.propX}
-              y="13"
-              width="4"
-              height="6"
-              fill={pal.eyeGlow}
-            />
-            {/* Elongated Cervine Skull */}
-            <rect x="21" y="9" width="19" height="11" fill={pal.skinOrBone} />
-            <rect x="16" y="13" width="7" height="6" fill={pal.skinShadow} />
+          {/* Cervine Stag Skull & Towering Multi-Tine Bone Antlers */}
+          <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+            {/* Left Branching Antler */}
+            <rect x="10" y="1" width="3" height="12" fill={pal.skinOrBone} />
+            <rect x="13" y="5" width="8" height="2" fill={pal.skinOrBone} />
+            <rect x="14" y="1" width="2" height="5" fill={pal.skinShadow} />
+            <rect x="18" y="2" width="2" height="4" fill={pal.skinShadow} />
+            {/* Right Branching Antler */}
+            <rect x="48" y="1" width="3" height="12" fill={pal.skinOrBone} />
+            <rect x="40" y="5" width="8" height="2" fill={pal.skinOrBone} />
+            <rect x="45" y="1" width="2" height="5" fill={pal.skinShadow} />
+            <rect x="41" y="2" width="2" height="4" fill={pal.skinShadow} />
+            {/* Hanging Wisp Lantern on Left Antler */}
+            <rect x={10 + pose.propX} y="13" width="4" height="6" fill={pal.eyeGlow} />
+            <rect x={11 + pose.propX} y="14" width="2" height="3" fill="#FFFFFF" />
+            {/* Sculpted Cervine Skull & Snout */}
+            <rect x="20" y="8" width="21" height="12" fill="#12151E" />
+            <rect x="21" y="9" width="19" height="10" fill={pal.skinOrBone} />
+            <rect x="22" y="9" width="15" height="3" fill="#FFF8EC" />
+            <rect x="14" y="12" width="8" height="7" fill={pal.skinShadow} />
+            <rect x="15" y="13" width="6" height="4" fill={pal.skinOrBone} />
+            <rect x="15" y="15" width="2" height="2" fill="#12151E" />
             {!pose.eyeBlink && (
-              <g fill={pal.eyeGlow}>
-                <rect x={25 + pose.eyeShiftX} y="12" width="3" height="3" />
-                <rect x={34 + pose.eyeShiftX} y="12" width="3" height="3" />
+              <g>
+                <rect x={25 + pose.eyeShiftX} y="12" width="3" height="3" fill="#12151E" />
+                <rect x={26 + pose.eyeShiftX} y="12" width="2" height="2" fill={pal.eyeGlow} />
+                <rect x={34 + pose.eyeShiftX} y="12" width="3" height="3" fill="#12151E" />
+                <rect x={35 + pose.eyeShiftX} y="12" width="2" height="2" fill={pal.eyeGlow} />
               </g>
             )}
+            <g transform={`translate(0, ${pose.jawOpen})`}>
+              <rect x="16" y="18" width="16" height="3" fill={pal.skinShadow} />
+              <rect x="18" y="17" width="2" height="2" fill="#FFF8EC" />
+              <rect x="22" y="17" width="2" height="2" fill="#FFF8EC" />
+              <rect x="26" y="17" width="2" height="2" fill="#FFF8EC" />
+            </g>
           </g>
-          {/* Gnarled Briar Scythe / Woodsman Felling Axe */}
-          <g
-            transform={`translate(${pose.torsoX + pose.weaponX}, ${
-              pose.torsoY + pose.weaponY
-            })`}
-          >
-            <rect x="10" y="8" width="3" height="44" fill="#4E3828" />
-            <rect x="3" y="10" width="9" height="12" fill={pal.metalLight} />
-            <rect x="5" y="12" width="5" height="8" fill={pal.secondary} />
+          {/* Briar-Clawed Forelimbs */}
+          <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+            <rect x="9" y="22" width="6" height="16" fill={pal.primaryDark} />
+            <rect x="7" y="36" width="2" height="6" fill={pal.skinOrBone} />
+            <rect x="10" y="37" width="2" height="6" fill={pal.skinOrBone} />
+            <rect x="13" y="36" width="2" height="6" fill={pal.skinOrBone} />
           </g>
         </g>
       );
@@ -3426,34 +3574,63 @@ function renderArticulatedCreatureFamily(
     // ========================================================================
     case 'LIBRARY_VORACIOUS_TOME':
     case 'LIBRARY_FACELESS_SCRIBE': {
-      const isTome = family === 'LIBRARY_VORACIOUS_TOME';
+      const isTome =
+        family === 'LIBRARY_VORACIOUS_TOME' || def.subVariant === 'STALKER_BEAST';
       if (isTome) {
         return (
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY - pose.breathPhase})`}>
-            {/* Heavy Brass Binding Chains */}
-            <rect x="28" y="42" width="3" height="12" fill={pal.metal} />
-            <rect x="34" y="44" width="3" height="10" fill={pal.metalDark} />
-            {/* Open Leather Grimoire Wings */}
-            <rect x="8" y="16" width="48" height="26" fill={pal.primaryDark} />
-            <rect x="10" y="18" width="44" height="22" fill={pal.skinOrBone} />
-            {/* Jagged Paper Fangs & Writhing Arcane Ink Tongue */}
-            <rect x="16" y="24" width="32" height="10" fill="#12081C" />
-            <rect x="18" y="24" width="3" height="3" fill="#FFF3C4" />
-            <rect x="24" y="24" width="3" height="3" fill="#FFF3C4" />
-            <rect x="36" y="24" width="3" height="3" fill="#FFF3C4" />
-            <rect x="42" y="24" width="3" height="3" fill="#FFF3C4" />
+            {/* Heavy Brass Binding Chains & Padlock */}
+            <rect x="26" y="41" width="3" height="13" fill="#160D21" />
+            <rect x="27" y="42" width="2" height="11" fill={pal.metal} />
+            <rect x="34" y="43" width="3" height="11" fill="#160D21" />
+            <rect x="35" y="44" width="2" height="9" fill={pal.metalDark} />
+            {/* Open Leather Grimoire Covers & Gold Corner Bosses */}
+            <rect x="7" y="14" width="50" height="28" fill="#160D21" />
+            <rect x="8" y="15" width="48" height="26" fill={pal.primaryDark} />
+            <rect x="8" y="15" width="5" height="5" fill={pal.metalLight} />
+            <rect x="51" y="15" width="5" height="5" fill={pal.metalLight} />
+            <rect x="8" y="36" width="5" height="5" fill={pal.metalLight} />
+            <rect x="51" y="36" width="5" height="5" fill={pal.metalLight} />
+            {/* Layered Parchment Pages */}
+            <rect x="11" y="17" width="42" height="22" fill={pal.skinShadow} />
+            <rect x="12" y="18" width="40" height="20" fill={pal.skinOrBone} />
+            <rect x="13" y="19" width="18" height="3" fill="#FFF8EC" />
+            {/* Abyssal Maw, Sharp Teeth & Writhing Arcane Tongue */}
+            <rect x="15" y="23" width="34" height="12" fill="#12081C" />
+            {[17, 21, 25, 35, 39, 43].map((tx) => (
+              <rect key={tx} x={tx} y="23" width="2" height="3" fill="#FFF8EC" />
+            ))}
+            {[19, 23, 37, 41].map((bx) => (
+              <rect key={bx} x={bx} y="32" width="2" height="3" fill={pal.skinOrBone} />
+            ))}
+            <rect
+              x={25 + pose.weaponX}
+              y={28 + pose.jawOpen}
+              width="14"
+              height="9"
+              fill={pal.secondaryDark}
+            />
             <rect
               x={26 + pose.weaponX}
               y={29 + pose.jawOpen}
-              width="12"
-              height="8"
+              width="11"
+              height="6"
               fill={pal.secondary}
             />
-            {/* Glowing Abyssal Eyes on Book Cover */}
+            <rect
+              x={28 + pose.weaponX}
+              y={30 + pose.jawOpen}
+              width="6"
+              height="2"
+              fill={pal.eyeGlow}
+            />
+            {/* Multiple Eldritch Eyes on Cover */}
             {!pose.eyeBlink && (
-              <g fill={pal.eyeGlow}>
-                <rect x={22 + pose.eyeShiftX} y="19" width="4" height="3" />
-                <rect x={38 + pose.eyeShiftX} y="19" width="4" height="3" />
+              <g>
+                <rect x={20 + pose.eyeShiftX} y="18" width="4" height="3" fill="#12081C" />
+                <rect x={21 + pose.eyeShiftX} y="18" width="2" height="2" fill={pal.eyeGlow} />
+                <rect x={39 + pose.eyeShiftX} y="18" width="4" height="3" fill="#12081C" />
+                <rect x={40 + pose.eyeShiftX} y="18" width="2" height="2" fill={pal.eyeGlow} />
               </g>
             )}
           </g>
@@ -3461,42 +3638,57 @@ function renderArticulatedCreatureFamily(
       }
       return (
         <g>
-          {/* Floating Scroll Halo Behind Scribe */}
+          {/* Floating Runic Scroll Halo Behind Scribe */}
           <g transform={`translate(${pose.torsoX - pose.propX}, ${pose.torsoY})`}>
-            <rect x="14" y="8" width="6" height="18" fill={pal.skinOrBone} />
-            <rect x="44" y="8" width="6" height="18" fill={pal.skinOrBone} />
+            <rect x="12" y="7" width="7" height="20" fill="#160D21" />
+            <rect x="13" y="8" width="5" height="18" fill={pal.skinOrBone} />
+            <rect x="14" y="11" width="3" height="1" fill={pal.secondary} />
+            <rect x="14" y="15" width="3" height="1" fill={pal.secondary} />
+            <rect x="44" y="7" width="7" height="20" fill="#160D21" />
+            <rect x="45" y="8" width="5" height="18" fill={pal.skinOrBone} />
+            <rect x="46" y="11" width="3" height="1" fill={pal.secondary} />
+            <rect x="46" y="15" width="3" height="1" fill={pal.secondary} />
           </g>
-          {/* Elongated Scholar Robes */}
+          {/* Layered Archivist Vestments & Gold Trim */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect x="19" y="19" width="25" height="36" fill={pal.primary} />
-            <rect x="23" y="21" width="17" height="33" fill={pal.primaryDark} />
-            <rect x="28" y="21" width="7" height="32" fill={pal.secondary} />
+            <rect x="18" y="18" width="27" height="38" fill="#160D21" />
+            <rect x="19" y="19" width="25" height="36" fill={pal.primaryDark} />
+            <rect x="21" y="20" width="21" height="34" fill={pal.primary} />
+            <rect x="24" y="21" width="15" height="32" fill={pal.primaryLight} />
+            <rect x="28" y="21" width="7" height="32" fill={pal.secondaryDark} />
+            <rect x="29" y="21" width="5" height="32" fill={pal.secondary} />
+            <rect x="20" y="36" width="23" height="3" fill={pal.metalDark} />
+            <rect x="29" y="35" width="5" height="5" fill={pal.metalLight} />
           </g>
-          {/* Blank Porcelain Mask with Shifting Violet Rune-Script */}
-          <g
-            transform={`translate(${pose.torsoX + pose.headX}, ${
-              pose.torsoY + pose.headY
-            })`}
-          >
-            <rect x="24" y="7" width="15" height="13" fill={pal.skinOrBone} />
+          {/* Porcelain Mask with Shifting Violet Rune-Script */}
+          <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+            <rect x="22" y="5" width="19" height="15" fill={pal.primaryDark} />
+            <rect x="24" y="7" width="15" height="12" fill={pal.skinShadow} />
+            <rect x="25" y="7" width="13" height="11" fill={pal.skinOrBone} />
+            <rect x="26" y="8" width="10" height="3" fill="#FFF8EC" />
             <rect
               x={29 + pose.eyeShiftX}
               y="10"
               width="5"
               height="7"
-              fill={pal.secondary}
+              fill={pal.secondaryDark}
             />
-            <rect x="30" y="12" width="3" height="3" fill={pal.eyeGlow} />
+            <rect
+              x={30 + pose.eyeShiftX}
+              y="11"
+              width="3"
+              height="5"
+              fill={pal.eyeGlow}
+            />
           </g>
           {/* Giant Dripping Obsidian Fountain-Quill Lance */}
-          <g
-            transform={`translate(${pose.torsoX + pose.weaponX}, ${
-              pose.torsoY + pose.weaponY
-            })`}
-          >
-            <rect x="10" y="6" width="4" height="44" fill={pal.secondary} />
-            <rect x="9" y="42" width="6" height="8" fill={pal.metalLight} />
-            <rect x="11" y="50" width="2" height="5" fill="#12081C" />
+          <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+            <rect x="9" y="5" width="5" height="38" fill="#160D21" />
+            <rect x="10" y="6" width="3" height="36" fill={pal.secondary} />
+            <rect x="11" y="7" width="1" height="30" fill={pal.eyeGlow} />
+            <rect x="8" y="41" width="7" height="8" fill={pal.metalDark} />
+            <rect x="9" y="42" width="5" height="6" fill={pal.metalLight} />
+            <rect x="10" y="49" width="3" height="6" fill="#12081C" />
           </g>
         </g>
       );
@@ -3508,89 +3700,349 @@ function renderArticulatedCreatureFamily(
     case 'TOWER_ARMILLARY_CONSTRUCT': {
       return (
         <g transform={`translate(${pose.torsoX}, ${pose.torsoY - pose.breathPhase})`}>
-          {/* Outer & Inner Concentric Brass Armillary Rings */}
-          <rect x="12" y="12" width="40" height="3" fill={pal.metalLight} />
-          <rect x="12" y="45" width="40" height="3" fill={pal.metalLight} />
-          <rect x="12" y="15" width="3" height="30" fill={pal.metal} />
-          <rect x="49" y="15" width="3" height="30" fill={pal.metal} />
-          {/* Tilted Inner Equatorial Brass Ring */}
+          {/* Outer Engraved Brass Armillary Ring */}
+          <rect x="11" y="10" width="42" height="4" fill="#1A1208" />
+          <rect x="12" y="11" width="40" height="2" fill={pal.metalLight} />
+          <rect x="11" y="46" width="42" height="4" fill="#1A1208" />
+          <rect x="12" y="47" width="40" height="2" fill={pal.metalLight} />
+          <rect x="11" y="14" width="4" height="32" fill="#1A1208" />
+          <rect x="12" y="14" width="2" height="32" fill={pal.metal} />
+          <rect x="49" y="14" width="4" height="32" fill="#1A1208" />
+          <rect x="50" y="14" width="2" height="32" fill={pal.metal} />
+          {/* Tilted Inner Equatorial Ring */}
+          <rect
+            x="16"
+            y={26 + (pose.secondaryPhase % 2)}
+            width="32"
+            height="5"
+            fill={pal.metalDark}
+          />
           <rect
             x="17"
             y={27 + (pose.secondaryPhase % 2)}
             width="30"
-            height="4"
+            height="3"
             fill={pal.accent}
           />
           {/* Celestial Star-Map Singularity Core */}
+          <rect x="21" y="19" width="22" height="22" fill="#0D0B1C" />
           <rect x="22" y="20" width="20" height="20" fill={pal.primaryDark} />
-          <rect x="25" y="23" width="14" height="14" fill={pal.secondary} />
+          <rect x="24" y="22" width="16" height="16" fill={pal.secondaryDark} />
+          <rect x="26" y="24" width="12" height="12" fill={pal.secondary} />
           {!pose.eyeBlink && (
-            <rect
-              x={29 + pose.eyeShiftX}
-              y="27"
-              width="6"
-              height="6"
-              fill={pal.eyeGlow}
-            />
+            <g>
+              <rect x={28 + pose.eyeShiftX} y="26" width="8" height="8" fill={pal.eyeGlow} />
+              <rect x={30 + pose.eyeShiftX} y="28" width="4" height="4" fill="#FFFFFF" />
+            </g>
           )}
           {/* Levitating Star-Lance */}
           <g transform={`translate(${pose.weaponX}, ${pose.weaponY})`}>
+            <rect x="5" y="7" width="5" height="44" fill="#0D0B1C" />
             <rect x="6" y="8" width="3" height="42" fill={pal.metalLight} />
+            <rect x="3" y="13" width="9" height="9" fill={pal.metalDark} />
             <rect x="4" y="14" width="7" height="7" fill={pal.eyeGlow} />
+            <rect x="6" y="16" width="3" height="3" fill="#FFFFFF" />
           </g>
         </g>
       );
     }
 
     // ========================================================================
-    // LA COLMENA: ZÁNGANO DE QUITINA / REINA DE ÁMBAR (Insectoid Mantis/Wasp)
+    // LA COLMENA: 3 DISTINCT INSECTOID SILHOUETTES (SCARAB GUARD / AMBER BROOD-SHAMAN / WASP-MANTIS ASSASSIN)
     // ========================================================================
     case 'HIVE_CHITIN_WARRIOR': {
+      const isBroodShaman = def.subVariant === 'SHAMAN_CASTER';
+      const isScarabGuard = def.subVariant === 'GUARDIAN';
+
+      if (isScarabGuard) {
+        // SILHOUETTE A: HEAVY HORNED SCARAB CARAPACE GUARD (6 insect legs, ridged chitin shell, horn, mandibles & chitin cleaver)
+        return (
+          <g>
+            {/* 6 Segmented Chitinous Insect Legs with Tarsal Claws */}
+            <g transform={`translate(0, ${pose.isDeadCollapsed ? 6 : 0})`}>
+              <rect x="13" y="42" width="4" height="13" fill="#120B05" />
+              <rect x="14" y="43" width="2" height="11" fill={pal.primaryDark} />
+              <rect x="11" y="54" width="5" height="2" fill={pal.metalLight} />
+
+              <rect x="21" y="44" width="5" height="13" fill="#120B05" />
+              <rect x="22" y="45" width="3" height="11" fill={pal.primary} />
+              <rect x="19" y="55" width="6" height="2" fill={pal.metalLight} />
+
+              <rect x="35" y="44" width="5" height="13" fill="#120B05" />
+              <rect x="36" y="45" width="3" height="11" fill={pal.primary} />
+              <rect x="35" y="55" width="6" height="2" fill={pal.metalLight} />
+
+              <rect x="44" y="42" width="4" height="13" fill="#120B05" />
+              <rect x="45" y="43" width="2" height="11" fill={pal.primaryDark} />
+              <rect x="44" y="54" width="5" height="2" fill={pal.metalLight} />
+            </g>
+
+            {/* Heavy Domed Scarab Abdomen & Ridged Thorax Plates (5-tone chitin shading) */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              {/* Rear Rounded Beetle Elytra Shell */}
+              <rect x="28" y="21" width="22" height="24" fill="#120B05" />
+              <rect x="29" y="22" width="20" height="22" fill={pal.primaryDark} />
+              <rect x="30" y="23" width="17" height="19" fill={pal.primary} />
+              <rect x="32" y="24" width="12" height="14" fill={pal.primaryLight} />
+              <rect x="34" y="25" width="6" height="4" fill={pal.metalLight} />
+              {/* Horizontal Chitin Segment Ridges */}
+              <rect x="30" y="29" width="18" height="2" fill="#120B05" />
+              <rect x="30" y="35" width="18" height="2" fill="#120B05" />
+
+              {/* Armored Front Thorax & Amber Core */}
+              <rect x="17" y="19" width="24" height="25" fill="#120B05" />
+              <rect x="18" y="20" width="22" height="23" fill={pal.primary} />
+              <rect x="20" y="21" width="18" height="19" fill={pal.primaryLight} />
+              <rect x="24" y="25" width="10" height="10" fill={pal.secondaryDark} />
+              <rect x="25" y="26" width="8" height="8" fill={pal.secondary} />
+              <rect x="26" y="27" width="4" height="3" fill="#FFF3C4" />
+              {/* Spiked Chitin Shoulder Pauldrons */}
+              <rect x="14" y="16" width="9" height="7" fill="#120B05" />
+              <rect x="15" y="17" width="7" height="5" fill={pal.metalLight} />
+              <rect x="37" y="16" width="9" height="7" fill="#120B05" />
+              <rect x="38" y="17" width="7" height="5" fill={pal.metalLight} />
+            </g>
+
+            {/* Left Forelimb + Hexagonal Honeycomb Chitin Shield */}
+            <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY + pose.propY})`}>
+              <rect x="40" y="22" width="14" height="21" fill="#120B05" />
+              <rect x="41" y="23" width="12" height="19" fill={pal.primaryDark} />
+              <rect x="42" y="24" width="10" height="17" fill={pal.secondaryDark} />
+              <rect x="43" y="25" width="8" height="15" fill={pal.secondary} />
+              <rect x="44" y="27" width="6" height="4" fill="#FFF3C4" />
+              <rect x="44" y="33" width="6" height="4" fill={pal.primaryDark} />
+            </g>
+
+            {/* Insectoid Head, Curved Rhinoceros Horn, Antennae, Faceted Compound Eyes & Pincer Mandibles */}
+            <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+              {/* Segmented Antennae */}
+              <rect x="19" y="3" width="2" height="6" fill={pal.secondary} />
+              <rect x="17" y="2" width="3" height="2" fill={pal.skinOrBone} />
+              <rect x="37" y="3" width="2" height="6" fill={pal.secondary} />
+              <rect x="38" y="2" width="3" height="2" fill={pal.skinOrBone} />
+              {/* Curved Scarab Horn */}
+              <rect x="26" y="1" width="5" height="8" fill="#120B05" />
+              <rect x="27" y="2" width="3" height="7" fill={pal.metalLight} />
+              <rect x="25" y="1" width="3" height="3" fill="#FFF3C4" />
+              {/* Chitin Head Capsule */}
+              <rect x="19" y="8" width="20" height="12" fill="#120B05" />
+              <rect x="20" y="9" width="18" height="10" fill={pal.primaryDark} />
+              <rect x="22" y="10" width="14" height="6" fill={pal.primary} />
+              {/* Faceted Compound Eyes */}
+              {!pose.eyeBlink && (
+                <g>
+                  <rect x={21 + pose.eyeShiftX} y="11" width="5" height="5" fill={pal.eyeGlow} />
+                  <rect x={22 + pose.eyeShiftX} y="11" width="2" height="2" fill="#FFF3C4" />
+                  <rect x={32 + pose.eyeShiftX} y="11" width="5" height="5" fill={pal.eyeGlow} />
+                  <rect x={33 + pose.eyeShiftX} y="11" width="2" height="2" fill="#FFF3C4" />
+                </g>
+              )}
+              {/* Clacking Serrated Pincer Mandibles */}
+              <g transform={`translate(0, ${pose.jawOpen})`}>
+                <rect x="18" y="18" width="6" height="5" fill="#120B05" />
+                <rect x="19" y="19" width="4" height="3" fill={pal.metalLight} />
+                <rect x="23" y="20" width="2" height="2" fill="#FFF3C4" />
+                <rect x="34" y="18" width="6" height="5" fill="#120B05" />
+                <rect x="35" y="19" width="4" height="3" fill={pal.metalLight} />
+                <rect x="33" y="20" width="2" height="2" fill="#FFF3C4" />
+              </g>
+            </g>
+
+            {/* Right Forelimb + Heavy Serrated Chitin Great-Cleaver */}
+            <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+              <rect x="4" y="10" width="11" height="28" fill="#120B05" />
+              <rect x="5" y="11" width="9" height="26" fill={pal.primaryLight} />
+              <rect x="5" y="11" width="3" height="25" fill={pal.secondary} />
+              <rect x="5" y="12" width="1" height="22" fill="#FFF3C4" />
+              {/* Serrated Saw-Teeth on Blade Edge */}
+              <rect x="3" y="14" width="2" height="3" fill="#FFF3C4" />
+              <rect x="3" y="20" width="2" height="3" fill="#FFF3C4" />
+              <rect x="3" y="26" width="2" height="3" fill="#FFF3C4" />
+            </g>
+          </g>
+        );
+      }
+
+      if (isBroodShaman) {
+        // SILHOUETTE B: ROYAL AMBER BROOD-WEAVER / HIVE SHAMAN (Swollen glowing amber abdomen sac, royal crown antennae, resin staff)
+        return (
+          <g>
+            {/* Translucent Royal Gossamer Wings */}
+            <g
+              transform={`translate(${pose.torsoX}, ${
+                pose.torsoY - (pose.secondaryPhase % 2)
+              })`}
+            >
+              <rect x="9" y="10" width="13" height="22" fill={pal.skinOrBone} opacity="0.45" />
+              <rect x="11" y="12" width="9" height="16" fill="#FFF3C4" opacity="0.35" />
+              <rect x="41" y="10" width="13" height="22" fill={pal.skinOrBone} opacity="0.45" />
+              <rect x="43" y="12" width="9" height="16" fill="#FFF3C4" opacity="0.35" />
+            </g>
+
+            {/* Swollen Bioluminescent Amber Brood-Abdomen Sac */}
+            <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY})`}>
+              <rect x="31" y="30" width="22" height="22" fill="#120B05" />
+              <rect x="32" y="31" width="20" height="20" fill={pal.secondaryDark} />
+              <rect x="34" y="32" width="16" height="17" fill={pal.secondary} />
+              <rect
+                x="36"
+                y="34"
+                width={10 + (pose.breathPhase % 2)}
+                height={10 + (pose.breathPhase % 2)}
+                fill={pal.skinOrBone}
+              />
+              <rect x="38" y="36" width="5" height="4" fill="#FFFFFF" />
+              {/* Segmented Chitin Bands Over Abdomen */}
+              <rect x="32" y="36" width="20" height="2" fill="#120B05" />
+              <rect x="32" y="42" width="20" height="2" fill="#120B05" />
+              <rect x="32" y="47" width="18" height="2" fill="#120B05" />
+            </g>
+
+            {/* 4 Slender Insect Legs & Royal Thorax */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="18" y="42" width="4" height="14" fill="#120B05" />
+              <rect x="19" y="43" width="2" height="12" fill={pal.primaryLight} />
+              <rect x="28" y="42" width="4" height="14" fill="#120B05" />
+              <rect x="29" y="43" width="2" height="12" fill={pal.primaryLight} />
+
+              <rect x="18" y="20" width="20" height="23" fill="#120B05" />
+              <rect x="19" y="21" width="18" height="21" fill={pal.primary} />
+              <rect x="21" y="22" width="14" height="18" fill={pal.primaryLight} />
+              {/* Royal Honeycomb Collar */}
+              <rect x="16" y="19" width="24" height="5" fill={pal.secondary} />
+              <rect x="18" y="20" width="20" height="2" fill="#FFF3C4" />
+            </g>
+
+            {/* Royal Crowned Insect Head, Plumed Antennae & Compound Eyes */}
+            <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+              <rect x="16" y="1" width="3" height="9" fill={pal.skinOrBone} />
+              <rect x="14" y="1" width="3" height="3" fill="#FFF3C4" />
+              <rect x="37" y="1" width="3" height="9" fill={pal.skinOrBone} />
+              <rect x="39" y="1" width="3" height="3" fill="#FFF3C4" />
+              <rect x="23" y="4" width="10" height="5" fill={pal.secondary} />
+              <rect x="26" y="2" width="4" height="3" fill="#FFF3C4" />
+              <rect x="19" y="8" width="18" height="11" fill="#120B05" />
+              <rect x="20" y="9" width="16" height="9" fill={pal.primaryDark} />
+              {!pose.eyeBlink && (
+                <g>
+                  <rect x={21 + pose.eyeShiftX} y="11" width="5" height="5" fill={pal.eyeGlow} />
+                  <rect x={22 + pose.eyeShiftX} y="11" width="2" height="2" fill="#FFFFFF" />
+                  <rect x={30 + pose.eyeShiftX} y="11" width="5" height="5" fill={pal.eyeGlow} />
+                  <rect x={31 + pose.eyeShiftX} y="11" width="2" height="2" fill="#FFFFFF" />
+                </g>
+              )}
+              <rect x="24" y={17 + pose.jawOpen} width="8" height="3" fill={pal.secondary} />
+            </g>
+
+            {/* Royal Amber Honeycomb Staff + Dripping Nectar Cenote */}
+            <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+              <rect x="10" y="8" width="3" height="46" fill="#120B05" />
+              <rect x="11" y="9" width="1" height="44" fill={pal.metalLight} />
+              <rect x="6" y="4" width="11" height="10" fill="#120B05" />
+              <rect x="7" y="5" width="9" height="8" fill={pal.secondary} />
+              <rect x="9" y="6" width="5" height="5" fill="#FFF3C4" />
+            </g>
+          </g>
+        );
+      }
+
+      // SILHOUETTE C: WINGED MANTIS / WASP ASSASSIN (Vibrating veined wings, curled venom stinger abdomen, 4 mantis legs & dual scythe forelimbs)
       return (
         <g>
-          {/* Vibrating Translucent Amber Insect Wings */}
+          {/* Vibrating Veined Translucent Amber Insect Wings */}
           <g
             transform={`translate(${pose.torsoX}, ${
               pose.torsoY - (pose.secondaryPhase % 2)
             })`}
           >
-            <rect x="10" y="12" width="12" height="20" fill={pal.skinOrBone} opacity="0.55" />
-            <rect x="42" y="12" width="12" height="20" fill={pal.skinOrBone} opacity="0.55" />
+            <rect x="7" y="9" width="15" height="24" fill="#120B05" opacity="0.5" />
+            <rect x="8" y="10" width="13" height="22" fill={pal.skinOrBone} opacity="0.65" />
+            <rect x="10" y="12" width="2" height="16" fill={pal.secondaryDark} opacity="0.7" />
+            <rect x="14" y="11" width="6" height="4" fill="#FFFFFF" opacity="0.45" />
+
+            <rect x="41" y="9" width="15" height="24" fill="#120B05" opacity="0.5" />
+            <rect x="42" y="10" width="13" height="22" fill={pal.skinOrBone} opacity="0.65" />
+            <rect x="50" y="12" width="2" height="16" fill={pal.secondaryDark} opacity="0.7" />
+            <rect x="43" y="11" width="6" height="4" fill="#FFFFFF" opacity="0.45" />
           </g>
-          {/* Segmented Wasp Abdomen & Venom Stinger */}
+
+          {/* Segmented Wasp Abdomen & Dripping Venom Stinger */}
           <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY})`}>
-            <rect x="34" y="34" width="16" height="14" fill={pal.primary} />
-            <rect x="36" y="37" width="12" height="3" fill={pal.secondary} />
-            <rect x="36" y="42" width="12" height="3" fill={pal.secondary} />
-            <rect x="48" y="46" width="5" height="4" fill={pal.eyeGlow} />
+            <rect x="33" y="31" width="19" height="16" fill="#120B05" />
+            <rect x="34" y="32" width="17" height="14" fill={pal.primary} />
+            <rect x="35" y="34" width="15" height="3" fill={pal.secondary} />
+            <rect x="36" y="34" width="8" height="1" fill="#FFF3C4" />
+            <rect x="35" y="39" width="15" height="3" fill={pal.secondary} />
+            <rect x="35" y="44" width="13" height="2" fill={pal.secondaryDark} />
+            {/* Needle Stinger & Venom Droplet */}
+            <rect x="49" y="44" width="6" height="4" fill="#120B05" />
+            <rect x="50" y="45" width="4" height="2" fill={pal.eyeGlow} />
+            <rect x="53" y={47 + (pose.breathPhase % 2)} width="2" height="2" fill="#86EFAC" />
           </g>
-          {/* Chitin Thorax & 4 Insectoid Legs */}
+
+          {/* Segmented Chitin Thorax & 4 Articulated Insect Legs */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect x="22" y="22" width="18" height="20" fill={pal.primaryLight} />
-            <rect x="18" y="42" width="4" height="14" fill={pal.primaryDark} />
-            <rect x="32" y="42" width="4" height="14" fill={pal.primaryDark} />
+            <rect x="16" y="41" width="5" height="15" fill="#120B05" />
+            <rect x="17" y="42" width="3" height="13" fill={pal.primaryDark} />
+            <rect x="14" y="54" width="6" height="2" fill={pal.secondary} />
+
+            <rect x="24" y="42" width="4" height="14" fill="#120B05" />
+            <rect x="25" y="43" width="2" height="12" fill={pal.primary} />
+
+            <rect x="33" y="42" width="5" height="14" fill="#120B05" />
+            <rect x="34" y="43" width="3" height="12" fill={pal.primaryDark} />
+            <rect x="33" y="54" width="6" height="2" fill={pal.secondary} />
+
+            <rect x="20" y="20" width="20" height="22" fill="#120B05" />
+            <rect x="21" y="21" width="18" height="20" fill={pal.primary} />
+            <rect x="23" y="22" width="14" height="16" fill={pal.primaryLight} />
+            <rect x="22" y="26" width="16" height="2" fill={pal.secondary} />
+            <rect x="23" y="31" width="14" height="2" fill={pal.secondary} />
           </g>
-          {/* Compound Insect Eyes, Antennae & Clacking Mandibles */}
+
+          {/* Triangular Mantis Head, Bulging Compound Eyes, Antennae & Mandibles */}
           <g
             transform={`translate(${pose.torsoX + pose.headX}, ${
               pose.torsoY + pose.headY
             })`}
           >
-            <rect x="20" y="4" width="2" height="8" fill={pal.secondary} />
-            <rect x="36" y="4" width="2" height="8" fill={pal.secondary} />
-            <rect x="21" y="11" width="16" height="11" fill={pal.primaryDark} />
-            <rect x="22" y="13" width="5" height="5" fill={pal.eyeGlow} />
-            <rect x="31" y="13" width="5" height="5" fill={pal.eyeGlow} />
+            <rect x="18" y="2" width="2" height="9" fill={pal.secondary} />
+            <rect x="16" y="1" width="3" height="2" fill="#FFF3C4" />
+            <rect x="38" y="2" width="2" height="9" fill={pal.secondary} />
+            <rect x="39" y="1" width="3" height="2" fill="#FFF3C4" />
+
+            <rect x="19" y="9" width="20" height="12" fill="#120B05" />
+            <rect x="20" y="10" width="18" height="10" fill={pal.primaryDark} />
+            <rect x="23" y="11" width="12" height="7" fill={pal.primaryLight} />
+            {!pose.eyeBlink && (
+              <g>
+                <rect x={20 + pose.eyeShiftX} y="11" width="6" height="6" fill={pal.eyeGlow} />
+                <rect x={21 + pose.eyeShiftX} y="12" width="2" height="2" fill="#FFF3C4" />
+                <rect x={32 + pose.eyeShiftX} y="11" width="6" height="6" fill={pal.eyeGlow} />
+                <rect x={33 + pose.eyeShiftX} y="12" width="2" height="2" fill="#FFF3C4" />
+              </g>
+            )}
+            <g transform={`translate(0, ${pose.jawOpen})`}>
+              <rect x="22" y="18" width="4" height="5" fill={pal.secondary} />
+              <rect x="32" y="18" width="4" height="5" fill={pal.secondary} />
+              <rect x="25" y="20" width="2" height="2" fill="#FFF3C4" />
+              <rect x="31" y="20" width="2" height="2" fill="#FFF3C4" />
+            </g>
           </g>
+
           {/* Dual Serrated Mantis Scythe Forelimbs */}
           <g
             transform={`translate(${pose.torsoX + pose.weaponX}, ${
               pose.torsoY + pose.weaponY
             })`}
           >
-            <rect x="8" y="18" width="14" height="4" fill={pal.metalLight} />
-            <rect x="6" y="22" width="4" height="14" fill={pal.secondary} />
-            <rect x="10" y="25" width="2" height="9" fill="#FFF3C4" />
+            <rect x="6" y="16" width="16" height="5" fill="#120B05" />
+            <rect x="7" y="17" width="14" height="3" fill={pal.metalLight} />
+            <rect x="4" y="20" width="6" height="18" fill="#120B05" />
+            <rect x="5" y="21" width="4" height="16" fill={pal.secondary} />
+            <rect x="8" y="23" width="2" height="12" fill="#FFF3C4" />
+            <rect x="10" y="25" width="2" height="2" fill="#FFFFFF" />
+            <rect x="10" y="30" width="2" height="2" fill="#FFFFFF" />
           </g>
         </g>
       );
@@ -3602,20 +4054,32 @@ function renderArticulatedCreatureFamily(
     case 'CRYSTAL_PRISM_GOLEM': {
       return (
         <g>
-          {/* Crystal Pillar Legs */}
+          {/* Faceted Crystal Pillar Legs */}
           <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
-            <rect x="20" y="43" width="7" height="13" fill={pal.primaryDark} />
-            <rect x="36" y="43" width="7" height="13" fill={pal.primaryDark} />
+            <rect x="19" y="42" width="8" height="14" fill="#0A1218" />
+            <rect x="20" y="43" width="6" height="12" fill={pal.primaryDark} />
+            <rect x="21" y="44" width="3" height="10" fill={pal.metal} />
+            <rect x="35" y="42" width="8" height="14" fill="#0A1218" />
+            <rect x="36" y="43" width="6" height="12" fill={pal.primaryDark} />
+            <rect x="37" y="44" width="3" height="10" fill={pal.metal} />
           </g>
           {/* Faceted Geode Torso & Blinding Diamond Core */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect x="16" y="18" width="32" height="26" fill={pal.primary} />
-            <rect x="19" y="20" width="26" height="22" fill={pal.metal} />
-            <rect x="25" y="24" width="14" height="14" fill={pal.secondary} />
-            <rect x="28" y="27" width="8" height="8" fill={pal.eyeGlow} />
+            <rect x="15" y="17" width="34" height="27" fill="#0A1218" />
+            <rect x="16" y="18" width="32" height="25" fill={pal.primary} />
+            <rect x="19" y="20" width="26" height="21" fill={pal.metal} />
+            <rect x="21" y="21" width="10" height="6" fill={pal.metalLight} />
+            <rect x="24" y="23" width="16" height="15" fill={pal.secondaryDark} />
+            <rect x="26" y="25" width="12" height="11" fill={pal.secondary} />
+            <rect x="28" y="27" width="8" height="7" fill={pal.eyeGlow} />
+            <rect x="30" y="29" width="4" height="3" fill="#FFFFFF" />
             {/* Sharp Crystal Shoulder Spires */}
-            <rect x="12" y="10" width="6" height="14" fill={pal.metalLight} />
-            <rect x="46" y="10" width="6" height="14" fill={pal.metalLight} />
+            <rect x="10" y="8" width="8" height="16" fill="#0A1218" />
+            <rect x="11" y="9" width="6" height="14" fill={pal.metalLight} />
+            <rect x="12" y="10" width="2" height="10" fill="#FFFFFF" />
+            <rect x="46" y="8" width="8" height="16" fill="#0A1218" />
+            <rect x="47" y="9" width="6" height="14" fill={pal.metalLight} />
+            <rect x="48" y="10" width="2" height="10" fill="#FFFFFF" />
           </g>
           {/* Angular Monolith Crystal Head */}
           <g
@@ -3623,24 +4087,34 @@ function renderArticulatedCreatureFamily(
               pose.torsoY + pose.headY
             })`}
           >
-            <rect x="24" y="6" width="16" height="13" fill={pal.metalLight} />
-            <rect x="26" y="8" width="12" height="9" fill={pal.primaryDark} />
+            <rect x="23" y="5" width="18" height="14" fill="#0A1218" />
+            <rect x="24" y="6" width="16" height="12" fill={pal.metalLight} />
+            <rect x="26" y="8" width="12" height="8" fill={pal.primaryDark} />
             <rect
-              x={29 + pose.eyeShiftX}
-              y="11"
-              width="6"
-              height="3"
+              x={28 + pose.eyeShiftX}
+              y="10"
+              width="8"
+              height="4"
               fill={pal.eyeGlow}
             />
+            <rect
+              x={30 + pose.eyeShiftX}
+              y="11"
+              width="4"
+              height="2"
+              fill="#FFFFFF"
+            />
           </g>
-          {/* Floating Orbiting Prism Blade */}
+          {/* Floating Orbiting Prism Greatblade */}
           <g
             transform={`translate(${pose.torsoX + pose.weaponX}, ${
               pose.torsoY + pose.weaponY
             })`}
           >
-            <rect x="6" y="14" width="5" height="28" fill={pal.metalLight} />
-            <rect x="7" y="16" width="3" height="24" fill={pal.secondary} />
+            <rect x="5" y="11" width="7" height="32" fill="#0A1218" />
+            <rect x="6" y="12" width="5" height="30" fill={pal.metalLight} />
+            <rect x="7" y="14" width="3" height="26" fill={pal.secondary} />
+            <rect x="7" y="15" width="1" height="20" fill="#FFFFFF" />
           </g>
         </g>
       );
@@ -3650,41 +4124,195 @@ function renderArticulatedCreatureFamily(
     // PRISIÓN MALDITA: ESPECTRO ENCADENADO (Iron-Caged Floating Wraith)
     // ========================================================================
     case 'PRISON_SHACKLED_WRAITH': {
+      const isPrisonBrute = def.subVariant === 'GUARDIAN';
+      const isPrisonStalker = def.subVariant === 'STALKER_BEAST';
+
+      if (isPrisonBrute) {
+        // SILHOUETTE A: SHACKLED PRISON BRUTE (Ragged striped convict tunic, iron collar, wrist manacles, ankle iron ball & spiked flail)
+        return (
+          <g>
+            {/* Bare Scarred Feet & Heavy Iron Ankle Ball-and-Chain */}
+            <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
+              <rect x="20" y="42" width="7" height="14" fill="#110E1A" />
+              <rect x="21" y="43" width="5" height="10" fill={pal.primaryDark} />
+              <rect x="20" y="53" width="7" height="3" fill={pal.skinShadow} />
+              <rect x="34" y="42" width="7" height="14" fill="#110E1A" />
+              <rect x="35" y="43" width="5" height="10" fill={pal.primaryDark} />
+              <rect x="34" y="53" width="7" height="3" fill={pal.skinShadow} />
+              {/* Ankle Shackle & Heavy Iron Ball on Floor */}
+              <rect x="34" y="50" width="7" height="3" fill={pal.metalLight} />
+              <rect x="41" y="52" width="5" height="2" fill={pal.metal} />
+              <rect x="45" y="48" width="9" height="9" fill="#110E1A" />
+              <rect x="46" y="49" width="7" height="7" fill={pal.metalDark} />
+              <rect x="47" y="50" width="4" height="4" fill={pal.metal} />
+              <rect x="48" y="50" width="2" height="2" fill={pal.metalLight} />
+            </g>
+
+            {/* Muscular Hunched Torso in Torn Striped Convict Tunic & Heavy Iron Chains */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="17" y="19" width="28" height="25" fill="#110E1A" />
+              <rect x="18" y="20" width="26" height="23" fill={pal.primary} />
+              {/* Torn Convict Stripes & Exposed Scarred Chest */}
+              <rect x="19" y="22" width="24" height="3" fill={pal.skinShadow} />
+              <rect x="19" y="28" width="24" height="3" fill={pal.skinShadow} />
+              <rect x="19" y="34" width="24" height="3" fill={pal.skinShadow} />
+              <rect x="24" y="21" width="12" height="13" fill={pal.skinOrBone} />
+              <rect x="26" y="24" width="7" height="2" fill={pal.secondaryDark} />
+              {/* Heavy Riveted Iron Neck Collar & Padlocked Chest Chains */}
+              <rect x="20" y="18" width="22" height="4" fill={pal.metalDark} />
+              <rect x="22" y="19" width="18" height="2" fill={pal.metalLight} />
+              <rect x="16" y="25" width="30" height="3" fill={pal.metal} />
+              <rect x="28" y="26" width="6" height="7" fill={pal.accent} />
+              <rect x="30" y="28" width="2" height="3" fill="#110E1A" />
+            </g>
+
+            {/* Left Arm with Iron Wrist Manacle & Trailing Broken Chain */}
+            <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY + pose.propY})`}>
+              <rect x="41" y="22" width="6" height="13" fill={pal.skinShadow} />
+              <rect x="40" y="31" width="8" height="4" fill={pal.metalLight} />
+              <rect x="43" y="35" width="2" height="11" fill={pal.metal} />
+              <rect x="42" y="44" width="4" height="4" fill={pal.metalLight} />
+            </g>
+
+            {/* Scarred Convict Head with Torn Iron Half-Mask & Glowing Eyes */}
+            <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+              <rect x="22" y="6" width="18" height="13" fill="#110E1A" />
+              <rect x="23" y="7" width="16" height="11" fill={pal.skinShadow} />
+              <rect x="24" y="8" width="14" height="9" fill={pal.skinOrBone} />
+              {/* Riveted Iron Jaw-Muzzle */}
+              <rect x="23" y="13" width="16" height="5" fill={pal.metalDark} />
+              <rect x="25" y="14" width="2" height="3" fill={pal.metalLight} />
+              <rect x="30" y="14" width="2" height="3" fill={pal.metalLight} />
+              <rect x="35" y="14" width="2" height="3" fill={pal.metalLight} />
+              {!pose.eyeBlink && (
+                <g>
+                  <rect x={26 + pose.eyeShiftX} y="10" width="3" height="2" fill="#110E1A" />
+                  <rect x={27 + pose.eyeShiftX} y="10" width="2" height="2" fill={pal.eyeGlow} />
+                  <rect x={33 + pose.eyeShiftX} y="10" width="3" height="2" fill="#110E1A" />
+                  <rect x={34 + pose.eyeShiftX} y="10" width="2" height="2" fill={pal.eyeGlow} />
+                </g>
+              )}
+            </g>
+
+            {/* Right Arm + Jagged Uprooted Cell Bar Club */}
+            <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+              <rect x="13" y="22" width="6" height="12" fill={pal.skinShadow} />
+              <rect x="12" y="30" width="8" height="4" fill={pal.metalLight} />
+              <rect x="8" y="8" width="5" height="38" fill="#110E1A" />
+              <rect x="9" y="9" width="3" height="36" fill={pal.metal} />
+              <rect x="9" y="9" width="1" height="34" fill={pal.metalLight} />
+              {/* Concrete/Stone Block Still Attached to Top of Cell Bar */}
+              <rect x="4" y="7" width="13" height="9" fill={pal.primaryDark} />
+              <rect x="5" y="8" width="11" height="7" fill={pal.metalDark} />
+              <rect x="6" y="9" width="5" height="3" fill={pal.metalLight} />
+            </g>
+          </g>
+        );
+      }
+
+      if (isPrisonStalker) {
+        // SILHOUETTE C: FERAL CELL STALKER (Low crouched inmate, bandages, trailing wrist chains & dual shivs)
+        return (
+          <g>
+            <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
+              <rect x="18" y="43" width="6" height="13" fill="#110E1A" />
+              <rect x="19" y="44" width="4" height="11" fill={pal.skinShadow} />
+              <rect x="37" y="43" width="6" height="13" fill="#110E1A" />
+              <rect x="38" y="44" width="4" height="11" fill={pal.skinShadow} />
+            </g>
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="19" y="23" width="24" height="21" fill="#110E1A" />
+              <rect x="20" y="24" width="22" height="19" fill={pal.primary} />
+              <rect x="22" y="25" width="18" height="14" fill={pal.skinShadow} />
+              <rect x="21" y="27" width="20" height="3" fill={pal.skinOrBone} />
+              <rect x="21" y="32" width="20" height="3" fill={pal.skinOrBone} />
+              <rect x="22" y="22" width="18" height="3" fill={pal.metalLight} />
+            </g>
+            <g transform={`translate(${pose.torsoX + pose.headX}, ${pose.torsoY + pose.headY})`}>
+              <rect x="21" y="9" width="19" height="13" fill={pal.primaryDark} />
+              <rect x="23" y="11" width="15" height="10" fill={pal.skinShadow} />
+              <rect x="23" y="12" width="15" height="3" fill={pal.skinOrBone} />
+              {!pose.eyeBlink && (
+                <g fill={pal.eyeGlow}>
+                  <rect x={25 + pose.eyeShiftX} y="15" width="3" height="2" />
+                  <rect x={33 + pose.eyeShiftX} y="15" width="3" height="2" />
+                </g>
+              )}
+            </g>
+            <g transform={`translate(${pose.torsoX + pose.weaponX}, ${pose.torsoY + pose.weaponY})`}>
+              <rect x="7" y="20" width="3" height="15" fill={pal.metalLight} />
+              <rect x="8" y="21" width="1" height="12" fill="#FFFFFF" />
+              <rect x="6" y="33" width="5" height="4" fill={pal.primaryDark} />
+              <rect x="11" y="35" width="2" height="10" fill={pal.metal} />
+            </g>
+          </g>
+        );
+      }
+
+      // SILHOUETTE B: FLOATING SHACKLED WRAITH / SOUL TORTURER (Hooded spectral torso, glowing rune-chains, skull visage & swinging soul-cage lantern)
       return (
         <g transform={`translate(${pose.torsoX}, ${pose.torsoY - pose.breathPhase})`}>
-          {/* Spectral Ectoplasm Tail Instead of Legs */}
-          <rect x="24" y="40" width="14" height="10" fill={pal.primary} />
+          {/* Trailing Spectral Ectoplasm Tail */}
+          <rect x="23" y="39" width="16" height="10" fill={pal.primaryDark} />
+          <rect x="25" y="40" width="12" height="8" fill={pal.primary} />
           <rect
             x={26 + (pose.secondaryPhase % 2)}
-            y="49"
+            y="48"
             width="9"
             height="7"
             fill={pal.secondaryDark}
           />
-          {/* Tattered Prisoner Shroud & Heavy Padlocked Chains */}
-          <rect x="18" y="20" width="26" height="22" fill={pal.primaryLight} />
-          <rect x="16" y="24" width="30" height="3" fill={pal.metalLight} />
-          <rect x="28" y="26" width="6" height="7" fill={pal.accent} />
-          {/* Iron Torture Cage Locked Around Spectral Head */}
+          <rect
+            x={28 + (pose.secondaryPhase % 2)}
+            y="53"
+            width="5"
+            height="4"
+            fill={pal.secondary}
+          />
+          {/* Tattered Hooded Shroud & Heavy Padlocked Rune-Chains */}
+          <rect x="17" y="19" width="28" height="22" fill="#110E1A" />
+          <rect x="18" y="20" width="26" height="20" fill={pal.primaryLight} />
+          <rect x="21" y="22" width="20" height="16" fill={pal.primary} />
+          <rect x="15" y="24" width="32" height="3" fill={pal.metalLight} />
+          <rect x="17" y="30" width="28" height="2" fill={pal.metal} />
+          <rect x="28" y="25" width="6" height="8" fill={pal.accent} />
+          <rect x="30" y="27" width="2" height="4" fill={pal.eyeGlow} />
+
+          {/* Left Hand Holding Swinging Soul-Cage Lantern */}
+          <g transform={`translate(${pose.propX}, ${pose.propY})`}>
+            <rect x="44" y="24" width="4" height="3" fill={pal.skinOrBone} />
+            <rect x="45" y="27" width="2" height="8" fill={pal.metalLight} />
+            <rect x="41" y="35" width="10" height="12" fill="#110E1A" />
+            <rect x="42" y="36" width="8" height="10" fill={pal.metalDark} />
+            <rect x="44" y="38" width="4" height="6" fill={pal.eyeGlow} />
+            <rect x="45" y="39" width="2" height="4" fill="#FFFFFF" />
+          </g>
+
+          {/* Hooded Spectral Skull Visage with Iron Crown-Collar */}
           <g transform={`translate(${pose.headX}, ${pose.headY})`}>
-            <rect x="22" y="6" width="18" height="14" fill={pal.metalDark} />
-            <rect x="24" y="8" width="14" height="10" fill="#08060D" />
-            {/* Vertical Iron Cage Bars */}
-            <rect x="26" y="6" width="2" height="14" fill={pal.metalLight} />
-            <rect x="31" y="6" width="2" height="14" fill={pal.metalLight} />
-            <rect x="36" y="6" width="2" height="14" fill={pal.metalLight} />
+            <rect x="20" y="5" width="22" height="15" fill="#110E1A" />
+            <rect x="21" y="6" width="20" height="13" fill={pal.primaryDark} />
+            <rect x="24" y="8" width="14" height="10" fill={pal.skinShadow} />
+            <rect x="25" y="9" width="12" height="7" fill={pal.skinOrBone} />
+            <rect x="22" y="7" width="18" height="3" fill={pal.metalLight} />
             {!pose.eyeBlink && (
-              <g fill={pal.eyeGlow}>
-                <rect x={27 + pose.eyeShiftX} y="12" width="2" height="3" />
-                <rect x={33 + pose.eyeShiftX} y="12" width="2" height="3" />
+              <g>
+                <rect x={26 + pose.eyeShiftX} y="11" width="3" height="3" fill="#110E1A" />
+                <rect x={27 + pose.eyeShiftX} y="11" width="2" height="2" fill={pal.eyeGlow} />
+                <rect x={33 + pose.eyeShiftX} y="11" width="3" height="3" fill="#110E1A" />
+                <rect x={34 + pose.eyeShiftX} y="11" width="2" height="2" fill={pal.eyeGlow} />
               </g>
             )}
+            <rect x="27" y="15" width="8" height="2" fill="#110E1A" />
           </g>
-          {/* Swinging Iron Ball-and-Chain Shackle */}
+
+          {/* Right Hand Swinging Spiked Iron Ball-and-Chain */}
           <g transform={`translate(${pose.weaponX}, ${pose.weaponY})`}>
-            <rect x="9" y="22" width="3" height="18" fill={pal.metalLight} />
+            <rect x="9" y="20" width="3" height="18" fill={pal.metalLight} />
+            <rect x="4" y="37" width="13" height="13" fill="#110E1A" />
             <rect x="5" y="38" width="11" height="11" fill={pal.metalDark} />
             <rect x="7" y="40" width="7" height="7" fill={pal.metal} />
+            <rect x="8" y="41" width="3" height="3" fill={pal.metalLight} />
           </g>
         </g>
       );
@@ -3698,9 +4326,14 @@ function renderArticulatedCreatureFamily(
         <g>
           {/* Crimson Liturgical Vestments */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+            <rect x="17" y="18" width="28" height="38" fill="#140408" />
             <rect x="18" y="19" width="26" height="37" fill={pal.primary} />
-            <rect x="22" y="21" width="18" height="34" fill={pal.secondaryDark} />
+            <rect x="21" y="21" width="20" height="34" fill={pal.secondaryDark} />
+            <rect x="23" y="22" width="16" height="32" fill={pal.secondary} />
             <rect x="28" y="21" width="6" height="34" fill={pal.metal} />
+            <rect x="29" y="21" width="2" height="34" fill={pal.metalLight} />
+            <rect x="15" y="18" width="8" height="6" fill={pal.metalLight} />
+            <rect x="39" y="18" width="8" height="6" fill={pal.metalLight} />
           </g>
           {/* Left Hand Holding Overflowing Crimson Chalice */}
           <g
@@ -3708,13 +4341,15 @@ function renderArticulatedCreatureFamily(
               pose.torsoY + pose.propY
             })`}
           >
-            <rect x="42" y="24" width="8" height="6" fill={pal.metalLight} />
-            <rect x="45" y="30" width="2" height="6" fill={pal.metal} />
+            <rect x="41" y="23" width="10" height="7" fill="#140408" />
+            <rect x="42" y="24" width="8" height="5" fill={pal.metalLight} />
+            <rect x="45" y="29" width="2" height="7" fill={pal.metal} />
+            <rect x="43" y="35" width="6" height="2" fill={pal.metalLight} />
             <rect x="43" y="22" width="6" height="3" fill={pal.secondary} />
             <rect
               x="44"
               y={18 - (pose.breathPhase % 2)}
-              width="2"
+              width="3"
               height="3"
               fill={pal.eyeGlow}
             />
@@ -3725,13 +4360,16 @@ function renderArticulatedCreatureFamily(
               pose.torsoY + pose.headY
             })`}
           >
+            <rect x="23" y="2" width="16" height="8" fill="#140408" />
             <rect x="24" y="3" width="14" height="7" fill={pal.secondary} />
+            <rect x="30" y="3" width="2" height="6" fill={pal.metalLight} />
+            <rect x="22" y="9" width="18" height="12" fill="#140408" />
             <rect x="23" y="9" width="16" height="11" fill={pal.metalLight} />
+            <rect x="24" y="10" width="10" height="3" fill="#FFF8EC" />
             <rect x="26" y="12" width="3" height="2" fill="#14060A" />
             <rect x="33" y="12" width="3" height="2" fill="#14060A" />
-            {/* Crimson Tears Beneath Mask Eyes */}
-            <rect x="27" y="14" width="1" height="5" fill={pal.secondary} />
-            <rect x="34" y="14" width="1" height="5" fill={pal.secondary} />
+            <rect x="27" y="14" width="2" height="5" fill={pal.secondary} />
+            <rect x="34" y="14" width="2" height="5" fill={pal.secondary} />
           </g>
           {/* Serrated Ritual Flamberge */}
           <g
@@ -3739,9 +4377,11 @@ function renderArticulatedCreatureFamily(
               pose.torsoY + pose.weaponY
             })`}
           >
+            <rect x="9" y="6" width="6" height="28" fill="#140408" />
             <rect x="10" y="7" width="4" height="26" fill={pal.secondary} />
             <rect x="11" y="7" width="2" height="24" fill={pal.metalLight} />
-            <rect x="7" y="32" width="10" height="3" fill={pal.metalLight} />
+            <rect x="6" y="32" width="12" height="3" fill={pal.metalLight} />
+            <rect x="11" y="35" width="2" height="6" fill={pal.primaryDark} />
           </g>
         </g>
       );
@@ -3755,17 +4395,23 @@ function renderArticulatedCreatureFamily(
         <g>
           {/* Bandaged Legs */}
           <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
-            <rect x="22" y="43" width="6" height="13" fill={pal.skinShadow} />
-            <rect x="34" y="43" width="6" height="13" fill={pal.skinShadow} />
+            <rect x="21" y="42" width="8" height="14" fill="#171108" />
+            <rect x="22" y="43" width="6" height="12" fill={pal.skinShadow} />
+            <rect x="22" y="46" width="6" height="2" fill={pal.skinOrBone} />
+            <rect x="33" y="42" width="8" height="14" fill="#171108" />
+            <rect x="34" y="43" width="6" height="12" fill={pal.skinShadow} />
+            <rect x="34" y="46" width="6" height="2" fill={pal.skinOrBone} />
           </g>
           {/* Linen-Wrapped Torso & Turquoise-Gold Scarab Collar */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+            <rect x="18" y="19" width="26" height="26" fill="#171108" />
             <rect x="19" y="20" width="24" height="24" fill={pal.skinOrBone} />
             <rect x="19" y="25" width="24" height="2" fill={pal.skinShadow} />
-            <rect x="19" y="31" width="24" height="2" fill={pal.skinShadow} />
-            {/* Royal Turquoise & Gold Usekh Collar */}
-            <rect x="17" y="19" width="28" height="6" fill={pal.metalLight} />
-            <rect x="20" y="20" width="22" height="4" fill={pal.secondary} />
+            <rect x="19" y="30" width="24" height="2" fill={pal.skinShadow} />
+            <rect x="19" y="35" width="24" height="2" fill={pal.skinShadow} />
+            <rect x="16" y="18" width="30" height="7" fill={pal.metalLight} />
+            <rect x="19" y="19" width="24" height="5" fill={pal.secondary} />
+            <rect x="28" y="20" width="6" height="4" fill={pal.metalLight} />
           </g>
           {/* Golden Nemes Headdress & Jackal Mask */}
           <g
@@ -3773,8 +4419,11 @@ function renderArticulatedCreatureFamily(
               pose.torsoY + pose.headY
             })`}
           >
+            <rect x="19" y="5" width="24" height="16" fill="#171108" />
             <rect x="20" y="6" width="22" height="14" fill={pal.metalLight} />
-            <rect x="22" y="8" width="18" height="11" fill={pal.primaryDark} />
+            <rect x="20" y="9" width="22" height="2" fill={pal.secondary} />
+            <rect x="20" y="13" width="22" height="2" fill={pal.secondary} />
+            <rect x="23" y="8" width="16" height="11" fill={pal.primaryDark} />
             {!pose.eyeBlink && (
               <g fill={pal.eyeGlow}>
                 <rect x={25 + pose.eyeShiftX} y="12" width="3" height="2" />
@@ -3788,8 +4437,9 @@ function renderArticulatedCreatureFamily(
               pose.torsoY + pose.weaponY
             })`}
           >
-            <rect x="11" y="20" width="3" height="16" fill={pal.metal} />
-            <rect x="6" y="10" width="8" height="12" fill={pal.metalLight} />
+            <rect x="10" y="20" width="4" height="18" fill={pal.metal} />
+            <rect x="5" y="9" width="10" height="13" fill="#171108" />
+            <rect x="6" y="10" width="8" height="11" fill={pal.metalLight} />
             <rect x="9" y="13" width="5" height="6" fill="#09070D" />
           </g>
         </g>
@@ -3813,9 +4463,11 @@ function renderArticulatedCreatureFamily(
           </g>
           {/* Aristocratic Fencer Coat & Boots */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+            <rect x="19" y="19" width="24" height="37" fill="#0D101C" />
             <rect x="20" y="20" width="22" height="35" fill={pal.primary} />
             <rect x="23" y="22" width="16" height="22" fill={pal.metal} />
             <rect x="28" y="22" width="6" height="22" fill={pal.secondary} />
+            <rect x="29" y="22" width="2" height="22" fill={pal.metalLight} />
           </g>
           {/* Smooth Silver Mirror Mask */}
           <g
@@ -3823,7 +4475,9 @@ function renderArticulatedCreatureFamily(
               pose.torsoY + pose.headY
             })`}
           >
+            <rect x="23" y="6" width="16" height="15" fill="#0D101C" />
             <rect x="24" y="7" width="14" height="13" fill={pal.metalLight} />
+            <rect x="25" y="8" width="5" height="10" fill="#FFFFFF" />
             <rect x="29" y="8" width="2" height="11" fill={pal.secondary} />
             <rect
               x={26 + pose.eyeShiftX}
@@ -3839,77 +4493,173 @@ function renderArticulatedCreatureFamily(
               pose.torsoY + pose.weaponY
             })`}
           >
-            <rect x="9" y="4" width="2" height="30" fill={pal.metalLight} />
-            <rect x="6" y="32" width="8" height="4" fill={pal.accent} />
+            <rect x="9" y="3" width="2" height="31" fill={pal.metalLight} />
+            <rect x="9" y="4" width="1" height="26" fill="#FFFFFF" />
+            <rect x="5" y="32" width="10" height="4" fill={pal.accent} />
+            <rect x="9" y="36" width="2" height="6" fill={pal.primaryDark} />
           </g>
         </g>
       );
     }
 
     // ========================================================================
-    // CAVERNAS HELADAS: LOBO DE ESCARCHA & GUERRERO CONGELADO
+    // CAVERNAS HELADAS: LOBO DE ESCARCHA (TRUE PREDATORY DIRE-WOLF) & GUERRERO CONGELADO
     // ========================================================================
     case 'ICE_FROST_WOLF':
     case 'ICE_FROZEN_WARRIOR': {
-      const isWolf = family === 'ICE_FROST_WOLF';
+      const isWolf =
+        family === 'ICE_FROST_WOLF' || def.subVariant === 'STALKER_BEAST';
       if (isWolf) {
         return (
           <g>
-            {/* Quadruped Dire-Wolf Body & Jagged Icicle Spine */}
+            {/* Bushy Wolf Tail & Muscular Hind Legs with Claws */}
             <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-              <rect x="18" y="28" width="30" height="15" fill={pal.primary} />
-              <rect x="20" y="30" width="26" height="11" fill={pal.skinOrBone} />
-              {/* Jagged Ice Spikes Along Back */}
-              <rect x="24" y="21" width="4" height="7" fill={pal.metalLight} />
-              <rect x="31" y="19" width="4" height="9" fill={pal.metalLight} />
-              <rect x="38" y="22" width="4" height="6" fill={pal.metalLight} />
-              <rect x="20" y="43" width="5" height="13" fill={pal.primaryDark} />
-              <rect x="40" y="43" width="5" height="13" fill={pal.primaryDark} />
+              {/* Thick Bushy Frost-Tipped Wolf Tail */}
+              <rect
+                x={46 + pose.propX}
+                y={24 + pose.propY}
+                width="12"
+                height="7"
+                fill="#0D1821"
+              />
+              <rect
+                x={47 + pose.propX}
+                y={25 + pose.propY}
+                width="10"
+                height="5"
+                fill={pal.primaryLight}
+              />
+              <rect
+                x={52 + pose.propX}
+                y={25 + pose.propY}
+                width="5"
+                height="3"
+                fill={pal.skinOrBone}
+              />
+              {/* Far Hind Leg */}
+              <rect x="38" y="39" width="6" height="17" fill="#0D1821" />
+              <rect x="39" y="40" width="4" height="14" fill={pal.primaryDark} />
+              <rect x="36" y="54" width="6" height="3" fill={pal.skinShadow} />
+              {/* Near Muscular Hind Leg */}
+              <rect x="43" y="35" width="8" height="14" fill="#0D1821" />
+              <rect x="44" y="36" width="6" height="12" fill={pal.primary} />
+              <rect x="45" y="46" width="5" height="10" fill={pal.primaryLight} />
+              <rect x="42" y="54" width="7" height="3" fill={pal.skinOrBone} />
             </g>
-            {/* Snarling Wolf Jaws & Frost Breath Vapor */}
+
+            {/* Muscular Dire-Wolf Chest, Layered Fur Ruff & Ice-Crystal Spine */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="17" y="25" width="31" height="17" fill="#0D1821" />
+              <rect x="18" y="26" width="29" height="15" fill={pal.primaryDark} />
+              <rect x="19" y="27" width="26" height="12" fill={pal.primary} />
+              <rect x="20" y="27" width="16" height="9" fill={pal.primaryLight} />
+              {/* Thick White/Silver Chest Fur Mane */}
+              <rect x="15" y="24" width="12" height="14" fill={pal.skinShadow} />
+              <rect x="16" y="25" width="10" height="11" fill={pal.skinOrBone} />
+              <rect x="17" y="26" width="6" height="6" fill="#FFFFFF" />
+              {/* Jagged Glacial Ice Spires Along Spine */}
+              <rect x="25" y="19" width="4" height="7" fill={pal.metal} />
+              <rect x="26" y="20" width="2" height="5" fill="#FFFFFF" />
+              <rect x="32" y="17" width="5" height="9" fill={pal.metalLight} />
+              <rect x="33" y="18" width="2" height="7" fill="#FFFFFF" />
+              <rect x="39" y="20" width="4" height="6" fill={pal.metal} />
+            </g>
+
+            {/* Front Lupine Forelegs & Ice-Clawed Paws */}
+            <g transform={`translate(${pose.weaponX * 0.4}, ${pose.isDeadCollapsed ? 7 : 0})`}>
+              <rect x="18" y="39" width="6" height="17" fill="#0D1821" />
+              <rect x="19" y="40" width="4" height="14" fill={pal.primaryDark} />
+              <rect x="16" y="54" width="6" height="3" fill={pal.skinShadow} />
+
+              <rect x="24" y="38" width="7" height="18" fill="#0D1821" />
+              <rect x="25" y="39" width="5" height="15" fill={pal.primary} />
+              <rect x="26" y="40" width="3" height="12" fill={pal.skinOrBone} />
+              <rect x="22" y="54" width="8" height="3" fill={pal.skinOrBone} />
+              <rect x="21" y="55" width="2" height="2" fill="#FFFFFF" />
+            </g>
+
+            {/* Predatory Lupine Head, Pointed Wolf Ears, Snarling Muzzle & White Fangs */}
             <g
               transform={`translate(${pose.torsoX + pose.headX}, ${
                 pose.torsoY + pose.headY
               })`}
             >
-              <rect x="8" y="22" width="14" height="10" fill={pal.skinOrBone} />
-              <rect x="12" y="25" width="3" height="2" fill={pal.eyeGlow} />
-              <rect
-                x="9"
-                y={32 + pose.jawOpen}
-                width="11"
-                height="3"
-                fill={pal.primaryDark}
-              />
-              <rect
-                x={3 - (pose.breathPhase % 2)}
-                y="29"
-                width="4"
-                height="3"
-                fill={pal.metalLight}
-                opacity="0.8"
-              />
+              {/* Pointed Lupine Ears */}
+              <rect x="15" y="13" width="5" height="7" fill="#0D1821" />
+              <rect x="16" y="14" width="3" height="5" fill={pal.primaryLight} />
+              <rect x="20" y="14" width="4" height="6" fill="#0D1821" />
+              <rect x="21" y="15" width="2" height="4" fill={pal.skinOrBone} />
+              {/* Wolf Cranium & Tapered Lupine Snout */}
+              <rect x="6" y="19" width="18" height="9" fill="#0D1821" />
+              <rect x="7" y="20" width="16" height="7" fill={pal.primary} />
+              <rect x="11" y="20" width="11" height="4" fill={pal.primaryLight} />
+              <rect x="7" y="21" width="10" height="3" fill={pal.skinOrBone} />
+              {/* Black Lupine Nose Tip */}
+              <rect x="6" y="20" width="3" height="3" fill="#090C10" />
+              {/* Glowing Ice-Blue Predator Eye */}
+              {!pose.eyeBlink && (
+                <g>
+                  <rect x={13 + pose.eyeShiftX} y="21" width="4" height="2" fill="#090C10" />
+                  <rect x={14 + pose.eyeShiftX} y="21" width="2" height="2" fill={pal.eyeGlow} />
+                  <rect x={14 + pose.eyeShiftX} y="21" width="1" height="1" fill="#FFFFFF" />
+                </g>
+              )}
+              {/* Sharp White Upper Canine Fangs */}
+              <rect x="7" y="27" width="2" height="3" fill="#FFFFFF" />
+              <rect x="10" y="27" width="1" height="2" fill="#FFFFFF" />
+              <rect x="12" y="27" width="2" height="2" fill="#FFFFFF" />
+              {/* Articulated Lower Wolf Jaw & Frost Breath */}
+              <g transform={`translate(0, ${pose.jawOpen})`}>
+                <rect x="8" y="29" width="13" height="4" fill="#0D1821" />
+                <rect x="9" y="29" width="11" height="3" fill={pal.primaryDark} />
+                <rect x="8" y="28" width="2" height="2" fill="#FFFFFF" />
+                <rect x="11" y="28" width="2" height="2" fill="#FFFFFF" />
+                <rect
+                  x={2 - (pose.breathPhase % 2)}
+                  y="27"
+                  width="4"
+                  height="3"
+                  fill={pal.metalLight}
+                  opacity="0.85"
+                />
+              </g>
             </g>
           </g>
         );
       }
+
+      // FROZEN DRAUGR WARRIOR
       return (
         <g>
+          <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
+            <rect x="19" y="42" width="8" height="14" fill="#0D1821" />
+            <rect x="20" y="43" width="6" height="12" fill={pal.primaryDark} />
+            <rect x="35" y="42" width="8" height="14" fill="#0D1821" />
+            <rect x="36" y="43" width="6" height="12" fill={pal.primaryDark} />
+          </g>
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect x="17" y="19" width="28" height="37" fill={pal.primary} />
-            <rect x="20" y="21" width="22" height="24" fill={pal.metal} />
-            <rect x="14" y="15" width="7" height="10" fill={pal.metalLight} />
-            <rect x="41" y="15" width="7" height="10" fill={pal.metalLight} />
+            <rect x="16" y="18" width="30" height="26" fill="#0D1821" />
+            <rect x="17" y="19" width="28" height="24" fill={pal.primary} />
+            <rect x="20" y="21" width="22" height="20" fill={pal.metal} />
+            <rect x="23" y="23" width="16" height="14" fill={pal.primaryLight} />
+            <rect x="13" y="15" width="9" height="9" fill={pal.skinShadow} />
+            <rect x="14" y="16" width="7" height="6" fill={pal.skinOrBone} />
+            <rect x="40" y="15" width="9" height="9" fill={pal.skinShadow} />
+            <rect x="41" y="16" width="7" height="6" fill={pal.skinOrBone} />
           </g>
           <g
             transform={`translate(${pose.torsoX + pose.headX}, ${
               pose.torsoY + pose.headY
             })`}
           >
+            <rect x="19" y="1" width="4" height="9" fill={pal.metalLight} />
+            <rect x="39" y="1" width="4" height="9" fill={pal.metalLight} />
+            <rect x="21" y="6" width="20" height="14" fill="#0D1821" />
             <rect x="22" y="7" width="18" height="12" fill={pal.metalDark} />
-            <rect x="20" y="2" width="3" height="8" fill={pal.metalLight} />
-            <rect x="39" y="2" width="3" height="8" fill={pal.metalLight} />
-            <rect x="25" y="12" width="12" height="2" fill={pal.eyeGlow} />
+            <rect x="24" y="8" width="14" height="5" fill={pal.metal} />
+            <rect x="25" y="12" width="12" height="3" fill="#090C10" />
+            <rect x={26 + pose.eyeShiftX} y="12" width="3" height="2" fill={pal.eyeGlow} />
+            <rect x={33 + pose.eyeShiftX} y="12" width="3" height="2" fill={pal.eyeGlow} />
           </g>
           <g
             transform={`translate(${pose.torsoX + pose.weaponX}, ${
@@ -3917,55 +4667,203 @@ function renderArticulatedCreatureFamily(
             })`}
           >
             <rect x="10" y="6" width="3" height="46" fill={pal.primaryDark} />
-            <rect x="2" y="9" width="14" height="14" fill={pal.metalLight} />
+            <rect x="1" y="8" width="15" height="15" fill="#0D1821" />
+            <rect x="2" y="9" width="13" height="13" fill={pal.metalLight} />
+            <rect x="3" y="10" width="4" height="11" fill="#FFFFFF" />
           </g>
         </g>
       );
     }
 
     // ========================================================================
-    // CEMENTERIO DE GIGANTES: COLOSO DEL OSARIO (Multi-Skull Bone Titan)
+    // CEMENTERIO DE GIGANTES: ESQUELETO GIGANTE / COLOSO DEL OSARIO
+    // Anatomically detailed giant skeleton with sculpted skull, eye sockets,
+    // nasal cavity, articulated jaw & teeth, vertebrae, individual rib cage bars,
+    // pelvis, femur/tibia leg bones, finger bones & colossal ossuary weapons.
     // ========================================================================
     default: {
+      const isBoneShaman = def.subVariant === 'SHAMAN_CASTER';
+      const isBoneStalker = def.subVariant === 'STALKER_BEAST';
+
       return (
         <g>
-          {/* Massive Fused Femur Pillar Legs */}
+          {/* Colossal Articulated Femur, Knee-Joint & Tibia Leg Bones */}
           <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
-            <rect x="18" y="42" width="9" height="15" fill={pal.skinShadow} />
-            <rect x="37" y="42" width="9" height="15" fill={pal.skinShadow} />
+            {/* Left Giant Leg Bone */}
+            <rect x="18" y="40" width="9" height="16" fill="#12100E" />
+            <rect x="19" y="41" width="7" height="6" fill={pal.skinShadow} />
+            <rect x="20" y="41" width="4" height="5" fill={pal.skinOrBone} />
+            {/* Knee Joint Condyle */}
+            <rect x="18" y="46" width="9" height="3" fill={pal.skinOrBone} />
+            <rect x="20" y="47" width="5" height="1" fill="#FFF8EC" />
+            {/* Tibia & Fibula */}
+            <rect x="19" y="49" width="7" height="6" fill={pal.skinShadow} />
+            <rect x="20" y="49" width="3" height="5" fill={pal.skinOrBone} />
+            <rect x="16" y="54" width="11" height="3" fill={pal.skinOrBone} />
+
+            {/* Right Giant Leg Bone */}
+            <rect x="37" y="40" width="9" height="16" fill="#12100E" />
+            <rect x="38" y="41" width="7" height="6" fill={pal.skinShadow} />
+            <rect x="39" y="41" width="4" height="5" fill={pal.skinOrBone} />
+            {/* Knee Joint Condyle */}
+            <rect x="37" y="46" width="9" height="3" fill={pal.skinOrBone} />
+            <rect x="39" y="47" width="5" height="1" fill="#FFF8EC" />
+            {/* Tibia & Fibula */}
+            <rect x="38" y="49" width="7" height="6" fill={pal.skinShadow} />
+            <rect x="39" y="49" width="3" height="5" fill={pal.skinOrBone} />
+            <rect x="37" y="54" width="11" height="3" fill={pal.skinOrBone} />
           </g>
-          {/* Broad Multi-Skull Ossuary Torso & Chained Gravestone Pauldrons */}
+
+          {/* Anatomically Sculpted Giant Ribcage, Spine, Pelvis & Gravestone Pauldrons */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect x="14" y="17" width="36" height="26" fill={pal.primary} />
-            <rect x="18" y="19" width="28" height="22" fill={pal.skinOrBone} />
-            <rect x="22" y="23" width="20" height="3" fill={pal.primaryDark} />
-            <rect x="22" y="29" width="20" height="3" fill={pal.primaryDark} />
-            {/* Chained Gravestones on Shoulders */}
-            <rect x="10" y="13" width="8" height="14" fill={pal.metal} />
-            <rect x="46" y="13" width="8" height="14" fill={pal.metal} />
+            {/* Deep Ribcage Cavity */}
+            <rect x="16" y="18" width="32" height="23" fill="#12100E" />
+            <rect x="19" y="20" width="26" height="18" fill="#080706" />
+            {/* Central Vertebral Spine Column & Sternum */}
+            <rect x="30" y="18" width="4" height="22" fill={pal.skinShadow} />
+            <rect x="31" y="19" width="2" height="20" fill={pal.skinOrBone} />
+            {/* Individual Curved Rib Bars (4 pairs with dark intercostal gaps) */}
+            {[20, 24, 28, 32].map((ry, idx) => (
+              <g key={ry}>
+                <rect
+                  x={18 + idx}
+                  y={ry}
+                  width={28 - idx * 2}
+                  height="2"
+                  fill={pal.skinShadow}
+                />
+                <rect
+                  x={19 + idx}
+                  y={ry}
+                  width={26 - idx * 2}
+                  height="1"
+                  fill={idx < 2 ? '#FFF8EC' : pal.skinOrBone}
+                />
+              </g>
+            ))}
+            {/* Sculpted Pelvic Ilium Bone */}
+            <rect x="20" y="36" width="24" height="5" fill="#12100E" />
+            <rect x="21" y="37" width="22" height="3" fill={pal.skinOrBone} />
+            <rect x="24" y="38" width="4" height="2" fill="#12100E" />
+            <rect x="36" y="38" width="4" height="2" fill="#12100E" />
+
+            {/* Chained Gravestone / Ossuary Shoulder Pauldrons */}
+            <rect x="10" y="14" width="10" height="13" fill="#12100E" />
+            <rect x="11" y="15" width="8" height="11" fill={pal.metalDark} />
+            <rect x="12" y="16" width="6" height="9" fill={pal.metal} />
+            <rect x="13" y="17" width="4" height="2" fill={pal.metalLight} />
+
+            <rect x="44" y="14" width="10" height="13" fill="#12100E" />
+            <rect x="45" y="15" width="8" height="11" fill={pal.metalDark} />
+            <rect x="46" y="16" width="6" height="9" fill={pal.metal} />
+            <rect x="47" y="17" width="4" height="2" fill={pal.metalLight} />
           </g>
-          {/* Crowned Giant Skull */}
+
+          {/* Left Skeletal Humerus, Radius/Ulna & Bony Fingers / Off-Hand */}
+          <g transform={`translate(${pose.torsoX + pose.propX}, ${pose.torsoY + pose.propY})`}>
+            <rect x="45" y="25" width="4" height="11" fill={pal.skinShadow} />
+            <rect x="46" y="26" width="2" height="9" fill={pal.skinOrBone} />
+            {/* Articulated Finger Bones */}
+            <rect x="44" y="36" width="6" height="4" fill={pal.skinOrBone} />
+            <rect x="44" y="39" width="1" height="3" fill="#FFF8EC" />
+            <rect x="46" y="39" width="1" height="3" fill="#FFF8EC" />
+            <rect x="48" y="39" width="1" height="3" fill="#FFF8EC" />
+          </g>
+
+          {/* Colossal Sculpted Humanoid Skull, Cheekbones, Nasal Cavity, Teeth & Jaw */}
           <g
             transform={`translate(${pose.torsoX + pose.headX}, ${
               pose.torsoY + pose.headY
             })`}
           >
-            <rect x="22" y="5" width="20" height="14" fill={pal.skinOrBone} />
-            {!pose.eyeBlink && (
-              <g fill={pal.eyeGlow}>
-                <rect x={26 + pose.eyeShiftX} y="10" width="4" height="3" />
-                <rect x={34 + pose.eyeShiftX} y="10" width="4" height="3" />
+            {isBoneStalker && (
+              <g>
+                <rect x="15" y="2" width="5" height="8" fill={pal.skinShadow} />
+                <rect x="44" y="2" width="5" height="8" fill={pal.skinShadow} />
               </g>
             )}
+            {/* Cranium Dome & Temple Cracks */}
+            <rect x="20" y="2" width="24" height="14" fill="#12100E" />
+            <rect x="21" y="3" width="22" height="12" fill={pal.skinShadow} />
+            <rect x="22" y="4" width="20" height="10" fill={pal.skinOrBone} />
+            <rect x="24" y="4" width="14" height="4" fill="#FFF8EC" />
+            {/* Cranial Fracture Line */}
+            <rect x="35" y="4" width="1" height="4" fill="#12100E" />
+            <rect x="36" y="7" width="2" height="1" fill="#12100E" />
+            {/* Deep Recessed Eye Sockets */}
+            <rect x="23" y="8" width="6" height="5" fill="#090807" />
+            <rect x="35" y="8" width="6" height="5" fill="#090807" />
+            {!pose.eyeBlink && (
+              <g>
+                <rect x={25 + pose.eyeShiftX} y="9" width="3" height="3" fill={pal.eyeGlow} />
+                <rect x={26 + pose.eyeShiftX} y="9" width="1" height="1" fill="#FFFFFF" />
+                <rect x={36 + pose.eyeShiftX} y="9" width="3" height="3" fill={pal.eyeGlow} />
+                <rect x={37 + pose.eyeShiftX} y="9" width="1" height="1" fill="#FFFFFF" />
+              </g>
+            )}
+            {/* Triangular Nasal Cavity & Zygomatic Cheekbones */}
+            <rect x="31" y="11" width="2" height="3" fill="#090807" />
+            <rect x="21" y="12" width="3" height="3" fill={pal.skinShadow} />
+            <rect x="40" y="12" width="3" height="3" fill={pal.skinShadow} />
+            {/* Upper Maxilla Teeth Row */}
+            <rect x="25" y="15" width="2" height="2" fill="#FFF8EC" />
+            <rect x="28" y="15" width="2" height="2" fill="#FFF8EC" />
+            <rect x="31" y="15" width="2" height="2" fill="#FFF8EC" />
+            <rect x="34" y="15" width="2" height="2" fill="#FFF8EC" />
+            <rect x="37" y="15" width="2" height="2" fill="#FFF8EC" />
+            {/* Articulated Lower Mandible Jaw & Teeth */}
+            <g transform={`translate(0, ${pose.jawOpen})`}>
+              <rect x="23" y="17" width="18" height="4" fill="#12100E" />
+              <rect x="24" y="17" width="16" height="3" fill={pal.skinShadow} />
+              <rect x="26" y="17" width="2" height="2" fill={pal.skinOrBone} />
+              <rect x="29" y="17" width="2" height="2" fill={pal.skinOrBone} />
+              <rect x="33" y="17" width="2" height="2" fill={pal.skinOrBone} />
+              <rect x="36" y="17" width="2" height="2" fill={pal.skinOrBone} />
+            </g>
           </g>
-          {/* Monolithic Broken Stone Pillar Club */}
+
+          {/* Right Skeletal Arm + Role-Distinct Colossal Weapon */}
           <g
             transform={`translate(${pose.torsoX + pose.weaponX}, ${
               pose.torsoY + pose.weaponY
             })`}
           >
-            <rect x="4" y="8" width="12" height="44" fill={pal.metal} />
-            <rect x="6" y="10" width="4" height="40" fill={pal.metalLight} />
+            <rect x="13" y="24" width="5" height="12" fill={pal.skinShadow} />
+            <rect x="14" y="25" width="3" height="10" fill={pal.skinOrBone} />
+            {isBoneShaman ? (
+              /* Ossuary Skull-Totem Staff */
+              <g>
+                <rect x="8" y="8" width="4" height="45" fill={pal.skinShadow} />
+                <rect x="9" y="9" width="2" height="43" fill={pal.skinOrBone} />
+                <rect x="5" y="4" width="10" height="8" fill={pal.skinOrBone} />
+                <rect x="6" y="6" width="2" height="2" fill="#090807" />
+                <rect x="11" y="6" width="2" height="2" fill="#090807" />
+                <rect x="7" y="1" width="6" height="4" fill={pal.eyeGlow} />
+              </g>
+            ) : isBoneStalker ? (
+              /* Serrated Giant Femur Great-Cleaver */
+              <g>
+                <rect x="4" y="7" width="10" height="36" fill="#12100E" />
+                <rect x="5" y="8" width="8" height="34" fill={pal.skinShadow} />
+                <rect x="5" y="8" width="4" height="32" fill={pal.skinOrBone} />
+                <rect x="5" y="9" width="2" height="28" fill="#FFF8EC" />
+                <rect x="3" y="12" width="2" height="3" fill="#FFF8EC" />
+                <rect x="3" y="19" width="2" height="3" fill="#FFF8EC" />
+                <rect x="3" y="26" width="2" height="3" fill="#FFF8EC" />
+              </g>
+            ) : (
+              /* Monolithic Rune-Carved Stone Pillar Club Bound in Iron Chains */
+              <g>
+                <rect x="3" y="6" width="13" height="46" fill="#12100E" />
+                <rect x="4" y="7" width="11" height="44" fill={pal.metalDark} />
+                <rect x="5" y="8" width="8" height="42" fill={pal.metal} />
+                <rect x="6" y="9" width="4" height="38" fill={pal.metalLight} />
+                {/* Iron Chains Wrapping the Stone Pillar */}
+                <rect x="3" y="15" width="13" height="3" fill={pal.skinShadow} />
+                <rect x="3" y="27" width="13" height="3" fill={pal.skinShadow} />
+                <rect x="8" y="19" width="3" height="6" fill={pal.eyeGlow} />
+              </g>
+            )}
           </g>
         </g>
       );
@@ -3994,17 +4892,41 @@ export const LaCriptaAnimatedStageNpc: React.FC<{
 
   const breathY = tick % 4 === 1 || tick % 4 === 2 ? -1 : 0;
   const handY = tick % 3 === 0 ? -1 : 0;
+  const lanternSwingX = tick % 4 === 0 ? -1 : tick % 4 === 2 ? 1 : 0;
   const rType: CriptaCanonicalRoomType = room.type;
 
   // Biome-specific merchant identity palette & accessories
   const biomeId = dungeon.id;
-  const isForge = biomeId === 'forja_infernal';
-  const isGarden = biomeId === 'jardin_podrido';
-  const isSewer = biomeId === 'alcantarillas_imperiales';
-  const isCastle = biomeId === 'castillo_del_verdugo' || biomeId === 'prision_maldita';
+  const isForge = biomeId === 'forja_infernal' || biomeId === 'minas_de_azufre';
+  const isGarden =
+    biomeId === 'jardin_podrido' ||
+    biomeId === 'bosque_marchito' ||
+    biomeId === 'pantano_de_las_brujas';
+  const isSewer =
+    biomeId === 'alcantarillas_imperiales' || biomeId === 'laboratorio_alquimico';
+  const isCastle =
+    biomeId === 'castillo_del_verdugo' ||
+    biomeId === 'prision_maldita' ||
+    biomeId === 'santuario_de_sangre';
   const isIce = biomeId === 'cavernas_heladas';
-  const isGoblin = biomeId === 'fortaleza_goblin';
-  const isAbyss = biomeId === 'el_abismo';
+  const isGoblin = biomeId === 'fortaleza_goblin' || biomeId === 'la_colmena';
+  const isAbyss = biomeId === 'el_abismo' || biomeId === 'templo_del_eclipse';
+
+  const cloakShadow = isForge
+    ? '#290E0C'
+    : isGarden
+    ? '#132417'
+    : isSewer
+    ? '#14211D'
+    : isCastle
+    ? '#1A101C'
+    : isIce
+    ? '#12222E'
+    : isGoblin
+    ? '#2B1E11'
+    : isAbyss
+    ? '#10081C'
+    : '#191126';
 
   const cloakColor = isForge
     ? '#4A1E1B'
@@ -4021,6 +4943,22 @@ export const LaCriptaAnimatedStageNpc: React.FC<{
     : isAbyss
     ? '#1F1233'
     : '#2E2040';
+
+  const cloakLight = isForge
+    ? '#6E2E29'
+    : isGarden
+    ? '#365C3F'
+    : isSewer
+    ? '#3B544B'
+    : isCastle
+    ? '#473047'
+    : isIce
+    ? '#385B75'
+    : isGoblin
+    ? '#6B4E30'
+    : isAbyss
+    ? '#331F52'
+    : '#463261';
 
   const trimColor = dungeon.palette.highlight || '#E7A54A';
   const glowColor = dungeon.palette.glow || '#FFD166';
@@ -4050,269 +4988,475 @@ export const LaCriptaAnimatedStageNpc: React.FC<{
       className="relative flex flex-col items-center justify-center select-none"
     >
       <svg
-        width={244}
-        height={228}
+        width={256}
+        height={240}
         viewBox="0 0 64 60"
         shapeRendering="crispEdges"
         className="drop-shadow-[0_16px_28px_rgba(0,0,0,0.95)] overflow-visible"
       >
-        {/* Ground Stone Pedestal */}
-        <rect x="8" y="51" width="48" height="4" fill={dungeon.palette.stone} />
-        <rect x="5" y="54" width="54" height="4" fill={dungeon.palette.stoneDark} />
-        <rect x="12" y="50" width="40" height="1" fill={trimColor} opacity="0.65" />
+        {/* Multi-Tiered Stone Plinth with Chiselled Bevels & Biome Moss/Trim */}
+        <rect x="4" y="54" width="56" height="5" fill="#09070D" />
+        <rect x="6" y="53" width="52" height="4" fill={dungeon.palette.stoneDark} />
+        <rect x="8" y="50" width="48" height="4" fill={dungeon.palette.stone} />
+        <rect x="10" y="50" width="44" height="1" fill={trimColor} opacity="0.7" />
+        <rect x="14" y="53" width="6" height="2" fill={cloakShadow} />
+        <rect x="42" y="53" width="8" height="2" fill={cloakShadow} />
 
         {rType === 'SHOP' ? (
+          /* ===================================================================
+             HIGH-DENSITY BIOME MERCHANT (Hunched Relic Peddler + Huge Wares Pack)
+             =================================================================== */
           <g>
-            {/* Biome Merchant's Huge Wares Backpack & Hanging Relics */}
+            {/* Colossal Multi-Compartment Wares Backpack, Rolled Rug, Potions & Relics */}
             <g transform={`translate(0, ${breathY})`}>
-              <rect x="34" y="16" width="16" height="28" fill="#52331E" />
-              <rect x="36" y="18" width="12" height="24" fill="#6E462A" />
-              <rect x="34" y="24" width="16" height="2" fill="#E7A54A" />
+              {/* Top Bedroll / Merchant Canopy Roll */}
+              <rect x="28" y="8" width="22" height="6" fill="#140D08" />
+              <rect x="29" y="9" width="20" height="4" fill="#5E3A24" />
+              <rect x="30" y="9" width="18" height="2" fill="#8C583A" />
+              <rect x="33" y="8" width="2" height="6" fill="#E7A54A" />
+              <rect x="43" y="8" width="2" height="6" fill="#E7A54A" />
+
+              {/* Main Timber & Stitched Leather Pack Frame */}
+              <rect x="31" y="13" width="22" height="32" fill="#120B07" />
+              <rect x="32" y="14" width="20" height="30" fill="#3D2415" />
+              <rect x="33" y="15" width="17" height="28" fill="#5E3A24" />
+              <rect x="34" y="16" width="14" height="24" fill="#784B30" />
+              {/* Horizontal Brass Straps & Buckles */}
+              <rect x="32" y="22" width="20" height="2" fill="#2A180E" />
+              <rect x="32" y="23" width="20" height="1" fill="#E7A54A" />
+              <rect x="40" y="21" width="4" height="4" fill="#FFD166" />
+              <rect x="41" y="22" width="2" height="2" fill="#120B07" />
+              <rect x="32" y="33" width="20" height="2" fill="#2A180E" />
+              <rect x="32" y="34" width="20" height="1" fill="#E7A54A" />
+
+              {/* Hanging Glass Potion Vials & Sword Hilt Protruding from Pack */}
+              <rect x="51" y="18" width="5" height="7" fill="#121A24" />
+              <rect x="52" y="19" width="3" height="5" fill="#C93B5B" />
+              <rect x="52" y="19" width="1" height="3" fill="#FF8FA3" />
+              <rect x="52" y="16" width="3" height="2" fill="#D8C6A0" />
+
+              <rect x="51" y="27" width="5" height="7" fill="#121A24" />
+              <rect x="52" y="28" width="3" height="5" fill="#3B9E66" />
+              <rect x="52" y="28" width="1" height="3" fill="#8EE6AE" />
+              <rect x="52" y="25" width="3" height="2" fill="#D8C6A0" />
+
+              {/* Biome-Specific Merchant Pack Trophies */}
               {isGarden && (
-                /* Luminous Mushrooms growing on Herbalist's Pack */
                 <g>
-                  <rect x="42" y="11" width="8" height="5" fill="#8E5EA8" />
-                  <rect x="44" y="12" width="3" height="2" fill="#D4FF80" />
+                  <rect x="42" y="4" width="10" height="5" fill="#63327A" />
+                  <rect x="43" y="5" width="8" height="3" fill="#9B59B6" />
+                  <rect x="44" y="5" width="2" height="2" fill="#D4FF80" />
+                  <rect x="48" y="6" width="2" height="1" fill="#D4FF80" />
                 </g>
               )}
               {isForge && (
-                /* Anvil & Tongs strapped to Forge Trader's Pack */
-                <rect x="44" y="12" width="6" height="6" fill="#8E8891" />
+                <g>
+                  <rect x="45" y="4" width="7" height="7" fill="#494E59" />
+                  <rect x="46" y="5" width="5" height="5" fill="#8E96A4" />
+                  <rect x="47" y="6" width="3" height="2" fill="#FF6B35" />
+                </g>
+              )}
+              {!isGarden && !isForge && (
+                /* Ornate Relic Scroll Case & Pommel */
+                <g>
+                  <rect x="46" y="4" width="4" height="9" fill="#9E6B24" />
+                  <rect x="47" y="5" width="2" height="7" fill="#FFD166" />
+                </g>
               )}
             </g>
 
-            {/* Merchant Robes & Layered Coat */}
+            {/* Merchant Boots & Hem of Layered Travel Coat */}
+            <rect x="19" y="46" width="7" height="5" fill="#120C09" />
+            <rect x="20" y="46" width="5" height="4" fill="#3D261A" />
+            <rect x="29" y="46" width="7" height="5" fill="#120C09" />
+            <rect x="30" y="46" width="5" height="4" fill="#3D261A" />
+
+            {/* Layered Merchant Robes, Velvet Lapels, Coin Belt & Pouches */}
             <g transform={`translate(0, ${breathY})`}>
-              <rect x="18" y="21" width="22" height="30" fill={cloakColor} />
-              <rect x="21" y="23" width="16" height="27" fill="#181224" />
-              <rect x="27" y="22" width="4" height="28" fill={trimColor} />
+              <rect x="16" y="20" width="24" height="27" fill="#0B0811" />
+              <rect x="17" y="21" width="22" height="25" fill={cloakShadow} />
+              <rect x="18" y="21" width="19" height="23" fill={cloakColor} />
+              <rect x="19" y="22" width="14" height="20" fill={cloakLight} />
+              {/* Inner Brocade Vest & Gold Trim Lapels */}
+              <rect x="23" y="22" width="10" height="24" fill="#161021" />
+              <rect x="22" y="21" width="2" height="25" fill={trimColor} />
+              <rect x="32" y="21" width="2" height="25" fill={trimColor} />
+              {/* Merchant Heavy Leather Belt & Bulging Gold Pouches */}
+              <rect x="17" y="34" width="22" height="4" fill="#26170E" />
+              <rect x="18" y="35" width="20" height="2" fill="#5E3A24" />
+              <rect x="26" y="34" width="4" height="4" fill="#FFD166" />
+              <rect x="27" y="35" width="2" height="2" fill="#26170E" />
+              <rect x="19" y="36" width="5" height="6" fill="#8C583A" />
+              <rect x="20" y="37" width="3" height="4" fill="#E7A54A" />
             </g>
 
-            {/* Merchant Head, Biome Hat/Mask & Tracking Eyes */}
+            {/* Merchant Head, Wide-Brimmed Hood/Hat, Mask/Scarf & Expressive Eyes */}
             <g transform={`translate(${lookX}, ${breathY})`}>
-              <rect x="20" y="9" width="18" height="13" fill={cloakColor} />
-              <rect x="23" y="12" width="12" height="9" fill="#0B0812" />
+              {/* Hood / Peddler Hat Brim */}
+              <rect x="16" y="7" width="22" height="14" fill="#0B0811" />
+              <rect x="17" y="8" width="20" height="12" fill={cloakShadow} />
+              <rect x="18" y="8" width="18" height="10" fill={cloakColor} />
+              <rect x="20" y="7" width="14" height="4" fill={cloakLight} />
+              <rect x="16" y="11" width="22" height="2" fill={trimColor} />
+
+              {/* Shadowed Face Cavity &Wrapped Lower Scarf */}
+              <rect x="20" y="12" width="14" height="8" fill="#09070F" />
+              <rect x="20" y="17" width="14" height="4" fill="#3D2638" />
+              <rect x="21" y="18" width="12" height="2" fill="#593852" />
+
               {isGoblin && (
-                /* Long Goblin Trader Ears */
-                <g fill="#6B8E4E">
-                  <rect x="14" y="13" width="6" height="3" />
-                  <rect x="38" y="13" width="6" height="3" />
+                /* Notched Long Goblin Merchant Ears & Gold Earring */
+                <g>
+                  <rect x="11" y="12" width="6" height="4" fill="#3C5928" />
+                  <rect x="12" y="12" width="5" height="2" fill="#6B8E4E" />
+                  <rect x="37" y="12" width="6" height="4" fill="#3C5928" />
+                  <rect x="37" y="12" width="5" height="2" fill="#6B8E4E" />
+                  <rect x="13" y="15" width="2" height="2" fill="#FFD166" />
                 </g>
               )}
+
+              {/* Blinking & Cursor-Tracking Luminous Merchant Eyes + Spectacles Rim */}
               {tick !== 7 && (
-                <g fill={hovered ? '#FFF3C4' : glowColor}>
-                  <rect x={25 + lookX} y="15" width="2" height="2" />
-                  <rect x={31 + lookX} y="15" width="2" height="2" />
+                <g>
+                  <rect x={21 + lookX} y="13" width="5" height="4" fill="#8C583A" />
+                  <rect x={28 + lookX} y="13" width="5" height="4" fill="#8C583A" />
+                  <rect x={22 + lookX} y="14" width="3" height="2" fill={hovered ? '#FFF3C4' : glowColor} />
+                  <rect x={29 + lookX} y="14" width="3" height="2" fill={hovered ? '#FFF3C4' : glowColor} />
+                  <rect x={23 + lookX} y="14" width="1" height="1" fill="#FFFFFF" />
+                  <rect x={30 + lookX} y="14" width="1" height="1" fill="#FFFFFF" />
                 </g>
               )}
             </g>
 
-            {/* Left Hand Holding Swaying Lantern + Right Hand Counting Gold Coins */}
+            {/* Left Arm Holding Swaying Wrought-Iron Lantern */}
+            <g transform={`translate(${lanternSwingX}, ${handY})`}>
+              <rect x="9" y="21" width="9" height="5" fill="#0B0811" />
+              <rect x="10" y="22" width="8" height="3" fill={cloakColor} />
+              {/* Gloved Hand & Lantern Chain */}
+              <rect x="8" y="22" width="3" height="3" fill="#8C583A" />
+              <rect x="9" y="25" width="2" height="3" fill="#8E96A4" />
+              {/* Ornate Wrought-Iron Lantern */}
+              <rect x="6" y="28" width="8" height="2" fill="#2A2E38" />
+              <rect x="5" y="30" width="10" height="10" fill="#1A1D24" />
+              <rect x="7" y="30" width="6" height="9" fill="#E7A54A" />
+              <rect x="8" y="31" width="4" height="7" fill="#FFD166" />
+              <rect x="9" y="32" width="2" height="4" fill="#FFF8EC" />
+              <rect x="6" y="39" width="8" height="2" fill="#2A2E38" />
+            </g>
+
+            {/* Right Hand Weighing & Tossing Gleaming Gold Coin */}
             <g transform={`translate(0, ${handY})`}>
-              <rect x="10" y="22" width="8" height="4" fill={cloakColor} />
-              <rect x="9" y="26" width="6" height="11" fill="#E7A54A" />
-              <rect x="10" y="28" width="4" height="7" fill="#FFF3C4" />
-              {/* Right Hand Tossing Gold Coin */}
-              <rect x="37" y="29" width="6" height="4" fill="#D8C6A0" />
+              <rect x="35" y="27" width="8" height="5" fill="#0B0811" />
+              <rect x="36" y="28" width="6" height="3" fill="#D8C6A0" />
+              {/* Spinning Gold Coin in Air */}
+              <rect
+                x="38"
+                y={21 - (tick % 3)}
+                width="4"
+                height="4"
+                fill="#E7A54A"
+              />
               <rect
                 x="39"
-                y={24 - (tick % 3)}
-                width="3"
-                height="3"
-                fill="#FFD166"
+                y={22 - (tick % 3)}
+                width="2"
+                height="2"
+                fill="#FFF3C4"
               />
             </g>
 
-            {/* Pet Sewer Rat / Curious Familiar peeking by Merchant's Boot */}
+            {/* Curious Backpack Familiar / Crypt Rat Peeking at Base */}
             <g transform={`translate(${tick % 5 === 0 ? 1 : 0}, 0)`}>
-              <rect x="12" y="47" width="6" height="4" fill="#59504B" />
-              <rect x="11" y="48" width="1" height="1" fill="#8EE6AE" />
+              <rect x="10" y="46" width="8" height="4" fill="#292220" />
+              <rect x="11" y="47" width="6" height="3" fill="#59504B" />
+              <rect x="10" y="47" width="2" height="2" fill="#7A6E67" />
+              <rect x="9" y="48" width="1" height="1" fill="#8EE6AE" />
+              <rect x="17" y="48" width="3" height="1" fill="#A88B83" />
             </g>
           </g>
         ) : rType === 'REST' ? (
-          /* High-detail Sanctuary Bonfire, Sleeping Pack & Campaign Forge Anvil */
+          /* ===================================================================
+             HIGH-DENSITY SANCTUARY CAMPFIRE, SWORD IN EMBERS & FIELD ANVIL
+             =================================================================== */
           <g>
-            <rect x="12" y="43" width="22" height="8" fill="#5E3A24" />
-            <rect
-              x="14"
-              y={24 + breathY}
-              width="18"
-              height="20"
-              fill="#C93B5B"
-            />
-            <rect
-              x="17"
-              y={15 - breathY}
-              width="12"
-              height="25"
-              fill="#E7A54A"
-            />
-            <rect x="19" y="21" width="8" height="15" fill="#FFF3C4" />
-            {/* Campaign Forge Anvil & Hammer */}
-            <rect x="37" y="34" width="17" height="6" fill="#8E96A4" />
-            <rect x="39" y="34" width="13" height="2" fill="#D4DCE8" />
-            <rect x="40" y="40" width="11" height="11" fill="#494E59" />
-            <rect
-              x="44"
-              y={26 + handY}
-              width="3"
-              height="8"
-              fill="#6E4B33"
-            />
-            <rect
-              x="41"
-              y={24 + handY}
-              width="9"
-              height="4"
-              fill="#A8B0C2"
-            />
-            {/* Rising Fire Sparks */}
-            <rect
-              x="21"
-              y={9 - (tick % 4)}
-              width="2"
-              height="3"
-              fill="#FFD166"
-            />
-            <rect
-              x="26"
-              y={12 - ((tick + 2) % 4)}
-              width="2"
-              height="2"
-              fill="#FFF3C4"
-            />
-          </g>
-        ) : (rType === 'TREASURE' || rType === 'LOOT') ? (
-          /* High-detail Runic Treasure Coffer with Breathing Lid & Floating Gems */
-          <g transform={`translate(0, ${hovered ? -1 : 0})`}>
-            <rect x="14" y="25" width="36" height="26" fill="#3D2415" />
-            <rect x="16" y="26" width="32" height="23" fill="#5E3A24" />
-            {/* Lid lifts slightly on hover or breath */}
-            <g transform={`translate(0, ${hovered ? -2 : breathY})`}>
-              <rect x="13" y="18" width="38" height="7" fill="#6E462A" />
-              <rect x="13" y="18" width="38" height="3" fill="#E7A54A" />
-              <rect x="20" y="18" width="4" height="7" fill="#FFD166" />
-              <rect x="40" y="18" width="4" height="7" fill="#FFD166" />
+            {/* Stone Firepit Ring & Charred Firewood Logs */}
+            <rect x="8" y="44" width="28" height="6" fill="#120B08" />
+            <rect x="10" y="43" width="24" height="5" fill="#4A2C1B" />
+            <rect x="12" y="44" width="20" height="3" fill="#6E4228" />
+            <rect x="9" y="46" width="6" height="4" fill="#494E59" />
+            <rect x="19" y="47" width="6" height="4" fill="#666D7A" />
+            <rect x="29" y="46" width="6" height="4" fill="#494E59" />
+            {/* Glowing Coal Bed */}
+            <rect x="13" y="44" width="18" height="3" fill="#C93B5B" />
+            <rect x="15" y="45" width="14" height="2" fill="#FF6B35" />
+
+            {/* Coiled Knight's Sword Resting in the Bonfire (Dark Fantasy Sanctuary Motif) */}
+            <rect x="20" y="13" width="3" height="31" fill="#2A2E38" />
+            <rect x="21" y="14" width="2" height="29" fill="#8E96A4" />
+            <rect x="16" y="21" width="11" height="3" fill="#E7A54A" />
+            <rect x="17" y="21" width="9" height="1" fill="#FFD166" />
+            <rect x="20" y="8" width="3" height="6" fill="#5E3A24" />
+            <rect x="19" y="6" width="5" height="3" fill="#FFD166" />
+
+            {/* Multi-Layered Animated Pixel Flames */}
+            <g transform={`translate(0, ${breathY})`}>
+              {/* Outer Crimson Flame Tongue */}
+              <rect x="12" y="26" width="20" height="18" fill="#9E223B" />
+              <rect x="14" y="22" width="16" height="21" fill="#C93B5B" />
+              {/* Mid Amber Flame Tongue */}
+              <rect x="15" y="24" width="14" height="18" fill="#E76F24" />
+              <rect x="17" y="19" width="10" height="22" fill="#E7A54A" />
+              {/* Inner Bright Gold & White Core */}
+              <rect x="18" y="25" width="8" height="16" fill="#FFD166" />
+              <rect x="20" y="29" width="4" height="11" fill="#FFF8EC" />
             </g>
-            {/* Glowing Gold Seam & Lock */}
-            <rect x="15" y="25" width="34" height="2" fill="#FFF3C4" />
-            <rect x="28" y="24" width="8" height="10" fill="#FFD166" />
-            <rect x="31" y="27" width="2" height="4" fill="#09070D" />
-            <rect
-              x="20"
-              y={12 + breathY}
-              width="3"
-              height="3"
-              fill="#FFD166"
-            />
-            <rect
-              x="31"
-              y={8 - breathY}
-              width="3"
-              height="3"
-              fill="#FFF3C4"
-            />
-            <rect
-              x="42"
-              y={12 + breathY}
-              width="3"
-              height="3"
-              fill="#FFD166"
-            />
+
+            {/* Heavy Blacksmith Field Anvil & Forging Hammer on Timber Block */}
+            <rect x="37" y="40" width="17" height="10" fill="#29180E" />
+            <rect x="38" y="41" width="15" height="8" fill="#52321E" />
+            <rect x="39" y="41" width="13" height="2" fill="#73472C" />
+            {/* Iron Anvil Base, Waist & Horn */}
+            <rect x="38" y="37" width="15" height="4" fill="#232730" />
+            <rect x="40" y="34" width="11" height="4" fill="#3A404D" />
+            <rect x="34" y="30" width="22" height="5" fill="#494E59" />
+            <rect x="36" y="30" width="18" height="3" fill="#8E96A4" />
+            <rect x="38" y="30" width="14" height="1" fill="#D4DCE8" />
+            {/* Smithing Hammer Resting / Bobbing Above Anvil */}
+            <g transform={`translate(0, ${handY})`}>
+              <rect x="44" y="21" width="3" height="10" fill="#5E3A24" />
+              <rect x="45" y="22" width="1" height="8" fill="#8C583A" />
+              <rect x="40" y="18" width="11" height="5" fill="#2A2E38" />
+              <rect x="41" y="19" width="9" height="3" fill="#A8B0C2" />
+              <rect x="42" y="19" width="7" height="1" fill="#FFFFFF" />
+            </g>
+
+            {/* Rising Embers & Sparks */}
+            <rect x="16" y={13 - (tick % 5)} width="2" height="3" fill="#FF6B35" />
+            <rect x="22" y={9 - ((tick + 2) % 5)} width="2" height="2" fill="#FFD166" />
+            <rect x="27" y={15 - ((tick + 4) % 5)} width="2" height="2" fill="#FFF3C4" />
+          </g>
+        ) : rType === 'TREASURE' || rType === 'LOOT' ? (
+          /* ===================================================================
+             HIGH-DENSITY ROYAL RELIQUARY COFFER OVERFLOWING WITH GOLD & GEMS
+             =================================================================== */
+          <g transform={`translate(0, ${hovered ? -1 : 0})`}>
+            {/* Spilled Gold Coins & Ruby Around Chest Base */}
+            <rect x="9" y="48" width="4" height="2" fill="#E7A54A" />
+            <rect x="10" y="48" width="2" height="1" fill="#FFF3C4" />
+            <rect x="50" y="48" width="5" height="2" fill="#E7A54A" />
+            <rect x="51" y="47" width="3" height="2" fill="#FFD166" />
+
+            {/* Lower Iron-Bound Oak Chest Body */}
+            <rect x="12" y="26" width="40" height="24" fill="#140B06" />
+            <rect x="13" y="27" width="38" height="22" fill="#3D2212" />
+            <rect x="15" y="28" width="34" height="19" fill="#5E361E" />
+            <rect x="17" y="30" width="30" height="14" fill="#78472A" />
+            {/* Horizontal Wood Plank Seams */}
+            <rect x="15" y="35" width="34" height="1" fill="#29160B" />
+            <rect x="15" y="41" width="34" height="1" fill="#29160B" />
+            {/* Vertical Forged Iron & Brass Straps */}
+            <rect x="14" y="27" width="4" height="22" fill="#2A2E38" />
+            <rect x="15" y="28" width="2" height="20" fill="#666D7A" />
+            <rect x="46" y="27" width="4" height="22" fill="#2A2E38" />
+            <rect x="47" y="28" width="2" height="20" fill="#666D7A" />
+            <rect x="20" y="27" width="4" height="22" fill="#9E6B24" />
+            <rect x="21" y="28" width="2" height="20" fill="#FFD166" />
+            <rect x="40" y="27" width="4" height="22" fill="#9E6B24" />
+            <rect x="41" y="28" width="2" height="20" fill="#FFD166" />
+
+            {/* Overflowing Treasure Seam Inside Open Lid (Gold, Rubies, Emeralds) */}
+            <rect x="15" y="23" width="34" height="5" fill="#E7A54A" />
+            <rect x="17" y="24" width="30" height="3" fill="#FFD166" />
+            <rect x="20" y="24" width="10" height="2" fill="#FFF8EC" />
+            <rect x="24" y="23" width="4" height="3" fill="#E63946" />
+            <rect x="36" y="23" width="4" height="3" fill="#2EC4B6" />
+
+            {/* Articulated Vaulted Lid (Lifts on breath/hover to reveal treasure glow) */}
+            <g transform={`translate(0, ${hovered ? -3 : breathY - 1})`}>
+              <rect x="11" y="15" width="42" height="10" fill="#140B06" />
+              <rect x="12" y="16" width="40" height="8" fill="#4A2916" />
+              <rect x="14" y="17" width="36" height="6" fill="#6E3F23" />
+              <rect x="16" y="17" width="32" height="2" fill="#8C5432" />
+              {/* Gold Trim & Lid Straps */}
+              <rect x="12" y="15" width="40" height="2" fill="#E7A54A" />
+              <rect x="20" y="15" width="4" height="9" fill="#FFD166" />
+              <rect x="40" y="15" width="4" height="9" fill="#FFD166" />
+            </g>
+
+            {/* Ornate Lion/Skull Escutcheon Lock Plate */}
+            <rect x="27" y="24" width="10" height="12" fill="#1A1209" />
+            <rect x="28" y="25" width="8" height="10" fill="#E7A54A" />
+            <rect x="29" y="26" width="6" height="8" fill="#FFD166" />
+            <rect x="31" y="28" width="2" height="4" fill="#09070D" />
+
+            {/* Floating Golden Sparkles */}
+            <rect x="18" y={10 + breathY} width="3" height="3" fill="#FFD166" />
+            <rect x="31" y={6 - breathY} width="3" height="3" fill="#FFF8EC" />
+            <rect x="44" y={10 + breathY} width="3" height="3" fill="#FFD166" />
           </g>
         ) : rType === 'SHRINE' ? (
-          /* High-detail Sacred Reliquary Statue & Levitating Chalice */
+          /* ===================================================================
+             HIGH-DENSITY WINGED SERAPH RELIQUARY STATUE & LEVITATING CHALICE
+             =================================================================== */
           <g>
-            {/* Winged Stone Seraph / Saint Statue */}
-            <rect x="14" y="14" width="8" height="26" fill={dungeon.palette.stoneDark} />
-            <rect x="42" y="14" width="8" height="26" fill={dungeon.palette.stoneDark} />
-            <rect x="20" y="12" width="24" height="39" fill={dungeon.palette.stone} />
-            <rect x="23" y="15" width="18" height="34" fill="#1B1526" />
-            <rect x="26" y="6" width="12" height="10" fill={dungeon.palette.stone} />
-            {/* Levitating Sacred Golden Chalice in Hands */}
+            {/* Carved Stone Winged Seraph Wings (4-Tone Chiselled Stone) */}
+            <rect x="8" y="11" width="12" height="32" fill="#09070D" />
+            <rect x="9" y="12" width="10" height="30" fill={dungeon.palette.stoneDark} />
+            <rect x="10" y="13" width="8" height="26" fill={dungeon.palette.stone} />
+            <rect x="11" y="14" width="5" height="18" fill="#8E96A4" opacity="0.45" />
+
+            <rect x="44" y="11" width="12" height="32" fill="#09070D" />
+            <rect x="45" y="12" width="10" height="30" fill={dungeon.palette.stoneDark} />
+            <rect x="46" y="13" width="8" height="26" fill={dungeon.palette.stone} />
+            <rect x="48" y="14" width="5" height="18" fill="#8E96A4" opacity="0.45" />
+
+            {/* Statue Robed Torso, Pillar Drapery & Hooded Seraph Head */}
+            <rect x="19" y="13" width="26" height="37" fill="#09070D" />
+            <rect x="20" y="14" width="24" height="36" fill={dungeon.palette.stoneDark} />
+            <rect x="22" y="15" width="20" height="34" fill={dungeon.palette.stone} />
+            <rect x="25" y="17" width="14" height="31" fill="#181224" />
+            {/* Carved Hooded Seraph Head & Halo */}
+            <rect x="23" y="2" width="18" height="2" fill={trimColor} />
+            <rect x="21" y="4" width="2" height="6" fill={trimColor} />
+            <rect x="41" y="4" width="2" height="6" fill={trimColor} />
+            <rect x="25" y="5" width="14" height="11" fill={dungeon.palette.stone} />
+            <rect x="27" y="8" width="10" height="7" fill="#120E1A" />
+            <rect x="28" y="10" width="3" height="2" fill={glowColor} />
+            <rect x="33" y="10" width="3" height="2" fill={glowColor} />
+
+            {/* Levitating Sacred Golden Chalice & Radiant Essence */}
             <g transform={`translate(0, ${breathY - 1})`}>
-              <rect x="26" y="22" width="12" height="6" fill="#FFD166" />
-              <rect x="30" y="28" width="4" height="6" fill="#E7A54A" />
-              <rect x="27" y="34" width="10" height="2" fill="#FFD166" />
-              <rect x="28" y="18" width="8" height="4" fill={glowColor} />
-              <rect x="30" y="15" width="4" height="3" fill="#FFF3C4" />
+              <rect x="25" y="23" width="14" height="7" fill="#9E6B24" />
+              <rect x="26" y="23" width="12" height="6" fill="#FFD166" />
+              <rect x="28" y="24" width="8" height="3" fill="#FFF8EC" />
+              <rect x="30" y="29" width="4" height="6" fill="#E7A54A" />
+              <rect x="27" y="35" width="10" height="2" fill="#FFD166" />
+              {/* Sacred Flame / Essence Rising from Chalice */}
+              <rect x="28" y="18" width="8" height="5" fill={glowColor} />
+              <rect x="30" y="15" width="4" height="5" fill="#FFF8EC" />
             </g>
           </g>
         ) : room.encounterSubject?.archetype === 'INJURED_HOUND' ? (
-          /* Loyal Injured Crypt Hound NPC (Panting Jaw, Bandaged Foreleg & Wagging Tail) */
+          /* ===================================================================
+             HIGH-DENSITY LOYAL INJURED CRYPT HOUND (4-Tone Fur, Collar & Bandage)
+             =================================================================== */
           <g>
-            {/* Wagging Tail */}
-            <rect
-              x={11 + (tick % 2)}
-              y={26 + breathY}
-              width="6"
-              height="3"
-              fill="#6E5645"
-            />
-            {/* Muscular Hound Body & Brass Collar */}
-            <g transform={`translate(0, ${breathY})`}>
-              <rect x="16" y="27" width="26" height="14" fill="#4A382B" />
-              <rect x="18" y="28" width="22" height="11" fill="#6E5645" />
-              <rect x="36" y="24" width="5" height="11" fill="#E7A54A" />
+            {/* Wagging Tufted Tail */}
+            <g transform={`translate(${tick % 2}, ${breathY})`}>
+              <rect x="9" y="25" width="8" height="5" fill="#1C140F" />
+              <rect x="10" y="26" width="7" height="3" fill="#594233" />
+              <rect x="11" y="26" width="4" height="2" fill="#7D5E4A" />
             </g>
-            {/* Hind & Bandaged Front Legs */}
-            <rect x="18" y="40" width="5" height="11" fill="#3B2C22" />
-            <rect x="32" y="40" width="5" height="11" fill="#3B2C22" />
-            {/* Linen Bandage on Injured Right Foreleg */}
-            <rect x="38" y="39" width="5" height="10" fill="#F4EBD9" />
-            <rect x="39" y="42" width="3" height="2" fill="#C93B5B" />
-            {/* Articulated Hound Head, Ears & Friendly Amber Eye */}
+
+            {/* Muscular Hound Ribcage, Haunches & Studded Brass Collar */}
+            <g transform={`translate(0, ${breathY})`}>
+              <rect x="15" y="26" width="28" height="15" fill="#1C140F" />
+              <rect x="16" y="27" width="26" height="13" fill="#423024" />
+              <rect x="18" y="28" width="22" height="10" fill="#634A39" />
+              <rect x="20" y="28" width="16" height="5" fill="#82634D" />
+              {/* Studded Brass Hound Collar */}
+              <rect x="36" y="24" width="6" height="12" fill="#8C583A" />
+              <rect x="37" y="25" width="4" height="10" fill="#E7A54A" />
+              <rect x="38" y="27" width="2" height="2" fill="#FFF3C4" />
+              <rect x="38" y="31" width="2" height="2" fill="#FFF3C4" />
+            </g>
+
+            {/* Hind Legs & Paws + Bandaged Injured Foreleg */}
+            <rect x="17" y="39" width="6" height="11" fill="#2B1F17" />
+            <rect x="18" y="40" width="4" height="9" fill="#4A3628" />
+            <rect x="17" y="48" width="7" height="2" fill="#634A39" />
+
+            <rect x="31" y="39" width="6" height="11" fill="#2B1F17" />
+            <rect x="32" y="40" width="4" height="9" fill="#4A3628" />
+            <rect x="31" y="48" width="7" height="2" fill="#634A39" />
+
+            {/* Linen Bandage Wrapped Around Injured Right Foreleg */}
+            <rect x="38" y="38" width="6" height="11" fill="#1C140F" />
+            <rect x="39" y="39" width="5" height="9" fill="#E8DFCE" />
+            <rect x="40" y="40" width="3" height="7" fill="#FFF8EC" />
+            <rect x="40" y="42" width="3" height="2" fill="#C93B5B" />
+
+            {/* Articulated Wolfhound Head, Pointed Ears, Snout & Panting Tongue */}
             <g transform={`translate(${lookX}, ${breathY})`}>
-              <rect x="37" y="14" width="4" height="5" fill="#4A382B" />
-              <rect x="38" y="18" width="14" height="9" fill="#6E5645" />
-              <rect x="44" y="20" width="3" height="2" fill="#FFD166" />
+              {/* Pointed Ears */}
+              <rect x="36" y="12" width="5" height="6" fill="#1C140F" />
+              <rect x="37" y="13" width="3" height="5" fill="#594233" />
+              <rect x="41" y="13" width="4" height="5" fill="#1C140F" />
+              <rect x="42" y="14" width="2" height="4" fill="#594233" />
+              {/* Cranium & Long Snout */}
+              <rect x="37" y="17" width="17" height="10" fill="#1C140F" />
+              <rect x="38" y="18" width="15" height="8" fill="#594233" />
+              <rect x="39" y="18" width="12" height="5" fill="#7D5E4A" />
+              <rect x="51" y="18" width="3" height="3" fill="#120D0A" />
+              {/* Warm Loyal Amber Eye */}
+              <rect x="43" y="19" width="4" height="3" fill="#120D0A" />
+              <rect x="44" y="19" width="3" height="2" fill="#FFD166" />
+              <rect x="45" y="19" width="1" height="1" fill="#FFFFFF" />
+              {/* Panting Lower Jaw & Pink Tongue */}
               <rect
-                x="41"
-                y={27 + (tick % 2)}
-                width="9"
-                height="3"
-                fill="#3B2C22"
+                x="40"
+                y={26 + (tick % 2)}
+                width="11"
+                height="4"
+                fill="#2B1F17"
               />
               <rect
                 x="47"
-                y={28 + (tick % 2)}
-                width="3"
-                height="3"
+                y={27 + (tick % 2)}
+                width="4"
+                height="4"
                 fill="#FF758F"
               />
             </g>
           </g>
         ) : (
-          /* Mysterious Biome Event Pilgrim / Chained Seer / Secret Keeper */
+          /* ===================================================================
+             HIGH-DENSITY MYSTERIOUS EVENT SEER / RUNIC PILGRIM KEEPER
+             =================================================================== */
           <g>
-            {/* Tall Runic Staff & Hanging Soul Censer */}
+            {/* Tall Runic Astrolabe Staff & Swaying Soul-Incense Censer */}
             <g transform={`translate(0, ${handY})`}>
-              <rect x="46" y="8" width="3" height="43" fill="#8C583A" />
-              <rect x="44" y="5" width="7" height="6" fill={trimColor} />
-              <rect x="46" y="6" width="3" height="4" fill="#FFF3C4" />
-              {/* Hanging Incense Censer */}
-              <rect x="12" y="24" width="6" height="8" fill={trimColor} />
-              <rect x="13" y="26" width="4" height="4" fill={glowColor} />
+              <rect x="46" y="7" width="4" height="44" fill="#1F120B" />
+              <rect x="47" y="8" width="2" height="42" fill="#8C583A" />
+              {/* Ornate Finial Ring & Floating Crystal */}
+              <rect x="43" y="3" width="10" height="8" fill="#2A1C0E" />
+              <rect x="44" y="4" width="8" height="6" fill={trimColor} />
+              <rect x="46" y="5" width="4" height="4" fill="#FFF8EC" />
+              {/* Left Hand Chain & Glowing Censer */}
+              <rect x="13" y="21" width="2" height="5" fill="#8E96A4" />
+              <rect x="10" y="25" width="8" height="9" fill="#1F160D" />
+              <rect x="11" y="26" width="6" height="7" fill={trimColor} />
+              <rect x="12" y="27" width="4" height="4" fill={glowColor} />
+              <rect x="13" y="28" width="2" height="2" fill="#FFF8EC" />
             </g>
 
-            {/* Layered Pilgrim Cloak, Stole & Rune Trim */}
+            {/* Layered Pilgrim Vestments, Embroidered Stole & Rune Cloak */}
             <g transform={`translate(0, ${breathY})`}>
-              <rect x="18" y="18" width="26" height="33" fill={cloakColor} />
-              <rect x="21" y="20" width="20" height="30" fill="#140F1F" />
-              <rect x="24" y="20" width="3" height="29" fill={trimColor} />
-              <rect x="35" y="20" width="3" height="29" fill={trimColor} />
+              <rect x="17" y="18" width="28" height="33" fill="#09070F" />
+              <rect x="18" y="19" width="26" height="31" fill={cloakShadow} />
+              <rect x="19" y="19" width="24" height="29" fill={cloakColor} />
+              <rect x="21" y="20" width="20" height="27" fill={cloakLight} />
+              <rect x="23" y="21" width="16" height="28" fill="#120D1C" />
+              {/* Twin Golden Ritual Stoles with Rune Marks */}
+              <rect x="23" y="20" width="3" height="29" fill={trimColor} />
+              <rect x="36" y="20" width="3" height="29" fill={trimColor} />
               <rect x="28" y="24" width="6" height="14" fill={glowColor} opacity="0.85" />
+              <rect x="29" y="26" width="4" height="10" fill="#FFF8EC" opacity="0.65" />
             </g>
 
-            {/* Hooded Seer Head, Mask & Cursor-Tracking Eyes */}
+            {/* Deep Cowl, Runic Brow Crown & Cursor-Tracking Oracle Eyes */}
             <g transform={`translate(${lookX}, ${breathY})`}>
-              <rect x="22" y="6" width="18" height="13" fill={cloakColor} />
+              <rect x="20" y="5" width="22" height="14" fill="#09070F" />
+              <rect x="21" y="6" width="20" height="13" fill={cloakShadow} />
+              <rect x="22" y="6" width="18" height="11" fill={cloakColor} />
               <rect x="24" y="8" width="14" height="3" fill={trimColor} />
-              <rect x="24" y="11" width="14" height="7" fill="#08060D" />
+              <rect x="24" y="11" width="14" height="7" fill="#07050C" />
               {tick !== 9 && (
-                <g fill="#FFF3C4">
-                  <rect x={27 + lookX} y="13" width="2" height="2" />
-                  <rect x={33 + lookX} y="13" width="2" height="2" />
+                <g>
+                  <rect x={26 + lookX} y="13" width="3" height="2" fill={glowColor} />
+                  <rect x={33 + lookX} y="13" width="3" height="2" fill={glowColor} />
+                  <rect x={27 + lookX} y="13" width="1" height="1" fill="#FFFFFF" />
+                  <rect x={34 + lookX} y="13" width="1" height="1" fill="#FFFFFF" />
                 </g>
               )}
             </g>

@@ -59,6 +59,7 @@ import { LaCriptaGiantDoorTransition } from './LaCriptaGiantDoorTransition';
 import {
   LaCriptaBiomeStageBackdrop,
   LaCriptaCardPixelIllustration,
+  LaCriptaFullScreenBiomeAtmosphere,
   LaCriptaNonCombatStagePortrait,
   LaCriptaPlayableCard,
 } from './LaCriptaEncounterCards';
@@ -416,7 +417,13 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
       ROMAN_NUMERALS[roomSequence.length - 1] || String(roomSequence.length);
 
     return (
-      <div className="relative flex-1 min-h-0 w-full h-full overflow-hidden flex flex-col select-none bg-[#09070D]">
+      <div className="relative flex-1 min-h-0 w-full h-full overflow-hidden flex flex-col select-none bg-[#06080D]">
+        {/* FULL-SCREEN ANIMATED PIXEL-ART BIOME WORLD ATMOSPHERE */}
+        <LaCriptaFullScreenBiomeAtmosphere
+          dungeon={chosenDungeon}
+          roomType={activeRoom.type}
+        />
+
         {/* GIANT PHYSICAL DUNGEON DOOR TRANSITION BETWEEN EVERY ROOM */}
         <LaCriptaGiantDoorTransition
           transition={expeditionState.roomDoorTransition}
@@ -424,7 +431,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
         />
 
         {/* FULL-SCREEN 2-COLUMN ENCOUNTER CANVAS */}
-        <div className="relative flex-1 min-h-0 w-full h-full grid grid-cols-1 lg:grid-cols-[minmax(340px,0.40fr)_minmax(0,0.60fr)] overflow-y-auto lg:overflow-hidden">
+        <div className="relative z-10 flex-1 min-h-0 w-full h-full grid grid-cols-1 lg:grid-cols-[minmax(340px,0.40fr)_minmax(0,0.60fr)] overflow-y-auto lg:overflow-hidden">
           {/* =================================================================
               LEFT SIDE: LARGE CREATURE / NPC / ENCOUNTER STAGE (38-42vw)
               ================================================================= */}
@@ -885,12 +892,12 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
           {/* =================================================================
               RIGHT SIDE: LARGE TACTICAL CARD & DECISION BOARD (58-62vw)
               ================================================================= */}
-          <section className="relative min-h-0 h-full flex flex-col justify-between p-4 sm:p-6 lg:p-7 bg-gradient-to-br from-[#100C18] via-[#0B0912] to-[#140E1D] overflow-y-auto">
-            {/* Subtle Ambient Grid & Corner Filigree */}
+          <section className="relative min-h-0 h-full flex flex-col justify-between p-4 sm:p-6 lg:p-7 bg-[#090710]/55 backdrop-blur-[1.5px] overflow-y-auto">
+            {/* Subtle Biome Radial Accent Over Right Board */}
             <div
-              className="pointer-events-none absolute inset-0 opacity-15"
+              className="pointer-events-none absolute inset-0 opacity-25"
               style={{
-                backgroundImage: `radial-gradient(circle at 80% 20%, ${chosenDungeon.palette.glow}22 0%, transparent 55%)`,
+                backgroundImage: `radial-gradient(circle at 80% 20%, ${chosenDungeon.palette.glow}33 0%, transparent 58%)`,
               }}
             />
 
@@ -1742,6 +1749,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
               inspectedPlayer={inspectedPlayer}
               inspectedEnemy={inspectedEnemy}
               activeRoom={activeRoom}
+              dungeon={chosenDungeon}
               partyRelics={expeditionState.partyRelics || []}
               discoveredAbilityIds={discoveredAbilityIds}
               isMyTurnInCombat={isMyTurn}
