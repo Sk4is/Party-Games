@@ -317,6 +317,26 @@ export interface FortunariumSpinResult {
   timestamp: number;
 }
 
+export interface FortunariumBestSpinRecord {
+  spinId: string;
+  spinNumber: number;
+  round: number;
+  playerId: string;
+  playerName: string;
+  playerColor: string;
+  betMode: FortunariumBetMode;
+  spinCost: number;
+  grossPayout: number;
+  netMoneyDelta: number;
+  isJackpot: boolean;
+  isBigWin: boolean;
+  patternsCount: number;
+  topPatternName: string;
+  patternNames: string[];
+  specialSummary?: string[];
+  timestamp: number;
+}
+
 export type FortunariumUpgradeId =
   | 'cosecha_roja'
   | 'huerto_citrico'
@@ -392,6 +412,8 @@ export interface FortunariumRoomState {
   totalJackpotsHit: number;
   biggestSingleWinInMatch: number;
   bestPatternNameInMatch: string;
+  peakMoneyInMatch?: number;
+  bestSpinsInMatch?: FortunariumBestSpinRecord[];
 
   integrity: number;
   maxIntegrity: number;

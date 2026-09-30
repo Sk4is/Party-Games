@@ -191,6 +191,8 @@ export class FortunariumServer {
       totalJackpotsHit: 0,
       biggestSingleWinInMatch: 0,
       bestPatternNameInMatch: '—',
+      peakMoneyInMatch: STARTING_CREDITS,
+      bestSpinsInMatch: [],
       integrity: 100,
       maxIntegrity: 100,
       repairsUsedInQuota: 0,
@@ -246,6 +248,8 @@ export class FortunariumServer {
       totalJackpotsHit: room.totalJackpotsHit,
       biggestSingleWinInMatch: room.biggestSingleWinInMatch,
       bestPatternNameInMatch: room.bestPatternNameInMatch,
+      peakMoneyInMatch: room.peakMoneyInMatch ?? STARTING_CREDITS,
+      bestSpinsInMatch: room.bestSpinsInMatch || [],
       integrity: room.integrity,
       maxIntegrity: room.maxIntegrity,
       repairsUsedInQuota: room.repairsUsedInQuota || 0,
@@ -818,6 +822,10 @@ export class FortunariumServer {
 
           room.money = finalMoney;
           room.quotaProgress = finalQuotaProgress;
+          room.peakMoneyInMatch = Math.max(
+            room.peakMoneyInMatch ?? STARTING_CREDITS,
+            finalMoney
+          );
           room.integrity = finalIntegrity;
           room.voltageMultiplier = core.voltageMultiplierAfter;
           room.keys = finalKeys;
@@ -831,6 +839,55 @@ export class FortunariumServer {
           for (const wl of core.winLines) {
             if (room.bestPatternNameInMatch === '—' || wl.payout >= room.biggestSingleWinInMatch * 0.5) {
               room.bestPatternNameInMatch = wl.name;
+            }
+          }
+
+          if (core.grossPayout > 0 || core.isJackpot) {
+            const sortedLines = [...core.winLines].sort((a, b) => b.payout - a.payout);
+            const patternNames = sortedLines.map((w) => w.name);
+            const topPatternName = core.isJackpot
+              ? sortedLines[0]?.name || 'PANTALLA COMPLETA'
+              : sortedLines[0]?.name ||
+                (core.specialEffects.some((fx) => fx.symbolId === 'moneda')
+                  ? 'BONO DE MONEDAS'
+                  : 'PREMIO ESPECIAL');
+            const positiveSpecials = core.specialEffects
+              .filter((fx) => fx.variant === 'positive' || fx.variant === 'jackpot')
+              .map((fx) => fx.title);
+
+            if (!room.bestSpinsInMatch) {
+              room.bestSpinsInMatch = [];
+            }
+            room.bestSpinsInMatch.push({
+              spinId: spinResult.spinId,
+              spinNumber: room.totalSpinsInMatch,
+              round: room.round,
+              playerId: player.id,
+              playerName: player.name,
+              playerColor: player.color,
+              betMode: room.betMode,
+              spinCost: actualSpinCost,
+              grossPayout: core.grossPayout,
+              netMoneyDelta,
+              isJackpot: core.isJackpot,
+              isBigWin: Boolean(spinIsBigWin),
+              patternsCount: core.winLines.length,
+              topPatternName,
+              patternNames,
+              specialSummary: positiveSpecials,
+              timestamp: spinResult.timestamp,
+            });
+            room.bestSpinsInMatch.sort((a, b) => {
+              if (b.grossPayout !== a.grossPayout) {
+                return b.grossPayout - a.grossPayout;
+              }
+              if (b.isJackpot !== a.isJackpot) {
+                return b.isJackpot ? 1 : -1;
+              }
+              return b.netMoneyDelta - a.netMoneyDelta;
+            });
+            if (room.bestSpinsInMatch.length > 5) {
+              room.bestSpinsInMatch.length = 5;
             }
           }
 
@@ -1276,6 +1333,10 @@ export class FortunariumServer {
 
         if (moneyChange > 0) {
           room.money += moneyChange;
+          room.peakMoneyInMatch = Math.max(
+            room.peakMoneyInMatch ?? STARTING_CREDITS,
+            room.money
+          );
           player.stats.totalMoneyGenerated += moneyChange;
           if (moneyChange > player.stats.biggestSingleWin) {
             player.stats.biggestSingleWin = moneyChange;
@@ -1815,6 +1876,8 @@ export class FortunariumServer {
     room.totalJackpotsHit = 0;
     room.biggestSingleWinInMatch = 0;
     room.bestPatternNameInMatch = '—';
+    room.peakMoneyInMatch = STARTING_CREDITS;
+    room.bestSpinsInMatch = [];
     room.integrity = 100;
     room.maxIntegrity = 100;
     room.repairsUsedInQuota = 0;

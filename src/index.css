@@ -1583,6 +1583,59 @@ body,
   animation: fort-mono-rainbow-flow 5s linear infinite;
 }
 
+/* End-of-Match Terminal Result Hero Pulses & Subtle Moving Scanline */
+@keyframes fort-end-defeat-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 2px 18px rgba(0, 0, 0, 0.92),
+      0 0 22px rgba(255, 42, 109, 0.18);
+  }
+  50% {
+    box-shadow:
+      inset 0 2px 22px rgba(0, 0, 0, 0.92),
+      0 0 34px rgba(255, 42, 109, 0.34);
+  }
+}
+
+@keyframes fort-end-victory-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 2px 18px rgba(0, 0, 0, 0.92),
+      0 0 24px rgba(34, 211, 238, 0.22),
+      0 0 14px rgba(250, 204, 21, 0.14);
+  }
+  50% {
+    box-shadow:
+      inset 0 2px 22px rgba(0, 0, 0, 0.92),
+      0 0 36px rgba(34, 211, 238, 0.36),
+      0 0 22px rgba(250, 204, 21, 0.28);
+  }
+}
+
+.fort-end-hero-defeat {
+  animation: fort-end-defeat-pulse 3.6s ease-in-out infinite;
+}
+
+.fort-end-hero-victory {
+  animation: fort-end-victory-pulse 3.6s ease-in-out infinite;
+}
+
+.fort-end-scanline-beam {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 18%;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(
+    180deg,
+    rgba(34, 211, 238, 0) 0%,
+    rgba(34, 211, 238, 0.028) 50%,
+    rgba(34, 211, 238, 0) 100%
+  );
+  animation: fort-crt-scanline-sweep 8.5s linear infinite;
+}
+
 /* Accessibility: Respect user reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   .fam2play-wordmark {
@@ -1593,6 +1646,9 @@ body,
     animation: none !important;
     background-position: 25% 50% !important;
   }
+  .fort-end-hero-defeat,
+  .fort-end-hero-victory,
+  .fort-end-scanline-beam,
   .animate-home-blob-amber,
   .animate-home-blob-rose,
   .animate-home-blob-cyan,
