@@ -69,6 +69,7 @@ import {
   LaCriptaFinalBossDoorScene,
   LaCriptaFinalBossRoomArt,
 } from './LaCriptaFinalBossComponents';
+import { LaCriptaGiantDoorTransition } from './LaCriptaGiantDoorTransition';
 import { CRIPTA_STATUS_EFFECTS_REGISTRY } from '../../data/la-cripta/criptaStatusEffects';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 
@@ -325,9 +326,22 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
         )
     );
 
+    const unclaimedDrops = (activeRoom.groundDrops || []).filter(
+      (d) => !d.claimedByPlayerId
+    );
+    const isTransitioningDoor = Boolean(
+      expeditionState.roomDoorTransition?.active
+    );
+    const isMinibossRoom =
+      activeRoom.type === 'MINIBOSS' || Boolean(activeRoom.isMinibossRoom);
+    const finalBossPhaseNum: 1 | 2 =
+      expeditionState.finalBossState?.phase === 'PHASE_2' ? 2 : 1;
+
     const canAdvance =
       !isDefeated &&
       !isFinalBossCombat &&
+      !isTransitioningDoor &&
+      unclaimedDrops.length === 0 &&
       (activeRoom.resolved ||
         activeRoom.type === 'SHOP' ||
         activeRoom.type === 'REST' ||
@@ -367,6 +381,12 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
 
     return (
       <div className="relative flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-2 flex flex-col justify-between gap-2.5 select-none">
+        {/* GIANT PHYSICAL DUNGEON DOOR TRANSITION BETWEEN EVERY ROOM */}
+        <LaCriptaGiantDoorTransition
+          transition={expeditionState.roomDoorTransition}
+          totalRooms={roomSequence.length}
+        />
+
         {/* 1. COMPACT TOP ROOM PROGRESS TRACKER */}
         {roomSequence.length > 0 && (
           <LaCriptaRoomProgressTracker
@@ -389,9 +409,11 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
             borderColor: isDefeated
               ? '#8F263D'
               : isFinalBossCombat
-              ? expeditionState.finalBossPhase === 2
+              ? finalBossPhaseNum === 2
                 ? '#C93B5B'
                 : '#E7A54A'
+              : isMinibossRoom
+              ? '#C93B5B'
               : chosenDungeon.palette.glow,
             backgroundImage: `radial-gradient(circle at 30% 25%, ${chosenDungeon.palette.fog}99 0%, #0B0A0E 85%)`,
           }}
@@ -401,21 +423,46 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
             <div className="flex items-center gap-2.5 min-w-0">
               <div
                 className="w-8 h-8 border-2 flex items-center justify-center shrink-0 bg-[#09070D]"
-                style={{ borderColor: chosenDungeon.palette.glow }}
+                style={{
+                  borderColor: isMinibossRoom
+                    ? '#C93B5B'
+                    : chosenDungeon.palette.glow,
+                }}
               >
                 <LaCriptaRoomTypeIcon
                   type={activeRoom.type}
-                  color={chosenDungeon.palette.highlight}
+                  color={
+                    isMinibossRoom ? '#FFD166' : chosenDungeon.palette.highlight
+                  }
                   size={18}
                 />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-cripta-pixel uppercase tracking-widest text-[#E7A54A]">
-                  {isFinalBossCombat
-                    ? `SANTUARIO FINAL · FASE ${expeditionState.finalBossPhase || 1} DE 2`
-                    : inSecretRoom
-                    ? 'CÁMARA OCULTA'
-                    : `PUERTA ${Math.min(3, completedDoorCount + 1)}/3 · SALA ${activeRoom.roomNumber} DE ${roomSequence.length} · ${ROOM_TYPE_LABELS[activeRoom.type].toUpperCase()}`}
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-cripta-pixel uppercase tracking-widest text-[#E7A54A]">
+                  <span>
+                    {isFinalBossCombat
+                      ? `SANTUARIO FINAL · FASE ${finalBossPhaseNum} DE 2`
+                      : inSecretRoom
+                      ? 'CÁMARA OCULTA'
+                      : `PUERTA ${Math.min(3, completedDoorCount + 1)}/3 · SALA ${activeRoom.roomNumber} DE ${roomSequence.length} · ${(
+                          ROOM_TYPE_LABELS[activeRoom.type] || activeRoom.type
+                        ).toUpperCase()}`}
+                  </span>
+                  {isMinibossRoom && !activeRoom.resolved && (
+                    <span className="px-1.5 py-0.2 bg-[#2A0E19] border border-[#C93B5B] text-[9px] text-[#FFD166] font-bold">
+                      ★ GUARDIÁN DE MAZMORRA
+                    </span>
+                  )}
+                  {activeRoom.resolved && unclaimedDrops.length > 0 && (
+                    <span className="px-1.5 py-0.2 bg-[#261810] border border-[#FFD166] text-[9px] text-[#FFD166] animate-pulse">
+                      ✦ RECOGIENDO BOTÍN ({unclaimedDrops.length})
+                    </span>
+                  )}
+                  {activeRoom.resolved && unclaimedDrops.length === 0 && (
+                    <span className="px-1.5 py-0.2 bg-[#112419] border border-[#5EA87A] text-[9px] text-[#5EA87A]">
+                      ✓ SALA DESPEJADA
+                    </span>
+                  )}
                 </div>
                 <h1
                   className="font-cripta-display text-lg sm:text-2xl font-black tracking-wide truncate"
@@ -427,7 +474,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              {expeditionState.eventFlags?.crypt_hound_ally && (
+              {expeditionState.eventFlags?.fedCryptHound && (
                 <span
                   className="px-2 py-1 bg-[#14241B] border border-[#5EA87A] text-[9px] font-cripta-pixel text-[#5EA87A]"
                   title="La Sabuesa de la Cripta os acompaña hacia el Jefe"
@@ -475,13 +522,14 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
               <div className="relative flex-1 min-h-[250px] sm:min-h-[320px] flex flex-col">
                 {isFinalBossCombat ? (
                   <div className="relative w-full h-full min-h-[250px] sm:min-h-[320px] border-2 border-[#282039] bg-[#08050C] overflow-hidden">
-                    <LaCriptaFinalBossRoomArt phase={expeditionState.finalBossPhase || 1} />
+                    <LaCriptaFinalBossRoomArt phase={finalBossPhaseNum} />
                   </div>
                 ) : (
                   <LaCriptaRoomEnvironmentCanvas
                     dungeon={chosenDungeon}
                     room={activeRoom}
                     canAdvance={canAdvance && !expeditionState.dungeonCompleted}
+                    unclaimedDropsCount={unclaimedDrops.length}
                     onClickExitArchway={() => {
                       if (onAdvanceRoom) {
                         laCriptaAudio.playDoorVote();
@@ -509,17 +557,15 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                 )}
 
                 {/* Physical Ground Loot Drops inside the Room */}
-                {onClaimGroundDrop &&
-                  activeRoom.groundDrops &&
-                  activeRoom.groundDrops.some((d) => !d.claimed) && (
-                    <LaCriptaGroundDropsOverlay
-                      drops={activeRoom.groundDrops}
-                      onClaimDrop={(dropId) => {
-                        laCriptaAudio.playHeroSelect();
-                        onClaimGroundDrop(dropId);
-                      }}
-                    />
-                  )}
+                {onClaimGroundDrop && unclaimedDrops.length > 0 && (
+                  <LaCriptaGroundDropsOverlay
+                    drops={activeRoom.groundDrops || []}
+                    onClaimDrop={(dropId) => {
+                      laCriptaAudio.playHeroSelect();
+                      onClaimGroundDrop(dropId);
+                    }}
+                  />
+                )}
 
                 {/* Central Room Visual Feedback Overlay */}
                 {(roomCenterEvents.length > 0 || roomCenterVfxEvent?.vfxStyle) && (
@@ -668,18 +714,36 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
 
                               {/* Enemy HP Bar, Armor & Active Statuses */}
                               <div
-                                className="mt-0.5 px-2.5 py-1 bg-[#09070D]/95 border-2 text-center min-w-[118px] shadow-[0_6px_16px_rgba(0,0,0,0.9)]"
+                                className="mt-0.5 px-2.5 py-1 bg-[#09070D]/95 border-2 text-center min-w-[124px] shadow-[0_6px_16px_rgba(0,0,0,0.9)]"
                                 style={{
-                                  borderColor: isTargeted ? '#E7A54A' : '#282039',
+                                  borderColor: enemy.enrageTriggered
+                                    ? '#C93B5B'
+                                    : isTargeted
+                                    ? '#E7A54A'
+                                    : '#282039',
                                 }}
                               >
+                                {(enemy.isMiniboss || enemy.enrageTriggered) && (
+                                  <div className="mb-0.5 flex items-center justify-center gap-1">
+                                    {enemy.isMiniboss && (
+                                      <span className="px-1 py-0.2 bg-[#26111B] border border-[#E7A54A] text-[7px] font-cripta-pixel font-bold text-[#FFD166] uppercase">
+                                        ★ MINIJEFE
+                                      </span>
+                                    )}
+                                    {enemy.enrageTriggered && (
+                                      <span className="px-1 py-0.2 bg-[#360E1B] border border-[#C93B5B] text-[7px] font-cripta-pixel font-bold text-[#FF6B8B] uppercase animate-pulse">
+                                        🔥 ENFURECIDO
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                                 <div className="flex items-center justify-center gap-1">
                                   {isTargeted && (
                                     <span className="text-[8px] font-cripta-pixel text-[#E7A54A]">
                                       ▶
                                     </span>
                                   )}
-                                  <span className="text-[10px] font-cripta-pixel font-bold text-[#D9D0BC] truncate max-w-[130px]">
+                                  <span className="text-[10px] font-cripta-pixel font-bold text-[#D9D0BC] truncate max-w-[136px]">
                                     {enemy.name}
                                   </span>
                                 </div>
@@ -697,18 +761,31 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                                     🛡 {enemy.armor || 0}
                                   </span>
                                 </div>
-                                {enemy.statusEffects &&
-                                  enemy.statusEffects.length > 0 && (
-                                    <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
-                                      {enemy.statusEffects.map((st, sIdx) => (
-                                        <LaCriptaStatusEffectBadge
-                                          key={`${st.effectType}_${sIdx}`}
-                                          status={st}
-                                          compact
-                                        />
-                                      ))}
-                                    </div>
-                                  )}
+                                {((enemy.poisonStacks || 0) > 0 ||
+                                  (enemy.vulnerableTurns || 0) > 0) && (
+                                  <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
+                                    {(enemy.poisonStacks || 0) > 0 && (
+                                      <LaCriptaStatusEffectBadge
+                                        status={{
+                                          type: 'VENENO',
+                                          turnsRemaining: enemy.poisonStacks || 1,
+                                          potency: enemy.poisonStacks || 1,
+                                        }}
+                                        compact
+                                      />
+                                    )}
+                                    {(enemy.vulnerableTurns || 0) > 0 && (
+                                      <LaCriptaStatusEffectBadge
+                                        status={{
+                                          type: 'VULNERABLE',
+                                          turnsRemaining: enemy.vulnerableTurns || 1,
+                                          potency: 1,
+                                        }}
+                                        compact
+                                      />
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </button>
                           </div>
@@ -1462,14 +1539,17 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                 activeRoom.type === 'SHOP' &&
                 activeRoom.shopInventory &&
                 activeRoom.shopInventory.length > 0 &&
-                onBuyShopSlot && (
+                (onBuyShopSlot || onShopBuyItem) && (
                   <LaCriptaShopShelvesPanel
                     slots={activeRoom.shopInventory}
                     partyGold={partyGold}
                     disabled={iAmDead}
                     hasDiscountRelic={Boolean(hasDiscountRelic)}
                     localPlayer={me}
-                    onBuySlot={(slotId) => onBuyShopSlot(slotId)}
+                    purchaseHistory={activeRoom.shopPurchaseHistory || []}
+                    onBuySlot={(slotId) =>
+                      (onBuyShopSlot || onShopBuyItem)?.(slotId)
+                    }
                   />
                 )}
 
@@ -1669,15 +1749,29 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
               )}
 
               {/* ============================================================= */}
-              {/* D) ROOM RESOLVED -> ADVANCE TO NEXT ROOM OR COMPLETE DOOR     */}
+              {/* D) ROOM RESOLVED -> REWARD SETTLING -> CROSS GIANT DOOR       */}
               {/* ============================================================= */}
-              {expeditionState.dungeonCompleted ? (
+              {!isDefeated && activeRoom.resolved && unclaimedDrops.length > 0 && (
+                <div className="p-3 bg-[#24170D] border-2 border-[#FFD166] flex flex-wrap items-center justify-between gap-2 shadow-[0_0_20px_rgba(255,209,102,0.25)]">
+                  <div className="flex items-center gap-2 text-xs font-cripta-pixel text-[#FFD166] font-bold">
+                    <span>✦</span>
+                    <span>
+                      SALA DESPEJADA · RECOGE EL BOTÍN EN EL SUELO ({unclaimedDrops.length}) ANTES DE CRUZAR LA PUERTA
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-cripta-pixel text-[#D9D0BC]/80">
+                    Haz clic en el botín del escenario izquierdo para reclamarlo
+                  </span>
+                </div>
+              )}
+
+              {expeditionState.dungeonCompleted && unclaimedDrops.length === 0 ? (
                 <div className="p-4 bg-[#19111D] border-2 border-[#E7A54A] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_26px_rgba(231,165,74,0.28)]">
                   <div className="flex items-center gap-3">
                     <Trophy className="w-8 h-8 text-[#E7A54A] shrink-0" />
                     <div>
                       <div className="text-[10px] font-cripta-pixel text-[#FFD166] tracking-widest uppercase">
-                        ✦ PUERTA {Math.min(3, completedDoorCount + 1)} / 3 SUPERADA ✦
+                        ✦ MINIJEFE DERROTADO · PUERTA {Math.min(3, completedDoorCount + 1)} / 3 SUPERADA ✦
                       </div>
                       <div className="font-cripta-display text-lg sm:text-xl font-black text-[#E7A54A]">
                         ¡{chosenDungeon.name} CONQUISTADA!
@@ -1691,6 +1785,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   {onAdvanceRoom && (
                     <button
                       type="button"
+                      disabled={isTransitioningDoor}
                       onClick={() => {
                         laCriptaAudio.playDoorVote();
                         onAdvanceRoom();
@@ -1699,12 +1794,12 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     >
                       <span>
                         {completedDoorCount + 1 >= 3
-                          ? 'SALIR HACIA EL CORAZÓN DE LA CRIPTA'
+                          ? 'CRUZAR PUERTA AL CORAZÓN DE LA CRIPTA'
                           : isSolo
-                          ? 'SALIR Y VOLVER A LAS TRES PUERTAS'
+                          ? 'CRUZAR PUERTA Y VOLVER A LAS TRES PUERTAS'
                           : iAmReadyToAdvance
                           ? `ESPERANDO AL GRUPO (${readyPlayerIds.length}/${totalConnected})`
-                          : 'SALIR Y VOLVER A LAS TRES PUERTAS'}
+                          : 'CRUZAR PUERTA Y VOLVER A LAS TRES PUERTAS'}
                       </span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
@@ -1715,11 +1810,13 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                 onAdvanceRoom && (
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[#282039]">
                     <div className="text-xs font-cripta-pixel text-[#5EA87A]">
-                      ✓ PASO DESPEJADO ·{' '}
+                      ✓ SALA COMPLETADA ·{' '}
                       {inSecretRoom
                         ? 'Listos para regresar a la galería principal'
                         : currentRoomIndex + 1 >= roomSequence.length
-                        ? 'Jefe del bioma derrotado · Puerta de salida desbloqueada'
+                        ? 'Minijefe derrotado · Puerta de salida desbloqueada'
+                        : currentRoomIndex + 2 === roomSequence.length
+                        ? `⚠ Siguiente cámara: GUARDIÁN MINIJEFE (${roomSequence.length}/${roomSequence.length})`
                         : `Siguiente cámara lista (${Math.min(
                             roomSequence.length,
                             currentRoomIndex + 2
@@ -1727,6 +1824,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     </div>
                     <button
                       type="button"
+                      disabled={isTransitioningDoor}
                       onClick={() => {
                         laCriptaAudio.playDoorVote();
                         onAdvanceRoom();
@@ -1735,14 +1833,14 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     >
                       <span>
                         {inSecretRoom
-                          ? 'SALIR DE LA CÁMARA SECRETA'
+                          ? 'CRUZAR PUERTA A LA GALERÍA'
                           : currentRoomIndex + 1 >= roomSequence.length
-                          ? 'COMPLETAR MAZMORRA'
+                          ? 'CRUZAR PUERTA Y COMPLETAR MAZMORRA'
                           : isSolo
-                          ? 'AVANZAR A LA SIGUIENTE SALA'
+                          ? 'CRUZAR PUERTA A LA SIGUIENTE SALA'
                           : iAmReadyToAdvance
                           ? `ESPERANDO AL GRUPO (${readyPlayerIds.length}/${totalConnected})`
-                          : 'AVANZAR A LA SIGUIENTE SALA'}
+                          : 'CRUZAR PUERTA A LA SIGUIENTE SALA'}
                       </span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
@@ -1765,11 +1863,14 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   ) {
     return (
       <div className="relative flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 py-3 flex flex-col justify-center gap-3 select-none">
+        <LaCriptaGiantDoorTransition
+          transition={expeditionState.roomDoorTransition}
+        />
         <div className="flex items-center justify-center">
-          <LaCriptaDoorCounterBadge completedDoors={3} />
+          <LaCriptaDoorCounterBadge completedDoorCount={3} />
         </div>
         <LaCriptaFinalBossDoorScene
-          completedBiomes={expeditionState.completedBiomes || []}
+          completedDungeonIds={expeditionState.completedDungeonIds || []}
           players={expeditionState.players}
           currentPlayerId={currentPlayerId}
           isUnlocking={expeditionState.phase === 'FINAL_BOSS_ENTRANCE'}
@@ -1796,9 +1897,12 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
 
   return (
     <div className="relative flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 py-3 flex flex-col justify-center gap-3 sm:gap-4 select-none">
+      <LaCriptaGiantDoorTransition
+        transition={expeditionState.roomDoorTransition}
+      />
       {/* Persistent Door Counter + Completed Biomes Strip */}
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <LaCriptaDoorCounterBadge completedDoors={completedDoorCount} />
+        <LaCriptaDoorCounterBadge completedDoorCount={completedDoorCount} />
         {(expeditionState.completedDungeonIds || []).length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {(expeditionState.completedDungeonIds || []).map((cId, idx) => {

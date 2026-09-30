@@ -356,6 +356,108 @@ class LaCriptaAudioEngine {
       osc.stop(t + 0.46);
     });
   }
+
+  /**
+   * Heavy stone door grinding shut + iron seal lock thud (Room Transition Close)
+   */
+  public playRoomDoorClose() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // Low stone slide rumble
+    const slide = ctx.createOscillator();
+    const slideGain = ctx.createGain();
+    slide.type = 'sawtooth';
+    slide.frequency.setValueAtTime(78, now);
+    slide.frequency.linearRampToValueAtTime(52, now + 0.36);
+    slideGain.gain.setValueAtTime(0.001, now);
+    slideGain.gain.linearRampToValueAtTime(0.14, now + 0.05);
+    slideGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    slide.connect(slideGain);
+    slideGain.connect(ctx.destination);
+    slide.start(now);
+    slide.stop(now + 0.42);
+
+    // Heavy central seal slam at 0.34s
+    const slam = ctx.createOscillator();
+    const slamGain = ctx.createGain();
+    slam.type = 'triangle';
+    const tSlam = now + 0.34;
+    slam.frequency.setValueAtTime(110, tSlam);
+    slam.frequency.exponentialRampToValueAtTime(28, tSlam + 0.22);
+    slamGain.gain.setValueAtTime(0.24, tSlam);
+    slamGain.gain.exponentialRampToValueAtTime(0.001, tSlam + 0.24);
+    slam.connect(slamGain);
+    slamGain.connect(ctx.destination);
+    slam.start(tSlam);
+    slam.stop(tSlam + 0.25);
+  }
+
+  /**
+   * Heavy stone door parting open to reveal the next chamber (with ominous horn if entering Miniboss)
+   */
+  public playRoomDoorOpen(isMiniboss = false) {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // Unlatch metallic click + stone parting
+    const unlatch = ctx.createOscillator();
+    const unlatchGain = ctx.createGain();
+    unlatch.type = 'triangle';
+    unlatch.frequency.setValueAtTime(160, now);
+    unlatch.frequency.exponentialRampToValueAtTime(92, now + 0.18);
+    unlatchGain.gain.setValueAtTime(0.15, now);
+    unlatchGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+    unlatch.connect(unlatchGain);
+    unlatchGain.connect(ctx.destination);
+    unlatch.start(now);
+    unlatch.stop(now + 0.21);
+
+    if (isMiniboss) {
+      // Ominous low brass war-horn chord for Miniboss chamber reveal
+      [110, 130.81, 164.81].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = idx === 0 ? 'sawtooth' : 'triangle';
+        const t = now + 0.1 + idx * 0.04;
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.linearRampToValueAtTime(0.12, t + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.68);
+      });
+    }
+  }
+
+  /**
+   * Miniboss 50% HP Enrage roar / power surge
+   */
+  public playMinibossEnrage() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    [98, 146.83, 196].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      const t = now + idx * 0.05;
+      osc.frequency.setValueAtTime(freq * 0.85, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.15, t + 0.35);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.13, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.44);
+    });
+  }
 }
 
 export const laCriptaAudio = new LaCriptaAudioEngine();

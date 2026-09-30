@@ -189,6 +189,157 @@ function formatSlugTitle(slug: string): string {
     .join(' ');
 }
 
+export interface DungeonMinibossBlueprint {
+  slug: string;
+  name: string;
+  title: string;
+  signatureMoveName: string;
+  enrageBannerText: string;
+}
+
+export const DUNGEON_MINIBOSS_REGISTRY: Record<CriptaDungeonId, DungeonMinibossBlueprint> = {
+  catacumbas_del_rey: {
+    slug: 'comandante_del_sepulcro',
+    name: 'Comandante del Sepulcro',
+    title: 'MINIBOSS · GUARDIÁN DE LA PUERTA REAL',
+    signatureMoveName: 'Mandato de la Guardia Sepulcral',
+    enrageBannerText: '¡EL COMANDANTE DEL SEPULCRO ALZA SU ESTANDARTE REAL (FURIA SEPULCRAL)!',
+  },
+  jardin_podrido: {
+    slug: 'reina_fungica_menor',
+    name: 'Reina Fúngica Menor',
+    title: 'MINIBOSS · MATRIARCA DEL MICELIO',
+    signatureMoveName: 'Marea de Esporas Reales',
+    enrageBannerText: '¡LA REINA FÚNGICA MENOR LIBERA UNA NUBE DE ESPORAS LETALES!',
+  },
+  forja_infernal: {
+    slug: 'forjador_maldito',
+    name: 'Forjador Maldito',
+    title: 'MINIBOSS · MAESTRO DEL YUNQUE ABISAL',
+    signatureMoveName: 'Martillo de Escoria Fundida',
+    enrageBannerText: '¡EL FORJADOR MALDITO AVIVA SU CORAZA AL ROJO VIVO!',
+  },
+  templo_sumergido: {
+    slug: 'leviatán_del_altar',
+    name: 'Sacerdote del Abismo Salobre',
+    title: 'MINIBOSS · GUARDIÁN DE LA MAREA PROFUNDA',
+    signatureMoveName: 'Torrente de las Profundidades',
+    enrageBannerText: '¡LAS AGUAS DEL TEMPLO SUMERGIDO RUGEN CON FURIA ABISAL!',
+  },
+  minas_abandonadas: {
+    slug: 'capataz_de_la_veta',
+    name: 'Capataz de la Veta Negra',
+    title: 'MINIBOSS · SEÑOR DEL DERRUMBE',
+    signatureMoveName: 'Colapso de Galería',
+    enrageBannerText: '¡EL CAPATAZ DE LA VETA HACE TEMBLAR LOS PILARES DE LA MINA!',
+  },
+  castillo_del_verdugo: {
+    slug: 'gran_inquisidor_del_cadalso',
+    name: 'Gran Verdugo del Cadalso',
+    title: 'MINIBOSS · JUEZ DE HIERRO SANGRIENTO',
+    signatureMoveName: 'Sentencia de la Guillotina',
+    enrageBannerText: '¡EL GRAN VERDUGO AFILA SU HACHA DE EJECUCIÓN!',
+  },
+  bosque_de_los_susurros: {
+    slug: 'ciervo_de_las_almas',
+    name: 'Acechador de las Ramas Pálidas',
+    title: 'MINIBOSS · ESPÍRITU MAYOR DEL BOSQUE',
+    signatureMoveName: 'Coro de Susurros Malditos',
+    enrageBannerText: '¡LAS VOCES DEL BOSQUE ENVUELVEN AL GUARDIÁN EN SOMBRAS!',
+  },
+  alcantarillas_imperiales: {
+    slug: 'rey_de_la_cloaca',
+    name: 'Amalgama de la Cloaca Imperial',
+    title: 'MINIBOSS · DEVORADOR DE DESECHOS',
+    signatureMoveName: 'Ola de Miasma Corrosivo',
+    enrageBannerText: '¡LA AMALGAMA IMPERIAL REGURGITA LODO TÓXICO HIRVIENTE!',
+  },
+  biblioteca_prohibida: {
+    slug: 'archivista_encadenado',
+    name: 'Archivista Encadenado',
+    title: 'MINIBOSS · CUSTODIO DE LOS TOMOS PROHIBIDOS',
+    signatureMoveName: 'Decreto del Silencio Arcano',
+    enrageBannerText: '¡EL ARCHIVISTA ENCADENADO ROMPE LOS SELLOS DEL GRIMORIO PROHIBIDO!',
+  },
+  torre_del_astrologo: {
+    slug: 'oraculo_del_eclipse',
+    name: 'Oráculo del Eclipse Eterno',
+    title: 'MINIBOSS · VIGÍA DEL FIRMAMENTO ROTO',
+    signatureMoveName: 'Alineación de Estrellas Muertas',
+    enrageBannerText: '¡EL ORÁCULO DEL ECLIPSE CONVOCA EL FUEGO DEL COSMOS!',
+  },
+  la_colmena: {
+    slug: 'pretor_de_quitina',
+    name: 'Pretor de Quitina Real',
+    title: 'MINIBOSS · GUARDIÁN DE LA CÁMARA DE CRÍA',
+    signatureMoveName: 'Frenesí del Enjambre Real',
+    enrageBannerText: '¡EL PRETOR DE QUITINA ENDURECE SU CAPARAZÓN Y ENTRA EN FRENESÍ!',
+  },
+  cripta_de_cristal: {
+    slug: 'arconte_prismatico',
+    name: 'Arconte del Prisma Roto',
+    title: 'MINIBOSS · CENTINELA DE CUARZO ASTRAL',
+    signatureMoveName: 'Haz de Refracción Letal',
+    enrageBannerText: '¡EL ARCONTE PRISMÁTICO SOBRECARGA SU NÚCLEO DE CRISTAL!',
+  },
+  prision_maldita: {
+    slug: 'alcaide_de_las_cadenas',
+    name: 'Alcaide de las Cadenas Eternas',
+    title: 'MINIBOSS · CARCELERO DE ALMAS',
+    signatureMoveName: 'Grilletes de Condenación',
+    enrageBannerText: '¡EL ALCAIDE ARRASTRA LAS CADENAS DEL PENAL CON FURIA ESPECTRAL!',
+  },
+  santuario_de_sangre: {
+    slug: 'cardenal_carmesi',
+    name: 'Cardenal del Cáliz Carmesí',
+    title: 'MINIBOSS · SUMO OFICIANTE DE SANGRE',
+    signatureMoveName: 'Liturgia de Desangramiento',
+    enrageBannerText: '¡EL CARDENAL CARMESÍ BEBE DEL CÁLIZ Y DESATA SU RITO FINAL!',
+  },
+  ciudad_sepultada: {
+    slug: 'faraon_de_ceniza',
+    name: 'Visir de la Arena Sepultada',
+    title: 'MINIBOSS · SEÑOR DEL OBELISCO ENTERRADO',
+    signatureMoveName: 'Tormenta del Sarcófago Dorado',
+    enrageBannerText: '¡EL VISIR DE CENIZA INVOCA LA MALDICIÓN DE LA DINASTÍA MUERTA!',
+  },
+  palacio_de_los_espejos: {
+    slug: 'regente_del_reflejo',
+    name: 'Regente de los Mil Espejos',
+    title: 'MINIBOSS · ILUSIONISTA DE LA CORTE DE AZOGUE',
+    signatureMoveName: 'Danza de Cristales Quebrados',
+    enrageBannerText: '¡EL REGENTE FRACTURA LOS ESPEJOS DE LA SALA EN MIL FILOS!',
+  },
+  cavernas_heladas: {
+    slug: 'alfa_de_la_escarcha',
+    name: 'Patriarca del Colmillo Blanco',
+    title: 'MINIBOSS · BESTIA ANCESTRAL DEL GLACIAR',
+    signatureMoveName: 'Ventisca de Colmillo Helado',
+    enrageBannerText: '¡EL PATRIARCA DEL GLACIAR DESATA UNA VENTISCA CONGELANTE!',
+  },
+  fortaleza_goblin: {
+    slug: 'caudillo_rompehuesos',
+    name: 'Caudillo Rompehuesos',
+    title: 'MINIBOSS · TIRANO DEL BASTIÓN CHATARRA',
+    signatureMoveName: 'Bombardeo de Pólvora Negra',
+    enrageBannerText: '¡EL CAUDILLO ROMPEHUESOS ENCIENDE SUS BARRILES DE GUERRA!',
+  },
+  cementerio_de_gigantes: {
+    slug: 'titan_de_osario',
+    name: 'Coloso del Osario Antiguo',
+    title: 'MINIBOSS · GUARDIÁN DE LOS CRÁNEOS TITÁNICOS',
+    signatureMoveName: 'Pisotón de Fémur Colosal',
+    enrageBannerText: '¡EL COLOSO DEL OSARIO RECOMPONE SUS HUESOS CON IRA ANCESTRAL!',
+  },
+  el_abismo: {
+    slug: 'heraldo_del_velo',
+    name: 'Heraldo del Velo',
+    title: 'MINIBOSS · EMISARIO DEL VACÍO PROFUNDO',
+    signatureMoveName: 'Ruptura del Velo Abisal',
+    enrageBannerText: '¡EL HERALDO DEL VELO RASGA LA REALIDAD CON ENERGÍA DEL VACÍO!',
+  },
+};
+
 const ROOM_TYPE_TITLES: Record<CriptaCanonicalRoomType, string[]> = {
   COMBAT: [
     'Galería de la Guardia Caída',
@@ -251,6 +402,11 @@ const ROOM_TYPE_TITLES: Record<CriptaCanonicalRoomType, string[]> = {
     'Cámara Prohibida tras el Muro',
     'Bóveda Secreta de los Arquitectos',
   ],
+  MINIBOSS: [
+    'Umbral del Guardián de la Puerta',
+    'Cámara del Sello de la Mazmorra',
+    'Bastión del Custodio Mayor',
+  ],
   BOSS: [
     'Trono del Señor de la Mazmorra',
     'Santuario Final del Abismo',
@@ -259,7 +415,7 @@ const ROOM_TYPE_TITLES: Record<CriptaCanonicalRoomType, string[]> = {
 };
 
 const ROOM_TYPE_SUBTITLES: Record<CriptaCanonicalRoomType, string> = {
-  COMBAT: 'COMATE EN LA CÁMARA · DERROTA A LOS GUARDIANES PARA AVANZAR',
+  COMBAT: 'COMBATE EN LA CÁMARA · DERROTA A LOS GUARDIANES PARA AVANZAR',
   ELITE: 'AMENAZA DE ÉLITE · UN CAMPEÓN LETAL BLOQUEA EL PASO',
   TREASURE: 'CÁMARA DEL TESORO · RECLAMA EL BOTÍN ANCESTRAL',
   LOOT: 'HALLAZGO · RECOGE LOS SUMINISTROS DEL CAMINO',
@@ -271,7 +427,8 @@ const ROOM_TYPE_SUBTITLES: Record<CriptaCanonicalRoomType, string> = {
   TRAP: 'TRAMPA ACTIVA · DESACTIVA O SUPERA EL MECANISMO',
   PUZZLE: 'ACERTIJO ARCANO · ACTIVA LAS RUNAS EN EL ORDEN CORRECTO',
   SECRET: 'SALA SECRETA DESCUBIERTA · RELIQUIAS OCULTAS DEL REINO',
-  BOSS: 'JEFE DE LA MAZMORRA · EL ENFRENTAMIENTO FINAL',
+  MINIBOSS: 'MINIBOSS DE MAZMORRA · DERROTA AL CUSTODIO PARA COMPLETAR ESTA PUERTA',
+  BOSS: 'JEFE FINAL DE LA EXPEDICIÓN · EL ENFRENTAMIENTO SUPREMO',
 };
 
 function enrichEnemyInstance(enemy: CriptaRoomEnemy, roomIndex: number): CriptaRoomEnemy {
@@ -293,7 +450,7 @@ function enrichEnemyInstance(enemy: CriptaRoomEnemy, roomIndex: number): CriptaR
 
 function buildEnemiesForRoom(
   dungeonId: CriptaDungeonId,
-  roomType: 'COMBAT' | 'ELITE' | 'BOSS',
+  roomType: 'COMBAT' | 'ELITE' | 'MINIBOSS' | 'BOSS',
   roomIndex: number,
   playerCount: number,
   rng: () => number
@@ -305,29 +462,35 @@ function buildEnemiesForRoom(
     DUNGEON_BIOME_THREAT_PROFILES.catacumbas_del_rey;
   const scaleFactor = 1 + (Math.max(1, playerCount) - 1) * 0.42 + roomIndex * 0.1;
 
-  if (roomType === 'BOSS') {
-    const bossSlug = dungeon.bossPool[0] || 'guardian_del_abismo';
-    const bossMaxHp = Math.round(95 * scaleFactor);
+  if (roomType === 'MINIBOSS' || roomType === 'BOSS') {
+    const minibossDef =
+      DUNGEON_MINIBOSS_REGISTRY[dungeonId] || DUNGEON_MINIBOSS_REGISTRY.catacumbas_del_rey;
+    const bossMaxHp = Math.round(96 * scaleFactor);
+    const baseAtk = Math.round(13 + roomIndex * 1.15);
     return [
       enrichEnemyInstance(
         {
-          id: `enemy_boss_${roomIndex}_0`,
-          slug: bossSlug,
-          name: formatSlugTitle(bossSlug),
-          title: `Señor de ${dungeon.name}`,
+          id: `enemy_miniboss_${roomIndex}_0`,
+          slug: minibossDef.slug,
+          name: minibossDef.name,
+          title: minibossDef.title,
           isElite: false,
+          isMiniboss: true,
           isBoss: true,
+          isFinalBoss: false,
+          signatureMoveName: minibossDef.signatureMoveName,
+          enrageTriggered: false,
           hp: bossMaxHp,
           maxHp: bossMaxHp,
-          attack: Math.round(14 + roomIndex * 1.2),
-          armor: 6,
+          attack: baseAtk,
+          armor: 5,
           intent: 'AFLICCIÓN',
-          intentCategory: 'MAGIC',
-          intentValue: Math.round(15 + roomIndex * 1.2),
+          intentCategory: 'SPECIAL',
+          intentValue: baseAtk + 2,
           accentColor: dungeon.palette.glow,
           statusThreat: threatProfile.primaryStatus,
           statusSecondaryThreat: threatProfile.secondaryStatus,
-          abilityName: threatProfile.bossAbilityLabel,
+          abilityName: minibossDef.signatureMoveName,
           spriteArchetype: config.spriteArchetype,
         },
         roomIndex
@@ -756,7 +919,7 @@ export function generateProceduralDungeon(
 
   for (let i = 0; i < totalRooms; i++) {
     if (i === totalRooms - 1) {
-      roomTypes.push('BOSS');
+      roomTypes.push('MINIBOSS');
       continue;
     }
 
@@ -869,7 +1032,8 @@ export function generateProceduralDungeon(
         ? formatSlugTitle(poolSlug)
         : fallbackTitles[idx % fallbackTitles.length];
 
-    const isCombatLike = rType === 'COMBAT' || rType === 'ELITE' || rType === 'BOSS';
+    const isCombatLike =
+      rType === 'COMBAT' || rType === 'ELITE' || rType === 'MINIBOSS' || rType === 'BOSS';
     const enemies = isCombatLike
       ? buildEnemiesForRoom(dungeonId, rType, idx, playerCount, rng)
       : [];
@@ -899,6 +1063,9 @@ export function generateProceduralDungeon(
       rng
     );
 
+    const minibossDef =
+      DUNGEON_MINIBOSS_REGISTRY[dungeonId] || DUNGEON_MINIBOSS_REGISTRY.catacumbas_del_rey;
+
     return {
       id: `room_${dungeonId}_${idx + 1}`,
       index: idx,
@@ -906,14 +1073,24 @@ export function generateProceduralDungeon(
       dungeonId,
       type: rType,
       state: isFirst ? 'IN_PROGRESS' : 'LOCKED',
+      lifecyclePhase: isFirst ? 'ACTIVE' : 'ENTERING',
+      resolvedAtTimestamp: null,
+      isMinibossRoom: rType === 'MINIBOSS',
       revealed: isFirst,
       visited: isFirst,
       resolved: false,
-      title: rType === 'BOSS' ? `Trono de ${formatSlugTitle(dungeon.bossPool[0] || 'Guardián')}` : specificTitle,
+      title:
+        rType === 'MINIBOSS'
+          ? `Cámara de ${minibossDef.name}`
+          : rType === 'BOSS'
+          ? `Trono de ${formatSlugTitle(dungeon.bossPool[0] || 'Guardián')}`
+          : specificTitle,
       subtitle: ROOM_TYPE_SUBTITLES[rType],
       narrative:
         idx === 0
           ? `Habéis cruzado el umbral de ${dungeon.name}. ${dungeon.description}`
+          : rType === 'MINIBOSS'
+          ? `El umbral final de ${dungeon.name} está custodiado por ${minibossDef.name}. Derrotadlo para sellar esta puerta.`
           : rType === 'BOSS'
           ? `La cámara final de ${dungeon.name} tiembla ante la presencia de su guardián supremo.`
           : `Sala ${idx + 1} de ${dungeon.name} (${dungeon.environmentModifiers.join(' · ')}).`,
@@ -925,10 +1102,16 @@ export function generateProceduralDungeon(
       options,
       groundDrops: [],
       shopInventory,
+      shopPurchaseHistory: rType === 'SHOP' ? [] : undefined,
       puzzleRunes,
       combatTurn: isCombatLike ? 1 : undefined,
       combatRoundPhase: isCombatLike ? 'PLAYER_PHASE' : undefined,
-      combatBannerText: isCombatLike ? 'RONDA 1 — FASE DE JUGADORES' : null,
+      combatBannerText:
+        rType === 'MINIBOSS'
+          ? `¡MINIBOSS DE MAZMORRA: ${minibossDef.name.toUpperCase()}!`
+          : isCombatLike
+          ? 'RONDA 1 — FASE DE JUGADORES'
+          : null,
       queuedPlayerActions: isCombatLike ? {} : undefined,
       activeCombatActorId: null,
       activeTargetedPlayerIds: [],

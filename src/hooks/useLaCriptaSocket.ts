@@ -564,21 +564,41 @@ export function useLaCriptaSocket({
   );
 
   const sendLockRoundAction = useCallback(
-    (payload: {
-      actionType: CriptaPlayerRoundActionType;
-      abilityId?: string;
-      targetEnemyId?: string;
-      targetPlayerId?: string;
-      itemSlotIndex?: number;
-    }) => {
-      sendMessage({
-        type: 'LOCK_ROUND_ACTION',
-        actionType: payload.actionType,
-        abilityId: payload.abilityId,
-        targetEnemyId: payload.targetEnemyId,
-        targetPlayerId: payload.targetPlayerId,
-        itemSlotIndex: payload.itemSlotIndex,
-      });
+    (
+      actionOrPayload:
+        | CriptaPlayerRoundActionType
+        | 'USE_ITEM'
+        | {
+            actionType: CriptaPlayerRoundActionType;
+            abilityId?: string;
+            targetEnemyId?: string;
+            targetPlayerId?: string;
+            itemSlotIndex?: number;
+          },
+      targetEnemyId?: string,
+      targetPlayerId?: string,
+      abilityId?: string,
+      itemSlotIndex?: number
+    ) => {
+      if (typeof actionOrPayload === 'object' && actionOrPayload !== null) {
+        sendMessage({
+          type: 'LOCK_ROUND_ACTION',
+          actionType: actionOrPayload.actionType,
+          abilityId: actionOrPayload.abilityId,
+          targetEnemyId: actionOrPayload.targetEnemyId,
+          targetPlayerId: actionOrPayload.targetPlayerId,
+          itemSlotIndex: actionOrPayload.itemSlotIndex,
+        });
+      } else {
+        sendMessage({
+          type: 'LOCK_ROUND_ACTION',
+          actionType: actionOrPayload as CriptaPlayerRoundActionType,
+          abilityId,
+          targetEnemyId,
+          targetPlayerId,
+          itemSlotIndex,
+        });
+      }
     },
     [sendMessage]
   );

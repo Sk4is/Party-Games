@@ -23,16 +23,18 @@ export const LaCriptaEnemyPixelSprite: React.FC<LaCriptaEnemyPixelSpriteProps> =
   totalVisibleEnemies = 1,
 }) => {
   const baseSizePx = enemy.isFinalBoss
-    ? 172
-    : enemy.isBoss
-    ? 148
+    ? 176
+    : enemy.isMiniboss || enemy.isBoss
+    ? 154
     : enemy.isElite
     ? 124
     : 108;
   const crowdScale =
-    totalVisibleEnemies >= 3 ? 0.76 : totalVisibleEnemies === 2 ? 0.88 : 1;
+    totalVisibleEnemies >= 3 ? 0.78 : totalVisibleEnemies === 2 ? 0.9 : 1;
   const sizePx = Math.round(baseSizePx * crowdScale);
-  const accent = enemy.accentColor || '#E7A54A';
+  const accent = enemy.enrageTriggered
+    ? '#FF4D6D'
+    : enemy.accentColor || '#E7A54A';
   const arch = enemy.spriteArchetype;
 
   const animClass =
@@ -54,19 +56,32 @@ export const LaCriptaEnemyPixelSprite: React.FC<LaCriptaEnemyPixelSpriteProps> =
         isTargeted ? 'scale-105' : ''
       }`}
     >
-      {/* Ground shadow */}
+      {/* Ground shadow & Enrage Crimson Ring */}
       <rect x="5" y="25" width="18" height="2" fill="#050408" opacity="0.85" />
-
-      {/* Boss / Elite Crown or Horns */}
-      {enemy.isBoss && (
-        <g>
-          <rect x="7" y="1" width="2" height="4" fill="#E7A54A" />
-          <rect x="13" y="0" width="2" height="5" fill="#E7A54A" />
-          <rect x="19" y="1" width="2" height="4" fill="#E7A54A" />
-          <rect x="7" y="4" width="14" height="2" fill="#8F263D" />
+      {enemy.enrageTriggered && (
+        <g opacity="0.85">
+          <rect x="3" y="24" width="22" height="1" fill="#C93B5B" />
+          <rect x="2" y="10" width="1" height="10" fill="#FFD166" />
+          <rect x="25" y="10" width="1" height="10" fill="#FFD166" />
         </g>
       )}
-      {enemy.isElite && !enemy.isBoss && (
+
+      {/* Miniboss / Boss / Elite Crown or Horns */}
+      {(enemy.isBoss || enemy.isMiniboss) && (
+        <g>
+          <rect x="6" y="1" width="2" height="4" fill="#FFD166" />
+          <rect x="13" y="0" width="2" height="5" fill="#E7A54A" />
+          <rect x="20" y="1" width="2" height="4" fill="#FFD166" />
+          <rect
+            x="6"
+            y="4"
+            width="16"
+            height="2"
+            fill={enemy.enrageTriggered ? '#C93B5B' : '#8F263D'}
+          />
+        </g>
+      )}
+      {enemy.isElite && !enemy.isBoss && !enemy.isMiniboss && (
         <g>
           <rect x="6" y="3" width="3" height="2" fill={accent} />
           <rect x="19" y="3" width="3" height="2" fill={accent} />
@@ -219,6 +234,7 @@ interface LaCriptaRoomEnvironmentCanvasProps {
   dungeon: CriptaDungeonDefinition;
   room: CriptaDungeonRoom;
   canAdvance: boolean;
+  unclaimedDropsCount?: number;
   onClickExitArchway: () => void;
   onClickSecretHook?: () => void;
   onClickInteractiveObject?: (objectId: string) => void;
@@ -235,6 +251,7 @@ export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanv
   dungeon,
   room,
   canAdvance,
+  unclaimedDropsCount = 0,
   onClickExitArchway,
   onClickSecretHook,
   onClickInteractiveObject,
@@ -242,6 +259,7 @@ export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanv
 }) => {
   const { stone, stoneDark, highlight, glow, fog, secondary } = dungeon.palette;
   const rType = room.type;
+  const isMinibossChamber = rType === 'MINIBOSS' || Boolean(room.isMinibossRoom);
   const hasLivingEnemies = room.enemies && room.enemies.some((e) => e.hp > 0);
 
   return (
@@ -415,6 +433,24 @@ export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanv
           </g>
         )}
 
+        {isMinibossChamber && (
+          <g>
+            {/* Ominous Miniboss Warden Dais, Runic Seal & Crimson Skull Braziers */}
+            <rect x="64" y="66" width="108" height="6" fill="#2A0F1B" />
+            <rect x="72" y="68" width="92" height="2" fill="#C93B5B" />
+            {/* Left & Right Warden Braziers */}
+            <rect x="52" y="38" width="10" height="32" fill={stoneDark} />
+            <rect x="50" y="34" width="14" height="6" fill="#E7A54A" />
+            <rect x="53" y="26" width="8" height="8" fill="#C93B5B" />
+            <rect x="55" y="28" width="4" height="4" fill="#FFD166" />
+
+            <rect x="174" y="38" width="10" height="32" fill={stoneDark} />
+            <rect x="172" y="34" width="14" height="6" fill="#E7A54A" />
+            <rect x="175" y="26" width="8" height="8" fill="#C93B5B" />
+            <rect x="177" y="28" width="4" height="4" fill="#FFD166" />
+          </g>
+        )}
+
         {(rType === 'EVENT' || rType === 'SECRET') && !hasLivingEnemies && (
           <g className="animate-cripta-sprite-idle">
             {/* Large Focal Event Figure / Pedestal / NPC in Left Stage */}
@@ -471,7 +507,7 @@ export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanv
             </>
           ) : (
             <>
-              {/* Sealed Iron Bars while threat is active */}
+              {/* Sealed Iron Bars while threat is active or loot is unclaimed */}
               <rect x="207" y="26" width="2" height="46" fill="#5A5268" />
               <rect x="213" y="26" width="2" height="46" fill="#5A5268" />
               <rect x="219" y="26" width="2" height="46" fill="#5A5268" />
@@ -495,7 +531,7 @@ export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanv
                 style={{ left: `${obj.xPercent}%`, top: `${obj.yPercent}%` }}
                 title={
                   obj.discovered
-                    ? obj.rewardText || `${obj.label} (Inspeccionado)`
+                    ? obj.outcomeSummary || `${obj.label} (Inspeccionado)`
                     : `${obj.label}: ${obj.hint}`
                 }
                 className={`pointer-events-auto -translate-x-1/2 -translate-y-1/2 px-2 py-1 border text-[9px] font-cripta-pixel transition-all flex items-center gap-1 shadow-[0_4px_12px_rgba(0,0,0,0.9)] ${
@@ -536,14 +572,20 @@ export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanv
       )}
 
       {/* Interactive Exit Threshold Button Overlay on Right Archway */}
-      {canAdvance && (
-        <button
-          type="button"
-          onClick={onClickExitArchway}
-          className="absolute right-2 sm:right-4 bottom-3 px-3 py-1.5 bg-[#E7A54A] hover:bg-[#f2b863] text-[#0B0A0E] border-2 border-[#FFF3C4] font-cripta-pixel text-[11px] sm:text-xs font-bold tracking-wider shadow-[0_0_20px_rgba(231,165,74,0.7)] transition-transform hover:scale-105 cursor-pointer z-20"
-        >
-          AVANZAR SALA →
-        </button>
+      {unclaimedDropsCount > 0 && room.resolved ? (
+        <div className="absolute right-2 sm:right-4 bottom-3 px-2.5 py-1 bg-[#261810]/95 border-2 border-[#FFD166] font-cripta-pixel text-[9px] sm:text-[10px] font-bold text-[#FFD166] animate-pulse z-20">
+          ⚠ RECOGE EL BOTÍN ({unclaimedDropsCount}) ANTES DE SALIR
+        </div>
+      ) : (
+        canAdvance && (
+          <button
+            type="button"
+            onClick={onClickExitArchway}
+            className="absolute right-2 sm:right-4 bottom-3 px-3 py-1.5 bg-[#E7A54A] hover:bg-[#f2b863] text-[#0B0A0E] border-2 border-[#FFF3C4] font-cripta-pixel text-[11px] sm:text-xs font-bold tracking-wider shadow-[0_0_20px_rgba(231,165,74,0.7)] transition-transform hover:scale-105 cursor-pointer z-20"
+          >
+            {isMinibossChamber ? 'CRUZAR SALIDA →' : 'CRUZAR PUERTA →'}
+          </button>
+        )
       )}
     </div>
   );

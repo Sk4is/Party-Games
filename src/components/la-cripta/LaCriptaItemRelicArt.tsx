@@ -413,8 +413,23 @@ export const LaCriptaShopShelvesPanel: React.FC<{
   disabled: boolean;
   hasDiscountRelic?: boolean;
   localPlayer?: CriptaPlayer | null;
+  purchaseHistory?: Array<{
+    id: string;
+    buyerName: string;
+    itemName: string;
+    priceGold: number;
+    timestamp: number;
+  }>;
   onBuySlot: (slotId: string) => void;
-}> = ({ slots, partyGold, disabled, hasDiscountRelic = false, localPlayer, onBuySlot }) => {
+}> = ({
+  slots,
+  partyGold,
+  disabled,
+  hasDiscountRelic = false,
+  localPlayer,
+  purchaseHistory = [],
+  onBuySlot,
+}) => {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(
     slots[0]?.id || null
   );
@@ -595,15 +610,19 @@ export const LaCriptaShopShelvesPanel: React.FC<{
                     {info.title}
                   </div>
                   <div
-                    className={`mt-0.5 font-cripta-mono text-[10px] font-bold ${
+                    className={`mt-0.5 font-cripta-mono text-[10px] font-bold truncate w-full ${
                       slot.soldOut
-                        ? 'text-[#D8C6A0]/40'
+                        ? 'text-[#D8C6A0]/50'
                         : canAfford
                         ? 'text-[#E7A54A]'
                         : 'text-[#C93B5B]'
                     }`}
                   >
-                    {slot.soldOut ? 'ADQUIRIDO' : `${slot.priceGold} ORO`}
+                    {slot.soldOut
+                      ? slot.buyerName
+                        ? `✓ ${slot.buyerName}`
+                        : 'ADQUIRIDO'
+                      : `${slot.priceGold} ORO`}
                   </div>
                 </button>
               );
@@ -640,17 +659,40 @@ export const LaCriptaShopShelvesPanel: React.FC<{
             <div
               className={`font-cripta-mono text-[10px] font-bold ${
                 relicSlot.soldOut
-                  ? 'text-[#D8C6A0]/40'
+                  ? 'text-[#D8C6A0]/50'
                   : partyGold >= relicSlot.priceGold
                   ? 'text-[#FFD166]'
                   : 'text-[#C93B5B]'
               }`}
             >
-              {relicSlot.soldOut ? 'ADQUIRIDA' : `${relicSlot.priceGold} ORO`}
+              {relicSlot.soldOut
+                ? relicSlot.buyerName
+                  ? `✓ ${relicSlot.buyerName}`
+                  : 'ADQUIRIDA'
+                : `${relicSlot.priceGold} ORO`}
             </div>
           </button>
         )}
       </div>
+
+      {/* Multiplayer Real-Time Shop Purchase Feed (Section 11) */}
+      {purchaseHistory.length > 0 && (
+        <div className="px-2.5 py-1.5 bg-[#0D0914] border border-[#282039] flex flex-wrap items-center gap-2 text-[9px] font-cripta-pixel">
+          <span className="text-[#E7A54A] font-bold uppercase">
+            🛒 COMPRAS DEL GRUPO:
+          </span>
+          {purchaseHistory.slice(-3).map((entry) => (
+            <span
+              key={entry.id}
+              className="px-1.5 py-0.5 bg-[#19111D] border border-[#5EA87A]/40 text-[#D9D0BC]"
+            >
+              <strong className="text-[#5EA87A]">{entry.buyerName}</strong> adquirió{' '}
+              <span className="text-[#FFD166]">{entry.itemName}</span> ({entry.priceGold}{' '}
+              ORO)
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Selected Slot Detail, Side-by-Side Weapon Comparison & Purchase Bar */}
       {activeSlot && (

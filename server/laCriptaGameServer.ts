@@ -75,6 +75,7 @@ interface ClientConnection {
 interface ServerCriptaRoom extends CriptaExpeditionState {
   doorOpeningTimer: NodeJS.Timeout | null;
   combatRoundTimer: NodeJS.Timeout | null;
+  roomTransitionTimer: NodeJS.Timeout | null;
   isResolvingRound: boolean;
   disconnectTimers: Map<string, NodeJS.Timeout>;
   nextEventBatchId: number;
@@ -93,6 +94,7 @@ function buildDefaultRunStats(): CriptaRunStats {
     roomsVisited: 0,
     enemiesDefeated: 0,
     elitesDefeated: 0,
+    minibossesDefeated: 0,
     goldEarned: 0,
     goldSpent: 0,
     itemsUsed: 0,
@@ -284,6 +286,7 @@ export class LaCriptaServer {
       partyGold: 45,
       currentRoomIndex: 0,
       transitioningToRoomIndex: null,
+      roomDoorTransition: null,
       roomSequence: [],
       discoveredSecretRoom: null,
       inSecretRoom: false,
@@ -292,6 +295,7 @@ export class LaCriptaServer {
       lastEventBatch: null,
       doorOpeningTimer: null,
       combatRoundTimer: null,
+      roomTransitionTimer: null,
       isResolvingRound: false,
       disconnectTimers: new Map(),
       nextEventBatchId: 1,
@@ -418,6 +422,9 @@ export class LaCriptaServer {
       partyGold: room.partyGold ?? 45,
       currentRoomIndex: room.currentRoomIndex ?? 0,
       transitioningToRoomIndex: room.transitioningToRoomIndex ?? null,
+      roomDoorTransition: room.roomDoorTransition
+        ? { ...room.roomDoorTransition }
+        : null,
       roomSequence: room.roomSequence ? room.roomSequence.map((r) => ({ ...r })) : [],
       discoveredSecretRoom: room.discoveredSecretRoom
         ? { ...room.discoveredSecretRoom }
@@ -1825,6 +1832,45 @@ export class LaCriptaServer {
       activeRoom.outcomeLog = `${player.name} compra ${iDef?.name || 'un objeto'} por ${slot.priceGold} ORO.`;
     }
 
+    // Record multiplayer shop purchase history & emit live SHOP_PURCHASE event (Section 6)
+    const purchasedLabel =
+      slot.kind === 'RELIC' && slot.relicId
+        ? CRIPTA_RELICS_REGISTRY[slot.relicId]?.name || 'Reliquia'
+        : slot.kind === 'WEAPON' && slot.weaponId
+        ? CRIPTA_WEAPONS_REGISTRY[slot.weaponId]?.name || 'Arma'
+        : slot.kind === 'ARMOR' && slot.armorId
+        ? CRIPTA_ARMORS_REGISTRY[slot.armorId]?.name || 'Armadura'
+        : slot.kind === 'ACCESSORY' && slot.accessoryId
+        ? CRIPTA_ACCESSORIES_REGISTRY[slot.accessoryId]?.name || 'Accesorio'
+        : slot.kind === 'FORGE_UPGRADE'
+        ? 'Mejora de Forja'
+        : slot.itemId
+        ? CRIPTA_ITEMS_REGISTRY[slot.itemId]?.name || 'Objeto'
+        : 'Artículo';
+
+    if (!activeRoom.shopPurchaseHistory) {
+      activeRoom.shopPurchaseHistory = [];
+    }
+    activeRoom.shopPurchaseHistory.unshift({
+      id: `pur_${Date.now()}_${slot.id}`,
+      buyerName: player.name,
+      itemName: purchasedLabel,
+      priceGold: slot.priceGold,
+      timestamp: Date.now(),
+    });
+
+    visualEvents.push({
+      id: `ev_shop_notice_${Date.now()}`,
+      kind: 'SHOP_PURCHASE',
+      targetType: 'ROOM',
+      sourcePlayerId: player.id,
+      value: slot.priceGold,
+      label: `${player.name.toUpperCase()} COMPRÓ ${purchasedLabel.toUpperCase()}`,
+      sublabel: `-${slot.priceGold} ORO · TIENDA ABIERTA`,
+      color: '#FFD166',
+      vfxStyle: 'gold',
+    });
+
     this.emitVisualEventBatch(room, visualEvents, player.id, 'BUY_SHOP');
     this.broadcastRoomState(room);
   }
@@ -1999,15 +2045,28 @@ export class LaCriptaServer {
     if (killedEnemy.isElite) {
       room.runStats.elitesDefeated += 1;
     }
+    if (killedEnemy.isMiniboss || (killedEnemy.isBoss && !killedEnemy.isFinalBoss)) {
+      room.runStats.minibossesDefeated = (room.runStats.minibossesDefeated || 0) + 1;
+    }
     room.dungeonEnemiesDefeated = (room.dungeonEnemiesDefeated || 0) + 1;
 
     visualEvents.push({
       id: `ev_${ts}_kill_${killedEnemy.id}`,
-      kind: 'ENEMY_DEATH',
+      kind:
+        killedEnemy.isMiniboss || (killedEnemy.isBoss && !killedEnemy.isFinalBoss)
+          ? 'MINIBOSS_DEFEATED'
+          : 'ENEMY_DEATH',
       targetType: 'ENEMY',
       targetId: killedEnemy.id,
-      label: `¡${killedEnemy.name.toUpperCase()} DERROTADO!`,
-      color: '#E7A54A',
+      label:
+        killedEnemy.isMiniboss || (killedEnemy.isBoss && !killedEnemy.isFinalBoss)
+          ? `¡MINIBOSS DERROTADO: ${killedEnemy.name.toUpperCase()}!`
+          : `¡${killedEnemy.name.toUpperCase()} DERROTADO!`,
+      sublabel:
+        killedEnemy.isMiniboss || (killedEnemy.isBoss && !killedEnemy.isFinalBoss)
+          ? 'GUARDIÁN DE LA PUERTA VENCIDO · RECLAMA EL BOTÍN'
+          : undefined,
+      color: '#FFD166',
       vfxStyle: 'explosion',
     });
 
@@ -2022,7 +2081,7 @@ export class LaCriptaServer {
       }
     }
 
-    // Authoritative Enemy Loot Drop Roll (Requirements 10, 11, 18)
+    // Authoritative Enemy Loot Drop Roll (Requirements 10, 11, 18 & Miniboss Guaranteed Rewards Section 44)
     if (!killedEnemy.isFinalBoss) {
       const enemyIdx = Math.max(0, activeRoom.enemies.indexOf(killedEnemy));
       const drop = rollEnemyLootDrop(
@@ -2031,13 +2090,36 @@ export class LaCriptaServer {
         enemyIdx,
         killedEnemy.name,
         killedEnemy.isElite,
-        killedEnemy.isBoss,
+        Boolean(killedEnemy.isBoss || killedEnemy.isMiniboss),
         room.players,
         room.partyRelics || []
       );
       if (drop) {
         if (!activeRoom.groundDrops) activeRoom.groundDrops = [];
         activeRoom.groundDrops.push(drop);
+      }
+
+      // Dungeon Minibosses also drop a guaranteed high-tier tonic/potion alongside their Relic drop!
+      if (killedEnemy.isMiniboss || (killedEnemy.isBoss && !killedEnemy.isFinalBoss)) {
+        if (!activeRoom.groundDrops) activeRoom.groundDrops = [];
+        const bonusMinibossItems: CriptaItemId[] = [
+          'pocion_mayor',
+          'elixir_fuerza',
+          'elixir_arcano',
+          'sal_purificadora',
+        ];
+        const pickedBonusItem =
+          bonusMinibossItems[
+            ((room.dungeonSeed || room.seed) + activeRoom.index) % bonusMinibossItems.length
+          ];
+        activeRoom.groundDrops.push({
+          id: `drop_miniboss_bonus_${activeRoom.index}_${ts}`,
+          kind: 'ITEM',
+          itemId: pickedBonusItem,
+          droppedByEnemyName: killedEnemy.name,
+          xPercent: 34,
+          claimedByPlayerId: null,
+        });
       }
     }
   }
@@ -2091,13 +2173,19 @@ export class LaCriptaServer {
 
     activeRoom.resolved = true;
     activeRoom.state = 'RESOLVED';
+    activeRoom.lifecyclePhase = 'REWARDING';
+    activeRoom.resolvedAtTimestamp = ts;
     activeRoom.activeTurnPlayerId = null;
+
+    const isMinibossRoom =
+      activeRoom.type === 'MINIBOSS' ||
+      (activeRoom.type === 'BOSS' && !activeRoom.isFinalBossRoom);
 
     const hasGoldRelic = playerHasRelic(actorPlayer, room.partyRelics || [], 'moneda_del_muerto');
     const baseGoldReward = activeRoom.isFinalBossRoom
       ? 160
-      : activeRoom.type === 'BOSS'
-      ? 80
+      : isMinibossRoom
+      ? 60
       : activeRoom.type === 'ELITE'
       ? 38
       : 22;
@@ -2115,26 +2203,27 @@ export class LaCriptaServer {
       label: `+${goldReward} ORO`,
       sublabel: activeRoom.isFinalBossRoom
         ? 'TESORO SUPREMO DE LA CRIPTA'
-        : activeRoom.type === 'BOSS'
-        ? 'BOTÍN DEL JEFE'
+        : isMinibossRoom
+        ? 'TESORO DEL MINIBOSS DE MAZMORRA'
         : 'BOTÍN DE CÁMARA',
       color: '#E7A54A',
       vfxStyle: 'gold',
     });
 
     // Post-combat victory breath for living players
+    const victoryHeal = isMinibossRoom ? 12 : 8;
     for (const p of room.players) {
       if (!p.isDead && p.hp > 0) {
-        p.hp = Math.min(p.maxHp, p.hp + 8);
-        room.runStats.healingDone += 8;
+        p.hp = Math.min(p.maxHp, p.hp + victoryHeal);
+        room.runStats.healingDone += victoryHeal;
         visualEvents.push({
           id: `ev_${ts}_vic_heal_${p.id}`,
           kind: 'HEAL_PLAYER',
           targetType: 'PLAYER',
           targetId: p.id,
-          value: 8,
-          label: '+8 PV',
-          sublabel: 'VICTORIA',
+          value: victoryHeal,
+          label: `+${victoryHeal} PV`,
+          sublabel: isMinibossRoom ? 'TRIUNFO SOBRE EL MINIBOSS' : 'VICTORIA',
           color: '#5EA87A',
           vfxStyle: 'heal',
         });
@@ -2154,14 +2243,16 @@ export class LaCriptaServer {
       activeRoom.outcomeLog = `${logParts.join(
         ' '
       )} ¡MALKORATH HA SIDO DESTRUIDO! Habéis conquistado las 3 Puertas y derrotado al Corazón de la Cripta.`;
-    } else if (activeRoom.type === 'BOSS') {
+    } else if (isMinibossRoom) {
       room.dungeonCompleted = true;
       const doorNum = Math.min(3, (room.completedDoorCount ?? 0) + 1);
       const dName = this.getCurrentDungeonDisplayName(room);
+      const defeatedMinibossName = activeRoom.enemies[0]?.name || 'Custodio de la Puerta';
       room.dungeonCompletionSummary = {
         dungeonId: room.selectedDungeonId || 'catacumbas_del_rey',
         dungeonName: dName,
         doorNumberCompleted: doorNum,
+        minibossDefeatedName: defeatedMinibossName,
         goldEarned: Math.max(0, (room.partyGold ?? 0) - (room.dungeonStartGold ?? 0)),
         itemsFound: room.dungeonItemsFound || 0,
         relicsFound: room.dungeonRelicsFound || 0,
@@ -2169,11 +2260,11 @@ export class LaCriptaServer {
       };
       activeRoom.outcomeLog = `${logParts.join(
         ' '
-      )} ¡Guardián derrotado! Mazmorra superada (${doorNum}/3). Recoged el botín del suelo y regresad a las Tres Puertas.`;
+      )} ¡${defeatedMinibossName} derrotado! Recoged la Reliquia y el botín del suelo antes de cruzar la Gran Puerta de salida (${doorNum}/3).`;
     } else {
       activeRoom.outcomeLog = `${logParts.join(
         ' '
-      )} ¡Cámara despejada! Botín obtenido: +${goldReward} ORO y +8 VIDA.`;
+      )} ¡Cámara despejada! Botín obtenido: +${goldReward} ORO y +${victoryHeal} VIDA.`;
     }
 
     return true;
@@ -2838,6 +2929,38 @@ export class LaCriptaServer {
       }
       enemyHit.memory.recentDamageByPlayer[player.id] =
         (enemyHit.memory.recentDamageByPlayer[player.id] || 0) + dmgDealt;
+
+      // Section 40: Dungeon Miniboss 50% HP Threshold Behavior (Enrage + Signature Move Telegraph)
+      if (
+        (enemyHit.isMiniboss || (enemyHit.isBoss && !enemyHit.isFinalBoss)) &&
+        !enemyHit.enrageTriggered &&
+        enemyHit.hp > 0 &&
+        enemyHit.hp <= enemyHit.maxHp * 0.5
+      ) {
+        enemyHit.enrageTriggered = true;
+        enemyHit.attack += 3;
+        enemyHit.armorBuffBonus = (enemyHit.armorBuffBonus || 0) + 2;
+        enemyHit.armorBuffRounds = 3;
+        const sigMove = enemyHit.signatureMoveName || 'Furia del Umbral';
+        enemyHit.intent = 'CATACLISMO';
+        enemyHit.intentCategory = 'SPECIAL';
+        enemyHit.intentValue = enemyHit.attack + 4;
+        enemyHit.preparedTelegraphLabel = sigMove;
+
+        visualEvents.push({
+          id: `ev_${ts}_miniboss_enrage_${enemyHit.id}`,
+          kind: 'MINIBOSS_ENRAGE',
+          targetType: 'ENEMY',
+          targetId: enemyHit.id,
+          label: `¡FURIA DE MINIBOSS (≤50% PV)!`,
+          sublabel: `+3 ATAQUE · +2 ARMADURA · PREPARA ${sigMove.toUpperCase()}`,
+          color: '#FFD166',
+          vfxStyle: 'explosion',
+        });
+        logParts.push(
+          `¡${enemyHit.name} desata su umbral de furia al caer bajo el 50% de vida (+3 ATAQUE, +2 ARMADURA y prepara ${sigMove})!`
+        );
+      }
     };
 
     if (action === 'PASS') {
@@ -4757,10 +4880,19 @@ export class LaCriptaServer {
   private handleRoomAdvance(room: ServerCriptaRoom, player: CriptaPlayer) {
     if (room.phase !== 'DUNGEON' && room.phase !== 'DUNGEON_ARRIVAL') return;
     if (room.expeditionDefeated) return;
+    // Prevent double transitions or transitioning while combat round is still resolving (Sections 1, 33, 60)
+    if (room.roomDoorTransition?.active || room.isResolvingRound) return;
+
     const activeRoom = this.getActiveDungeonRoom(room);
     if (!activeRoom) return;
 
-    // Allow SHOP rooms to be exited at any time even if nothing was bought
+    // Never transition if any connected player is currently resolving a full-inventory replacement modal
+    const anyPendingReplacement = room.players.some(
+      (p) => p.isConnected && Boolean(p.pendingInventoryReplacement)
+    );
+    if (anyPendingReplacement) return;
+
+    // Allow SHOP, REST, and LOOT rooms to be exited once players choose to leave
     const canLeaveRoom =
       activeRoom.resolved ||
       activeRoom.type === 'SHOP' ||
@@ -4785,37 +4917,14 @@ export class LaCriptaServer {
       activeRoom.readyToAdvancePlayerIds.includes(p.id)
     ).length;
 
-    // In Solo mode or when majority/all living connected players are ready, advance immediately
+    // In Solo mode or when all living connected players (or host majority) are ready, start the Giant Door Transition!
     const shouldAdvance =
       isSolo ||
       readyCount >= activeDecisionPlayers.length ||
       (player.isHost && readyCount >= Math.ceil(activeDecisionPlayers.length / 2));
 
     if (!shouldAdvance) {
-      this.broadcastRoomState(room);
-      return;
-    }
-
-    // If currently in the Secret Room, return to the main room sequence (or advance to next room if main room was resolved)
-    if (room.inSecretRoom) {
-      room.inSecretRoom = false;
-      const mainRoom = (room.roomSequence || [])[room.currentRoomIndex ?? 0];
-      if (mainRoom && mainRoom.resolved) {
-        const nextIdx = (room.currentRoomIndex ?? 0) + 1;
-        if (room.roomSequence && nextIdx < room.roomSequence.length) {
-          room.currentRoomIndex = nextIdx;
-          const nextRoom = room.roomSequence[nextIdx];
-          nextRoom.revealed = true;
-          nextRoom.visited = true;
-          nextRoom.state = nextRoom.type === 'SHOP' ? 'RESOLVED' : 'IN_PROGRESS';
-          if (nextRoom.type === 'SHOP') nextRoom.resolved = true;
-          if (nextRoom.enemies.length > 0) {
-            nextRoom.actedPlayerIdsThisRound = [];
-            nextRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, nextRoom);
-          }
-        }
-      }
-      this.syncLegacyNodes(room);
+      activeRoom.lifecyclePhase = 'READY_TO_LEAVE';
       this.broadcastRoomState(room);
       return;
     }
@@ -4823,100 +4932,167 @@ export class LaCriptaServer {
     const seq = room.roomSequence || [];
     const currentIdx = room.currentRoomIndex ?? 0;
     const nextIdx = currentIdx + 1;
+    const isLeavingSecret = Boolean(room.inSecretRoom);
+    const isEndOfDungeon = !isLeavingSecret && nextIdx >= seq.length;
 
-    if (nextIdx >= seq.length) {
-      // First press at the end of a dungeon opens the Dungeon Completion summary screen;
-      // Second press transitions the party back to the Three Doors chamber (incrementing door count)!
-      if (!room.dungeonCompleted) {
-        room.dungeonCompleted = true;
-        activeRoom.readyToAdvancePlayerIds = [];
-        this.syncLegacyNodes(room);
-        this.broadcastRoomState(room);
-        return;
-      }
+    const targetNextRoom = isLeavingSecret
+      ? seq[Math.min(seq.length - 1, currentIdx + (seq[currentIdx]?.resolved ? 1 : 0))]
+      : !isEndOfDungeon
+      ? seq[nextIdx]
+      : null;
 
-      // Leaving completed dungeon -> return to Three Doors chamber!
-      const finishedDungeonId = room.selectedDungeonId;
-      if (!room.completedDungeonIds) room.completedDungeonIds = [];
-      if (finishedDungeonId && !room.completedDungeonIds.includes(finishedDungeonId)) {
-        room.completedDungeonIds.push(finishedDungeonId);
-      }
-      room.completedDoorCount = Math.min(3, (room.completedDoorCount ?? 0) + 1);
-      if (!room.runStats) room.runStats = buildDefaultRunStats();
-      room.runStats.dungeonsCompleted = room.completedDoorCount;
+    // Begin STAGE 1-3 of Giant Door Transition (Door Closes & Seals over the current room for 820ms)
+    activeRoom.lifecyclePhase = 'TRANSITIONING_OUT';
+    const transitionStartedAt = Date.now();
+    room.transitioningToRoomIndex = isEndOfDungeon
+      ? currentIdx
+      : targetNextRoom?.index ?? nextIdx;
+    room.roomDoorTransition = {
+      active: true,
+      fromRoomIndex: currentIdx,
+      toRoomIndex: isEndOfDungeon ? currentIdx : targetNextRoom?.index ?? nextIdx,
+      fromDungeonId: room.selectedDungeonId || 'catacumbas_del_rey',
+      targetRoomType: isEndOfDungeon
+        ? 'MINIBOSS'
+        : targetNextRoom?.type || 'COMBAT',
+      targetRoomTitle: isEndOfDungeon
+        ? 'Cámara de las Tres Puertas'
+        : targetNextRoom?.title || 'Siguiente Cámara',
+      isEnteringMiniboss: Boolean(
+        !isEndOfDungeon && targetNextRoom?.type === 'MINIBOSS'
+      ),
+      isReturningToDoors: isEndOfDungeon,
+      startedAt: transitionStartedAt,
+    };
 
-      const ts = Date.now();
-      const visualEvents: CriptaVisualEvent[] = [
-        {
-          id: `ev_${ts}_door_cleared`,
-          kind: 'DOOR_COMPLETED',
-          targetType: 'ROOM',
-          value: room.completedDoorCount,
-          label: `PUERTA SUPERADA (${room.completedDoorCount} / 3)`,
-          sublabel:
-            room.completedDoorCount >= 3
-              ? 'EL CORAZÓN DE LA CRIPTA DESPIERTA'
-              : 'REGRESANDO A LAS TRES PUERTAS',
-          color: '#E7A54A',
-          vfxStyle: 'gold',
-        },
-      ];
+    this.broadcastRoomState(room);
 
-      // Relic: Escudo del Sepulturero (+10 PV al superar una puerta)
-      if (this.hasPartyRelic(room, 'escudo_del_sepulturero')) {
-        for (const p of room.players) {
-          if (!p.isDead && p.hp > 0) {
-            p.hp = Math.min(p.maxHp, p.hp + 10);
-            visualEvents.push({
-              id: `ev_${ts}_sepul_${p.id}`,
-              kind: 'HEAL_PLAYER',
-              targetType: 'PLAYER',
-              targetId: p.id,
-              value: 10,
-              label: '+10 PV',
-              sublabel: 'ESCUDO DEL SEPULTURERO',
-              color: '#5EA87A',
-              vfxStyle: 'holy',
-            });
+    if (room.roomTransitionTimer) {
+      clearTimeout(room.roomTransitionTimer);
+    }
+
+    // At 820ms (while the Giant Door is sealed shut), swap the authoritative room behind the door!
+    room.roomTransitionTimer = setTimeout(() => {
+      room.roomTransitionTimer = null;
+
+      if (isLeavingSecret) {
+        room.inSecretRoom = false;
+        const mainRoom = (room.roomSequence || [])[room.currentRoomIndex ?? 0];
+        if (mainRoom && mainRoom.resolved) {
+          const nIdx = (room.currentRoomIndex ?? 0) + 1;
+          if (room.roomSequence && nIdx < room.roomSequence.length) {
+            this.activateDungeonRoomAtIndex(room, nIdx);
           }
         }
-      }
-
-      // Prepare next door offer (avoiding already completed dungeons)
-      const nextSeed = (room.seed + room.completedDoorCount * 7919) >>> 0;
-      room.seed = nextSeed;
-      if (room.completedDoorCount < 3) {
-        room.offeredDungeons = selectThreeDistinctDungeonsExcluding(
-          nextSeed,
-          room.completedDungeonIds
-        );
-      } else {
-        room.offeredDungeons = [];
-      }
-      room.doorVotes = {};
-      room.voteTieWarning = false;
-      room.decisionResolved = false;
-      room.selectedDungeonId = null;
-      room.doorOpeningStartedAt = null;
-      room.dungeonCompleted = false;
-      room.inSecretRoom = false;
-      room.phase = 'RETURNING_TO_DOORS';
-
-      this.emitVisualEventBatch(room, visualEvents, player.id, 'DOOR_CLEAR');
-      this.broadcastRoomState(room);
-
-      if (room.doorOpeningTimer) {
-        clearTimeout(room.doorOpeningTimer);
-      }
-      room.doorOpeningTimer = setTimeout(() => {
-        room.doorOpeningTimer = null;
-        if (room.phase === 'RETURNING_TO_DOORS') {
-          room.phase = 'THREE_DOORS';
-          this.broadcastRoomState(room);
+        this.syncLegacyNodes(room);
+        this.broadcastRoomState(room);
+      } else if (isEndOfDungeon) {
+        // Leaving completed Miniboss room -> return to Three Doors chamber!
+        const finishedDungeonId = room.selectedDungeonId;
+        if (!room.completedDungeonIds) room.completedDungeonIds = [];
+        if (finishedDungeonId && !room.completedDungeonIds.includes(finishedDungeonId)) {
+          room.completedDungeonIds.push(finishedDungeonId);
         }
-      }, 1600);
-      return;
-    }
+        room.completedDoorCount = Math.min(3, (room.completedDoorCount ?? 0) + 1);
+        if (!room.runStats) room.runStats = buildDefaultRunStats();
+        room.runStats.dungeonsCompleted = room.completedDoorCount;
+
+        const ts = Date.now();
+        const visualEvents: CriptaVisualEvent[] = [
+          {
+            id: `ev_${ts}_door_cleared`,
+            kind: 'DOOR_COMPLETED',
+            targetType: 'ROOM',
+            value: room.completedDoorCount,
+            label: `PUERTA SUPERADA (${room.completedDoorCount} / 3)`,
+            sublabel:
+              room.completedDoorCount >= 3
+                ? 'EL CORAZÓN DE LA CRIPTA DESPIERTA'
+                : 'REGRESANDO A LAS TRES PUERTAS',
+            color: '#E7A54A',
+            vfxStyle: 'gold',
+          },
+        ];
+
+        // Relic: Escudo del Sepulturero (+10 PV al superar una puerta)
+        if (this.hasPartyRelic(room, 'escudo_del_sepulturero')) {
+          for (const p of room.players) {
+            if (!p.isDead && p.hp > 0) {
+              p.hp = Math.min(p.maxHp, p.hp + 10);
+              visualEvents.push({
+                id: `ev_${ts}_sepul_${p.id}`,
+                kind: 'HEAL_PLAYER',
+                targetType: 'PLAYER',
+                targetId: p.id,
+                value: 10,
+                label: '+10 PV',
+                sublabel: 'ESCUDO DEL SEPULTURERO',
+                color: '#5EA87A',
+                vfxStyle: 'holy',
+              });
+            }
+          }
+        }
+
+        // Prepare next door offer (avoiding already completed dungeons)
+        const nextSeed = (room.seed + room.completedDoorCount * 7919) >>> 0;
+        room.seed = nextSeed;
+        if (room.completedDoorCount < 3) {
+          room.offeredDungeons = selectThreeDistinctDungeonsExcluding(
+            nextSeed,
+            room.completedDungeonIds
+          );
+        } else {
+          room.offeredDungeons = [];
+        }
+        room.doorVotes = {};
+        room.voteTieWarning = false;
+        room.decisionResolved = false;
+        room.selectedDungeonId = null;
+        room.doorOpeningStartedAt = null;
+        room.dungeonCompleted = false;
+        room.inSecretRoom = false;
+        room.transitioningToRoomIndex = null;
+        room.roomDoorTransition = null;
+        room.phase = 'RETURNING_TO_DOORS';
+
+        this.emitVisualEventBatch(room, visualEvents, player.id, 'DOOR_CLEAR');
+        this.broadcastRoomState(room);
+
+        if (room.doorOpeningTimer) {
+          clearTimeout(room.doorOpeningTimer);
+        }
+        room.doorOpeningTimer = setTimeout(() => {
+          room.doorOpeningTimer = null;
+          if (room.phase === 'RETURNING_TO_DOORS') {
+            room.phase = 'THREE_DOORS';
+            this.broadcastRoomState(room);
+          }
+        }, 1500);
+        return;
+      } else {
+        this.activateDungeonRoomAtIndex(room, nextIdx);
+        this.syncLegacyNodes(room);
+        this.broadcastRoomState(room);
+      }
+
+      // STAGE 5-6: Giant Door swings open over 780ms to reveal the new room, then unlocks controls
+      room.roomTransitionTimer = setTimeout(() => {
+        room.roomTransitionTimer = null;
+        room.transitioningToRoomIndex = null;
+        room.roomDoorTransition = null;
+        const currRoom = this.getActiveDungeonRoom(room);
+        if (currRoom) {
+          currRoom.lifecyclePhase = 'ACTIVE';
+        }
+        this.broadcastRoomState(room);
+      }, 780);
+    }, 820);
+  }
+
+  private activateDungeonRoomAtIndex(room: ServerCriptaRoom, nextIdx: number) {
+    const seq = room.roomSequence || [];
+    if (nextIdx < 0 || nextIdx >= seq.length) return;
 
     room.currentRoomIndex = nextIdx;
     if (!room.runStats) room.runStats = buildDefaultRunStats();
@@ -4924,6 +5100,7 @@ export class LaCriptaServer {
     const nextRoom = seq[nextIdx];
     nextRoom.revealed = true;
     nextRoom.visited = true;
+    nextRoom.lifecyclePhase = 'ENTERING';
     nextRoom.state = nextRoom.type === 'SHOP' ? 'RESOLVED' : 'IN_PROGRESS';
     if (nextRoom.type === 'SHOP') {
       nextRoom.resolved = true;
@@ -4948,16 +5125,16 @@ export class LaCriptaServer {
     if (nextRoom.enemies.length > 0) {
       nextRoom.combatTurn = 1;
       nextRoom.combatRoundPhase = 'PLAYER_PHASE';
-      nextRoom.combatBannerText = 'RONDA 1 — FASE DE JUGADORES';
+      nextRoom.combatBannerText =
+        nextRoom.type === 'MINIBOSS'
+          ? `¡MINIBOSS DE MAZMORRA: ${(nextRoom.enemies[0]?.name || 'GUARDIÁN').toUpperCase()}!`
+          : 'RONDA 1 — FASE DE JUGADORES';
       nextRoom.queuedPlayerActions = {};
       nextRoom.activeCombatActorId = null;
       nextRoom.activeTargetedPlayerIds = [];
       nextRoom.actedPlayerIdsThisRound = [];
       nextRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, nextRoom);
     }
-
-    this.syncLegacyNodes(room);
-    this.broadcastRoomState(room);
   }
 
   /**

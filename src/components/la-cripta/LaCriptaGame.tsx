@@ -112,6 +112,7 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     sendUnlockRoundAction,
     sendUseInventoryItem,
     sendClaimGroundDrop,
+    sendBuyShopSlot,
     sendReplaceInventoryItem,
     sendDiscardOverflowItem,
     sendShopBuyItem,
@@ -309,7 +310,16 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
 
       // Trigger crisp synthesized audio feedback for the batch
       if (!playedPrimarySfx) {
-        if (ev.kind === 'REVIVE_PLAYER' || ev.kind === 'RELIC_ACQUIRED' || ev.kind === 'DOOR_COMPLETED') {
+        if (ev.kind === 'MINIBOSS_ENRAGE') {
+          laCriptaAudio.playMinibossEnrage();
+          playedPrimarySfx = true;
+        } else if (
+          ev.kind === 'REVIVE_PLAYER' ||
+          ev.kind === 'RELIC_ACQUIRED' ||
+          ev.kind === 'RELIC_OBTAINED' ||
+          ev.kind === 'DOOR_COMPLETED' ||
+          ev.kind === 'MINIBOSS_DEFEATED'
+        ) {
           laCriptaAudio.playReviveFanfare();
           playedPrimarySfx = true;
         } else if (ev.kind === 'CRIT_ENEMY' || ev.kind === 'BOSS_PHASE_TRANSITION') {
@@ -483,6 +493,7 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
             onDiscoverSecret={sendRoomDiscoverSecret}
             onAdvanceRoom={sendRoomAdvance}
             onClaimGroundDrop={sendClaimGroundDrop}
+            onBuyShopSlot={sendBuyShopSlot}
             onShopBuyItem={sendShopBuyItem}
             onShopBuyRelic={sendShopBuyRelic}
             onSelectedEnemyChange={setSelectedTargetEnemyId}

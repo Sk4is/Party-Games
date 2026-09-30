@@ -175,6 +175,7 @@ export type CriptaRoomNodeType =
   | 'TRAP'
   | 'PUZZLE'
   | 'SECRET'
+  | 'MINIBOSS'
   | 'BOSS'
   | 'ENCOUNTER'
   | 'SANCTUARY';
@@ -192,7 +193,17 @@ export type CriptaCanonicalRoomType =
   | 'TRAP'
   | 'PUZZLE'
   | 'SECRET'
+  | 'MINIBOSS'
   | 'BOSS';
+
+export type CriptaRoomLifecyclePhase =
+  | 'ENTERING'
+  | 'ACTIVE'
+  | 'RESOLVING'
+  | 'REWARDING'
+  | 'SETTLING'
+  | 'READY_TO_LEAVE'
+  | 'TRANSITIONING_OUT';
 
 export type CriptaDungeonLengthTier = 'CORTA' | 'MEDIA' | 'LARGA' | 'PROFUNDA';
 
@@ -511,9 +522,12 @@ export type CriptaRoomEnemy = {
   name: string;
   title: string;
   isElite: boolean;
+  isMiniboss?: boolean;
   isBoss: boolean;
   isFinalBoss?: boolean;
   bossPhase?: 1 | 2;
+  signatureMoveName?: string;
+  enrageTriggered?: boolean;
   hp: number;
   maxHp: number;
   attack: number;
@@ -784,6 +798,16 @@ export interface CriptaDungeonRoom {
   options: CriptaRoomInteractiveOption[];
   groundDrops?: CriptaRoomGroundDrop[];
   shopInventory?: CriptaShopSlot[];
+  shopPurchaseHistory?: Array<{
+    id: string;
+    buyerName: string;
+    itemName: string;
+    priceGold: number;
+    timestamp: number;
+  }>;
+  lifecyclePhase?: CriptaRoomLifecyclePhase;
+  resolvedAtTimestamp?: number | null;
+  isMinibossRoom?: boolean;
   isFinalBossRoom?: boolean;
   puzzleRunes?: {
     sequence: number[];
@@ -809,6 +833,8 @@ export type CriptaVisualEventKind =
   | 'SHIELD_ENEMY'
   | 'PROTECT_ENEMY'
   | 'TELEGRAPH_ENEMY'
+  | 'MINIBOSS_ENRAGE'
+  | 'MINIBOSS_DEFEATED'
   | 'DAMAGE_PLAYER'
   | 'HEAL_PLAYER'
   | 'SHIELD_PLAYER'
@@ -822,6 +848,7 @@ export type CriptaVisualEventKind =
   | 'LOOT_ITEM'
   | 'ITEM_ACQUIRED'
   | 'ITEM_CONSUMED'
+  | 'SHOP_PURCHASE'
   | 'WEAPON_EQUIPPED'
   | 'WEAPON_UPGRADED'
   | 'RELIC_OBTAINED'
@@ -902,6 +929,7 @@ export interface CriptaDungeonCompletionSummary {
   dungeonId: CriptaDungeonId;
   dungeonName: string;
   doorNumberCompleted: number; // 1, 2, or 3
+  minibossDefeatedName?: string;
   goldEarned: number;
   itemsFound: number;
   relicsFound: number;
@@ -913,6 +941,7 @@ export interface CriptaRunStats {
   roomsVisited: number;
   enemiesDefeated: number;
   elitesDefeated: number;
+  minibossesDefeated?: number;
   goldEarned: number;
   goldSpent: number;
   itemsUsed: number;
@@ -1050,6 +1079,17 @@ export interface CriptaExpeditionState {
   partyGold?: number;
   currentRoomIndex?: number;
   transitioningToRoomIndex?: number | null;
+  roomDoorTransition?: {
+    active: boolean;
+    fromRoomIndex: number;
+    toRoomIndex: number;
+    fromDungeonId: CriptaDungeonId;
+    targetRoomType: CriptaCanonicalRoomType;
+    targetRoomTitle: string;
+    isEnteringMiniboss: boolean;
+    isReturningToDoors: boolean;
+    startedAt: number;
+  } | null;
   roomSequence?: CriptaDungeonRoom[];
   discoveredSecretRoom?: CriptaDungeonRoom | null;
   inSecretRoom?: boolean;

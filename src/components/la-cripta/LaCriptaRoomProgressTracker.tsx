@@ -26,7 +26,8 @@ export const ROOM_TYPE_LABELS: Record<CriptaCanonicalRoomType, string> = {
   TRAP: 'Trampa',
   PUZZLE: 'Acertijo',
   SECRET: 'Secreto',
-  BOSS: 'Jefe',
+  MINIBOSS: 'Minijefe',
+  BOSS: 'Jefe Final',
 };
 
 /**
@@ -182,6 +183,18 @@ export const LaCriptaRoomTypeIcon: React.FC<LaCriptaRoomTypeIconProps> = ({
         </g>
       )}
 
+      {type === 'MINIBOSS' && (
+        <g fill={color}>
+          {/* Warden Horned Crest & Glowing Eyes */}
+          <rect x="1" y="1" width="2" height="3" fill="#E7A54A" />
+          <rect x="9" y="1" width="2" height="3" fill="#E7A54A" />
+          <rect x="3" y="2" width="6" height="6" />
+          <rect x="4" y="8" width="4" height="3" />
+          <rect x="3" y="4" width="2" height="2" fill="#C93B5B" />
+          <rect x="7" y="4" width="2" height="2" fill="#C93B5B" />
+        </g>
+      )}
+
       {type === 'BOSS' && (
         <g fill={color}>
           {/* Crowned Boss Skull */}
@@ -261,27 +274,30 @@ export const LaCriptaRoomProgressTracker: React.FC<LaCriptaRoomProgressTrackerPr
         </div>
       </div>
 
-      {/* Row 2: Horizontal Connected Node Sequence [⚔]—[CHEST]—[!]—[●]—[?]—[?] */}
+      {/* Row 2: Horizontal Connected Node Sequence [⚔]—[CHEST]—[!]—[●]—[?]—[MINIJEFE] */}
       <div className="w-full overflow-x-auto pb-0.5">
         <div className="flex items-center min-w-max gap-1">
           {rooms.map((rm, idx) => {
             const isCurrent = idx === currentRoomIndex && !inSecretRoom;
             const isCompleted = rm.resolved && idx < currentRoomIndex;
-            const isRevealed = rm.revealed || isCompleted || isCurrent;
-            const isBossNode = rm.type === 'BOSS';
+            const isBossNode = rm.type === 'BOSS' || rm.type === 'MINIBOSS' || rm.isMinibossRoom;
+            // Final Miniboss / Boss node is always iconic on the dungeon track
+            const isRevealed = rm.revealed || isCompleted || isCurrent || isBossNode;
 
             const borderColor = isCurrent
               ? '#E7A54A'
               : isCompleted
               ? dungeon.palette.glow
               : isBossNode
-              ? '#8F263D'
+              ? '#C93B5B'
               : '#282039';
 
             const bgColor = isCurrent
               ? '#24182E'
               : isCompleted
               ? '#15101D'
+              : isBossNode
+              ? '#1C0B13'
               : '#09070D';
 
             const iconColor = isCurrent
@@ -293,9 +309,9 @@ export const LaCriptaRoomProgressTracker: React.FC<LaCriptaRoomProgressTrackerPr
               : '#D8C6A0';
 
             const labelTitle = isRevealed
-              ? `Sala ${idx + 1}: ${ROOM_TYPE_LABELS[rm.type]} (${rm.title})`
+              ? `Sala ${idx + 1}: ${ROOM_TYPE_LABELS[rm.type] || rm.type} (${rm.title})`
               : isBossNode
-              ? `Sala ${idx + 1}: Cámara del Jefe (?)`
+              ? `Sala ${idx + 1}: Cámara del Minijefe`
               : `Sala ${idx + 1}: Inexplorada (?)`;
 
             return (
