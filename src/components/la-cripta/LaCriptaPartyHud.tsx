@@ -1,9 +1,25 @@
 import React, { useState } from 'react';
-import { Copy, Check, Volume2, VolumeX, LogOut, Crown, Sparkles } from 'lucide-react';
-import { CriptaExpeditionState, CriptaSpriteAnimationState } from '../../types/laCripta';
+import { Copy, Check, Volume2, VolumeX, LogOut, Crown, Sparkles, Swords } from 'lucide-react';
+import {
+  CriptaAcquiredRelic,
+  CriptaExpeditionState,
+  CriptaSpriteAnimationState,
+  CriptaVisualEvent,
+} from '../../types/laCripta';
 import { CRIPTA_CHARACTERS_CATALOG } from '../../data/la-cripta/criptaCatalog';
+import { CRIPTA_CONSUMABLES_BY_ID } from '../../data/la-cripta/criptaItemsAndRelics';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 import { LaCriptaPixelSprite } from './LaCriptaPixelSprite';
+import {
+  LaCriptaFallenSoulIcon,
+  LaCriptaStatusEffectBadge,
+} from './LaCriptaStatusEffectBadge';
+import { LaCriptaFloatingEventBadge } from './LaCriptaVisualFeedback';
+import {
+  LaCriptaPartyRelicsBar,
+  LaCriptaPlayerInventoryBar,
+  LaCriptaRelicDetailModal,
+} from './LaCriptaItemRelicArt';
 
 interface LaCriptaPartyHudProps {
   expeditionState: CriptaExpeditionState;
@@ -11,6 +27,9 @@ interface LaCriptaPartyHudProps {
   onLeaveExpedition: () => void;
   onReturnToLobby?: () => void;
   playerAnimationStates?: Record<string, CriptaSpriteAnimationState>;
+  activeVisualEvents?: CriptaVisualEvent[];
+  onUseConsumable?: (slotIndex: number, targetEnemyId?: string, targetPlayerId?: string) => void;
+  selectedTargetEnemyId?: string | null;
 }
 
 /**
@@ -77,13 +96,28 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
 
           <span className="hidden md:inline text-[11px] font-cripta-pixel text-[#D9D0BC]/65">
             {expeditionState.phase === 'LOBBY' && 'PREPARACIÓN DE LA EXPEDICIÓN'}
-            {expeditionState.phase === 'THREE_DOORS' && 'LAS TRES PUERTAS DEL DESTINO'}
+            {expeditionState.phase === 'THREE_DOORS' &&
+              ((expeditionState.completedDoorCount ?? 0) >= 3
+                ? 'EL CORAZÓN DE LA CRIPTA'
+                : `LAS TRES PUERTAS · (${expeditionState.completedDoorCount ?? 0}/3 SUPERADAS)`)}
+            {expeditionState.phase === 'RETURNING_TO_DOORS' && 'REGRESANDO A LAS TRES PUERTAS...'}
             {(expeditionState.phase === 'ENTERING_DUNGEON' ||
               expeditionState.phase === 'DOOR_OPENING') &&
               'ABRIENDO SELLOS ANCESTRALES...'}
+            {expeditionState.phase === 'FINAL_BOSS_ENTRANCE' &&
+              'DESBLOQUEANDO EL CORAZÓN DE LA CRIPTA...'}
+            {expeditionState.phase === 'FINAL_BOSS_COMBAT' &&
+              `JEFE FINAL · FASE ${expeditionState.finalBossPhase ?? 1}`}
+            {expeditionState.phase === 'RUN_VICTORY' && '¡EXPEDICIÓN VICTORIOSA!'}
             {(expeditionState.phase === 'DUNGEON' ||
               expeditionState.phase === 'DUNGEON_ARRIVAL') &&
-              `PISO ${expeditionState.floor} · SALA I`}
+              `PUERTA ${Math.min(3, (expeditionState.completedDoorCount ?? 0) + 1)}/3 · SALA ${
+                (expeditionState.currentRoomIndex ?? 0) + 1
+              }${
+                expeditionState.roomSequence?.length
+                  ? `/${expeditionState.roomSequence.length}`
+                  : ''
+              }`}
           </span>
         </div>
 
@@ -132,19 +166,44 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
 };
 
 /**
- * Persistent BOTTOM Video-Game Party HUD (Requirements 13, 14, 15).
+ * Persistent BOTTOM Video-Game Party HUD (Requirements 13, 14, 15 + Phase 4 Inventory & Relics).
  * Displays up to 4 adventurers with animated pixel-art character silhouettes breaking slightly
  * above the ornamental dark-fantasy HUD frame, segmented pixel HP strip, identity, cursor colour,
- * and statuses.
+ * 3-slot personal inventory, and shared party Relics bar.
  */
 export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
   expeditionState,
   currentPlayerId,
   playerAnimationStates = {},
+  activeVisualEvents = [],
+  onUseConsumable,
+  selectedTargetEnemyId,
 }) => {
+  const [inspectedRelic, setInspectedRelic] = useState<CriptaAcquiredRelic | null>(null);
+
   const orderedPlayers = [...expeditionState.players].sort((a, b) => a.seatIndex - b.seatIndex);
   const playerCount = orderedPlayers.length;
   const isSolo = playerCount === 1;
+  const partyRelics = expeditionState.partyRelics || [];
+
+  // Determine current room & active turn player if in dungeon combat
+  const roomSequence = expeditionState.roomSequence || [];
+  const currentRoomIndex = expeditionState.currentRoomIndex ?? 0;
+  const activeRoom =
+    expeditionState.inSecretRoom && expeditionState.discoveredSecretRoom
+      ? expeditionState.discoveredSecretRoom
+      : roomSequence[currentRoomIndex] || null;
+  const hasLivingEnemies = Boolean(
+    activeRoom &&
+      !activeRoom.resolved &&
+      activeRoom.enemies &&
+      activeRoom.enemies.some((e) => e.hp > 0)
+  );
+  const activeTurnPlayerId = hasLivingEnemies ? activeRoom?.activeTurnPlayerId : null;
+  const isExploreOrBossPhase =
+    expeditionState.phase === 'DUNGEON' ||
+    expeditionState.phase === 'DUNGEON_ARRIVAL' ||
+    expeditionState.phase === 'FINAL_BOSS_COMBAT';
 
   const gridLayoutClass =
     playerCount <= 1
@@ -158,10 +217,28 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
   return (
     <aside
       aria-label={isSolo ? 'Panel del aventurero' : 'Grupo de aventureros'}
-      className="relative z-30 w-full border-t-2 border-[#E7A54A]/35 bg-gradient-to-t from-[#07060A] via-[#0B0A0E] to-[#19111D]/95 pt-3 pb-2.5 px-3 sm:px-6 shadow-[0_-14px_38px_rgba(0,0,0,0.92)] select-none"
+      className="relative z-30 w-full border-t-2 border-[#E7A54A]/35 bg-gradient-to-t from-[#07060A] via-[#0B0A0E] to-[#19111D]/95 pt-2.5 pb-2.5 px-3 sm:px-6 shadow-[0_-14px_38px_rgba(0,0,0,0.92)] select-none"
     >
       {/* Ornamental pixel-gold top trim line */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-[#E7A54A]/60 to-transparent" />
+
+      {/* Shared Party Relics Strip (Objetos Clave / Reliquias) */}
+      {partyRelics.length > 0 && (
+        <div className="max-w-7xl mx-auto mb-2 flex items-center justify-center">
+          <LaCriptaPartyRelicsBar
+            relics={partyRelics}
+            onInspectRelic={(rel) => setInspectedRelic(rel)}
+          />
+        </div>
+      )}
+
+      {inspectedRelic && (
+        <LaCriptaRelicDetailModal
+          relic={inspectedRelic}
+          players={expeditionState.players}
+          onClose={() => setInspectedRelic(null)}
+        />
+      )}
 
       <div className={gridLayoutClass}>
         {orderedPlayers.map((player) => {
@@ -170,11 +247,27 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
           const isMe = player.id === currentPlayerId;
           const votedDoorId = expeditionState.doorVotes[player.id];
           const animState = playerAnimationStates[player.id] || 'idle';
+          const isDead = Boolean(
+            player.isDead || (charDef && player.maxHp > 0 && player.hp <= 0)
+          );
+          const isActiveTurn =
+            !isDead &&
+            hasLivingEnemies &&
+            (activeTurnPlayerId === player.id || (!activeTurnPlayerId && isSolo));
+
+          // Events targeting this player (plus party-wide gold/loot shown on current player's card or solo card)
+          const playerEvents = activeVisualEvents.filter(
+            (ev) =>
+              (ev.targetType === 'PLAYER' && ev.targetId === player.id) ||
+              (ev.targetType === 'PARTY' &&
+                (ev.kind === 'GAIN_GOLD' || ev.kind === 'LOSE_GOLD' || ev.kind === 'LOOT_ITEM') &&
+                (isSolo || isMe))
+          );
 
           // Compute 10-segment pixel HP bar
           const hpSegmentsTotal = 10;
           const hpFilledSegments =
-            charDef && player.maxHp > 0
+            charDef && player.maxHp > 0 && !isDead
               ? Math.max(
                   0,
                   Math.min(
@@ -184,45 +277,93 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                 )
               : 0;
 
+          const bonusAtk = player.bonusAttack || 0;
+          const bonusDef = player.bonusDefense || 0;
+          const bonusMag = player.bonusMagic || 0;
+          const items = player.inventoryItems || [];
+
           return (
             <div
               key={player.id}
-              className="relative flex items-center gap-2.5 sm:gap-3 px-2.5 sm:px-3.5 py-2 bg-[#140F1A] border-2 transition-colors"
+              className={`relative flex items-center gap-2.5 sm:gap-3 px-2.5 sm:px-3.5 py-2 border-2 transition-all duration-200 ${
+                isDead
+                  ? 'bg-[#0F090E]'
+                  : animState === 'hit' || animState === 'debuff'
+                  ? 'bg-[#2B0E17] -translate-y-0.5'
+                  : animState === 'heal' || animState === 'revive'
+                  ? 'bg-[#0E2419] -translate-y-0.5'
+                  : animState === 'attack' || animState === 'cast'
+                  ? 'bg-[#22182E] -translate-y-1'
+                  : 'bg-[#140F1A]'
+              }`}
               style={{
-                borderColor: charDef
+                borderColor: isDead
+                  ? '#8F263D'
+                  : isActiveTurn
+                  ? '#FFD166'
+                  : charDef
                   ? isMe
                     ? '#E7A54A'
                     : charDef.accentColor
                   : isMe
                   ? player.color
                   : '#282039',
-                boxShadow: isMe
+                boxShadow: isDead
+                  ? 'inset 0 0 22px rgba(143,38,61,0.3), 0 4px 16px rgba(0,0,0,0.9)'
+                  : isActiveTurn
+                  ? 'inset 0 0 22px rgba(255,209,102,0.22), 0 0 18px rgba(231,165,74,0.35)'
+                  : isMe
                   ? `inset 0 0 18px ${player.color}22, 0 4px 16px rgba(0,0,0,0.85)`
                   : '0 4px 16px rgba(0,0,0,0.85)',
               }}
             >
+              {/* Floating Visual Gameplay Feedback Popups above Player Card */}
+              {playerEvents.length > 0 && (
+                <div className="pointer-events-none absolute -top-9 inset-x-0 z-40 flex flex-col items-center gap-1">
+                  {playerEvents.slice(-3).map((ev, idx) => (
+                    <LaCriptaFloatingEventBadge key={ev.id} event={ev} indexOffset={idx} />
+                  ))}
+                </div>
+              )}
+
+              {/* Active Combat Turn Crown Tag */}
+              {isActiveTurn && (
+                <div className="pointer-events-none absolute -top-2.5 right-2 z-30 px-1.5 py-0.5 bg-[#E7A54A] border border-[#FFF3C4] text-[8px] font-cripta-pixel font-bold text-[#0B0A0E] tracking-wider flex items-center gap-1 shadow">
+                  <Swords className="w-2.5 h-2.5" />
+                  <span>{isMe ? '¡TU TURNO!' : 'EN TURNO'}</span>
+                </div>
+              )}
+
               {/* Pixel corner rivets */}
               <span
                 className="pointer-events-none absolute top-0.5 left-0.5 w-1.5 h-1.5"
-                style={{ backgroundColor: player.color }}
+                style={{ backgroundColor: isDead ? '#8F263D' : player.color }}
               />
               <span
                 className="pointer-events-none absolute top-0.5 right-0.5 w-1.5 h-1.5"
-                style={{ backgroundColor: player.color }}
+                style={{ backgroundColor: isDead ? '#8F263D' : player.color }}
               />
 
               {/* Animated Pixel Character Bust — breaks slightly out of the top HUD frame */}
               <div
                 className="relative w-14 h-14 sm:w-16 sm:h-16 shrink-0 flex items-center justify-center bg-[#09070D] border-2 overflow-visible"
                 style={{
-                  borderColor: player.color,
+                  borderColor: isDead
+                    ? '#8F263D'
+                    : isActiveTurn
+                    ? '#FFD166'
+                    : player.color,
                 }}
               >
                 {charId && charDef ? (
-                  <div className="-mt-3 sm:-mt-4 pointer-events-none">
+                  <div
+                    className={`-mt-3 sm:-mt-4 pointer-events-none transition-all ${
+                      isDead ? 'grayscale opacity-35' : ''
+                    }`}
+                  >
                     <LaCriptaPixelSprite
                       characterId={charId}
-                      animationState={animState}
+                      animationState={isDead ? 'idle' : animState}
                       size="hud"
                     />
                   </div>
@@ -230,6 +371,16 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   <div className="flex flex-col items-center justify-center text-center p-1">
                     <span className="font-cripta-pixel text-base text-[#D8C6A0]/40 animate-pulse">
                       ?
+                    </span>
+                  </div>
+                )}
+
+                {/* Fallen / Dead Overlay on Portrait */}
+                {isDead && (
+                  <div className="absolute inset-0 bg-[#1A080E]/80 flex flex-col items-center justify-center gap-0.5 px-1 text-center">
+                    <LaCriptaFallenSoulIcon size={18} />
+                    <span className="text-[8px] font-cripta-pixel font-bold text-[#C93B5B] uppercase tracking-wider">
+                      CAÍDO
                     </span>
                   </div>
                 )}
@@ -252,14 +403,18 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
 
               {/* Right HUD Module: Player Name, Class, 10-Block Pixel HP Strip & Statuses */}
               <div className="flex-1 min-w-0">
-                {/* Row 1: Player Name + Host Crown */}
+                {/* Row 1: Player Name + Host Crown + Armor & Stat Bonuses */}
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span
                       className="w-2 h-2 shrink-0"
                       style={{ backgroundColor: player.color }}
                     />
-                    <span className="font-cripta-pixel text-xs sm:text-sm font-bold text-[#D9D0BC] uppercase truncate">
+                    <span
+                      className={`font-cripta-pixel text-xs sm:text-sm font-bold uppercase truncate ${
+                        isDead ? 'text-[#C93B5B] line-through' : 'text-[#D9D0BC]'
+                      }`}
+                    >
                       {player.name}
                     </span>
                     {isMe && !isSolo && (
@@ -274,6 +429,37 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                       />
                     )}
                   </div>
+
+                  {charDef && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {bonusAtk > 0 && (
+                        <span
+                          className="font-cripta-mono text-[9px] text-[#E7A54A]"
+                          title={`Bonificación de Ataque: +${bonusAtk}`}
+                        >
+                          ⚔+{bonusAtk}
+                        </span>
+                      )}
+                      {bonusMag > 0 && (
+                        <span
+                          className="font-cripta-mono text-[9px] text-[#9B72CF]"
+                          title={`Bonificación de Magia: +${bonusMag}`}
+                        >
+                          ✦+{bonusMag}
+                        </span>
+                      )}
+                      <span
+                        className="font-cripta-mono text-[10px] text-[#69A8A5]"
+                        title={
+                          bonusDef > 0
+                            ? `Armadura actual (${player.armor}) · Bonificación Defensa +${bonusDef}`
+                            : 'Armadura actual'
+                        }
+                      >
+                        🛡 {player.armor}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Row 2: Selected Class or Choosing State */}
@@ -281,9 +467,9 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   {charDef ? (
                     <span
                       className="font-cripta-pixel text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate"
-                      style={{ color: charDef.accentColor }}
+                      style={{ color: isDead ? '#C93B5B' : charDef.accentColor }}
                     >
-                      {charDef.className}
+                      {isDead ? `${charDef.className} · CAÍDO` : charDef.className}
                     </span>
                   ) : (
                     <span className="font-cripta-pixel text-[10px] text-[#D8C6A0]/50 uppercase tracking-wider truncate">
@@ -292,27 +478,39 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   )}
 
                   {charDef && (
-                    <span className="font-cripta-mono text-[10px] text-[#D8C6A0] shrink-0">
-                      {player.hp}/{player.maxHp}
+                    <span
+                      className={`font-cripta-mono text-[10px] shrink-0 ${
+                        isDead ? 'text-[#C93B5B] font-bold' : 'text-[#D8C6A0]'
+                      }`}
+                    >
+                      {isDead ? `0/${player.maxHp} PV` : `${player.hp}/${player.maxHp} PV`}
                     </span>
                   )}
                 </div>
 
                 {/* Row 3: Pixel-Art Segmented HP Bar (♥ ████████░░) */}
                 <div className="mt-1.5 flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#C93B5B] font-cripta-pixel leading-none shrink-0">
-                    ♥
+                  <span
+                    className={`text-[10px] font-cripta-pixel leading-none shrink-0 ${
+                      isDead ? 'text-[#8F263D]' : 'text-[#C93B5B]'
+                    }`}
+                  >
+                    {isDead ? '☠' : '♥'}
                   </span>
                   <div className="flex items-center gap-0.5 flex-1">
                     {Array.from({ length: hpSegmentsTotal }).map((_, segIdx) => {
-                      const lit = charDef ? segIdx < hpFilledSegments : false;
+                      const lit = charDef && !isDead ? segIdx < hpFilledSegments : false;
                       return (
                         <span
                           key={segIdx}
                           className="h-2 sm:h-2.5 flex-1 border transition-colors duration-200"
                           style={{
                             backgroundColor: lit ? '#C93B5B' : '#09070D',
-                            borderColor: lit ? '#E7A54A' : '#282039',
+                            borderColor: lit
+                              ? '#E7A54A'
+                              : isDead
+                              ? '#541826'
+                              : '#282039',
                           }}
                         />
                       );
@@ -320,35 +518,81 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   </div>
                 </div>
 
-                {/* Row 4: Compact Status Effects & Door Vote Seal (multiplayer) */}
-                <div className="mt-1 flex items-center justify-between gap-1 min-h-[14px]">
-                  <div className="flex items-center gap-1 overflow-hidden">
+                {/* Row 4: Interactive Pixel Status Effects, 3-Slot Personal Inventory & Door Vote Seal */}
+                <div className="mt-1.5 flex items-center justify-between gap-1.5 min-h-[20px]">
+                  <div className="flex flex-wrap items-center gap-1 min-w-0">
                     {!player.isConnected ? (
                       <span className="text-[9px] font-cripta-pixel text-[#C93B5B]">
                         RECONECTANDO...
                       </span>
+                    ) : isDead ? (
+                      <span className="text-[9px] font-cripta-pixel text-[#C93B5B] uppercase">
+                        SIN VIDA · ESPERA RESURRECCIÓN
+                      </span>
                     ) : (
-                      player.statuses.slice(0, 2).map((st) => (
-                        <span
-                          key={st.id}
-                          className="px-1 py-0.2 bg-[#0B0A0E] border border-[#282039] text-[8px] font-cripta-pixel text-[#E7A54A]"
-                          title={st.name}
-                        >
-                          {st.code}
-                        </span>
-                      ))
+                      <>
+                        {player.statuses.slice(0, 4).map((st) => (
+                          <LaCriptaStatusEffectBadge key={st.id} status={st} />
+                        ))}
+                        {items.length > 0 && (!player.inventory || player.inventory.length === 0) && (
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1 py-0.2 bg-[#1D1526] border border-[#E7A54A]/60 text-[8px] font-cripta-pixel text-[#E7A54A]"
+                            title={`Reliquias y objetos: ${items.join(', ')}`}
+                          >
+                            <span>✦</span>
+                            <span className="truncate max-w-[78px]">
+                              {items[items.length - 1]}
+                            </span>
+                            {items.length > 1 && <span>+{items.length - 1}</span>}
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
 
-                  {!isSolo && votedDoorId && expeditionState.phase === 'THREE_DOORS' && (
-                    <span
-                      className="inline-flex items-center gap-0.5 text-[9px] font-cripta-pixel text-[#E7A54A] shrink-0"
-                      title="Ha sellado una puerta"
-                    >
-                      <Sparkles className="w-2.5 h-2.5" />
-                      SELLO
-                    </span>
-                  )}
+                  {/* 3-Slot Personal Inventory Bar */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {charDef && (
+                      <LaCriptaPlayerInventoryBar
+                        slots={player.inventory || []}
+                        isLocalPlayer={isMe}
+                        canUseNow={Boolean(
+                          isMe &&
+                            !isDead &&
+                            isExploreOrBossPhase &&
+                            (!hasLivingEnemies || isActiveTurn)
+                        )}
+                        onUseSlot={(slotIdx) => {
+                          if (!onUseConsumable) return;
+                          const slot = (player.inventory || [])[slotIdx];
+                          if (!slot) return;
+                          const itemDef = CRIPTA_CONSUMABLES_BY_ID[slot.itemId];
+                          if (!itemDef) return;
+                          laCriptaAudio.playHeroSelect();
+                          if (itemDef.targetRule === 'FALLEN_ALLY') {
+                            const fallenAlly = expeditionState.players.find(
+                              (p) => p.isDead || p.hp <= 0
+                            );
+                            onUseConsumable(slotIdx, undefined, fallenAlly?.id);
+                          } else if (itemDef.targetRule === 'SINGLE_ENEMY') {
+                            onUseConsumable(slotIdx, selectedTargetEnemyId || undefined, undefined);
+                          } else {
+                            onUseConsumable(slotIdx, undefined, currentPlayerId);
+                          }
+                        }}
+                      />
+                    )}
+
+                    {!isSolo && votedDoorId && expeditionState.phase === 'THREE_DOORS' && (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[9px] font-cripta-pixel text-[#E7A54A] shrink-0"
+                        title="Ha sellado una puerta"
+                      >
+                        <Sparkles className="w-2.5 h-2.5" />
+                        SELLO
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

@@ -69,6 +69,10 @@ class LaCriptaAudioEngine {
     });
   }
 
+  public playHeroSelect() {
+    this.playCharacterSelect();
+  }
+
   public playDoorHover() {
     const ctx = this.getContext();
     if (!ctx) return;
@@ -175,6 +179,181 @@ class LaCriptaAudioEngine {
       gain.connect(ctx.destination);
       osc.start(t);
       osc.stop(t + 2.05);
+    });
+  }
+
+  public playSwordSlash(isCrit = false) {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // Sharp metallic blade sweep
+    const blade = ctx.createOscillator();
+    const bladeGain = ctx.createGain();
+    blade.type = 'sawtooth';
+    blade.frequency.setValueAtTime(isCrit ? 620 : 440, now);
+    blade.frequency.exponentialRampToValueAtTime(95, now + (isCrit ? 0.19 : 0.13));
+
+    bladeGain.gain.setValueAtTime(isCrit ? 0.22 : 0.16, now);
+    bladeGain.gain.exponentialRampToValueAtTime(0.001, now + (isCrit ? 0.2 : 0.14));
+
+    blade.connect(bladeGain);
+    bladeGain.connect(ctx.destination);
+    blade.start(now);
+    blade.stop(now + (isCrit ? 0.21 : 0.15));
+
+    // Heavy impact thud
+    const impact = ctx.createOscillator();
+    const impactGain = ctx.createGain();
+    impact.type = 'triangle';
+    impact.frequency.setValueAtTime(isCrit ? 185 : 130, now + 0.03);
+    impact.frequency.exponentialRampToValueAtTime(38, now + 0.18);
+    impactGain.gain.setValueAtTime(isCrit ? 0.28 : 0.2, now + 0.03);
+    impactGain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+    impact.connect(impactGain);
+    impactGain.connect(ctx.destination);
+    impact.start(now + 0.03);
+    impact.stop(now + 0.2);
+
+    if (isCrit) {
+      // Critical gold ring
+      const ring = ctx.createOscillator();
+      const ringGain = ctx.createGain();
+      ring.type = 'sine';
+      ring.frequency.setValueAtTime(880, now + 0.04);
+      ring.frequency.exponentialRampToValueAtTime(587.33, now + 0.28);
+      ringGain.gain.setValueAtTime(0.14, now + 0.04);
+      ringGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      ring.connect(ringGain);
+      ringGain.connect(ctx.destination);
+      ring.start(now + 0.04);
+      ring.stop(now + 0.31);
+    }
+  }
+
+  public playMagicCast() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const notes = [293.66, 369.99, 440, 587.33];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      const t = now + idx * 0.035;
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.15, t + 0.16);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.11, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.21);
+    });
+  }
+
+  public playShieldGuard() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // Steel shield clang + resonant harmonic
+    [196, 392].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = idx === 0 ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.88, now + 0.22);
+      gain.gain.setValueAtTime(idx === 0 ? 0.18 : 0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    });
+  }
+
+  public playEnemyDeath() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const crumble = ctx.createOscillator();
+    const gain = ctx.createGain();
+    crumble.type = 'sawtooth';
+    crumble.frequency.setValueAtTime(165, now);
+    crumble.frequency.exponentialRampToValueAtTime(34, now + 0.32);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+    crumble.connect(gain);
+    gain.connect(ctx.destination);
+    crumble.start(now);
+    crumble.stop(now + 0.35);
+  }
+
+  public playHealChime() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    [329.63, 440, 659.25].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      const t = now + idx * 0.045;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.1, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.25);
+    });
+  }
+
+  public playGoldChange(isPositive = true) {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const freqs = isPositive ? [587.33, 880] : [440, 293.66];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      const t = now + idx * 0.05;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.11, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.17);
+    });
+  }
+
+  public playReviveFanfare() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const chord = [261.63, 329.63, 392.0, 523.25];
+    chord.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      const t = now + idx * 0.05;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.12, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.46);
     });
   }
 }

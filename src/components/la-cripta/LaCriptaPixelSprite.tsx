@@ -47,10 +47,18 @@ export const LaCriptaPixelSprite: React.FC<LaCriptaPixelSpriteProps> = ({
   const wrapperAnimClass =
     effectiveState === 'enter'
       ? 'animate-cripta-sprite-enter'
-      : effectiveState === 'hit'
+      : effectiveState === 'hit' || effectiveState === 'debuff'
       ? 'animate-cripta-sprite-hit'
-      : effectiveState === 'heal'
+      : effectiveState === 'heal' || effectiveState === 'buff'
       ? 'animate-cripta-sprite-heal'
+      : effectiveState === 'attack'
+      ? 'animate-cripta-sprite-attack'
+      : effectiveState === 'cast'
+      ? 'animate-cripta-sprite-cast'
+      : effectiveState === 'defend'
+      ? 'animate-cripta-sprite-defend'
+      : effectiveState === 'revive'
+      ? 'animate-cripta-sprite-revive'
       : '';
 
   const renderSpritePixels = () => {

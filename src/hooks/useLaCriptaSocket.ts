@@ -547,8 +547,108 @@ export function useLaCriptaSocket({
     [sendMessage]
   );
 
+  const voteFinalBossDoor = useCallback(() => {
+    sendMessage({ type: 'VOTE_FINAL_BOSS_DOOR' });
+  }, [sendMessage]);
+
   const retryDungeonInit = useCallback(() => {
     sendMessage({ type: 'RETRY_DUNGEON_INIT' });
+  }, [sendMessage]);
+
+  const sendCombatAction = useCallback(
+    (action: 'ATTACK' | 'ABILITY' | 'DEFEND', targetEnemyId?: string) => {
+      sendMessage({ type: 'ROOM_COMBAT_ACTION', action, targetEnemyId });
+    },
+    [sendMessage]
+  );
+
+  const sendUseInventoryItem = useCallback(
+    (slotIndex: number, targetPlayerId?: string, targetEnemyId?: string) => {
+      sendMessage({
+        type: 'USE_INVENTORY_ITEM',
+        slotIndex,
+        targetPlayerId,
+        targetEnemyId,
+      });
+    },
+    [sendMessage]
+  );
+
+  const sendClaimGroundDrop = useCallback(
+    (dropId: string) => {
+      sendMessage({ type: 'CLAIM_GROUND_DROP', dropId });
+    },
+    [sendMessage]
+  );
+
+  const sendBuyShopSlot = useCallback(
+    (slotId: string) => {
+      sendMessage({ type: 'BUY_SHOP_SLOT', slotId });
+    },
+    [sendMessage]
+  );
+
+  const sendResolveInventoryFull = useCallback(
+    (replaceSlotIndex: number | null) => {
+      sendMessage({ type: 'RESOLVE_INVENTORY_FULL', replaceSlotIndex });
+    },
+    [sendMessage]
+  );
+
+  const sendReplaceInventoryItem = useCallback(
+    (replaceSlotIndex: number) => {
+      sendMessage({ type: 'RESOLVE_INVENTORY_FULL', replaceSlotIndex });
+    },
+    [sendMessage]
+  );
+
+  const sendDiscardOverflowItem = useCallback(() => {
+    sendMessage({ type: 'RESOLVE_INVENTORY_FULL', replaceSlotIndex: null });
+  }, [sendMessage]);
+
+  const sendShopBuyItem = useCallback(
+    (slotId: string) => {
+      sendMessage({ type: 'BUY_SHOP_SLOT', slotId });
+    },
+    [sendMessage]
+  );
+
+  const sendShopBuyRelic = useCallback(
+    (slotId?: string) => {
+      const currentIdx = expeditionState?.currentRoomIndex ?? 0;
+      const resolvedSlotId = slotId || `shop_${currentIdx}_slot_relic`;
+      sendMessage({ type: 'BUY_SHOP_SLOT', slotId: resolvedSlotId });
+    },
+    [expeditionState?.currentRoomIndex, sendMessage]
+  );
+
+  const sendReviveAlly = useCallback(
+    (targetPlayerId: string, method: 'GOLD' | 'BLOOD' | 'SHRINE') => {
+      sendMessage({ type: 'ROOM_REVIVE_ALLY', targetPlayerId, method });
+    },
+    [sendMessage]
+  );
+
+  const sendRoomInteractOption = useCallback(
+    (optionId: string) => {
+      sendMessage({ type: 'ROOM_INTERACT_OPTION', optionId });
+    },
+    [sendMessage]
+  );
+
+  const sendRoomPuzzleInput = useCallback(
+    (runeIndex: number) => {
+      sendMessage({ type: 'ROOM_PUZZLE_INPUT', runeIndex });
+    },
+    [sendMessage]
+  );
+
+  const sendRoomDiscoverSecret = useCallback(() => {
+    sendMessage({ type: 'ROOM_DISCOVER_SECRET' });
+  }, [sendMessage]);
+
+  const sendRoomAdvance = useCallback(() => {
+    sendMessage({ type: 'ROOM_ADVANCE' });
   }, [sendMessage]);
 
   const returnToLobby = useCallback(() => {
@@ -569,7 +669,22 @@ export function useLaCriptaSocket({
     setCursorColor,
     startExpedition,
     voteDoor,
+    voteFinalBossDoor,
     retryDungeonInit,
+    sendCombatAction,
+    sendUseInventoryItem,
+    sendClaimGroundDrop,
+    sendBuyShopSlot,
+    sendResolveInventoryFull,
+    sendReplaceInventoryItem,
+    sendDiscardOverflowItem,
+    sendShopBuyItem,
+    sendShopBuyRelic,
+    sendReviveAlly,
+    sendRoomInteractOption,
+    sendRoomPuzzleInput,
+    sendRoomDiscoverSecret,
+    sendRoomAdvance,
     returnToLobby,
   };
 }
