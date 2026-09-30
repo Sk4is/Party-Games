@@ -387,10 +387,20 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     [expeditionState?.players, playerId]
   );
 
+  const isFullViewportGame = Boolean(
+    expeditionState &&
+      expeditionState.phase !== 'LOBBY' &&
+      expeditionState.phase !== 'RUN_VICTORY'
+  );
+
   return (
     <div
       onPointerMove={handlePointerMove}
-      className="relative min-h-screen w-full bg-[#0B0A0E] text-[#D9D0BC] flex flex-col justify-between overflow-x-hidden selection:bg-[#E7A54A] selection:text-[#0B0A0E]"
+      className={`relative w-full bg-[#0B0A0E] text-[#D9D0BC] flex flex-col justify-between overflow-x-hidden selection:bg-[#E7A54A] selection:text-[#0B0A0E] ${
+        isFullViewportGame
+          ? 'h-[100dvh] max-h-[100dvh] overflow-hidden'
+          : 'min-h-screen'
+      }`}
     >
       {/* Subtle Fantasy Arcade CRT Scanline Overlay (pointer-events: none) */}
       <LaCriptaCrtOverlay />

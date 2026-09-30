@@ -1991,6 +1991,9 @@ export class LaCriptaServer {
       .filter((p) => !p.isDead && p.hp > 0)
       .sort((a, b) => a.seatIndex - b.seatIndex)[0];
     bossChamber.activeTurnPlayerId = firstLiving ? firstLiving.id : connectedPlayers[0]?.id || null;
+    bossChamber.currentTurnAp = 2;
+    bossChamber.maxTurnAp = 2;
+    bossChamber.actedPlayerIdsThisRound = [];
 
     room.decisionResolved = true;
     room.doorOpeningStartedAt = now;
@@ -2464,12 +2467,59 @@ export class LaCriptaServer {
 
     const currentRoundPhase = activeRoom.combatRoundPhase || 'PLAYER_PHASE';
     if (currentRoundPhase !== 'PLAYER_PHASE' || room.isResolvingRound) {
-      // Prevent duplicate clicks or actions while resolving player/enemy phases
       return;
     }
 
-    if (!activeRoom.queuedPlayerActions) {
-      activeRoom.queuedPlayerActions = {};
+    if (!activeRoom.actedPlayerIdsThisRound) {
+      activeRoom.actedPlayerIdsThisRound = [];
+    }
+
+    // Ensure activeTurnPlayerId points to a valid living connected player
+    const livingConnected = room.players
+      .filter((p) => p.isConnected && !p.isDead && p.hp > 0)
+      .sort((a, b) => a.seatIndex - b.seatIndex);
+    if (livingConnected.length === 0) return;
+
+    let currentTurnPlayer = livingConnected.find((p) => p.id === activeRoom.activeTurnPlayerId);
+    if (!currentTurnPlayer) {
+      const nextId = this.computeNextTurnPlayerId(room, activeRoom);
+      currentTurnPlayer = livingConnected.find((p) => p.id === nextId) || livingConnected[0];
+      activeRoom.activeTurnPlayerId = currentTurnPlayer.id;
+      activeRoom.currentTurnAp = 2;
+      activeRoom.maxTurnAp = 2;
+    }
+
+    // Enforce individual sequential player turns!
+    if (player.id !== currentTurnPlayer.id) {
+      this.sendError(ws, `Es el turno de ${currentTurnPlayer.name}.`);
+      return;
+    }
+
+    const maxAp = activeRoom.maxTurnAp || 2;
+    const currentAp =
+      typeof activeRoom.currentTurnAp === 'number' ? activeRoom.currentTurnAp : maxAp;
+
+    const apCost =
+      payload.actionType === 'PASS'
+        ? 0
+        : payload.actionType === 'WEAPON_SPECIAL'
+        ? 2
+        : 1;
+
+    if (payload.actionType !== 'PASS' && currentAp < apCost) {
+      this.sendError(
+        ws,
+        `Puntos de Acción insuficientes (${currentAp}/${maxAp} AP). Necesitas ${apCost} AP.`
+      );
+      return;
+    }
+
+    if (payload.actionType === 'WEAPON_SPECIAL' && (player.weaponSpecialCooldown || 0) > 0) {
+      this.sendError(
+        ws,
+        `Tu habilidad especial de arma está en recarga (${player.weaponSpecialCooldown}T).`
+      );
+      return;
     }
 
     // Validate ITEM action if chosen
@@ -2506,39 +2556,109 @@ export class LaCriptaServer {
       submittedAt: Date.now(),
     };
 
-    activeRoom.queuedPlayerActions[player.id] = queued;
+    const currentRound = activeRoom.combatTurn || 1;
+    activeRoom.combatTurn = currentRound;
+    activeRoom.activeCombatActorId = player.id;
+    activeRoom.lastPlayedByPlayerName = player.name;
+    activeRoom.lastPlayedCardTitle =
+      payload.actionType === 'ATTACK'
+        ? 'ATAQUE DE ARMA'
+        : payload.actionType === 'WEAPON_SPECIAL'
+        ? 'TÉCNICA ESPECIAL'
+        : payload.actionType === 'ABILITY'
+        ? 'HABILIDAD DE CLASE'
+        : payload.actionType === 'DEFEND'
+        ? 'GUARDIA DE HIERRO'
+        : payload.actionType === 'ITEM'
+        ? 'USAR OBJETO'
+        : 'FINALIZAR TURNO';
 
-    if (!activeRoom.actedPlayerIdsThisRound) {
-      activeRoom.actedPlayerIdsThisRound = [];
+    // Execute the played card immediately!
+    const shouldExecuteAction =
+      payload.actionType !== 'PASS' || currentAp > 0;
+    let victoryOrPhase2 = false;
+
+    if (shouldExecuteAction) {
+      victoryOrPhase2 = this.executeSinglePlayerRoundAction(
+        room,
+        activeRoom,
+        player,
+        queued,
+        currentRound
+      );
     }
+
+    const remainingAp =
+      payload.actionType === 'PASS' ? 0 : Math.max(0, currentAp - apCost);
+    activeRoom.currentTurnAp = remainingAp;
+    activeRoom.maxTurnAp = maxAp;
+
+    if (victoryOrPhase2 || activeRoom.resolved || room.expeditionDefeated) {
+      room.isResolvingRound = false;
+      activeRoom.activeCombatActorId = null;
+      if (!activeRoom.resolved && !room.expeditionDefeated) {
+        // Transitioned to Final Boss Phase 2 -> reset round turn order with 2 AP
+        activeRoom.actedPlayerIdsThisRound = [];
+        activeRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, activeRoom);
+        activeRoom.currentTurnAp = 2;
+        activeRoom.maxTurnAp = 2;
+      }
+      this.syncLegacyNodes(room);
+      this.broadcastRoomState(room);
+      return;
+    }
+
+    // If the active player still has AP remaining (e.g. 1/2 AP after playing a 1 AP card), stay on their turn!
+    if (remainingAp > 0 && payload.actionType !== 'PASS') {
+      this.syncLegacyNodes(room);
+      this.broadcastRoomState(room);
+      return;
+    }
+
+    // Otherwise, this player's turn is complete! Advance to next player or Enemy Turn.
     if (!activeRoom.actedPlayerIdsThisRound.includes(player.id)) {
       activeRoom.actedPlayerIdsThisRound.push(player.id);
     }
 
+    this.advanceSequentialTurnOrTriggerEnemyPhase(room, activeRoom);
+  }
+
+  private advanceSequentialTurnOrTriggerEnemyPhase(
+    room: ServerCriptaRoom,
+    activeRoom: CriptaDungeonRoom
+  ) {
+    const livingConnected = room.players
+      .filter((p) => p.isConnected && !p.isDead && p.hp > 0)
+      .sort((a, b) => a.seatIndex - b.seatIndex);
+
+    const actedSet = new Set(activeRoom.actedPlayerIdsThisRound || []);
+    const unactedPlayers = livingConnected.filter((p) => !actedSet.has(p.id));
+
+    if (unactedPlayers.length > 0) {
+      const nextPlayer = unactedPlayers[0];
+      activeRoom.activeTurnPlayerId = nextPlayer.id;
+      activeRoom.activeCombatActorId = null;
+      activeRoom.currentTurnAp = 2;
+      activeRoom.maxTurnAp = 2;
+      activeRoom.combatRoundPhase = 'PLAYER_PHASE';
+      activeRoom.combatBannerText = `TURNO DE ${nextPlayer.name.toUpperCase()}`;
+      this.syncLegacyNodes(room);
+      this.broadcastRoomState(room);
+      return;
+    }
+
+    // All living connected players have completed their individual turns -> start Enemy Phase!
+    activeRoom.activeTurnPlayerId = null;
+    this.syncLegacyNodes(room);
     this.broadcastRoomState(room);
-    this.checkAndTriggerRoundResolutionIfReady(room);
+    this.runAuthoritativeRoundResolution(room, activeRoom);
   }
 
   private handleUnlockRoundAction(
     _ws: WebSocket,
     room: ServerCriptaRoom,
-    player: CriptaPlayer
+    _player: CriptaPlayer
   ) {
-    if (!this.isInsideExploreOrBossPhase(room)) return;
-    const activeRoom = this.getActiveDungeonRoom(room);
-    if (!activeRoom || activeRoom.resolved) return;
-
-    const currentRoundPhase = activeRoom.combatRoundPhase || 'PLAYER_PHASE';
-    if (currentRoundPhase !== 'PLAYER_PHASE' || room.isResolvingRound) return;
-
-    if (activeRoom.queuedPlayerActions && activeRoom.queuedPlayerActions[player.id]) {
-      delete activeRoom.queuedPlayerActions[player.id];
-    }
-    if (activeRoom.actedPlayerIdsThisRound) {
-      activeRoom.actedPlayerIdsThisRound = activeRoom.actedPlayerIdsThisRound.filter(
-        (id) => id !== player.id
-      );
-    }
     this.broadcastRoomState(room);
   }
 
@@ -2550,20 +2670,18 @@ export class LaCriptaServer {
     const livingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
     if (livingEnemies.length === 0) return;
 
-    const livingConnectedPlayers = room.players.filter(
-      (p) => p.isConnected && !p.isDead && p.hp > 0
-    );
+    const livingConnectedPlayers = room.players
+      .filter((p) => p.isConnected && !p.isDead && p.hp > 0)
+      .sort((a, b) => a.seatIndex - b.seatIndex);
     if (livingConnectedPlayers.length === 0) return;
 
-    const queuedMap = activeRoom.queuedPlayerActions || {};
-    const allLocked = livingConnectedPlayers.every(
-      (p) => Boolean(queuedMap[p.id] && queuedMap[p.id].locked)
+    // If the currently active turn player disconnected or died, advance to the next living player or enemy turn
+    const activeTurnStillValid = livingConnectedPlayers.some(
+      (p) => p.id === activeRoom.activeTurnPlayerId
     );
-
-    if (!allLocked) return;
-
-    // All living connected players have locked a valid action -> begin round resolution automatically!
-    this.runAuthoritativeRoundResolution(room, activeRoom);
+    if (!activeTurnStillValid && activeRoom.combatRoundPhase === 'PLAYER_PHASE') {
+      this.advanceSequentialTurnOrTriggerEnemyPhase(room, activeRoom);
+    }
   }
 
   private runAuthoritativeRoundResolution(
@@ -2575,34 +2693,7 @@ export class LaCriptaServer {
 
     const currentRound = activeRoom.combatTurn || 1;
     activeRoom.combatTurn = currentRound;
-    activeRoom.combatRoundPhase = 'RESOLVING_PLAYERS';
-    activeRoom.combatBannerText = `RONDA ${currentRound} — RESOLVIENDO ACCIONES`;
     activeRoom.activeTargetedPlayerIds = [];
-
-    // Clear previous round's temporary player defense/protection flags before resolving new player actions
-    for (const p of room.players) {
-      p.isDefendingThisRound = false;
-      p.protectedByPlayerId = null;
-    }
-
-    // Sort locked player actions by deterministic initiative speed (then seatIndex)
-    const livingPlayers = room.players
-      .filter((p) => p.isConnected && !p.isDead && p.hp > 0)
-      .sort((a, b) => {
-        const spdDiff = this.getPlayerInitiativeSpeed(b) - this.getPlayerInitiativeSpeed(a);
-        if (spdDiff !== 0) return spdDiff;
-        return a.seatIndex - b.seatIndex;
-      });
-
-    const queuedMap = { ...(activeRoom.queuedPlayerActions || {}) };
-    const orderedPlayerQueue = livingPlayers
-      .map((p) => ({ player: p, action: queuedMap[p.id] }))
-      .filter(
-        (entry): entry is { player: CriptaPlayer; action: CriptaQueuedPlayerAction } =>
-          Boolean(entry.action)
-      );
-
-    this.broadcastRoomState(room);
 
     const scheduleStep = (fn: () => void, delayMs: number) => {
       if (room.combatRoundTimer) {
@@ -2614,65 +2705,20 @@ export class LaCriptaServer {
       }, delayMs);
     };
 
-    const stepPlayerAction = (idx: number) => {
-      if (room.expeditionDefeated || activeRoom.resolved) {
-        room.isResolvingRound = false;
-        activeRoom.activeCombatActorId = null;
-        this.broadcastRoomState(room);
-        return;
-      }
-
-      if (idx >= orderedPlayerQueue.length) {
-        // Player phase finished -> start ENEMY_PHASE_WARNING (~520ms)
-        const survivingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
-        if (survivingEnemies.length === 0) {
-          room.isResolvingRound = false;
-          activeRoom.activeCombatActorId = null;
-          this.broadcastRoomState(room);
-          return;
-        }
-
-        activeRoom.combatRoundPhase = 'ENEMY_PHASE_WARNING';
-        activeRoom.combatBannerText = 'FASE ENEMIGA';
-        activeRoom.activeCombatActorId = null;
-        activeRoom.activeTargetedPlayerIds = [];
-        this.broadcastRoomState(room);
-
-        scheduleStep(() => {
-          startEnemyPhaseResolution();
-        }, 520);
-        return;
-      }
-
-      const { player, action } = orderedPlayerQueue[idx];
-      if (player.isDead || player.hp <= 0) {
-        stepPlayerAction(idx + 1);
-        return;
-      }
-
-      activeRoom.activeCombatActorId = player.id;
-      const victoryOrPhase2 = this.executeSinglePlayerRoundAction(
-        room,
-        activeRoom,
-        player,
-        action,
-        currentRound
-      );
-
-      this.syncLegacyNodes(room);
+    const survivingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
+    if (survivingEnemies.length === 0) {
+      room.isResolvingRound = false;
+      activeRoom.activeCombatActorId = null;
       this.broadcastRoomState(room);
+      return;
+    }
 
-      if (victoryOrPhase2 || activeRoom.resolved || room.expeditionDefeated) {
-        room.isResolvingRound = false;
-        activeRoom.activeCombatActorId = null;
-        this.broadcastRoomState(room);
-        return;
-      }
-
-      scheduleStep(() => {
-        stepPlayerAction(idx + 1);
-      }, 430);
-    };
+    activeRoom.combatRoundPhase = 'ENEMY_PHASE_WARNING';
+    activeRoom.combatBannerText = 'TURNO DEL ENEMIGO';
+    activeRoom.activeCombatActorId = null;
+    activeRoom.activeTurnPlayerId = null;
+    activeRoom.activeTargetedPlayerIds = [];
+    this.broadcastRoomState(room);
 
     const startEnemyPhaseResolution = () => {
       if (room.expeditionDefeated || activeRoom.resolved) {
@@ -2745,10 +2791,10 @@ export class LaCriptaServer {
       stepEnemyAction(0);
     };
 
-    // Start stepping through locked player actions
+    // Start stepping through enemy phase resolution after a brief pause so the final player card animation is seen
     scheduleStep(() => {
-      stepPlayerAction(0);
-    }, 180);
+      startEnemyPhaseResolution();
+    }, 480);
   }
 
   private executeSinglePlayerRoundAction(
@@ -3978,11 +4024,17 @@ export class LaCriptaServer {
     const nextRound = (activeRoom.combatTurn || 1) + 1;
     activeRoom.combatTurn = nextRound;
     activeRoom.combatRoundPhase = 'PLAYER_PHASE';
-    activeRoom.combatBannerText = `RONDA ${nextRound} — FASE DE JUGADORES`;
     activeRoom.queuedPlayerActions = {};
     activeRoom.actedPlayerIdsThisRound = [];
     activeRoom.activeCombatActorId = null;
     activeRoom.activeTargetedPlayerIds = [];
+    activeRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, activeRoom);
+    activeRoom.currentTurnAp = 2;
+    activeRoom.maxTurnAp = 2;
+    const firstTurnPlayer = room.players.find((p) => p.id === activeRoom.activeTurnPlayerId);
+    activeRoom.combatBannerText = firstTurnPlayer
+      ? `RONDA ${nextRound} — TURNO DE ${firstTurnPlayer.name.toUpperCase()}`
+      : `RONDA ${nextRound} — FASE DE JUGADORES`;
 
     // Update visible enemy intents for the new round
     for (const enemy of activeRoom.enemies) {
@@ -5134,6 +5186,8 @@ export class LaCriptaServer {
       nextRoom.activeTargetedPlayerIds = [];
       nextRoom.actedPlayerIdsThisRound = [];
       nextRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, nextRoom);
+      nextRoom.currentTurnAp = 2;
+      nextRoom.maxTurnAp = 2;
     }
   }
 
@@ -5236,6 +5290,8 @@ export class LaCriptaServer {
           .filter((p) => !p.isDead && p.hp > 0)
           .sort((a, b) => a.seatIndex - b.seatIndex)[0];
         firstRoom.activeTurnPlayerId = firstLiving ? firstLiving.id : null;
+        firstRoom.currentTurnAp = 2;
+        firstRoom.maxTurnAp = 2;
       }
 
       room.dungeonStartGold = room.partyGold ?? 45;

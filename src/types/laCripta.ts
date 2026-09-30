@@ -793,6 +793,10 @@ export interface CriptaDungeonRoom {
   activeEnemyActorId?: string | null;
   activeTargetedPlayerIds?: string[];
   activeTurnPlayerId?: string | null;
+  currentTurnAp?: number;
+  maxTurnAp?: number;
+  lastPlayedCardTitle?: string | null;
+  lastPlayedByPlayerName?: string | null;
   actedPlayerIdsThisRound?: string[];
   enemies: CriptaRoomEnemy[];
   options: CriptaRoomInteractiveOption[];

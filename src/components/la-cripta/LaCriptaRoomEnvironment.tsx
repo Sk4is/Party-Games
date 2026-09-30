@@ -10,28 +10,30 @@ interface LaCriptaEnemyPixelSpriteProps {
   isTargeted?: boolean;
   animState?: 'idle' | 'hit' | 'lunge' | 'death';
   totalVisibleEnemies?: number;
+  customSizePx?: number;
 }
 
 /**
  * Crisp 28x28 pixel-art enemy & boss sprite renderer.
- * Scaled up for the Left Encounter Stage (Section 2: Large Enemies / NPCs).
+ * Scaled up for the Left Creature Portrait Stage (45–70% stage presence).
  */
 export const LaCriptaEnemyPixelSprite: React.FC<LaCriptaEnemyPixelSpriteProps> = ({
   enemy,
   isTargeted = false,
   animState = 'idle',
   totalVisibleEnemies = 1,
+  customSizePx,
 }) => {
   const baseSizePx = enemy.isFinalBoss
-    ? 176
+    ? 268
     : enemy.isMiniboss || enemy.isBoss
-    ? 154
+    ? 244
     : enemy.isElite
-    ? 124
-    : 108;
+    ? 216
+    : 196;
   const crowdScale =
-    totalVisibleEnemies >= 3 ? 0.78 : totalVisibleEnemies === 2 ? 0.9 : 1;
-  const sizePx = Math.round(baseSizePx * crowdScale);
+    totalVisibleEnemies >= 3 ? 0.68 : totalVisibleEnemies === 2 ? 0.82 : 1;
+  const sizePx = customSizePx || Math.round(baseSizePx * crowdScale);
   const accent = enemy.enrageTriggered
     ? '#FF4D6D'
     : enemy.accentColor || '#E7A54A';
