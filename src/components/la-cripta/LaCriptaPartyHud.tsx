@@ -7,7 +7,13 @@ import {
   CriptaVisualEvent,
 } from '../../types/laCripta';
 import { CRIPTA_CHARACTERS_CATALOG } from '../../data/la-cripta/criptaCatalog';
-import { CRIPTA_CONSUMABLES_BY_ID } from '../../data/la-cripta/criptaItemsAndRelics';
+import { CRIPTA_ITEMS_REGISTRY } from '../../data/la-cripta/criptaItemsAndRelics';
+import {
+  computePlayerEffectiveStats,
+  CRIPTA_ACCESSORIES_REGISTRY,
+  CRIPTA_ARMORS_REGISTRY,
+  getEquippedWeaponForPlayer,
+} from '../../data/la-cripta/criptaEquipmentAndEvents';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 import { LaCriptaPixelSprite } from './LaCriptaPixelSprite';
 import {
@@ -287,9 +293,14 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                 )
               : 0;
 
-          const bonusAtk = player.bonusAttack || 0;
-          const bonusDef = player.bonusDefense || 0;
-          const bonusMag = player.bonusMagic || 0;
+          const effStats = charDef ? computePlayerEffectiveStats(player) : null;
+          const eqWeapon = charDef ? getEquippedWeaponForPlayer(player) : null;
+          const armorDef = player.equippedArmorId
+            ? CRIPTA_ARMORS_REGISTRY[player.equippedArmorId]
+            : null;
+          const accDef = player.equippedAccessoryId
+            ? CRIPTA_ACCESSORIES_REGISTRY[player.equippedAccessoryId]
+            : null;
           const items = player.inventoryItems || [];
           const normalInv = player.normalInventory || [];
 
@@ -489,47 +500,64 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                     )}
                   </div>
 
-                  {charDef && (
+                  {charDef && effStats && (
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {bonusAtk > 0 && (
-                        <span
-                          className="font-cripta-mono text-[9px] text-[#E7A54A]"
-                          title={`Bonificación de Ataque: +${bonusAtk}`}
-                        >
-                          ⚔+{bonusAtk}
-                        </span>
-                      )}
-                      {bonusMag > 0 && (
-                        <span
-                          className="font-cripta-mono text-[9px] text-[#9B72CF]"
-                          title={`Bonificación de Magia: +${bonusMag}`}
-                        >
-                          ✦+{bonusMag}
-                        </span>
-                      )}
                       <span
-                        className="font-cripta-mono text-[10px] text-[#69A8A5]"
-                        title={
-                          bonusDef > 0
-                            ? `Armadura actual (${player.armor}) · Bonificación Defensa +${bonusDef}`
-                            : 'Armadura actual'
-                        }
+                        className="font-cripta-mono text-[9px] text-[#E7A54A] cursor-help"
+                        title={`ATAQUE ${effStats.attack} — Aumenta el daño físico y las pruebas marciales (${effStats.critChancePct}% Crítico)`}
                       >
-                        🛡 {player.armor}
+                        ⚔{effStats.attack}
+                      </span>
+                      <span
+                        className="font-cripta-mono text-[9px] text-[#9B72CF] cursor-help"
+                        title={`MAGIA ${effStats.magic} — Potencia habilidades mágicas, curación (+${effStats.healBoostPct}%) y pociones (+${effStats.potionBoostPct}%)`}
+                      >
+                        ✦{effStats.magic}
+                      </span>
+                      <span
+                        className="font-cripta-mono text-[10px] text-[#69A8A5] cursor-help"
+                        title={`DEFENSA ${effStats.defense} (Armadura: ${player.armor}) — Reduce el daño recibido y supera pruebas de resistencia`}
+                      >
+                        🛡{player.armor}
                       </span>
                     </div>
                   )}
                 </div>
 
-                {/* Row 2: Selected Class or Choosing State */}
+                {/* Row 2: Selected Class + Equipped Weapon Badge + HP Numeric */}
                 <div className="mt-0.5 flex items-center justify-between gap-1">
                   {charDef ? (
-                    <span
-                      className="font-cripta-pixel text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate"
-                      style={{ color: isDead ? '#C93B5B' : charDef.accentColor }}
-                    >
-                      {isDead ? `${charDef.className} · CAÍDO` : charDef.className}
-                    </span>
+                    <div className="flex items-center gap-1.5 min-w-0 truncate">
+                      <span
+                        className="font-cripta-pixel text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate"
+                        style={{ color: isDead ? '#C93B5B' : charDef.accentColor }}
+                      >
+                        {isDead ? `${charDef.className} · CAÍDO` : charDef.className}
+                      </span>
+                      {eqWeapon && !isDead && (
+                        <span
+                          className="inline-flex items-center gap-0.5 px-1 py-0.1 bg-[#0B0812] border text-[8px] font-cripta-pixel truncate cursor-help"
+                          style={{
+                            borderColor: `${eqWeapon.weapon.accentColor}66`,
+                            color: eqWeapon.weapon.accentColor,
+                          }}
+                          title={`Arma equipada: ${eqWeapon.weapon.name} (Nivel ${eqWeapon.level})\nDaño: ${eqWeapon.scaledMin}–${eqWeapon.scaledMax} (${eqWeapon.weapon.scalingStat})\nAtaque Especial: ${eqWeapon.weapon.specialAttack.name} — ${eqWeapon.weapon.specialAttack.description}${
+                            armorDef ? `\nArmadura: ${armorDef.name} (${armorDef.specialEffectText})` : ''
+                          }${
+                            accDef ? `\nAccesorio: ${accDef.name} (${accDef.specialEffectText})` : ''
+                          }`}
+                        >
+                          <span>⚔</span>
+                          <span className="truncate max-w-[92px]">
+                            {eqWeapon.weapon.name}
+                            {eqWeapon.level > 1 ? ` +${eqWeapon.level}` : ''}
+                          </span>
+                          <span className="font-cripta-mono text-[#D9D0BC]">
+                            ({eqWeapon.scaledMin}–{eqWeapon.scaledMax})
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   ) : (
                     <span className="font-cripta-pixel text-[10px] text-[#D8C6A0]/50 uppercase tracking-wider truncate">
                       SIN ELEGIR
@@ -637,8 +665,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   <div className="flex items-center gap-1.5 shrink-0">
                     {charDef && (
                       <LaCriptaPlayerInventoryBar
-                        inventory={normalInv}
-                        slots={player.inventory}
+                        slots={normalInv}
                         isLocalPlayer={isMe}
                         inCombat={hasLivingEnemies}
                         canUseNow={Boolean(
@@ -648,16 +675,16 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                             (!hasLivingEnemies ||
                               (combatRoundPhase === 'PLAYER_PHASE' && !hasLockedAction))
                         )}
-                        onUseItem={(slotIdx) => {
+                        onUseSlot={(slotIdx) => {
                           if (!onUseConsumable) return;
-                          const itemId = normalInv[slotIdx] || player.inventory?.[slotIdx]?.itemId;
+                          const itemId = normalInv[slotIdx];
                           if (!itemId) return;
-                          const itemDef = CRIPTA_CONSUMABLES_BY_ID[itemId];
+                          const itemDef = CRIPTA_ITEMS_REGISTRY[itemId];
                           laCriptaAudio.playHeroSelect();
-                          if (itemDef?.targetRule === 'SINGLE_ENEMY' || itemDef?.category === 'OFFENSIVE') {
-                            onUseConsumable(slotIdx, selectedTargetEnemyId || undefined, undefined);
+                          if (itemDef?.targetType === 'ENEMY' || itemDef?.category === 'OFFENSIVE') {
+                            onUseConsumable(slotIdx, currentPlayerId, selectedTargetEnemyId || undefined);
                           } else {
-                            onUseConsumable(slotIdx, undefined, currentPlayerId);
+                            onUseConsumable(slotIdx, currentPlayerId, undefined);
                           }
                         }}
                       />

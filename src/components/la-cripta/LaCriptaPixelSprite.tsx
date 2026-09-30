@@ -578,101 +578,128 @@ export const LaCriptaPixelSprite: React.FC<LaCriptaPixelSpriteProps> = ({
         );
 
       // =======================================================================
-      // 5. CLÉRIGO — Expressive ceremonial mask/face, halo sun-crown, layered
-      //    robes with golden trim, engraved sacred symbol, raised reliquary
-      //    lantern casting warm light onto nearby pixels
+      // 5. CLÉRIGO — Dark-fantasy holy guardian / battle cleric: luminous golden
+      //    halo circlet & high sanctuary hood, clear solemn face, layered
+      //    vestments & mantle with gold trim, sacred sun-cross emblem, and
+      //    iconic sacred censer-staff with warm divine glow accents
       // =======================================================================
       case 'clerigo':
         return (
           <g>
-            {/* Layered Ceremonial Vestments & Golden Stole */}
-            <rect x="8" y="23" width="28" height="23" fill="#100C14" />
-            <rect x="9" y="24" width="26" height="22" fill="#9E917B" />
-            <rect x="11" y="24" width="22" height="22" fill="#C9B99F" />
-            <rect x="13" y="25" width="18" height="21" fill="#E6DAC3" />
-            {/* Deep Burgundy Inner Tabard */}
-            <rect x="18" y="25" width="8" height="21" fill="#571525" />
-            <rect x="19" y="25" width="6" height="21" fill="#7D1E34" />
-
-            {/* Golden Stole with Engraved Sacred Sun-Cross Symbol */}
-            <rect x="14" y="24" width="4" height="22" fill="#9E6825" />
-            <rect x="15" y="24" width="2" height="22" fill="#E7A54A" />
-            <rect x="26" y="24" width="4" height="22" fill="#9E6825" />
-            <rect x="26" y="24" width="3" height="22" fill="#E7A54A" />
-            {/* Illuminated right shoulder edge from nearby lantern */}
-            <rect x="31" y="24" width="3" height="12" fill="#E7A54A" />
-            <rect x="33" y="25" width="1" height="8" fill="#FFF3D1" />
-
-            {/* Engraved Sacred Symbol on Chest */}
-            <rect x="21" y="28" width="2" height="9" fill="#E7A54A" />
-            <rect x="19" y="31" width="6" height="2" fill="#E7A54A" />
-            <rect x="21" y="31" width="2" height="2" fill="#FFF8E7" />
-
-            {/* Ceremonial Sun-Crown Halo Rays */}
-            <rect x="20" y="2" width="4" height="6" fill="#100C14" />
-            <rect x="21" y="3" width="2" height="5" fill="#E7A54A" />
-            <rect x="21" y="3" width="1" height="2" fill="#FFF8E7" />
-            <rect x="13" y="5" width="4" height="5" fill="#100C14" />
-            <rect x="14" y="6" width="2" height="4" fill="#C98736" />
-            <rect x="27" y="5" width="4" height="5" fill="#100C14" />
-            <rect x="28" y="6" width="2" height="4" fill="#E7A54A" />
-            <rect x="9" y="11" width="4" height="3" fill="#C98736" />
-            <rect x="31" y="11" width="4" height="3" fill="#E7A54A" />
-
-            {/* Expressive Sculpted Ceremonial Mask / Face */}
-            <rect x="13" y="8" width="18" height="16" fill="#100C14" />
-            <rect x="14" y="9" width="16" height="14" fill="#9E8E74" />
-            <rect x="15" y="9" width="14" height="13" fill="#C7B699" />
-            <rect x="16" y="10" width="11" height="10" fill="#E6D8BE" />
-            {/* Warm rim light on right side of mask from the sacred lantern */}
-            <rect x="28" y="10" width="2" height="12" fill="#E7A54A" />
-            <rect x="29" y="12" width="1" height="8" fill="#FFF8E7" />
-            {/* Golden Brow Crown & Nose Bridge */}
-            <rect x="14" y="9" width="16" height="2" fill="#E7A54A" />
-            <rect x="21" y="11" width="2" height="7" fill="#FFFDF7" />
-            {/* Carved Serene Lips & Sacred Tear Engravings */}
-            <rect x="19" y="20" width="6" height="1" fill="#7D6B52" />
-            <rect x="20" y="19" width="4" height="1" fill="#9E6825" />
-            <rect x="17" y="17" width="1" height="3" fill="#C98736" />
-            <rect x="26" y="17" width="1" height="3" fill="#C98736" />
-
-            {/* Luminous Ceremonial Mask Eyes */}
-            <g className="animate-cripta-sprite-blink">
-              <rect x="16" y="14" width="4" height="2" fill="#100C14" />
-              <rect x="24" y="14" width="4" height="2" fill="#100C14" />
-              <rect x="17" y="14" width="2" height="2" fill="#E7A54A" />
-              <rect x="25" y="14" width="2" height="2" fill="#E7A54A" />
-              <rect x="17" y="14" width="1" height="1" fill="#FFF8E7" />
-              <rect x="25" y="14" width="1" height="1" fill="#FFF8E7" />
+            {/* Radiant Divine Halo Ring Behind Hood */}
+            <g className="animate-cripta-relic-glow">
+              <rect x="11" y="2" width="22" height="2" fill="#E7A54A" />
+              <rect x="14" y="1" width="16" height="1" fill="#FFF8E7" />
+              <rect x="8" y="4" width="3" height="6" fill="#C98736" />
+              <rect x="33" y="4" width="3" height="6" fill="#E7A54A" />
+              <rect x="6" y="9" width="2" height="6" fill="#9E6825" />
+              <rect x="36" y="9" width="2" height="6" fill="#C98736" />
+              {/* Halo Sun Rays */}
+              <rect x="21" y="0" width="2" height="2" fill="#FFF8E7" />
+              <rect x="10" y="2" width="2" height="2" fill="#FFD166" />
+              <rect x="32" y="2" width="2" height="2" fill="#FFD166" />
             </g>
 
-            {/* Raised Hand & Sacred Reliquary Lantern with Fluctuating Light */}
+            {/* Layered Holy Guardian Mantle, Pauldrons & Vestments */}
+            <g className="animate-cripta-sprite-idle">
+              {/* Outer Sanctuary Mantle (Ivory & Deep Crimson Lining) */}
+              <rect x="6" y="22" width="32" height="24" fill="#100C14" />
+              <rect x="7" y="23" width="30" height="23" fill="#4A1423" />
+              <rect x="8" y="23" width="28" height="23" fill="#B8A990" />
+              <rect x="10" y="24" width="24" height="22" fill="#DED1BA" />
+              <rect x="12" y="24" width="20" height="22" fill="#F2E8D5" />
+
+              {/* Golden Trimmed Shoulder Mantle Plates */}
+              <rect x="6" y="21" width="10" height="9" fill="#100C14" />
+              <rect x="7" y="22" width="8" height="7" fill="#D9CCB6" />
+              <rect x="7" y="22" width="8" height="2" fill="#E7A54A" />
+              <rect x="8" y="22" width="5" height="1" fill="#FFF8E7" />
+              <rect x="7" y="27" width="8" height="2" fill="#C98736" />
+
+              <rect x="28" y="21" width="10" height="9" fill="#100C14" />
+              <rect x="29" y="22" width="8" height="7" fill="#E6DAC3" />
+              <rect x="29" y="22" width="8" height="2" fill="#E7A54A" />
+              <rect x="31" y="22" width="5" height="1" fill="#FFF8E7" />
+              <rect x="29" y="27" width="8" height="2" fill="#C98736" />
+
+              {/* Deep Burgundy & Gold Battle-Cleric Scapular / Tabard */}
+              <rect x="16" y="24" width="12" height="22" fill="#571525" />
+              <rect x="17" y="24" width="10" height="22" fill="#7D1E34" />
+              <rect x="18" y="25" width="4" height="21" fill="#9E2843" />
+
+              {/* Twin Gold-Embroidered Stoles */}
+              <rect x="13" y="23" width="3" height="23" fill="#9E6825" />
+              <rect x="14" y="23" width="2" height="23" fill="#E7A54A" />
+              <rect x="28" y="23" width="3" height="23" fill="#9E6825" />
+              <rect x="28" y="23" width="2" height="23" fill="#E7A54A" />
+
+              {/* Sacred Sun-Cross Emblem on Chest */}
+              <rect x="21" y="27" width="2" height="11" fill="#E7A54A" />
+              <rect x="18" y="30" width="8" height="2" fill="#E7A54A" />
+              <rect x="20" y="29" width="4" height="4" fill="#FFD166" />
+              <rect x="21" y="30" width="2" height="2" fill="#FFFDF7" />
+
+              {/* High Sanctuary Hood & Golden Mitre-Circlet */}
+              <rect x="11" y="5" width="22" height="18" fill="#100C14" />
+              <rect x="12" y="6" width="20" height="16" fill="#C7B89E" />
+              <rect x="13" y="6" width="18" height="7" fill="#E6DAC3" />
+              <rect x="15" y="6" width="14" height="3" fill="#FFFDF7" />
+              {/* Golden Mitre-Circlet with Sun Jewel */}
+              <rect x="12" y="9" width="20" height="3" fill="#9E6825" />
+              <rect x="13" y="9" width="18" height="2" fill="#E7A54A" />
+              <rect x="20" y="7" width="4" height="5" fill="#E7A54A" />
+              <rect x="21" y="8" width="2" height="3" fill="#FFF8E7" />
+
+              {/* Clear Battle-Cleric Face Underneath Hood */}
+              <rect x="14" y="12" width="16" height="10" fill="#100C14" />
+              <rect x="15" y="12" width="14" height="9" fill="#9E7B66" />
+              <rect x="16" y="12" width="12" height="7" fill="#C49A80" />
+              <rect x="17" y="12" width="9" height="3" fill="#DEB499" />
+              {/* Warm divine rim light on right cheek from sacred censer */}
+              <rect x="27" y="13" width="2" height="7" fill="#FFD166" />
+              {/* Solemn Beard / Chin & Armored Gorget Collar */}
+              <rect x="16" y="18" width="12" height="3" fill="#6E5648" />
+              <rect x="19" y="18" width="6" height="1" fill="#9E7B66" />
+              <rect x="14" y="21" width="16" height="2" fill="#E7A54A" />
+
+              {/* Radiant Divine Eyes */}
+              <g className="animate-cripta-sprite-blink">
+                <rect x="16" y="14" width="4" height="3" fill="#100C14" />
+                <rect x="24" y="14" width="4" height="3" fill="#100C14" />
+                <rect x="17" y="14" width="2" height="2" fill="#FFD166" />
+                <rect x="25" y="14" width="2" height="2" fill="#FFD166" />
+                <rect x="17" y="14" width="1" height="1" fill="#FFFFFF" />
+                <rect x="25" y="14" width="1" height="1" fill="#FFFFFF" />
+              </g>
+            </g>
+
+            {/* Iconic Sacred Sun-Staff & Swinging Reliquary Censer (Right) */}
             <g>
-              {/* Raised Hand Holding Chain */}
-              <rect x="33" y="12" width="11" height="4" fill="#100C14" />
-              <rect x="34" y="13" width="9" height="2" fill="#E7A54A" />
-              <rect x="34" y="12" width="4" height="3" fill="#E6D8BE" />
-              {/* Suspension Chain */}
-              <rect x="38" y="16" width="2" height="4" fill="#D8C6A0" />
+              {/* Staff Shaft */}
+              <rect x="36" y="10" width="4" height="36" fill="#100C14" />
+              <rect x="37" y="11" width="2" height="35" fill="#9E6825" />
+              <rect x="37" y="11" width="1" height="35" fill="#E7A54A" />
 
-              {/* Ornate Reliquary Lantern Cage */}
-              <rect x="32" y="19" width="14" height="18" fill="#100C14" />
-              <rect x="34" y="18" width="10" height="2" fill="#C98736" />
-              <rect x="33" y="20" width="12" height="15" fill="#9E6825" />
-              <rect x="34" y="20" width="10" height="2" fill="#E7A54A" />
-              <rect x="34" y="33" width="10" height="2" fill="#E7A54A" />
+              {/* Sun-Cross Staff Finial */}
+              <rect x="33" y="4" width="10" height="8" fill="#100C14" />
+              <rect x="34" y="5" width="8" height="6" fill="#E7A54A" />
+              <rect x="36" y="3" width="4" height="10" fill="#FFD166" />
+              <rect x="37" y="6" width="2" height="4" fill="#FFFFFF" />
 
-              {/* Fluctuating Sacred Flame Inside Reliquary + Illuminated Pixels */}
+              {/* Gauntleted Hand Gripping Staff */}
+              <rect x="34" y="26" width="7" height="6" fill="#100C14" />
+              <rect x="35" y="27" width="5" height="4" fill="#E6DAC3" />
+              <rect x="35" y="27" width="4" height="2" fill="#E7A54A" />
+
+              {/* Hanging Golden Censer & Divine Flame Glow */}
+              <rect x="41" y="12" width="2" height="6" fill="#D8C6A0" />
+              <rect x="39" y="17" width="7" height="10" fill="#100C14" />
+              <rect x="40" y="18" width="5" height="8" fill="#C98736" />
               <g className="animate-cripta-relic-glow">
-                <rect x="35" y="22" width="8" height="11" fill="#E7A54A" />
-                <rect x="36" y="23" width="6" height="9" fill="#FFD27D" />
-                <rect x="37" y="24" width="4" height="7" fill="#FFFDF5" />
-                {/* Sacred cross bars over the light */}
-                <rect x="38" y="22" width="2" height="11" fill="#9E6825" />
-                <rect x="35" y="26" width="8" height="2" fill="#9E6825" />
-                {/* Warm Halo Sparks */}
-                <rect x="30" y="19" width="2" height="2" fill="#E7A54A" />
-                <rect x="45" y="21" width="2" height="2" fill="#FFF3D1" />
+                <rect x="41" y="19" width="3" height="5" fill="#FFD166" />
+                <rect x="42" y="20" width="1" height="3" fill="#FFFFFF" />
+                <rect x="44" y="14" width="2" height="2" fill="#FFD166" />
+                <rect x="32" y="15" width="2" height="2" fill="#FFF8E7" />
               </g>
             </g>
           </g>

@@ -365,7 +365,122 @@ export interface CriptaEnemyMemory {
   preparedTargetIds?: string[];
 }
 
-export type CriptaPlayerRoundActionType = 'ATTACK' | 'ABILITY' | 'ITEM' | 'DEFEND';
+export type CriptaPlayerRoundActionType =
+  | 'ATTACK'
+  | 'WEAPON_SPECIAL'
+  | 'ABILITY'
+  | 'ITEM'
+  | 'DEFEND'
+  | 'PASS';
+
+export type CriptaWeaponId =
+  | 'espada_oxidada'
+  | 'baston_ceniza'
+  | 'dagas_melladas'
+  | 'arco_cazador'
+  | 'maza_consagrada'
+  | 'lanzador_alquimico'
+  | 'espada_del_sepulcro'
+  | 'espadon_del_rey_hundido'
+  | 'hacha_forja_infernal'
+  | 'vara_de_cristal_astral'
+  | 'grimorio_prohibido_arma'
+  | 'hojas_colmillo_venenoso'
+  | 'arco_de_espinas'
+  | 'ballesta_de_asedio'
+  | 'simbolo_del_alba'
+  | 'catalizador_esporas'
+  | 'pico_de_minero_runico';
+
+export type CriptaArmorId =
+  | 'jubon_desgastado'
+  | 'cota_de_malla_cripta'
+  | 'coraza_del_sepulturero'
+  | 'tunica_del_astrologo'
+  | 'armadura_escamas_fungicas';
+
+export type CriptaAccessoryId =
+  | 'anillo_del_boticario'
+  | 'colgante_de_cristal'
+  | 'sello_del_cazador'
+  | 'espejo_roto_accesorio';
+
+export type CriptaWeaponFamily =
+  | 'SWORD'
+  | 'AXE'
+  | 'BOW'
+  | 'CROSSBOW'
+  | 'DAGGER'
+  | 'STAFF'
+  | 'MACE'
+  | 'ALCHEMICAL'
+  | 'PICKAXE';
+
+export interface CriptaWeaponSpecialAttack {
+  id: string;
+  name: string;
+  description: string;
+  targetRule: 'SINGLE' | 'CLEAVE_2' | 'CHAIN_2' | 'ALL_ENEMIES';
+  cooldownRounds: number;
+  damageMultiplier: number;
+  secondaryMultiplier?: number;
+  appliesStatus?: CriptaStatusEffectType;
+  partyHealBase?: number;
+  armorPierce?: number;
+}
+
+export interface CriptaWeaponDefinition {
+  id: CriptaWeaponId;
+  name: string;
+  family: CriptaWeaponFamily;
+  rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'LEGENDARY';
+  preferredClasses: CriptaCharacterId[];
+  scalingStat: 'ATAQUE' | 'MAGIA';
+  baseMinDamage: number;
+  baseMaxDamage: number;
+  bonusAttack?: number;
+  bonusDefense?: number;
+  bonusMagic?: number;
+  critBonusPct?: number;
+  undeadBonusPct?: number;
+  healBoostPct?: number;
+  potionBoostPct?: number;
+  onHitStatus?: CriptaStatusEffectType;
+  onCritStatus?: CriptaStatusEffectType;
+  specialEffectText: string;
+  specialAttack: CriptaWeaponSpecialAttack;
+  basePriceGold: number;
+  accentColor: string;
+}
+
+export interface CriptaArmorDefinition {
+  id: CriptaArmorId;
+  name: string;
+  rarity: 'COMMON' | 'UNCOMMON' | 'RARE';
+  bonusDefense: number;
+  bonusMaxHp: number;
+  bonusMagic?: number;
+  statusResistance?: CriptaStatusEffectType;
+  specialEffectText: string;
+  basePriceGold: number;
+}
+
+export interface CriptaAccessoryDefinition {
+  id: CriptaAccessoryId;
+  name: string;
+  rarity: 'UNCOMMON' | 'RARE';
+  bonusAttack?: number;
+  bonusDefense?: number;
+  bonusMagic?: number;
+  critBonusPct?: number;
+  potionBoostPct?: number;
+  specialEffectText: string;
+  basePriceGold: number;
+}
+
+export interface CriptaCombatRoundPhaseMap {
+  phase: CriptaCombatRoundPhase;
+}
 
 export type CriptaCombatRoundPhase =
   | 'PLAYER_PHASE'
@@ -437,6 +552,9 @@ export type CriptaRoomEnemy = {
   protectedByEnemyName?: string | null;
   preparedTelegraphLabel?: string | null;
   lastTargetedPlayerIds?: string[];
+  approxMinDamage?: number;
+  approxMaxDamage?: number;
+  magicResistance?: number;
   spriteArchetype:
     | 'skeleton_warrior'
     | 'plague_bloom'
@@ -569,58 +687,42 @@ export interface CriptaRoomGroundDrop {
 
 export interface CriptaShopSlot {
   id: string;
-  kind: 'ITEM' | 'RELIC';
+  kind: 'ITEM' | 'RELIC' | 'WEAPON' | 'ARMOR' | 'ACCESSORY' | 'FORGE_UPGRADE';
   itemId?: CriptaItemId;
   relicId?: CriptaRelicId;
+  weaponId?: CriptaWeaponId;
+  armorId?: CriptaArmorId;
+  accessoryId?: CriptaAccessoryId;
   priceGold: number;
   soldOut: boolean;
   buyerName?: string;
 }
 
-export interface CriptaPendingInventoryReplacement {
-  playerId?: string;
-  newItemId: CriptaItemId;
-  sourceType: 'DROP' | 'SHOP' | 'REWARD' | 'CHEST';
-  sourceRefId?: string;
-  sourceDropId?: string;
-  sourceShopSlotId?: string;
-  priceGold?: number;
-  costGold?: number;
+export interface CriptaRoomInteractiveObject {
+  id: string;
+  label: string;
+  hint: string;
+  objectKind: 'SKULL' | 'WALL_CRACK' | 'MUSHROOM' | 'CHALICE' | 'SKELETON' | 'RUNE_TABLET';
+  xPercent: number;
+  yPercent: number;
+  discovered: boolean;
+  discoveredByPlayerName?: string;
+  outcomeSummary?: string;
 }
 
-export interface CriptaDungeonCompletionSummary {
-  dungeonId: CriptaDungeonId;
-  dungeonName: string;
-  doorNumberCompleted: number; // 1, 2, or 3
-  goldEarned: number;
-  itemsFound: number;
-  relicsFound: number;
-  enemiesDefeated: number;
-}
-
-export interface CriptaRunStats {
-  dungeonsCompleted: number;
-  roomsVisited: number;
-  enemiesDefeated: number;
-  elitesDefeated: number;
-  goldEarned: number;
-  goldSpent: number;
-  itemsUsed: number;
-  relicsObtained: number;
-  damageDealt: number;
-  damageReceived: number;
-  healingDone: number;
-  playersRevived: number;
-  finalBossDefeated: boolean;
-}
-
-export interface CriptaFinalBossState {
-  active: boolean;
-  phase: 'PHASE_1' | 'TRANSITIONING' | 'PHASE_2' | 'DEFEATED';
-  phaseTransitionStartedAt: number | null;
-  coreExposedTurns: number;
-  cataclysmCharge: number;
-}
+export type CriptaEncounterSubjectArchetype =
+  | 'MERCHANT'
+  | 'SPECTRAL_KNIGHT'
+  | 'CURSED_WELL'
+  | 'BLACKSMITH_FORGE'
+  | 'ABYSSAL_MIRROR'
+  | 'ANCIENT_SEAL'
+  | 'INJURED_HOUND'
+  | 'CAMPFIRE_SANCTUARY'
+  | 'SACRED_SHRINE'
+  | 'TREASURE_CHEST'
+  | 'MECHANICAL_TRAP'
+  | 'RUNIC_OBELISK';
 
 export interface CriptaRoomInteractiveOption {
   id: string;
@@ -630,6 +732,17 @@ export interface CriptaRoomInteractiveOption {
   costGold?: number;
   costHp?: number;
   isReviveOption?: boolean;
+  isWeaponUpgradeOption?: boolean;
+  grantsWeaponId?: CriptaWeaponId;
+  grantsArmorId?: CriptaArmorId;
+  grantsAccessoryId?: CriptaAccessoryId;
+  recommendedClass?: CriptaCharacterId;
+  recommendedStat?: 'ATAQUE' | 'DEFENSA' | 'MAGIA' | 'VIDA';
+  recommendedStatLevel?: number;
+  riskLabel?: 'PARECE SEGURO' | 'ARRIESGADO' | 'MUY ARRIESGADO';
+  ownershipScope?: 'PERSONAL' | 'GRUPO' | 'EXPEDICIÓN';
+  requiresWeaponId?: CriptaWeaponId;
+  requiresAccessoryId?: CriptaAccessoryId;
   iconKey: 'sword' | 'shield' | 'heart' | 'gold' | 'key' | 'rune' | 'flame' | 'eye' | 'chalice' | 'potion';
   usedByPlayerIds: string[];
   resolved: boolean;
@@ -650,6 +763,14 @@ export interface CriptaDungeonRoom {
   narrative: string;
   outcomeLog: string | null;
   biomeVariant: number;
+  encounterSubject?: {
+    archetype: CriptaEncounterSubjectArchetype;
+    name: string;
+    roleSubtitle: string;
+    dialogueQuote?: string;
+    focusedPlayerId?: string | null;
+  };
+  interactiveObjects?: CriptaRoomInteractiveObject[];
   combatTurn?: number;
   combatRoundPhase?: CriptaCombatRoundPhase;
   combatBannerText?: string | null;
@@ -701,6 +822,8 @@ export type CriptaVisualEventKind =
   | 'LOOT_ITEM'
   | 'ITEM_ACQUIRED'
   | 'ITEM_CONSUMED'
+  | 'WEAPON_EQUIPPED'
+  | 'WEAPON_UPGRADED'
   | 'RELIC_OBTAINED'
   | 'RELIC_ACQUIRED'
   | 'ITEM_USED'
@@ -764,6 +887,59 @@ export interface CriptaRoomNode {
   resolved: boolean;
 }
 
+export interface CriptaPendingInventoryReplacement {
+  playerId?: string;
+  newItemId: CriptaItemId;
+  sourceType: 'DROP' | 'SHOP' | 'REWARD' | 'CHEST';
+  sourceRefId?: string;
+  sourceDropId?: string;
+  sourceShopSlotId?: string;
+  priceGold?: number;
+  costGold?: number;
+}
+
+export interface CriptaDungeonCompletionSummary {
+  dungeonId: CriptaDungeonId;
+  dungeonName: string;
+  doorNumberCompleted: number; // 1, 2, or 3
+  goldEarned: number;
+  itemsFound: number;
+  relicsFound: number;
+  enemiesDefeated: number;
+}
+
+export interface CriptaRunStats {
+  dungeonsCompleted: number;
+  roomsVisited: number;
+  enemiesDefeated: number;
+  elitesDefeated: number;
+  goldEarned: number;
+  goldSpent: number;
+  itemsUsed: number;
+  relicsObtained: number;
+  damageDealt: number;
+  damageReceived: number;
+  healingDone: number;
+  playersRevived: number;
+  finalBossDefeated: boolean;
+}
+
+export interface CriptaFinalBossState {
+  active: boolean;
+  phase: 'PHASE_1' | 'TRANSITIONING' | 'PHASE_2' | 'DEFEATED';
+  phaseTransitionStartedAt: number | null;
+  coreExposedTurns: number;
+  cataclysmCharge: number;
+}
+
+export interface CriptaRunEventFlags {
+  freedSpectralKnight?: boolean;
+  helpedGraveRobber?: boolean;
+  fedCryptHound?: boolean;
+  stoleSacredRelic?: boolean;
+  shopDiscountPct?: number;
+}
+
 export interface CriptaPlayer {
   id: string;
   name: string;
@@ -779,6 +955,13 @@ export interface CriptaPlayer {
   bonusAttack?: number;
   bonusDefense?: number;
   bonusMagic?: number;
+  /** Equipped Weapon, Upgrade Level (1..3), and Special Attack Cooldown */
+  equippedWeaponId?: CriptaWeaponId | null;
+  weaponUpgradeLevel?: 1 | 2 | 3;
+  weaponSpecialCooldown?: number;
+  /** Equipped Armor & Accessory slots */
+  equippedArmorId?: CriptaArmorId | null;
+  equippedAccessoryId?: CriptaAccessoryId | null;
   /** 6-slot normal consumable inventory */
   normalInventory?: CriptaItemId[];
   /** Personal run-defining relics owned by this adventurer */
@@ -794,6 +977,7 @@ export interface CriptaPlayer {
   recentDamageDealt?: number;
   recentHealingDone?: number;
   isDefendingThisRound?: boolean;
+  passedLastRound?: boolean;
   tauntTurnsRemaining?: number;
   protectedByPlayerId?: string | null;
   votedFinalBossDoor?: boolean;
@@ -855,6 +1039,8 @@ export interface CriptaExpeditionState {
   completedDoorCount?: number; // 0, 1, 2, or 3
   completedDungeonIds?: CriptaDungeonId[];
   partyRelics?: CriptaAcquiredRelic[];
+  discoveredEnemyAbilityIds?: string[];
+  eventFlags?: CriptaRunEventFlags;
   dungeonCompletionSummary?: CriptaDungeonCompletionSummary | null;
   runStats?: CriptaRunStats;
   finalBossState?: CriptaFinalBossState | null;
@@ -968,6 +1154,13 @@ export type CriptaClientMessage =
     }
   | {
       type: 'ROOM_DISCOVER_SECRET';
+    }
+  | {
+      type: 'INTERACT_ROOM_OBJECT';
+      objectId: string;
+    }
+  | {
+      type: 'UPGRADE_WEAPON';
     }
   | {
       type: 'ROOM_ADVANCE';

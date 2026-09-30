@@ -53,6 +53,17 @@ import {
   rollEnemyLootDrop,
   transformFinalBossToPhase2,
 } from '../src/data/la-cripta/criptaItemsAndRelics';
+import {
+  computePlayerEffectiveStats,
+  CRIPTA_ACCESSORIES_REGISTRY,
+  CRIPTA_ARMORS_REGISTRY,
+  CRIPTA_WEAPONS_REGISTRY,
+  estimatePlayerActionDamage,
+  getEquippedWeaponForPlayer,
+  getWeaponUpgradeCost,
+  rollAuthoritativePlayerDamage,
+  STARTER_WEAPON_BY_CLASS,
+} from '../src/data/la-cripta/criptaEquipmentAndEvents';
 import { roomRegistry } from './roomRegistry';
 
 interface ClientConnection {
@@ -147,6 +158,11 @@ function buildDefaultPlayer(
     bonusAttack: 0,
     bonusDefense: 0,
     bonusMagic: 0,
+    equippedWeaponId: null,
+    weaponUpgradeLevel: 1,
+    weaponSpecialCooldown: 0,
+    equippedArmorId: null,
+    equippedAccessoryId: null,
     normalInventory: ['venda'],
     personalRelics: [],
     pendingInventoryReplacement: null,
@@ -257,6 +273,8 @@ export class LaCriptaServer {
       completedDoorCount: 0,
       completedDungeonIds: [],
       partyRelics: [],
+      discoveredEnemyAbilityIds: [],
+      eventFlags: {},
       dungeonCompletionSummary: null,
       runStats: buildDefaultRunStats(),
       finalBossState: null,
@@ -351,6 +369,13 @@ export class LaCriptaServer {
         bonusAttack: p.bonusAttack ?? 0,
         bonusDefense: p.bonusDefense ?? 0,
         bonusMagic: p.bonusMagic ?? 0,
+        equippedWeaponId:
+          p.equippedWeaponId ??
+          (p.characterId ? STARTER_WEAPON_BY_CLASS[p.characterId] : null),
+        weaponUpgradeLevel: p.weaponUpgradeLevel ?? 1,
+        weaponSpecialCooldown: p.weaponSpecialCooldown ?? 0,
+        equippedArmorId: p.equippedArmorId ?? null,
+        equippedAccessoryId: p.equippedAccessoryId ?? null,
         normalInventory: p.normalInventory ? [...p.normalInventory] : [],
         personalRelics: p.personalRelics ? p.personalRelics.map((r) => ({ ...r })) : [],
         pendingInventoryReplacement: p.pendingInventoryReplacement
@@ -378,6 +403,10 @@ export class LaCriptaServer {
       completedDoorCount: room.completedDoorCount ?? 0,
       completedDungeonIds: room.completedDungeonIds ? [...room.completedDungeonIds] : [],
       partyRelics: room.partyRelics ? room.partyRelics.map((r) => ({ ...r })) : [],
+      discoveredEnemyAbilityIds: room.discoveredEnemyAbilityIds
+        ? [...room.discoveredEnemyAbilityIds]
+        : [],
+      eventFlags: room.eventFlags ? { ...room.eventFlags } : {},
       dungeonCompletionSummary: room.dungeonCompletionSummary
         ? { ...room.dungeonCompletionSummary }
         : null,
@@ -598,6 +627,9 @@ export class LaCriptaServer {
         player.maxHp = charDef.maxHp;
         player.hp = charDef.maxHp;
         player.armor = charDef.baseArmor;
+        player.equippedWeaponId = STARTER_WEAPON_BY_CLASS[charId];
+        player.weaponUpgradeLevel = 1;
+        player.weaponSpecialCooldown = 0;
         room.selectedCharacters[player.id] = charId;
 
         this.broadcastRoomState(room);
@@ -661,6 +693,8 @@ export class LaCriptaServer {
         room.completedDoorCount = 0;
         room.completedDungeonIds = [];
         room.partyRelics = [];
+        room.discoveredEnemyAbilityIds = [];
+        room.eventFlags = {};
         room.dungeonCompletionSummary = null;
         room.runStats = buildDefaultRunStats();
         room.finalBossState = null;
@@ -687,6 +721,12 @@ export class LaCriptaServer {
           p.bonusAttack = 0;
           p.bonusDefense = 0;
           p.bonusMagic = 0;
+          p.equippedWeaponId = p.characterId ? STARTER_WEAPON_BY_CLASS[p.characterId] : 'espada_oxidada';
+          p.weaponUpgradeLevel = 1;
+          p.weaponSpecialCooldown = 0;
+          p.equippedArmorId = null;
+          p.equippedAccessoryId = null;
+          p.passedLastRound = false;
           p.normalInventory = ['venda'];
           p.personalRelics = [];
           p.pendingInventoryReplacement = null;
@@ -801,6 +841,16 @@ export class LaCriptaServer {
 
       case 'ROOM_DISCOVER_SECRET': {
         this.handleRoomDiscoverSecret(ws, room, player);
+        break;
+      }
+
+      case 'INTERACT_ROOM_OBJECT': {
+        this.handleInteractRoomObject(ws, room, player, msg.objectId);
+        break;
+      }
+
+      case 'UPGRADE_WEAPON': {
+        this.handleUpgradeWeapon(ws, room, player);
         break;
       }
 
@@ -1588,6 +1638,148 @@ export class LaCriptaServer {
       this.grantRelicAuthoritatively(room, player, slot.relicId, visualEvents);
       const rDef = CRIPTA_RELICS_REGISTRY[slot.relicId];
       activeRoom.outcomeLog = `¡${player.name} compra la Reliquia ${rDef?.name || ''} por ${slot.priceGold} ORO!`;
+    } else if (slot.kind === 'WEAPON' && slot.weaponId) {
+      const wDef = CRIPTA_WEAPONS_REGISTRY[slot.weaponId];
+      if (!wDef) return;
+      room.partyGold = currentGold - slot.priceGold;
+      slot.soldOut = true;
+      slot.buyerName = player.name;
+      if (!room.runStats) room.runStats = buildDefaultRunStats();
+      room.runStats.goldSpent += slot.priceGold;
+
+      player.equippedWeaponId = wDef.id;
+      player.weaponSpecialCooldown = 0;
+
+      visualEvents.push(
+        {
+          id: `ev_shop_gold_${Date.now()}`,
+          kind: 'LOSE_GOLD',
+          targetType: 'PARTY',
+          value: -slot.priceGold,
+          label: `-${slot.priceGold} ORO`,
+          color: '#E7A54A',
+          vfxStyle: 'gold',
+        },
+        {
+          id: `ev_shop_wep_${Date.now()}`,
+          kind: 'WEAPON_EQUIPPED',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          sourcePlayerId: player.id,
+          label: `EQUIPÓ: ${wDef.name.toUpperCase()}`,
+          sublabel: `${wDef.baseMinDamage}–${wDef.baseMaxDamage} DAÑO · ${wDef.specialAttack.name.toUpperCase()}`,
+          color: wDef.accentColor,
+          vfxStyle: 'slash',
+        }
+      );
+      activeRoom.outcomeLog = `¡${player.name} compra y equipa ${wDef.name} (${wDef.baseMinDamage}–${wDef.baseMaxDamage} DAÑO) por ${slot.priceGold} ORO!`;
+    } else if (slot.kind === 'ARMOR' && slot.armorId) {
+      const aDef = CRIPTA_ARMORS_REGISTRY[slot.armorId];
+      if (!aDef) return;
+      room.partyGold = currentGold - slot.priceGold;
+      slot.soldOut = true;
+      slot.buyerName = player.name;
+      if (!room.runStats) room.runStats = buildDefaultRunStats();
+      room.runStats.goldSpent += slot.priceGold;
+
+      player.equippedArmorId = aDef.id;
+      player.maxHp += aDef.bonusMaxHp;
+      player.hp = Math.min(player.maxHp, player.hp + aDef.bonusMaxHp);
+      player.armor = Math.min(24, player.armor + aDef.bonusDefense);
+
+      visualEvents.push(
+        {
+          id: `ev_shop_gold_${Date.now()}`,
+          kind: 'LOSE_GOLD',
+          targetType: 'PARTY',
+          value: -slot.priceGold,
+          label: `-${slot.priceGold} ORO`,
+          color: '#E7A54A',
+          vfxStyle: 'gold',
+        },
+        {
+          id: `ev_shop_arm_${Date.now()}`,
+          kind: 'GAIN_DEFENSE',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          value: aDef.bonusDefense,
+          label: `EQUIPÓ: ${aDef.name.toUpperCase()}`,
+          sublabel: aDef.specialEffectText,
+          color: '#69A8A5',
+          vfxStyle: 'shield',
+        }
+      );
+      activeRoom.outcomeLog = `¡${player.name} equipa ${aDef.name} (${aDef.specialEffectText}) por ${slot.priceGold} ORO!`;
+    } else if (slot.kind === 'ACCESSORY' && slot.accessoryId) {
+      const accDef = CRIPTA_ACCESSORIES_REGISTRY[slot.accessoryId];
+      if (!accDef) return;
+      room.partyGold = currentGold - slot.priceGold;
+      slot.soldOut = true;
+      slot.buyerName = player.name;
+      if (!room.runStats) room.runStats = buildDefaultRunStats();
+      room.runStats.goldSpent += slot.priceGold;
+
+      player.equippedAccessoryId = accDef.id;
+
+      visualEvents.push(
+        {
+          id: `ev_shop_gold_${Date.now()}`,
+          kind: 'LOSE_GOLD',
+          targetType: 'PARTY',
+          value: -slot.priceGold,
+          label: `-${slot.priceGold} ORO`,
+          color: '#E7A54A',
+          vfxStyle: 'gold',
+        },
+        {
+          id: `ev_shop_acc_${Date.now()}`,
+          kind: 'GAIN_MAGIC',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          label: `EQUIPÓ: ${accDef.name.toUpperCase()}`,
+          sublabel: accDef.specialEffectText,
+          color: '#9B72CF',
+          vfxStyle: 'arcane',
+        }
+      );
+      activeRoom.outcomeLog = `¡${player.name} equipa ${accDef.name} (${accDef.specialEffectText}) por ${slot.priceGold} ORO!`;
+    } else if (slot.kind === 'FORGE_UPGRADE') {
+      const currLevel = player.weaponUpgradeLevel || 1;
+      if (currLevel >= 3) {
+        this.sendError(ws, 'Tu arma ya ha alcanzado el NIVEL III máximo.');
+        return;
+      }
+      room.partyGold = currentGold - slot.priceGold;
+      slot.soldOut = true;
+      slot.buyerName = player.name;
+      if (!room.runStats) room.runStats = buildDefaultRunStats();
+      room.runStats.goldSpent += slot.priceGold;
+
+      player.weaponUpgradeLevel = (currLevel + 1) as 2 | 3;
+      const eq = getEquippedWeaponForPlayer(player);
+
+      visualEvents.push(
+        {
+          id: `ev_shop_gold_${Date.now()}`,
+          kind: 'LOSE_GOLD',
+          targetType: 'PARTY',
+          value: -slot.priceGold,
+          label: `-${slot.priceGold} ORO`,
+          color: '#E7A54A',
+          vfxStyle: 'gold',
+        },
+        {
+          id: `ev_shop_up_${Date.now()}`,
+          kind: 'WEAPON_UPGRADED',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          label: `¡ARMA MEJORADA A NIVEL ${player.weaponUpgradeLevel}!`,
+          sublabel: `${eq.weapon.name.toUpperCase()} (${eq.scaledMin}–${eq.scaledMax} DAÑO)`,
+          color: '#FFD166',
+          vfxStyle: 'slash',
+        }
+      );
+      activeRoom.outcomeLog = `¡${player.name} forja su ${eq.weapon.name} al NIVEL ${player.weaponUpgradeLevel} (${eq.scaledMin}–${eq.scaledMax} DAÑO)!`;
     } else if (slot.kind === 'ITEM' && slot.itemId) {
       if ((player.normalInventory || []).length >= NORMAL_INVENTORY_MAX_SLOTS) {
         player.pendingInventoryReplacement = {
@@ -2542,9 +2734,11 @@ export class LaCriptaServer {
       ? CRIPTA_CHARACTERS_CATALOG[player.characterId]
       : null;
 
-    const atkStat = (charDef ? charDef.stats.attack : 5) + (player.bonusAttack || 0);
-    const magStat = (charDef ? charDef.stats.magic : 4) + (player.bonusMagic || 0);
-    const defStat = (charDef ? charDef.stats.defense : 5) + (player.bonusDefense || 0);
+    const effStats = computePlayerEffectiveStats(player);
+    const eqWeapon = getEquippedWeaponForPlayer(player);
+    const atkStat = effStats.attack;
+    const magStat = effStats.magic;
+    const defStat = effStats.defense;
 
     const classVfx: NonNullable<CriptaVisualEvent['vfxStyle']> =
       player.characterId === 'mago'
@@ -2571,6 +2765,10 @@ export class LaCriptaServer {
     if (hasFear) dmgMultiplier -= 0.2;
     if (hasWeakened) dmgMultiplier -= 0.18;
     if (hasBlessed) dmgMultiplier += 0.25;
+    if (player.passedLastRound) {
+      dmgMultiplier += 0.18;
+      player.passedLastRound = false;
+    }
     if (action === 'ABILITY' && playerHasRelic(player, room.partyRelics || [], 'libro_prohibido')) {
       dmgMultiplier += 0.3;
       applyStatusEffectToPlayer(player, 'BLESSED', 'libro_prohibido', currentTurn, 2);
@@ -2586,18 +2784,18 @@ export class LaCriptaServer {
     }
     dmgMultiplier = Math.max(0.45, dmgMultiplier);
 
-    if (retargetedFromDead && action !== 'DEFEND') {
+    if (retargetedFromDead && action !== 'DEFEND' && action !== 'PASS') {
       logParts.push(`(Objetivo previo derrotado -> redirigido a ${target.name})`);
     }
 
-    if (hasConfusion && action !== 'DEFEND') {
+    if (hasConfusion && action !== 'DEFEND' && action !== 'PASS') {
       const randomIdx = (currentTurn + player.seatIndex) % livingEnemies.length;
       target = livingEnemies[randomIdx];
       dmgMultiplier *= 0.8;
       logParts.push(`¡CONFUSIÓN desvía el golpe de ${player.name} hacia ${target.name}!`);
     }
 
-    if (bleedInstance && (action === 'ATTACK' || action === 'ABILITY')) {
+    if (bleedInstance && (action === 'ATTACK' || action === 'WEAPON_SPECIAL' || action === 'ABILITY')) {
       const bleedDmg = 2 * Math.max(1, bleedInstance.stacks);
       player.hp = Math.max(1, player.hp - bleedDmg);
       logParts.push(`(${player.name} pierde -${bleedDmg} PV por SANGRADO al atacar)`);
@@ -2614,11 +2812,12 @@ export class LaCriptaServer {
       });
     }
 
-    const healMult = hasCurse ? 0.65 : 1;
+    const healMult = (hasCurse ? 0.65 : 1) * (1 + effStats.healBoostPct / 100);
     const critMod =
       player.characterId === 'picaro' || player.characterId === 'cazador' ? 2 : 3;
     const isCrit =
       action !== 'DEFEND' &&
+      action !== 'PASS' &&
       !hasWeakened &&
       ((currentTurn + player.seatIndex) % critMod === 0 || hasBlessed);
     const hasCalizRelic = playerHasRelic(player, room.partyRelics || [], 'diente_del_rey');
@@ -2641,7 +2840,114 @@ export class LaCriptaServer {
         (enemyHit.memory.recentDamageByPlayer[player.id] || 0) + dmgDealt;
     };
 
-    if (action === 'DEFEND') {
+    if (action === 'PASS') {
+      player.isDefendingThisRound = true;
+      player.passedLastRound = true;
+      player.armor = Math.min(24, player.armor + 2);
+      const focusHeal = Math.max(2, Math.round(4 * healMult));
+      player.hp = Math.min(player.maxHp, player.hp + focusHeal);
+      room.runStats.healingDone += focusHeal;
+      visualEvents.push({
+        id: `ev_${ts}_pass_${player.id}`,
+        kind: 'SHIELD_PLAYER',
+        targetType: 'PLAYER',
+        targetId: player.id,
+        sourcePlayerId: player.id,
+        value: 2,
+        label: 'CONCENTRACIÓN +2 DEF',
+        sublabel: '+18% DAÑO PRÓXIMA RONDA',
+        color: '#69A8A5',
+        vfxStyle: 'shield',
+      });
+      logParts.push(
+        `${player.name} aguarda y concentra sus fuerzas (+2 ARMADURA, +${focusHeal} PV y +18% daño en la próxima ronda).`
+      );
+    } else if (action === 'WEAPON_SPECIAL') {
+      const spec = eqWeapon.weapon.specialAttack;
+      player.weaponSpecialCooldown = spec.cooldownRounds;
+
+      let hitTargets: CriptaRoomEnemy[] = [target];
+      if (spec.targetRule === 'ALL_ENEMIES') {
+        hitTargets = [...livingEnemies];
+      } else if (spec.targetRule === 'CLEAVE_2' || spec.targetRule === 'CHAIN_2') {
+        const secondary = livingEnemies.find((e) => e.id !== target.id && e.hp > 0);
+        if (secondary) hitTargets.push(secondary);
+      }
+
+      const hitLogNames: string[] = [];
+      for (let i = 0; i < hitTargets.length; i++) {
+        const en = hitTargets[i];
+        if (!en || en.hp <= 0) continue;
+        const rolled = rollAuthoritativePlayerDamage(
+          player,
+          'WEAPON_SPECIAL',
+          en,
+          currentTurn + i,
+          room.partyRelics || [],
+          i > 0 && spec.targetRule === 'CHAIN_2'
+        );
+        const dmg = rolled.damage;
+        const prevHp = en.hp;
+        en.hp = Math.max(0, en.hp - dmg);
+        room.runStats.damageDealt += dmg;
+        recordPlayerDamageAndThreat(en, dmg);
+        hitLogNames.push(`${en.name} (-${dmg} PV)`);
+
+        if (rolled.appliedOnHitStatus && en.hp > 0) {
+          if (rolled.appliedOnHitStatus === 'POISON' || rolled.appliedOnHitStatus === 'BLEED' || rolled.appliedOnHitStatus === 'BURN') {
+            en.poisonStacks = (en.poisonStacks || 0) + 1;
+          } else if (rolled.appliedOnHitStatus === 'CURSE') {
+            en.vulnerableTurns = (en.vulnerableTurns || 0) + 2;
+          }
+        }
+
+        visualEvents.push({
+          id: `ev_${ts}_wspec_${en.id}_${player.id}_${i}`,
+          kind: rolled.isCrit ? 'CRIT_ENEMY' : 'DAMAGE_ENEMY',
+          targetType: 'ENEMY',
+          targetId: en.id,
+          sourcePlayerId: player.id,
+          value: -dmg,
+          label: rolled.isCrit ? `¡CRÍTICO! -${dmg} PV` : `-${dmg} PV`,
+          sublabel: `${spec.name.toUpperCase()} (${eqWeapon.weapon.name.toUpperCase()})`,
+          color: rolled.isCrit ? '#FFD166' : eqWeapon.weapon.accentColor,
+          vfxStyle:
+            spec.targetRule === 'CLEAVE_2' || spec.targetRule === 'ALL_ENEMIES'
+              ? 'cleave'
+              : classVfx,
+          isCrit: rolled.isCrit,
+        });
+
+        if (prevHp > 0 && en.hp <= 0) {
+          this.handleEnemyKilledSideEffects(room, activeRoom, en, visualEvents, ts);
+        }
+      }
+
+      if (spec.partyHealBase && spec.partyHealBase > 0) {
+        const pHeal = Math.round(spec.partyHealBase * healMult);
+        for (const p of room.players) {
+          if (!p.isDead && p.hp > 0) {
+            p.hp = Math.min(p.maxHp, p.hp + pHeal);
+            room.runStats.healingDone += pHeal;
+            visualEvents.push({
+              id: `ev_${ts}_wspec_heal_${p.id}`,
+              kind: 'HEAL_PLAYER',
+              targetType: 'PLAYER',
+              targetId: p.id,
+              value: pHeal,
+              label: `+${pHeal} PV`,
+              sublabel: spec.name.toUpperCase(),
+              color: '#5EA87A',
+              vfxStyle: 'holy',
+            });
+          }
+        }
+      }
+
+      logParts.push(
+        `${player.name} ejecuta ${spec.name} (${eqWeapon.weapon.name}) sobre ${hitLogNames.join(', ')}.`
+      );
+    } else if (action === 'DEFEND') {
       player.isDefendingThisRound = true;
       player.threatScore = (player.threatScore || 0) + 6;
       const healAmt = Math.max(3, Math.round(6 * healMult));
@@ -2886,30 +3192,41 @@ export class LaCriptaServer {
         );
       }
     } else {
-      // Standard ATTACK
-      const rawDmg = atkStat * 2.1 + magStat * 0.7 + 5;
-      const critFactor = isCrit ? (hasCalizRelic ? 1.8 : 1.45) : 1;
-      const dmg = Math.max(
-        5,
-        Math.round((rawDmg - targetEffectiveArmor * 0.5) * dmgMultiplier * critFactor)
+      // Standard ATTACK using equipped weapon damage range + effective stats
+      const rolledAtk = rollAuthoritativePlayerDamage(
+        player,
+        'ATTACK',
+        target,
+        currentTurn,
+        room.partyRelics || []
       );
+      const dmg = Math.max(2, Math.round(rolledAtk.damage * (player.passedLastRound ? 1.15 : 1)));
+      const atkIsCrit = rolledAtk.isCrit || isCrit;
       const prevTargetHp = target.hp;
       target.hp = Math.max(0, target.hp - dmg);
       room.runStats.damageDealt += dmg;
       recordPlayerDamageAndThreat(target, dmg);
 
+      if (rolledAtk.appliedOnHitStatus && target.hp > 0) {
+        if (rolledAtk.appliedOnHitStatus === 'POISON') {
+          target.poisonStacks = (target.poisonStacks || 0) + 1;
+        } else if (rolledAtk.appliedOnHitStatus === 'CURSE') {
+          target.vulnerableTurns = (target.vulnerableTurns || 0) + 2;
+        }
+      }
+
       visualEvents.push({
         id: `ev_${ts}_atk_${target.id}_${player.id}`,
-        kind: isCrit ? 'CRIT_ENEMY' : 'DAMAGE_ENEMY',
+        kind: atkIsCrit ? 'CRIT_ENEMY' : 'DAMAGE_ENEMY',
         targetType: 'ENEMY',
         targetId: target.id,
         sourcePlayerId: player.id,
         value: -dmg,
-        label: isCrit ? `¡CRÍTICO! -${dmg} PV` : `-${dmg} PV`,
-        sublabel: isCrit ? 'GOLPE LETAL' : 'ATAQUE',
-        color: isCrit ? '#E7A54A' : '#C93B5B',
+        label: atkIsCrit ? `¡CRÍTICO! -${dmg} PV` : `-${dmg} PV`,
+        sublabel: `${eqWeapon.weapon.name.toUpperCase()}${eqWeapon.level > 1 ? ` +${eqWeapon.level}` : ''}`,
+        color: atkIsCrit ? '#E7A54A' : '#C93B5B',
         vfxStyle: classVfx,
-        isCrit,
+        isCrit: atkIsCrit,
       });
 
       if (prevTargetHp > 0 && target.hp <= 0) {
@@ -2936,7 +3253,7 @@ export class LaCriptaServer {
       }
 
       logParts.push(
-        `${player.name} ataca a ${target.name} (${isCrit ? '¡CRÍTICO! ' : ''}-${dmg} PV).`
+        `${player.name} ataca con ${eqWeapon.weapon.name} a ${target.name} (${atkIsCrit ? '¡CRÍTICO! ' : ''}-${dmg} PV).`
       );
     }
 
@@ -2981,6 +3298,14 @@ export class LaCriptaServer {
     const visualEvents: CriptaVisualEvent[] = [];
     const logParts: string[] = [];
     const ts = Date.now();
+
+    // Progressive Enemy Knowledge (Section 7): once an enemy executes an ability, mark it discovered!
+    if (!room.discoveredEnemyAbilityIds) {
+      room.discoveredEnemyAbilityIds = [];
+    }
+    if (ability.id && !room.discoveredEnemyAbilityIds.includes(ability.id)) {
+      room.discoveredEnemyAbilityIds.push(ability.id);
+    }
 
     activeRoom.activeTargetedPlayerIds = targetPlayers.map((p) => p.id);
     activeRoom.combatBannerText = `FASE ENEMIGA — ${enemy.name.toUpperCase()} · ${ability.name.toUpperCase()}`;
@@ -3506,6 +3831,9 @@ export class LaCriptaServer {
       player.recentHealingDone = Math.round((player.recentHealingDone || 0) * 0.5);
       player.threatScore = Math.round((player.threatScore || 0) * 0.7);
       player.isDefendingThisRound = false;
+      if ((player.weaponSpecialCooldown || 0) > 0) {
+        player.weaponSpecialCooldown = Math.max(0, (player.weaponSpecialCooldown || 0) - 1);
+      }
       if ((player.tauntTurnsRemaining || 0) > 0) {
         player.tauntTurnsRemaining = Math.max(0, player.tauntTurnsRemaining! - 1);
       }
@@ -4096,12 +4424,207 @@ export class LaCriptaServer {
       }
     }
 
+    // Apply Weapon / Armor / Accessory / Upgrade / Event Flags if specified on the option!
+    if (opt.grantsWeaponId && CRIPTA_WEAPONS_REGISTRY[opt.grantsWeaponId]) {
+      const wDef = CRIPTA_WEAPONS_REGISTRY[opt.grantsWeaponId];
+      player.equippedWeaponId = wDef.id;
+      player.weaponSpecialCooldown = 0;
+      visualEvents.push({
+        id: `ev_${ts}_opt_wep_${player.id}`,
+        kind: 'WEAPON_EQUIPPED',
+        targetType: 'PLAYER',
+        targetId: player.id,
+        sourcePlayerId: player.id,
+        label: `EQUIPÓ: ${wDef.name.toUpperCase()}`,
+        sublabel: `${wDef.baseMinDamage}–${wDef.baseMaxDamage} DAÑO`,
+        color: wDef.accentColor,
+        vfxStyle: 'slash',
+      });
+    }
+    if (opt.grantsArmorId && CRIPTA_ARMORS_REGISTRY[opt.grantsArmorId]) {
+      const aDef = CRIPTA_ARMORS_REGISTRY[opt.grantsArmorId];
+      player.equippedArmorId = aDef.id;
+      player.maxHp += aDef.bonusMaxHp;
+      player.hp = Math.min(player.maxHp, player.hp + aDef.bonusMaxHp);
+      player.armor = Math.min(24, player.armor + aDef.bonusDefense);
+    }
+    if (opt.grantsAccessoryId && CRIPTA_ACCESSORIES_REGISTRY[opt.grantsAccessoryId]) {
+      const accDef = CRIPTA_ACCESSORIES_REGISTRY[opt.grantsAccessoryId];
+      player.equippedAccessoryId = accDef.id;
+    }
+    if (opt.isWeaponUpgradeOption) {
+      const currLvl = player.weaponUpgradeLevel || 1;
+      if (currLvl < 3) {
+        player.weaponUpgradeLevel = (currLvl + 1) as 2 | 3;
+        const eq = getEquippedWeaponForPlayer(player);
+        visualEvents.push({
+          id: `ev_${ts}_opt_wup_${player.id}`,
+          kind: 'WEAPON_UPGRADED',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          label: `¡ARMA NIVEL ${player.weaponUpgradeLevel}!`,
+          sublabel: `${eq.weapon.name.toUpperCase()} (${eq.scaledMin}–${eq.scaledMax} DAÑO)`,
+          color: '#FFD166',
+          vfxStyle: 'slash',
+        });
+      }
+    }
+
+    if (!room.eventFlags) room.eventFlags = {};
+    if (activeRoom.encounterSubject?.archetype === 'SPECTRAL_KNIGHT' && opt.id.includes('respect')) {
+      room.eventFlags.freedSpectralKnight = true;
+    } else if (activeRoom.encounterSubject?.archetype === 'INJURED_HOUND' && !opt.id.includes('abandon')) {
+      room.eventFlags.fedCryptHound = true;
+    }
+
     activeRoom.resolved = true;
     activeRoom.state = 'RESOLVED';
     activeRoom.outcomeLog = `${player.name}: ${opt.label} · ${opt.effectText}`;
 
     this.emitVisualEventBatch(room, visualEvents, player.id, 'INTERACT_OPTION');
     this.syncLegacyNodes(room);
+    this.broadcastRoomState(room);
+  }
+
+  private handleInteractRoomObject(
+    ws: WebSocket,
+    room: ServerCriptaRoom,
+    player: CriptaPlayer,
+    objectId: string
+  ) {
+    if (!this.isInsideExploreOrBossPhase(room)) return;
+    if (room.expeditionDefeated) return;
+    if (player.isDead || player.hp <= 0) {
+      this.sendError(ws, 'Un aventurero vivo debe examinar este objeto.');
+      return;
+    }
+    const activeRoom = this.getActiveDungeonRoom(room);
+    if (!activeRoom || !activeRoom.interactiveObjects) return;
+
+    const obj = activeRoom.interactiveObjects.find((o) => o.id === objectId && !o.discovered);
+    if (!obj) return;
+
+    obj.discovered = true;
+    obj.discoveredByPlayerName = player.name;
+
+    const ts = Date.now();
+    const visualEvents: CriptaVisualEvent[] = [];
+    if (!room.runStats) room.runStats = buildDefaultRunStats();
+
+    if (obj.objectKind === 'SKULL' || obj.objectKind === 'SKELETON') {
+      const goldFound = 14;
+      room.partyGold = (room.partyGold ?? 0) + goldFound;
+      room.runStats.goldEarned += goldFound;
+      obj.outcomeSummary = `+${goldFound} ORO hallado por ${player.name}`;
+      visualEvents.push({
+        id: `ev_${ts}_obj_gold`,
+        kind: 'GAIN_GOLD',
+        targetType: 'PARTY',
+        value: goldFound,
+        label: `+${goldFound} ORO`,
+        sublabel: obj.label.toUpperCase(),
+        color: '#E7A54A',
+        vfxStyle: 'gold',
+      });
+    } else if (obj.objectKind === 'MUSHROOM' || obj.objectKind === 'CHALICE') {
+      const healAmt = 8;
+      player.hp = Math.min(player.maxHp, player.hp + healAmt);
+      room.runStats.healingDone += healAmt;
+      obj.outcomeSummary = `+${healAmt} PV restaurados a ${player.name}`;
+      visualEvents.push({
+        id: `ev_${ts}_obj_heal`,
+        kind: 'HEAL_PLAYER',
+        targetType: 'PLAYER',
+        targetId: player.id,
+        value: healAmt,
+        label: `+${healAmt} PV`,
+        sublabel: obj.label.toUpperCase(),
+        color: '#5EA87A',
+        vfxStyle: 'heal',
+      });
+    } else {
+      const hasPickaxe = player.equippedWeaponId === 'pico_de_minero_runico';
+      const goldFound = hasPickaxe ? 24 : 12;
+      room.partyGold = (room.partyGold ?? 0) + goldFound;
+      room.runStats.goldEarned += goldFound;
+      player.armor = Math.min(24, player.armor + 1);
+      obj.outcomeSummary = `+${goldFound} ORO y +1 DEFENSA`;
+      visualEvents.push({
+        id: `ev_${ts}_obj_crack`,
+        kind: 'GAIN_GOLD',
+        targetType: 'PARTY',
+        value: goldFound,
+        label: `+${goldFound} ORO`,
+        sublabel: hasPickaxe ? 'BRECHA CON PICO RÚNICO' : obj.label.toUpperCase(),
+        color: '#FFD166',
+        vfxStyle: 'gold',
+      });
+    }
+
+    activeRoom.outcomeLog = `${player.name} examina ${obj.label}: ${obj.outcomeSummary}.`;
+    this.emitVisualEventBatch(room, visualEvents, player.id, 'INTERACT_OBJECT');
+    this.broadcastRoomState(room);
+  }
+
+  private handleUpgradeWeapon(
+    ws: WebSocket,
+    room: ServerCriptaRoom,
+    player: CriptaPlayer
+  ) {
+    if (!this.isInsideExploreOrBossPhase(room)) return;
+    if (player.isDead || player.hp <= 0) return;
+
+    const currLevel = player.weaponUpgradeLevel || 1;
+    if (currLevel >= 3) {
+      this.sendError(ws, 'Tu arma ya está mejorada al NIVEL III máximo.');
+      return;
+    }
+
+    const discountPct = this.hasPartyRelic(room, 'moneda_del_muerto') ? 25 : 0;
+    const cost = getWeaponUpgradeCost(currLevel, discountPct);
+    if (!cost) return;
+
+    const currentGold = room.partyGold ?? 0;
+    if (currentGold < cost) {
+      this.sendError(ws, `Oro insuficiente. Necesitas ${cost} ORO para mejorar tu arma.`);
+      return;
+    }
+
+    room.partyGold = currentGold - cost;
+    if (!room.runStats) room.runStats = buildDefaultRunStats();
+    room.runStats.goldSpent += cost;
+
+    player.weaponUpgradeLevel = (currLevel + 1) as 2 | 3;
+    const eq = getEquippedWeaponForPlayer(player);
+    const activeRoom = this.getActiveDungeonRoom(room);
+
+    const visualEvents: CriptaVisualEvent[] = [
+      {
+        id: `ev_up_gold_${Date.now()}`,
+        kind: 'LOSE_GOLD',
+        targetType: 'PARTY',
+        value: -cost,
+        label: `-${cost} ORO`,
+        color: '#E7A54A',
+        vfxStyle: 'gold',
+      },
+      {
+        id: `ev_up_wep_${Date.now()}`,
+        kind: 'WEAPON_UPGRADED',
+        targetType: 'PLAYER',
+        targetId: player.id,
+        label: `¡ARMA NIVEL ${player.weaponUpgradeLevel}!`,
+        sublabel: `${eq.weapon.name.toUpperCase()} (${eq.scaledMin}–${eq.scaledMax} DAÑO)`,
+        color: '#FFD166',
+        vfxStyle: 'slash',
+      },
+    ];
+
+    if (activeRoom) {
+      activeRoom.outcomeLog = `¡${player.name} mejora su ${eq.weapon.name} a NIVEL ${player.weaponUpgradeLevel} (${eq.scaledMin}–${eq.scaledMax} DAÑO)!`;
+    }
+
+    this.emitVisualEventBatch(room, visualEvents, player.id, 'UPGRADE_WEAPON');
     this.broadcastRoomState(room);
   }
 

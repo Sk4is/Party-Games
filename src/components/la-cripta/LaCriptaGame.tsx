@@ -108,6 +108,8 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     voteFinalBossDoor,
     retryDungeonInit,
     sendCombatAction,
+    sendLockRoundAction,
+    sendUnlockRoundAction,
     sendUseInventoryItem,
     sendClaimGroundDrop,
     sendReplaceInventoryItem,
@@ -118,6 +120,8 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     sendRoomInteractOption,
     sendRoomPuzzleInput,
     sendRoomDiscoverSecret,
+    sendInteractRoomObject,
+    sendUpgradeWeapon,
     sendRoomAdvance,
     returnToLobby,
   } = useLaCriptaSocket({
@@ -234,11 +238,11 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     const nextEnemyAnims: Record<string, 'idle' | 'hit' | 'lunge' | 'death'> = {};
 
     if (batch.actorPlayerId && batch.actorAction) {
-      if (batch.actorAction === 'ATTACK') {
+      if (batch.actorAction === 'ATTACK' || batch.actorAction === 'WEAPON_SPECIAL') {
         nextPlayerAnims[batch.actorPlayerId] = 'attack';
       } else if (batch.actorAction === 'ABILITY' || batch.actorAction === 'USE_ITEM') {
         nextPlayerAnims[batch.actorPlayerId] = 'cast';
-      } else if (batch.actorAction === 'DEFEND') {
+      } else if (batch.actorAction === 'DEFEND' || batch.actorAction === 'PASS') {
         nextPlayerAnims[batch.actorPlayerId] = 'defend';
       }
     }
@@ -248,7 +252,7 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     let bossPhaseTimer: number | null = null;
 
     for (const ev of events) {
-      if (ev.kind === 'RELIC_ACQUIRED' && ev.relicId) {
+      if ((ev.kind === 'RELIC_ACQUIRED' || ev.kind === 'RELIC_OBTAINED') && ev.relicId) {
         setActiveRelicRevealId(ev.relicId);
         relicRevealTimer = window.setTimeout(() => {
           setActiveRelicRevealId(null);
@@ -387,11 +391,11 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
       {/* Final Boss Phase 1 -> Phase 2 Dramatic Transformation Overlay */}
       {showBossPhaseTransition && <LaCriptaBossPhaseTransitionOverlay />}
 
-      {/* Inventory Full (3/3) Replacement Modal for Local Player */}
-      {localPlayer?.pendingItemOverflow && (
+      {/* Inventory Full Replacement Modal for Local Player */}
+      {localPlayer?.pendingInventoryReplacement && (
         <LaCriptaInventoryFullModal
-          pendingItem={localPlayer.pendingItemOverflow}
-          currentSlots={localPlayer.inventory || []}
+          pendingItem={localPlayer.pendingInventoryReplacement}
+          currentSlots={localPlayer.normalInventory || []}
           onReplaceSlot={(slotIdx) => sendReplaceInventoryItem(slotIdx)}
           onDiscardNew={() => sendDiscardOverflowItem()}
         />
@@ -468,8 +472,13 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
             onVoteFinalBossDoor={voteFinalBossDoor}
             onRetryDungeonInit={retryDungeonInit}
             onCombatAction={sendCombatAction}
+            onLockRoundAction={sendLockRoundAction}
+            onUnlockRoundAction={sendUnlockRoundAction}
+            onUseConsumable={sendUseInventoryItem}
             onReviveAlly={sendReviveAlly}
             onInteractOption={sendRoomInteractOption}
+            onInteractRoomObject={sendInteractRoomObject}
+            onUpgradeWeapon={sendUpgradeWeapon}
             onPuzzleInput={sendRoomPuzzleInput}
             onDiscoverSecret={sendRoomDiscoverSecret}
             onAdvanceRoom={sendRoomAdvance}

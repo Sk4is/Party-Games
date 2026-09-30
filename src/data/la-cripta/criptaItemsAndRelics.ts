@@ -1,5 +1,7 @@
 import type {
+  CriptaAccessoryId,
   CriptaAcquiredRelic,
+  CriptaArmorId,
   CriptaDungeonId,
   CriptaDungeonRoom,
   CriptaItemDefinition,
@@ -10,6 +12,7 @@ import type {
   CriptaRoomEnemy,
   CriptaRoomGroundDrop,
   CriptaShopSlot,
+  CriptaWeaponId,
 } from '../../types/laCripta';
 import {
   buildEnemyAiProfileForArchetype,
@@ -522,16 +525,39 @@ export function generateShopInventoryForRoom(
   const cId = cleansePool[Math.floor(pseudoRandom(seed, stepBase + 2) * cleansePool.length)];
   const cDef = CRIPTA_ITEMS_REGISTRY[cId];
 
-  // Slot 3: Elixir / Utility / Offensive
-  const utilPool: CriptaItemId[] = [
-    'elixir_fuerza',
-    'elixir_hierro',
-    'elixir_arcano',
-    'bomba_humo',
-    'frasco_volatil',
+  // Slot 3: Weapon for sale
+  const shopWeaponPool: Array<{ id: CriptaWeaponId; price: number }> = [
+    { id: 'espada_del_sepulcro', price: 56 },
+    { id: 'vara_de_cristal_astral', price: 58 },
+    { id: 'hojas_colmillo_venenoso', price: 58 },
+    { id: 'arco_de_espinas', price: 58 },
+    { id: 'pico_de_minero_runico', price: 52 },
+    { id: 'espadon_del_rey_hundido', price: 78 },
+    { id: 'hacha_forja_infernal', price: 76 },
+    { id: 'grimorio_prohibido_arma', price: 80 },
+    { id: 'ballesta_de_asedio', price: 76 },
+    { id: 'simbolo_del_alba', price: 76 },
+    { id: 'catalizador_esporas', price: 74 },
   ];
-  const uId = utilPool[Math.floor(pseudoRandom(seed, stepBase + 3) * utilPool.length)];
-  const uDef = CRIPTA_ITEMS_REGISTRY[uId];
+  const wPick =
+    shopWeaponPool[Math.floor(pseudoRandom(seed, stepBase + 3) * shopWeaponPool.length)];
+
+  // Slot 4: Armor or Accessory for sale
+  const shopGearPool: Array<
+    | { kind: 'ARMOR'; armorId: CriptaArmorId; price: number }
+    | { kind: 'ACCESSORY'; accessoryId: CriptaAccessoryId; price: number }
+  > = [
+    { kind: 'ARMOR', armorId: 'cota_de_malla_cripta', price: 48 },
+    { kind: 'ARMOR', armorId: 'coraza_del_sepulturero', price: 66 },
+    { kind: 'ARMOR', armorId: 'tunica_del_astrologo', price: 64 },
+    { kind: 'ARMOR', armorId: 'armadura_escamas_fungicas', price: 52 },
+    { kind: 'ACCESSORY', accessoryId: 'anillo_del_boticario', price: 44 },
+    { kind: 'ACCESSORY', accessoryId: 'colgante_de_cristal', price: 56 },
+    { kind: 'ACCESSORY', accessoryId: 'sello_del_cazador', price: 56 },
+    { kind: 'ACCESSORY', accessoryId: 'espejo_roto_accesorio', price: 46 },
+  ];
+  const gPick =
+    shopGearPool[Math.floor(pseudoRandom(seed, stepBase + 5) * shopGearPool.length)];
 
   const slots: CriptaShopSlot[] = [
     {
@@ -549,15 +575,36 @@ export function generateShopInventoryForRoom(
       soldOut: false,
     },
     {
-      id: `shop_${roomIndex}_slot_3`,
-      kind: 'ITEM',
-      itemId: uId,
-      priceGold: Math.max(16, Math.round(uDef.basePrice * discountMult)),
+      id: `shop_${roomIndex}_slot_weapon`,
+      kind: 'WEAPON',
+      weaponId: wPick.id,
+      priceGold: Math.max(38, Math.round(wPick.price * discountMult)),
+      soldOut: false,
+    },
+    gPick.kind === 'ARMOR'
+      ? {
+          id: `shop_${roomIndex}_slot_gear`,
+          kind: 'ARMOR',
+          armorId: gPick.armorId,
+          priceGold: Math.max(34, Math.round(gPick.price * discountMult)),
+          soldOut: false,
+        }
+      : {
+          id: `shop_${roomIndex}_slot_gear`,
+          kind: 'ACCESSORY',
+          accessoryId: gPick.accessoryId,
+          priceGold: Math.max(34, Math.round(gPick.price * discountMult)),
+          soldOut: false,
+        },
+    {
+      id: `shop_${roomIndex}_slot_forge`,
+      kind: 'FORGE_UPGRADE',
+      priceGold: Math.max(32, Math.round(45 * discountMult)),
       soldOut: false,
     },
   ];
 
-  // Slot 4: Expensive Relic Pedestal (Requirement 19)
+  // Slot 6: Expensive Relic Pedestal (Requirement 19)
   const relicIdx = Math.floor(
     pseudoRandom(seed, stepBase + 7) * ALL_CRIPTA_RELIC_IDS.length
   );

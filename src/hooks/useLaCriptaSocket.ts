@@ -672,6 +672,17 @@ export function useLaCriptaSocket({
     sendMessage({ type: 'ROOM_DISCOVER_SECRET' });
   }, [sendMessage]);
 
+  const sendInteractRoomObject = useCallback(
+    (objectId: string) => {
+      sendMessage({ type: 'INTERACT_ROOM_OBJECT', objectId });
+    },
+    [sendMessage]
+  );
+
+  const sendUpgradeWeapon = useCallback(() => {
+    sendMessage({ type: 'UPGRADE_WEAPON' });
+  }, [sendMessage]);
+
   const sendRoomAdvance = useCallback(() => {
     sendMessage({ type: 'ROOM_ADVANCE' });
   }, [sendMessage]);
@@ -711,6 +722,8 @@ export function useLaCriptaSocket({
     sendRoomInteractOption,
     sendRoomPuzzleInput,
     sendRoomDiscoverSecret,
+    sendInteractRoomObject,
+    sendUpgradeWeapon,
     sendRoomAdvance,
     returnToLobby,
   };

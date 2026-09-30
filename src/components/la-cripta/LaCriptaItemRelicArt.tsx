@@ -12,6 +12,12 @@ import {
   CRIPTA_ITEMS_REGISTRY,
   CRIPTA_RELICS_REGISTRY,
 } from '../../data/la-cripta/criptaItemsAndRelics';
+import {
+  CRIPTA_ACCESSORIES_REGISTRY,
+  CRIPTA_ARMORS_REGISTRY,
+  CRIPTA_WEAPONS_REGISTRY,
+  getEquippedWeaponForPlayer,
+} from '../../data/la-cripta/criptaEquipmentAndEvents';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 
 /**
@@ -399,20 +405,21 @@ export const LaCriptaGroundDropsOverlay: React.FC<{
 };
 
 /**
- * Physical Shop Shelves & Rare Relic Pedestal (Requirements 12, 13, 19).
+ * Physical Shop Shelves, Arsenal Rack, Forge Anvil & Rare Relic Pedestal.
  */
 export const LaCriptaShopShelvesPanel: React.FC<{
   slots: CriptaShopSlot[];
   partyGold: number;
   disabled: boolean;
   hasDiscountRelic?: boolean;
+  localPlayer?: CriptaPlayer | null;
   onBuySlot: (slotId: string) => void;
-}> = ({ slots, partyGold, disabled, hasDiscountRelic = false, onBuySlot }) => {
+}> = ({ slots, partyGold, disabled, hasDiscountRelic = false, localPlayer, onBuySlot }) => {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(
     slots[0]?.id || null
   );
 
-  const normalSlots = slots.filter((s) => s.kind === 'ITEM');
+  const shelfSlots = slots.filter((s) => s.kind !== 'RELIC');
   const relicSlot = slots.find((s) => s.kind === 'RELIC') || null;
   const activeSlot = slots.find((s) => s.id === selectedSlotId) || slots[0] || null;
 
@@ -424,13 +431,88 @@ export const LaCriptaShopShelvesPanel: React.FC<{
     activeSlot?.kind === 'RELIC' && activeSlot.relicId
       ? CRIPTA_RELICS_REGISTRY[activeSlot.relicId]
       : null;
+  const activeWeaponDef =
+    activeSlot?.kind === 'WEAPON' && activeSlot.weaponId
+      ? CRIPTA_WEAPONS_REGISTRY[activeSlot.weaponId]
+      : null;
+  const activeArmorDef =
+    activeSlot?.kind === 'ARMOR' && activeSlot.armorId
+      ? CRIPTA_ARMORS_REGISTRY[activeSlot.armorId]
+      : null;
+  const activeAccDef =
+    activeSlot?.kind === 'ACCESSORY' && activeSlot.accessoryId
+      ? CRIPTA_ACCESSORIES_REGISTRY[activeSlot.accessoryId]
+      : null;
+  const isForgeSlot = activeSlot?.kind === 'FORGE_UPGRADE';
+
+  const currentEquipped = localPlayer ? getEquippedWeaponForPlayer(localPlayer) : null;
+
+  const resolveSlotTitleAndBadge = (slot: CriptaShopSlot) => {
+    if (slot.kind === 'ITEM' && slot.itemId) {
+      const def = CRIPTA_ITEMS_REGISTRY[slot.itemId];
+      return {
+        title: def?.name || 'Consumible',
+        tag: 'CONSUMIBLE',
+        sub: def?.description || '',
+        color: '#E7A54A',
+      };
+    }
+    if (slot.kind === 'WEAPON' && slot.weaponId) {
+      const w = CRIPTA_WEAPONS_REGISTRY[slot.weaponId];
+      return {
+        title: w?.name || 'Arma',
+        tag: `ARMA · ${w?.baseMinDamage}–${w?.baseMaxDamage} DAÑO`,
+        sub: `${w?.specialEffectText} · Especial: ${w?.specialAttack.name}`,
+        color: w?.accentColor || '#FFD166',
+      };
+    }
+    if (slot.kind === 'ARMOR' && slot.armorId) {
+      const a = CRIPTA_ARMORS_REGISTRY[slot.armorId];
+      return {
+        title: a?.name || 'Armadura',
+        tag: 'ARMADURA PERSONAL',
+        sub: a?.specialEffectText || '',
+        color: '#69A8A5',
+      };
+    }
+    if (slot.kind === 'ACCESSORY' && slot.accessoryId) {
+      const acc = CRIPTA_ACCESSORIES_REGISTRY[slot.accessoryId];
+      return {
+        title: acc?.name || 'Accesorio',
+        tag: 'ACCESORIO PERSONAL',
+        sub: acc?.specialEffectText || '',
+        color: '#9B72CF',
+      };
+    }
+    if (slot.kind === 'FORGE_UPGRADE') {
+      const nextLvl = Math.min(3, (currentEquipped?.level || 1) + 1);
+      return {
+        title: `Forjar Arma a Nivel ${nextLvl}`,
+        tag: 'YUNQUE DE FORJA',
+        sub: currentEquipped
+          ? `Mejora tu ${currentEquipped.weapon.name} (+Daño base y +Escalado)`
+          : 'Templa tu arma equipada al siguiente nivel.',
+        color: '#E76F38',
+      };
+    }
+    if (slot.kind === 'RELIC' && slot.relicId) {
+      const r = CRIPTA_RELICS_REGISTRY[slot.relicId];
+      return {
+        title: r?.name || 'Reliquia',
+        tag: r?.ownershipType === 'PARTY' ? 'RELIQUIA DE GRUPO' : 'RELIQUIA PERSONAL',
+        sub: r?.description || '',
+        color: '#FFD166',
+      };
+    }
+    return { title: 'Objeto', tag: 'TIENDA', sub: '', color: '#D8C6A0' };
+  };
 
   return (
     <div className="p-3 bg-[#110C17] border-2 border-[#E7A54A]/60 flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#282039] pb-1.5">
         <div className="flex items-center gap-2">
           <span className="font-cripta-pixel text-xs font-bold text-[#E7A54A]">
-            MOSTRADOR DEL MERCADER ERRANTE
+            MOSTRADOR DEL MERCADER Y FORJA
           </span>
           {hasDiscountRelic && (
             <span className="px-1.5 py-0.5 bg-[#1E152A] border border-[#E7A54A] text-[9px] font-cripta-pixel text-[#FFD166]">
@@ -443,17 +525,16 @@ export const LaCriptaShopShelvesPanel: React.FC<{
         </span>
       </div>
 
-      {/* Physical Shelf + Illuminated Relic Pedestal */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-stretch">
-        {/* Left 3 Columns: Wooden Shop Shelf with Consumable Bottles/Boxes */}
-        <div className="md:col-span-3 p-2.5 bg-[#18111D] border-2 border-[#593E25] flex flex-col justify-between">
+      {/* Physical Shelf + Arsenal + Illuminated Relic Pedestal */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 items-stretch">
+        {/* Left 3 Columns: Shop Shelf with Consumables, Weapon, Gear & Forge */}
+        <div className="lg:col-span-3 p-2.5 bg-[#18111D] border-2 border-[#593E25] flex flex-col justify-between">
           <div className="text-[9px] font-cripta-pixel uppercase tracking-wider text-[#D8C6A0]/70 mb-2">
-            ESTANTERÍA DE CONSUMIBLES
+            CONSUMIBLES · ARMAMENTO · EQUIPO · YUNQUE
           </div>
-          <div className="grid grid-cols-3 gap-2.5">
-            {normalSlots.map((slot) => {
-              const def = slot.itemId ? CRIPTA_ITEMS_REGISTRY[slot.itemId] : null;
-              if (!def) return null;
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {shelfSlots.map((slot) => {
+              const info = resolveSlotTitleAndBadge(slot);
               const isSelected = activeSlot?.id === slot.id;
               const canAfford = partyGold >= slot.priceGold && !slot.soldOut;
 
@@ -465,7 +546,7 @@ export const LaCriptaShopShelvesPanel: React.FC<{
                     laCriptaAudio.playStoneClick();
                     setSelectedSlotId(slot.id);
                   }}
-                  className={`relative p-2 border-2 flex flex-col items-center text-center transition-all cursor-pointer ${
+                  className={`relative p-2 border-2 flex flex-col items-center justify-between text-center transition-all cursor-pointer ${
                     slot.soldOut
                       ? 'bg-[#0B090F] border-[#282039] opacity-40'
                       : isSelected
@@ -473,11 +554,45 @@ export const LaCriptaShopShelvesPanel: React.FC<{
                       : 'bg-[#120D18] hover:bg-[#1E1628] border-[#3E2D4A]'
                   }`}
                 >
-                  <LaCriptaItemPixelIcon itemId={def.id} size={30} />
-                  {/* Wooden shelf plank under item */}
+                  <span
+                    className="px-1 py-0.2 bg-[#09070D] border text-[7px] font-cripta-pixel uppercase tracking-wider mb-1"
+                    style={{ borderColor: `${info.color}66`, color: info.color }}
+                  >
+                    {slot.kind === 'WEAPON'
+                      ? '⚔ ARMA'
+                      : slot.kind === 'ARMOR'
+                      ? '🛡 CORAZA'
+                      : slot.kind === 'ACCESSORY'
+                      ? '✦ JOYA'
+                      : slot.kind === 'FORGE_UPGRADE'
+                      ? '🔥 FORJA'
+                      : 'POCIÓN'}
+                  </span>
+
+                  {slot.kind === 'ITEM' && slot.itemId ? (
+                    <LaCriptaItemPixelIcon itemId={slot.itemId} size={28} />
+                  ) : (
+                    <div
+                      className="w-7 h-7 flex items-center justify-center border font-cripta-pixel text-xs font-bold"
+                      style={{
+                        borderColor: info.color,
+                        backgroundColor: '#0B090F',
+                        color: info.color,
+                      }}
+                    >
+                      {slot.kind === 'WEAPON'
+                        ? '⚔'
+                        : slot.kind === 'ARMOR'
+                        ? '🛡'
+                        : slot.kind === 'ACCESSORY'
+                        ? '◈'
+                        : '⚒'}
+                    </div>
+                  )}
+
                   <div className="w-full h-1 bg-[#6E472B] border-t border-[#9E6840] my-1.5" />
                   <div className="font-cripta-pixel text-[10px] font-bold text-[#D9D0BC] truncate w-full">
-                    {def.name}
+                    {info.title}
                   </div>
                   <div
                     className={`mt-0.5 font-cripta-mono text-[10px] font-bold ${
@@ -488,7 +603,7 @@ export const LaCriptaShopShelvesPanel: React.FC<{
                         : 'text-[#C93B5B]'
                     }`}
                   >
-                    {slot.soldOut ? 'AGOTADO' : `${slot.priceGold} ORO`}
+                    {slot.soldOut ? 'ADQUIRIDO' : `${slot.priceGold} ORO`}
                   </div>
                 </button>
               );
@@ -518,7 +633,6 @@ export const LaCriptaShopShelvesPanel: React.FC<{
             <div className="my-1.5 p-2 rounded-full bg-[#2E1C44]/70 border border-[#B57CFF]/50">
               <LaCriptaRelicPixelIcon relicId={relicSlot.relicId} size={32} />
             </div>
-            {/* Stone pedestal base */}
             <div className="w-16 h-2 bg-[#4A3E5E] border border-[#9B72CF]" />
             <div className="mt-1 font-cripta-pixel text-[10px] font-bold text-[#FFD166] truncate w-full">
               {CRIPTA_RELICS_REGISTRY[relicSlot.relicId]?.name}
@@ -538,58 +652,117 @@ export const LaCriptaShopShelvesPanel: React.FC<{
         )}
       </div>
 
-      {/* Selected Item / Relic Inspection & Purchase Bar */}
-      {activeSlot && (activeItemDef || activeRelicDef) && (
-        <div className="p-2.5 bg-[#09070D] border border-[#E7A54A]/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5">
-            {activeItemDef && <LaCriptaItemPixelIcon itemId={activeItemDef.id} size={28} />}
-            {activeRelicDef && <LaCriptaRelicPixelIcon relicId={activeRelicDef.id} size={28} />}
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-cripta-pixel text-xs font-bold text-[#FFD166] uppercase">
-                  {activeItemDef ? activeItemDef.name : activeRelicDef?.name}
-                </span>
-                <span className="px-1.5 py-0.2 bg-[#19111D] border border-[#7656A8] text-[9px] font-cripta-pixel text-[#D8C6A0]">
-                  {activeItemDef
-                    ? 'CONSUMIBLE (INVENTARIO)'
-                    : activeRelicDef?.ownershipType === 'PARTY'
-                    ? 'RELIQUIA DEL GRUPO'
-                    : 'RELIQUIA PERSONAL'}
-                </span>
-              </div>
-              <div className="text-[11px] font-cripta-pixel text-[#5EA87A] mt-0.5">
-                {activeItemDef ? activeItemDef.description : activeRelicDef?.description}
-              </div>
-            </div>
-          </div>
+      {/* Selected Slot Detail, Side-by-Side Weapon Comparison & Purchase Bar */}
+      {activeSlot && (
+        <div className="p-2.5 bg-[#09070D] border border-[#E7A54A]/50 flex flex-col gap-2">
+          {(() => {
+            const info = resolveSlotTitleAndBadge(activeSlot);
+            return (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5">
+                  {activeItemDef && <LaCriptaItemPixelIcon itemId={activeItemDef.id} size={28} />}
+                  {activeRelicDef && (
+                    <LaCriptaRelicPixelIcon relicId={activeRelicDef.id} size={28} />
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className="font-cripta-pixel text-xs font-bold uppercase"
+                        style={{ color: info.color }}
+                      >
+                        {info.title}
+                      </span>
+                      <span className="px-1.5 py-0.2 bg-[#19111D] border border-[#7656A8] text-[9px] font-cripta-pixel text-[#D8C6A0]">
+                        {info.tag}
+                      </span>
+                      <span className="px-1.5 py-0.2 bg-[#121D18] border border-[#5EA87A]/50 text-[8px] font-cripta-pixel text-[#8EE6AE]">
+                        {activeRelicDef?.ownershipType === 'PARTY'
+                          ? 'GRUPO COMPARTIDO'
+                          : `PERSONAL · ${localPlayer?.name || 'AVENTURERO'}`}
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-cripta-pixel text-[#5EA87A] mt-0.5">
+                      {info.sub}
+                    </div>
+                  </div>
+                </div>
 
-          <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
-            <div className="text-right">
-              <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70">PRECIO</div>
-              <div className="font-cripta-mono text-xs font-bold text-[#E7A54A]">
-                {activeSlot.priceGold} ORO
+                <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+                  <div className="text-right">
+                    <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70">PRECIO</div>
+                    <div className="font-cripta-mono text-xs font-bold text-[#E7A54A]">
+                      {activeSlot.priceGold} ORO
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={
+                      disabled ||
+                      activeSlot.soldOut ||
+                      partyGold < activeSlot.priceGold ||
+                      (isForgeSlot && (currentEquipped?.level || 1) >= 3)
+                    }
+                    onClick={() => {
+                      laCriptaAudio.playGoldChange(false);
+                      onBuySlot(activeSlot.id);
+                    }}
+                    className={`px-3.5 py-1.5 border-2 font-cripta-pixel text-xs font-bold ${
+                      activeSlot.soldOut
+                        ? 'bg-[#140F1A] border-[#282039] text-[#D8C6A0]/40 cursor-default'
+                        : disabled || partyGold < activeSlot.priceGold
+                        ? 'bg-[#140F1A] border-[#8F263D]/50 text-[#C93B5B]/70 cursor-not-allowed'
+                        : 'bg-[#E7A54A] hover:bg-[#f3b965] border-[#FFF3C4] text-[#0B0A0E] cursor-pointer'
+                    }`}
+                  >
+                    {activeSlot.soldOut
+                      ? 'COMPRADO'
+                      : activeWeaponDef || activeArmorDef || activeAccDef
+                      ? 'COMPRAR Y EQUIPAR'
+                      : isForgeSlot
+                      ? 'MEJORAR ARMA'
+                      : 'COMPRAR'}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Side-by-side Weapon Comparison (Section 14) */}
+          {activeWeaponDef && currentEquipped && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-[#282039]">
+              <div className="p-2 bg-[#120D18] border border-[#282039] flex items-center justify-between text-[10px] font-cripta-pixel">
+                <div>
+                  <span className="text-[#D8C6A0]/60 block text-[8px]">ARMA ACTUAL EQUIPADA</span>
+                  <span className="text-[#D9D0BC] font-bold">
+                    {currentEquipped.weapon.name} (NV.{currentEquipped.level})
+                  </span>
+                </div>
+                <div className="text-right font-cripta-mono text-[#D8C6A0]">
+                  <div>
+                    {currentEquipped.scaledMin}–{currentEquipped.scaledMax} DAÑO
+                  </div>
+                  <div className="text-[8px] text-[#69A8A5]">
+                    ESPECIAL: {currentEquipped.weapon.specialAttack.name}
+                  </div>
+                </div>
+              </div>
+              <div className="p-2 bg-[#1A1324] border border-[#FFD166]/60 flex items-center justify-between text-[10px] font-cripta-pixel">
+                <div>
+                  <span className="text-[#FFD166] block text-[8px]">NUEVA ARMA EN VENTA</span>
+                  <span className="text-[#FFD166] font-bold">{activeWeaponDef.name}</span>
+                </div>
+                <div className="text-right font-cripta-mono text-[#8EE6AE]">
+                  <div>
+                    {activeWeaponDef.baseMinDamage}–{activeWeaponDef.baseMaxDamage} DAÑO (
+                    {activeWeaponDef.scalingStat})
+                  </div>
+                  <div className="text-[8px] text-[#FFD166]">
+                    ESPECIAL: {activeWeaponDef.specialAttack.name}
+                  </div>
+                </div>
               </div>
             </div>
-            <button
-              type="button"
-              disabled={
-                disabled || activeSlot.soldOut || partyGold < activeSlot.priceGold
-              }
-              onClick={() => {
-                laCriptaAudio.playGoldChange(false);
-                onBuySlot(activeSlot.id);
-              }}
-              className={`px-3.5 py-1.5 border-2 font-cripta-pixel text-xs font-bold ${
-                activeSlot.soldOut
-                  ? 'bg-[#140F1A] border-[#282039] text-[#D8C6A0]/40 cursor-default'
-                  : disabled || partyGold < activeSlot.priceGold
-                  ? 'bg-[#140F1A] border-[#8F263D]/50 text-[#C93B5B]/70 cursor-not-allowed'
-                  : 'bg-[#E7A54A] hover:bg-[#f3b965] border-[#FFF3C4] text-[#0B0A0E] cursor-pointer'
-              }`}
-            >
-              {activeSlot.soldOut ? 'COMPRADO' : 'COMPRAR'}
-            </button>
-          </div>
+          )}
         </div>
       )}
     </div>

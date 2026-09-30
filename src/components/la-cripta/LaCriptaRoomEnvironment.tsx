@@ -9,17 +9,29 @@ interface LaCriptaEnemyPixelSpriteProps {
   enemy: CriptaRoomEnemy;
   isTargeted?: boolean;
   animState?: 'idle' | 'hit' | 'lunge' | 'death';
+  totalVisibleEnemies?: number;
 }
 
 /**
  * Crisp 28x28 pixel-art enemy & boss sprite renderer.
+ * Scaled up for the Left Encounter Stage (Section 2: Large Enemies / NPCs).
  */
 export const LaCriptaEnemyPixelSprite: React.FC<LaCriptaEnemyPixelSpriteProps> = ({
   enemy,
   isTargeted = false,
   animState = 'idle',
+  totalVisibleEnemies = 1,
 }) => {
-  const sizePx = enemy.isFinalBoss ? 116 : enemy.isBoss ? 92 : enemy.isElite ? 76 : 64;
+  const baseSizePx = enemy.isFinalBoss
+    ? 172
+    : enemy.isBoss
+    ? 148
+    : enemy.isElite
+    ? 124
+    : 108;
+  const crowdScale =
+    totalVisibleEnemies >= 3 ? 0.76 : totalVisibleEnemies === 2 ? 0.88 : 1;
+  const sizePx = Math.round(baseSizePx * crowdScale);
   const accent = enemy.accentColor || '#E7A54A';
   const arch = enemy.spriteArchetype;
 
@@ -38,7 +50,7 @@ export const LaCriptaEnemyPixelSprite: React.FC<LaCriptaEnemyPixelSpriteProps> =
       height={sizePx}
       viewBox="0 0 28 28"
       shapeRendering="crispEdges"
-      className={`transition-transform duration-200 select-none ${animClass} ${
+      className={`transition-transform duration-200 select-none drop-shadow-[0_10px_18px_rgba(0,0,0,0.92)] ${animClass} ${
         isTargeted ? 'scale-105' : ''
       }`}
     >
@@ -209,13 +221,15 @@ interface LaCriptaRoomEnvironmentCanvasProps {
   canAdvance: boolean;
   onClickExitArchway: () => void;
   onClickSecretHook?: () => void;
+  onClickInteractiveObject?: (objectId: string) => void;
+  className?: string;
 }
 
 /**
- * Illustrated Pixel-Art Chamber Environment Canvas (240x112 crisp SVG).
+ * Illustrated Pixel-Art Chamber Environment Canvas (240x136 crisp SVG).
  * Renders the biome walls, perspective flagstones, torches/particles,
- * room-type specific architectural centerpiece, secret rune hook,
- * and the interactive exit doorway on the right.
+ * room-type specific architectural centerpiece, interactive room objects,
+ * secret rune hook, and the interactive exit doorway on the right.
  */
 export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanvasProps> = ({
   dungeon,
@@ -223,16 +237,22 @@ export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanv
   canAdvance,
   onClickExitArchway,
   onClickSecretHook,
+  onClickInteractiveObject,
+  className = '',
 }) => {
   const { stone, stoneDark, highlight, glow, fog, secondary } = dungeon.palette;
   const rType = room.type;
+  const hasLivingEnemies = room.enemies && room.enemies.some((e) => e.hp > 0);
 
   return (
-    <div className="relative w-full overflow-hidden border-2 border-[#282039] bg-[#07060A]">
+    <div
+      className={`relative w-full h-full min-h-[240px] sm:min-h-[310px] overflow-hidden border-2 border-[#282039] bg-[#07060A] flex flex-col justify-between ${className}`}
+    >
       <svg
-        viewBox="0 0 240 108"
+        viewBox="0 0 240 124"
+        preserveAspectRatio="xMidYMid slice"
         shapeRendering="crispEdges"
-        className="w-full h-auto block select-none"
+        className="w-full h-full min-h-[240px] sm:min-h-[310px] block select-none"
       >
         {/* 1. Deep Background Cavern / Vault Skybox */}
         <rect x="0" y="0" width="240" height="108" fill={stoneDark} />
@@ -395,12 +415,32 @@ export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanv
           </g>
         )}
 
-        {(rType === 'EVENT' || rType === 'SECRET') && (
-          <g>
-            {/* Glowing Monolith / Secret Reliquary */}
-            <rect x="106" y="30" width="24" height="40" fill={stoneDark} />
-            <rect x="110" y="34" width="16" height="32" fill={glow} opacity="0.75" />
-            <rect x="115" y="42" width="6" height="12" fill="#FFF3C4" />
+        {(rType === 'EVENT' || rType === 'SECRET') && !hasLivingEnemies && (
+          <g className="animate-cripta-sprite-idle">
+            {/* Large Focal Event Figure / Pedestal / NPC in Left Stage */}
+            <rect x="88" y="64" width="56" height="8" fill={highlight} opacity="0.4" />
+            {room.encounterSubject ? (
+              <g>
+                {/* Large Hooded / Chained / Spectral NPC Figure */}
+                <rect x="100" y="20" width="32" height="46" fill="#0B0A0E" />
+                <rect x="103" y="22" width="26" height="42" fill="#282039" />
+                <rect x="106" y="24" width="20" height="16" fill={glow} opacity="0.85" />
+                <rect x="109" y="28" width="4" height="3" fill="#FFF3C4" />
+                <rect x="119" y="28" width="4" height="3" fill="#FFF3C4" />
+                {/* Chains / Staff / Lantern */}
+                <rect x="92" y="32" width="8" height="3" fill="#E7A54A" />
+                <rect x="132" y="32" width="8" height="3" fill="#E7A54A" />
+                <rect x="136" y="22" width="4" height="38" fill="#D8C6A0" />
+                <rect x="134" y="16" width="8" height="8" fill={highlight} />
+              </g>
+            ) : (
+              <g>
+                {/* Glowing Monolith / Secret Reliquary */}
+                <rect x="102" y="22" width="28" height="44" fill={stoneDark} />
+                <rect x="106" y="26" width="20" height="36" fill={glow} opacity="0.8" />
+                <rect x="112" y="34" width="8" height="16" fill="#FFF3C4" />
+              </g>
+            )}
           </g>
         )}
 
@@ -440,6 +480,48 @@ export const LaCriptaRoomEnvironmentCanvas: React.FC<LaCriptaRoomEnvironmentCanv
           )}
         </g>
       </svg>
+
+      {/* Interactive Room Objects (Skulls, Cracked Walls, Mushrooms, Chalices, Skeletons - Section 16) */}
+      {room.interactiveObjects &&
+        room.interactiveObjects.length > 0 &&
+        onClickInteractiveObject && (
+          <div className="pointer-events-none absolute inset-0 z-20">
+            {room.interactiveObjects.map((obj) => (
+              <button
+                key={obj.id}
+                type="button"
+                disabled={obj.discovered}
+                onClick={() => onClickInteractiveObject(obj.id)}
+                style={{ left: `${obj.xPercent}%`, top: `${obj.yPercent}%` }}
+                title={
+                  obj.discovered
+                    ? obj.rewardText || `${obj.label} (Inspeccionado)`
+                    : `${obj.label}: ${obj.hint}`
+                }
+                className={`pointer-events-auto -translate-x-1/2 -translate-y-1/2 px-2 py-1 border text-[9px] font-cripta-pixel transition-all flex items-center gap-1 shadow-[0_4px_12px_rgba(0,0,0,0.9)] ${
+                  obj.discovered
+                    ? 'bg-[#09070D]/80 border-[#282039] text-[#D8C6A0]/45 cursor-default'
+                    : 'bg-[#19111D]/95 hover:bg-[#2A1D33] border-[#E7A54A] hover:border-[#FFD166] text-[#FFD166] cursor-pointer hover:scale-105'
+                }`}
+              >
+                <span>
+                  {obj.objectKind === 'SKULL'
+                    ? '💀'
+                    : obj.objectKind === 'WALL_CRACK'
+                    ? '🧱'
+                    : obj.objectKind === 'MUSHROOM'
+                    ? '🍄'
+                    : obj.objectKind === 'CHALICE'
+                    ? '🏆'
+                    : '🦴'}
+                </span>
+                <span className="truncate max-w-[115px]">
+                  {obj.discovered ? '✓ INSPECCIONADO' : obj.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
       {/* Optional Secret Rune Trigger on Back Wall */}
       {room.secretHook && !room.secretHook.discovered && onClickSecretHook && (
