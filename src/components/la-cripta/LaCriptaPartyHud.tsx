@@ -199,7 +199,10 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
       activeRoom.enemies &&
       activeRoom.enemies.some((e) => e.hp > 0)
   );
-  const activeTurnPlayerId = hasLivingEnemies ? activeRoom?.activeTurnPlayerId : null;
+  const combatRoundPhase = activeRoom?.combatRoundPhase || 'PLAYER_PHASE';
+  const queuedPlayerActions = activeRoom?.queuedPlayerActions || {};
+  const activeCombatActorId = activeRoom?.activeCombatActorId || null;
+  const activeTargetedPlayerIds = activeRoom?.activeTargetedPlayerIds || [];
   const isExploreOrBossPhase =
     expeditionState.phase === 'DUNGEON' ||
     expeditionState.phase === 'DUNGEON_ARRIVAL' ||
@@ -250,10 +253,17 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
           const isDead = Boolean(
             player.isDead || (charDef && player.maxHp > 0 && player.hp <= 0)
           );
-          const isActiveTurn =
+          const queuedAction = queuedPlayerActions[player.id];
+          const hasLockedAction = Boolean(queuedAction?.locked);
+          const isCurrentlyActing = !isDead && hasLivingEnemies && activeCombatActorId === player.id;
+          const isTargetedByEnemy =
+            !isDead && hasLivingEnemies && activeTargetedPlayerIds.includes(player.id);
+          const isChoosingInPlayerPhase =
             !isDead &&
             hasLivingEnemies &&
-            (activeTurnPlayerId === player.id || (!activeTurnPlayerId && isSolo));
+            isExploreOrBossPhase &&
+            combatRoundPhase === 'PLAYER_PHASE' &&
+            !hasLockedAction;
 
           // Events targeting this player (plus party-wide gold/loot shown on current player's card or solo card)
           const playerEvents = activeVisualEvents.filter(
@@ -281,6 +291,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
           const bonusDef = player.bonusDefense || 0;
           const bonusMag = player.bonusMagic || 0;
           const items = player.inventoryItems || [];
+          const normalInv = player.normalInventory || [];
 
           return (
             <div
@@ -288,18 +299,26 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
               className={`relative flex items-center gap-2.5 sm:gap-3 px-2.5 sm:px-3.5 py-2 border-2 transition-all duration-200 ${
                 isDead
                   ? 'bg-[#0F090E]'
+                  : isTargetedByEnemy
+                  ? 'bg-[#2E0D18] -translate-y-1 ring-2 ring-[#E03E52]/70'
                   : animState === 'hit' || animState === 'debuff'
                   ? 'bg-[#2B0E17] -translate-y-0.5'
                   : animState === 'heal' || animState === 'revive'
                   ? 'bg-[#0E2419] -translate-y-0.5'
-                  : animState === 'attack' || animState === 'cast'
+                  : isCurrentlyActing || animState === 'attack' || animState === 'cast'
                   ? 'bg-[#22182E] -translate-y-1'
                   : 'bg-[#140F1A]'
               }`}
               style={{
                 borderColor: isDead
                   ? '#8F263D'
-                  : isActiveTurn
+                  : isTargetedByEnemy
+                  ? '#E03E52'
+                  : isCurrentlyActing
+                  ? '#FFD166'
+                  : hasLivingEnemies && hasLockedAction && combatRoundPhase === 'PLAYER_PHASE'
+                  ? '#5EA87A'
+                  : isChoosingInPlayerPhase && isMe
                   ? '#FFD166'
                   : charDef
                   ? isMe
@@ -310,8 +329,12 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   : '#282039',
                 boxShadow: isDead
                   ? 'inset 0 0 22px rgba(143,38,61,0.3), 0 4px 16px rgba(0,0,0,0.9)'
-                  : isActiveTurn
-                  ? 'inset 0 0 22px rgba(255,209,102,0.22), 0 0 18px rgba(231,165,74,0.35)'
+                  : isTargetedByEnemy
+                  ? 'inset 0 0 26px rgba(224,62,82,0.4), 0 0 20px rgba(224,62,82,0.55)'
+                  : isCurrentlyActing
+                  ? 'inset 0 0 22px rgba(255,209,102,0.28), 0 0 18px rgba(231,165,74,0.45)'
+                  : hasLivingEnemies && hasLockedAction && combatRoundPhase === 'PLAYER_PHASE'
+                  ? 'inset 0 0 18px rgba(94,168,122,0.22), 0 4px 16px rgba(0,0,0,0.85)'
                   : isMe
                   ? `inset 0 0 18px ${player.color}22, 0 4px 16px rgba(0,0,0,0.85)`
                   : '0 4px 16px rgba(0,0,0,0.85)',
@@ -326,11 +349,45 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                 </div>
               )}
 
-              {/* Active Combat Turn Crown Tag */}
-              {isActiveTurn && (
-                <div className="pointer-events-none absolute -top-2.5 right-2 z-30 px-1.5 py-0.5 bg-[#E7A54A] border border-[#FFF3C4] text-[8px] font-cripta-pixel font-bold text-[#0B0A0E] tracking-wider flex items-center gap-1 shadow">
-                  <Swords className="w-2.5 h-2.5" />
-                  <span>{isMe ? '¡TU TURNO!' : 'EN TURNO'}</span>
+              {/* Round Combat Readiness / Enemy Target / Active Resolution Tag */}
+              {!isDead && hasLivingEnemies && isExploreOrBossPhase && (
+                <div
+                  className={`pointer-events-none absolute -top-2.5 right-2 z-30 px-1.5 py-0.5 border text-[8px] font-cripta-pixel font-bold tracking-wider flex items-center gap-1 shadow ${
+                    isTargetedByEnemy
+                      ? 'bg-[#E03E52] border-[#FFD166] text-white animate-pulse'
+                      : isCurrentlyActing
+                      ? 'bg-[#FFD166] border-[#FFF3C4] text-[#0B0A0E]'
+                      : combatRoundPhase === 'PLAYER_PHASE' && hasLockedAction
+                      ? 'bg-[#173626] border-[#5EA87A] text-[#8EE6AE]'
+                      : combatRoundPhase === 'PLAYER_PHASE' && isMe
+                      ? 'bg-[#E7A54A] border-[#FFF3C4] text-[#0B0A0E]'
+                      : combatRoundPhase === 'PLAYER_PHASE'
+                      ? 'bg-[#1F182B] border-[#D8C6A0]/50 text-[#D8C6A0]'
+                      : 'bg-[#19111D] border-[#7656A8]/50 text-[#D8C6A0]/80'
+                  }`}
+                >
+                  {isTargetedByEnemy ? (
+                    <>
+                      <span>🎯</span>
+                      <span>¡OBJETIVO!</span>
+                    </>
+                  ) : isCurrentlyActing ? (
+                    <>
+                      <Swords className="w-2.5 h-2.5" />
+                      <span>ACTUANDO</span>
+                    </>
+                  ) : combatRoundPhase === 'PLAYER_PHASE' && hasLockedAction ? (
+                    <span>LISTO ✓</span>
+                  ) : combatRoundPhase === 'PLAYER_PHASE' && isMe ? (
+                    <>
+                      <Swords className="w-2.5 h-2.5" />
+                      <span>ELIGE TU ACCIÓN</span>
+                    </>
+                  ) : combatRoundPhase === 'PLAYER_PHASE' ? (
+                    <span>PENSANDO...</span>
+                  ) : (
+                    <span>EN COMBATE</span>
+                  )}
                 </div>
               )}
 
@@ -350,7 +407,9 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                 style={{
                   borderColor: isDead
                     ? '#8F263D'
-                    : isActiveTurn
+                    : isTargetedByEnemy
+                    ? '#E03E52'
+                    : isCurrentlyActing
                     ? '#FFD166'
                     : player.color,
                 }}
@@ -531,10 +590,34 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                       </span>
                     ) : (
                       <>
+                        {player.isDefendingThisRound && (
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1 py-0.2 bg-[#112328] border border-[#69A8A5] text-[8px] font-cripta-pixel text-[#69A8A5]"
+                            title="Postura defensiva activa en esta ronda"
+                          >
+                            🛡 DEFENSA
+                          </span>
+                        )}
+                        {(player.tauntTurnsRemaining || 0) > 0 && (
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1 py-0.2 bg-[#2B1D0E] border border-[#FFD166] text-[8px] font-cripta-pixel text-[#FFD166]"
+                            title="Provocación activa: atrae ataques enemigos"
+                          >
+                            ⚡ PROVOCA
+                          </span>
+                        )}
+                        {player.protectedByPlayerId && (
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1 py-0.2 bg-[#14262E] border border-[#69A8A5] text-[8px] font-cripta-pixel text-[#8EE6AE]"
+                            title="Protegido por un compañero"
+                          >
+                            🛡 PROTEGIDO
+                          </span>
+                        )}
                         {player.statuses.slice(0, 4).map((st) => (
                           <LaCriptaStatusEffectBadge key={st.id} status={st} />
                         ))}
-                        {items.length > 0 && (!player.inventory || player.inventory.length === 0) && (
+                        {items.length > 0 && normalInv.length === 0 && (
                           <span
                             className="inline-flex items-center gap-0.5 px-1 py-0.2 bg-[#1D1526] border border-[#E7A54A]/60 text-[8px] font-cripta-pixel text-[#E7A54A]"
                             title={`Reliquias y objetos: ${items.join(', ')}`}
@@ -550,31 +633,28 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                     )}
                   </div>
 
-                  {/* 3-Slot Personal Inventory Bar */}
+                  {/* Personal Inventory Bar */}
                   <div className="flex items-center gap-1.5 shrink-0">
                     {charDef && (
                       <LaCriptaPlayerInventoryBar
-                        slots={player.inventory || []}
+                        inventory={normalInv}
+                        slots={player.inventory}
                         isLocalPlayer={isMe}
+                        inCombat={hasLivingEnemies}
                         canUseNow={Boolean(
                           isMe &&
                             !isDead &&
                             isExploreOrBossPhase &&
-                            (!hasLivingEnemies || isActiveTurn)
+                            (!hasLivingEnemies ||
+                              (combatRoundPhase === 'PLAYER_PHASE' && !hasLockedAction))
                         )}
-                        onUseSlot={(slotIdx) => {
+                        onUseItem={(slotIdx) => {
                           if (!onUseConsumable) return;
-                          const slot = (player.inventory || [])[slotIdx];
-                          if (!slot) return;
-                          const itemDef = CRIPTA_CONSUMABLES_BY_ID[slot.itemId];
-                          if (!itemDef) return;
+                          const itemId = normalInv[slotIdx] || player.inventory?.[slotIdx]?.itemId;
+                          if (!itemId) return;
+                          const itemDef = CRIPTA_CONSUMABLES_BY_ID[itemId];
                           laCriptaAudio.playHeroSelect();
-                          if (itemDef.targetRule === 'FALLEN_ALLY') {
-                            const fallenAlly = expeditionState.players.find(
-                              (p) => p.isDead || p.hp <= 0
-                            );
-                            onUseConsumable(slotIdx, undefined, fallenAlly?.id);
-                          } else if (itemDef.targetRule === 'SINGLE_ENEMY') {
+                          if (itemDef?.targetRule === 'SINGLE_ENEMY' || itemDef?.category === 'OFFENSIVE') {
                             onUseConsumable(slotIdx, selectedTargetEnemyId || undefined, undefined);
                           } else {
                             onUseConsumable(slotIdx, undefined, currentPlayerId);

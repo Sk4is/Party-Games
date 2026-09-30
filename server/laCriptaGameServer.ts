@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import {
+import type {
   CriptaAcquiredRelic,
   CriptaCharacterId,
   CriptaClientMessage,
@@ -8,7 +8,10 @@ import {
   CriptaExpeditionState,
   CriptaItemId,
   CriptaPlayer,
+  CriptaPlayerRoundActionType,
+  CriptaQueuedPlayerAction,
   CriptaRelicId,
+  CriptaRoomEnemy,
   CriptaRunStats,
   CriptaServerMessage,
   CriptaVisualEvent,
@@ -24,6 +27,13 @@ import {
 import {
   generateProceduralDungeon,
 } from '../src/data/la-cripta/criptaDungeonGenerator';
+import {
+  buildEnemyAiProfileForArchetype,
+  chooseEnemyTacticalAction,
+  createInitialEnemyMemory,
+  refreshEnemyIntentPreview,
+  tickEnemyCooldownsForNewRound,
+} from '../src/data/la-cripta/criptaEnemyAiEngine';
 import {
   applyStatusEffectToPlayer,
   createStatusEffectInstance,
@@ -53,6 +63,8 @@ interface ClientConnection {
 
 interface ServerCriptaRoom extends CriptaExpeditionState {
   doorOpeningTimer: NodeJS.Timeout | null;
+  combatRoundTimer: NodeJS.Timeout | null;
+  isResolvingRound: boolean;
   disconnectTimers: Map<string, NodeJS.Timeout>;
   nextEventBatchId: number;
   dungeonStartGold: number;
@@ -261,6 +273,8 @@ export class LaCriptaServer {
       expeditionDefeated: false,
       lastEventBatch: null,
       doorOpeningTimer: null,
+      combatRoundTimer: null,
+      isResolvingRound: false,
       disconnectTimers: new Map(),
       nextEventBatchId: 1,
       dungeonStartGold: 45,
@@ -720,7 +734,26 @@ export class LaCriptaServer {
       }
 
       case 'ROOM_COMBAT_ACTION': {
-        this.handleRoomCombatAction(ws, room, player, msg.action, msg.targetEnemyId);
+        this.handleLockRoundAction(ws, room, player, {
+          actionType: msg.action,
+          targetEnemyId: msg.targetEnemyId,
+        });
+        break;
+      }
+
+      case 'LOCK_ROUND_ACTION': {
+        this.handleLockRoundAction(ws, room, player, {
+          actionType: msg.actionType,
+          abilityId: msg.abilityId,
+          targetEnemyId: msg.targetEnemyId,
+          targetPlayerId: msg.targetPlayerId,
+          itemSlotIndex: msg.itemSlotIndex,
+        });
+        break;
+      }
+
+      case 'UNLOCK_ROUND_ACTION': {
+        this.handleUnlockRoundAction(ws, room, player);
         break;
       }
 
@@ -1072,6 +1105,60 @@ export class LaCriptaServer {
       return;
     }
 
+    // In round-based combat, using an item counts as the player's normal action for the round!
+    if (inCombat) {
+      this.handleLockRoundAction(ws, room, player, {
+        actionType: 'ITEM',
+        itemSlotIndex: idx,
+        targetPlayerId,
+        targetEnemyId,
+      });
+      return;
+    }
+
+    const visualEvents: CriptaVisualEvent[] = [];
+    const logText = this.executeInventoryItemEffect(
+      room,
+      activeRoom,
+      player,
+      idx,
+      itemId,
+      targetPlayerId,
+      targetEnemyId,
+      visualEvents
+    );
+    if (logText) {
+      activeRoom.outcomeLog = logText;
+    }
+
+    this.emitVisualEventBatch(room, visualEvents, player.id, 'USE_ITEM');
+    this.syncLegacyNodes(room);
+    this.broadcastRoomState(room);
+  }
+
+  private executeInventoryItemEffect(
+    room: ServerCriptaRoom,
+    activeRoom: CriptaDungeonRoom,
+    player: CriptaPlayer,
+    slotIndex: number,
+    expectedItemId: CriptaItemId | undefined,
+    targetPlayerId: string | undefined,
+    targetEnemyId: string | undefined,
+    visualEvents: CriptaVisualEvent[]
+  ): string | null {
+    const inv = player.normalInventory || [];
+    let idx = slotIndex;
+    if (idx < 0 || idx >= inv.length || (expectedItemId && inv[idx] !== expectedItemId)) {
+      idx = expectedItemId ? inv.indexOf(expectedItemId) : -1;
+    }
+    if (idx < 0 || idx >= inv.length) return null;
+
+    const itemId = inv[idx];
+    const def = CRIPTA_ITEMS_REGISTRY[itemId];
+    if (!def) return null;
+
+    const livingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
+
     // Remove the consumed item from the slot
     player.normalInventory.splice(idx, 1);
     if (!room.runStats) room.runStats = buildDefaultRunStats();
@@ -1086,19 +1173,17 @@ export class LaCriptaServer {
       null;
 
     const ts = Date.now();
-    const turnNum = (activeRoom.combatTurn || 0) + 1;
-    const visualEvents: CriptaVisualEvent[] = [
-      {
-        id: `ev_${ts}_use_${itemId}`,
-        kind: 'ITEM_USED',
-        targetType: 'PLAYER',
-        targetId: player.id,
-        sourcePlayerId: player.id,
-        label: `USÓ ${def.name.toUpperCase()}`,
-        color: '#FFD166',
-        itemId,
-      },
-    ];
+    const turnNum = activeRoom.combatTurn || 1;
+    visualEvents.push({
+      id: `ev_${ts}_use_${itemId}`,
+      kind: 'ITEM_USED',
+      targetType: 'PLAYER',
+      targetId: player.id,
+      sourcePlayerId: player.id,
+      label: `USÓ ${def.name.toUpperCase()}`,
+      color: '#FFD166',
+      itemId,
+    });
 
     // Relic synergy: Frasco sin Fondo (+40% healing from potions & bandages)
     const hasBottomlessFlask =
@@ -1395,16 +1480,12 @@ export class LaCriptaServer {
       }
     }
 
-    // Check if an offensive item finished off the last enemy in the room
-    if (inCombat) {
-      this.checkAndResolveCombatVictoryIfCleared(room, activeRoom, player, [logText], visualEvents, ts);
-    } else {
-      activeRoom.outcomeLog = logText;
+    if (def.healAmount) {
+      player.recentHealingDone = (player.recentHealingDone || 0) + def.healAmount;
+      player.threatScore = (player.threatScore || 0) + Math.round(def.healAmount * 0.4);
     }
 
-    this.emitVisualEventBatch(room, visualEvents, player.id, 'USE_ITEM');
-    this.syncLegacyNodes(room);
-    this.broadcastRoomState(room);
+    return logText;
   }
 
   private handleClaimGroundDrop(
@@ -2048,12 +2129,36 @@ export class LaCriptaServer {
     this.broadcastRoomState(room);
   }
 
-  private handleRoomCombatAction(
+  private getPlayerInitiativeSpeed(player: CriptaPlayer): number {
+    switch (player.characterId) {
+      case 'picaro':
+        return 90;
+      case 'cazador':
+        return 80;
+      case 'alquimista':
+        return 70;
+      case 'mago':
+        return 60;
+      case 'clerigo':
+        return 50;
+      case 'caballero':
+        return 40;
+      default:
+        return 50;
+    }
+  }
+
+  private handleLockRoundAction(
     ws: WebSocket,
     room: ServerCriptaRoom,
     player: CriptaPlayer,
-    action: 'ATTACK' | 'ABILITY' | 'DEFEND',
-    targetEnemyId?: string
+    payload: {
+      actionType: CriptaPlayerRoundActionType;
+      abilityId?: string;
+      targetEnemyId?: string;
+      targetPlayerId?: string;
+      itemSlotIndex?: number;
+    }
   ) {
     if (!this.isInsideExploreOrBossPhase(room)) return;
     if (room.expeditionDefeated) return;
@@ -2074,8 +2179,51 @@ export class LaCriptaServer {
       return;
     }
 
-    activeRoom.combatTurn = (activeRoom.combatTurn || 0) + 1;
-    const currentTurn = activeRoom.combatTurn;
+    const currentRoundPhase = activeRoom.combatRoundPhase || 'PLAYER_PHASE';
+    if (currentRoundPhase !== 'PLAYER_PHASE' || room.isResolvingRound) {
+      // Prevent duplicate clicks or actions while resolving player/enemy phases
+      return;
+    }
+
+    if (!activeRoom.queuedPlayerActions) {
+      activeRoom.queuedPlayerActions = {};
+    }
+
+    // Validate ITEM action if chosen
+    let resolvedItemId: CriptaItemId | undefined;
+    if (payload.actionType === 'ITEM') {
+      const inv = player.normalInventory || [];
+      const idx = typeof payload.itemSlotIndex === 'number' ? payload.itemSlotIndex : 0;
+      if (idx < 0 || idx >= inv.length) {
+        this.sendError(ws, 'Selecciona un objeto válido de tu inventario.');
+        return;
+      }
+      const itemId = inv[idx];
+      const def = CRIPTA_ITEMS_REGISTRY[itemId];
+      if (!def || !def.combatUsable) {
+        this.sendError(ws, 'Ese objeto no se puede utilizar en combate.');
+        return;
+      }
+      resolvedItemId = itemId;
+    }
+
+    const validEnemy =
+      (payload.targetEnemyId && livingEnemies.find((e) => e.id === payload.targetEnemyId)) ||
+      livingEnemies[0];
+
+    const queued: CriptaQueuedPlayerAction = {
+      playerId: player.id,
+      actionType: payload.actionType,
+      abilityId: payload.abilityId,
+      targetEnemyId: validEnemy?.id,
+      targetPlayerId: payload.targetPlayerId,
+      itemSlotIndex: payload.itemSlotIndex,
+      itemId: resolvedItemId,
+      locked: true,
+      submittedAt: Date.now(),
+    };
+
+    activeRoom.queuedPlayerActions[player.id] = queued;
 
     if (!activeRoom.actedPlayerIdsThisRound) {
       activeRoom.actedPlayerIdsThisRound = [];
@@ -2084,8 +2232,312 @@ export class LaCriptaServer {
       activeRoom.actedPlayerIdsThisRound.push(player.id);
     }
 
-    let target =
-      livingEnemies.find((e) => e.id === targetEnemyId) || livingEnemies[0];
+    this.broadcastRoomState(room);
+    this.checkAndTriggerRoundResolutionIfReady(room);
+  }
+
+  private handleUnlockRoundAction(
+    _ws: WebSocket,
+    room: ServerCriptaRoom,
+    player: CriptaPlayer
+  ) {
+    if (!this.isInsideExploreOrBossPhase(room)) return;
+    const activeRoom = this.getActiveDungeonRoom(room);
+    if (!activeRoom || activeRoom.resolved) return;
+
+    const currentRoundPhase = activeRoom.combatRoundPhase || 'PLAYER_PHASE';
+    if (currentRoundPhase !== 'PLAYER_PHASE' || room.isResolvingRound) return;
+
+    if (activeRoom.queuedPlayerActions && activeRoom.queuedPlayerActions[player.id]) {
+      delete activeRoom.queuedPlayerActions[player.id];
+    }
+    if (activeRoom.actedPlayerIdsThisRound) {
+      activeRoom.actedPlayerIdsThisRound = activeRoom.actedPlayerIdsThisRound.filter(
+        (id) => id !== player.id
+      );
+    }
+    this.broadcastRoomState(room);
+  }
+
+  private checkAndTriggerRoundResolutionIfReady(room: ServerCriptaRoom) {
+    if (room.isResolvingRound) return;
+    const activeRoom = this.getActiveDungeonRoom(room);
+    if (!activeRoom || activeRoom.resolved) return;
+
+    const livingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
+    if (livingEnemies.length === 0) return;
+
+    const livingConnectedPlayers = room.players.filter(
+      (p) => p.isConnected && !p.isDead && p.hp > 0
+    );
+    if (livingConnectedPlayers.length === 0) return;
+
+    const queuedMap = activeRoom.queuedPlayerActions || {};
+    const allLocked = livingConnectedPlayers.every(
+      (p) => Boolean(queuedMap[p.id] && queuedMap[p.id].locked)
+    );
+
+    if (!allLocked) return;
+
+    // All living connected players have locked a valid action -> begin round resolution automatically!
+    this.runAuthoritativeRoundResolution(room, activeRoom);
+  }
+
+  private runAuthoritativeRoundResolution(
+    room: ServerCriptaRoom,
+    activeRoom: CriptaDungeonRoom
+  ) {
+    if (room.isResolvingRound) return;
+    room.isResolvingRound = true;
+
+    const currentRound = activeRoom.combatTurn || 1;
+    activeRoom.combatTurn = currentRound;
+    activeRoom.combatRoundPhase = 'RESOLVING_PLAYERS';
+    activeRoom.combatBannerText = `RONDA ${currentRound} — RESOLVIENDO ACCIONES`;
+    activeRoom.activeTargetedPlayerIds = [];
+
+    // Clear previous round's temporary player defense/protection flags before resolving new player actions
+    for (const p of room.players) {
+      p.isDefendingThisRound = false;
+      p.protectedByPlayerId = null;
+    }
+
+    // Sort locked player actions by deterministic initiative speed (then seatIndex)
+    const livingPlayers = room.players
+      .filter((p) => p.isConnected && !p.isDead && p.hp > 0)
+      .sort((a, b) => {
+        const spdDiff = this.getPlayerInitiativeSpeed(b) - this.getPlayerInitiativeSpeed(a);
+        if (spdDiff !== 0) return spdDiff;
+        return a.seatIndex - b.seatIndex;
+      });
+
+    const queuedMap = { ...(activeRoom.queuedPlayerActions || {}) };
+    const orderedPlayerQueue = livingPlayers
+      .map((p) => ({ player: p, action: queuedMap[p.id] }))
+      .filter(
+        (entry): entry is { player: CriptaPlayer; action: CriptaQueuedPlayerAction } =>
+          Boolean(entry.action)
+      );
+
+    this.broadcastRoomState(room);
+
+    const scheduleStep = (fn: () => void, delayMs: number) => {
+      if (room.combatRoundTimer) {
+        clearTimeout(room.combatRoundTimer);
+      }
+      room.combatRoundTimer = setTimeout(() => {
+        room.combatRoundTimer = null;
+        fn();
+      }, delayMs);
+    };
+
+    const stepPlayerAction = (idx: number) => {
+      if (room.expeditionDefeated || activeRoom.resolved) {
+        room.isResolvingRound = false;
+        activeRoom.activeCombatActorId = null;
+        this.broadcastRoomState(room);
+        return;
+      }
+
+      if (idx >= orderedPlayerQueue.length) {
+        // Player phase finished -> start ENEMY_PHASE_WARNING (~520ms)
+        const survivingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
+        if (survivingEnemies.length === 0) {
+          room.isResolvingRound = false;
+          activeRoom.activeCombatActorId = null;
+          this.broadcastRoomState(room);
+          return;
+        }
+
+        activeRoom.combatRoundPhase = 'ENEMY_PHASE_WARNING';
+        activeRoom.combatBannerText = 'FASE ENEMIGA';
+        activeRoom.activeCombatActorId = null;
+        activeRoom.activeTargetedPlayerIds = [];
+        this.broadcastRoomState(room);
+
+        scheduleStep(() => {
+          startEnemyPhaseResolution();
+        }, 520);
+        return;
+      }
+
+      const { player, action } = orderedPlayerQueue[idx];
+      if (player.isDead || player.hp <= 0) {
+        stepPlayerAction(idx + 1);
+        return;
+      }
+
+      activeRoom.activeCombatActorId = player.id;
+      const victoryOrPhase2 = this.executeSinglePlayerRoundAction(
+        room,
+        activeRoom,
+        player,
+        action,
+        currentRound
+      );
+
+      this.syncLegacyNodes(room);
+      this.broadcastRoomState(room);
+
+      if (victoryOrPhase2 || activeRoom.resolved || room.expeditionDefeated) {
+        room.isResolvingRound = false;
+        activeRoom.activeCombatActorId = null;
+        this.broadcastRoomState(room);
+        return;
+      }
+
+      scheduleStep(() => {
+        stepPlayerAction(idx + 1);
+      }, 430);
+    };
+
+    const startEnemyPhaseResolution = () => {
+      if (room.expeditionDefeated || activeRoom.resolved) {
+        room.isResolvingRound = false;
+        return;
+      }
+
+      activeRoom.combatRoundPhase = 'RESOLVING_ENEMIES';
+      const survivingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
+
+      // Clear enemy single-round defense/protection stances before enemies take their new round actions
+      for (const en of survivingEnemies) {
+        en.defendingRoundsRemaining = 0;
+        en.protectedByEnemyId = null;
+        tickEnemyCooldownsForNewRound(en);
+      }
+
+      const alreadyTargetedCounts: Record<string, number> = {};
+
+      const stepEnemyAction = (enemyIdx: number) => {
+        if (room.expeditionDefeated || activeRoom.resolved) {
+          room.isResolvingRound = false;
+          activeRoom.activeCombatActorId = null;
+          activeRoom.activeTargetedPlayerIds = [];
+          this.broadcastRoomState(room);
+          return;
+        }
+
+        const currentLivingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
+        if (enemyIdx >= currentLivingEnemies.length) {
+          // All surviving enemies have acted -> END_OF_ROUND resolution
+          scheduleStep(() => {
+            this.resolveEndOfCombatRound(room, activeRoom);
+          }, 420);
+          return;
+        }
+
+        const enemy = currentLivingEnemies[enemyIdx];
+        if (!enemy || enemy.hp <= 0) {
+          stepEnemyAction(enemyIdx + 1);
+          return;
+        }
+
+        activeRoom.activeCombatActorId = enemy.id;
+        this.executeSingleEnemyTacticalAction(
+          room,
+          activeRoom,
+          enemy,
+          alreadyTargetedCounts,
+          currentRound,
+          enemyIdx
+        );
+
+        this.syncLegacyNodes(room);
+        this.broadcastRoomState(room);
+
+        if (room.expeditionDefeated || activeRoom.resolved) {
+          room.isResolvingRound = false;
+          activeRoom.activeCombatActorId = null;
+          activeRoom.activeTargetedPlayerIds = [];
+          this.broadcastRoomState(room);
+          return;
+        }
+
+        scheduleStep(() => {
+          stepEnemyAction(enemyIdx + 1);
+        }, 620);
+      };
+
+      stepEnemyAction(0);
+    };
+
+    // Start stepping through locked player actions
+    scheduleStep(() => {
+      stepPlayerAction(0);
+    }, 180);
+  }
+
+  private executeSinglePlayerRoundAction(
+    room: ServerCriptaRoom,
+    activeRoom: CriptaDungeonRoom,
+    player: CriptaPlayer,
+    queued: CriptaQueuedPlayerAction,
+    currentTurn: number
+  ): boolean {
+    const livingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
+    if (livingEnemies.length === 0) return true;
+
+    const visualEvents: CriptaVisualEvent[] = [];
+    const logParts: string[] = [];
+    const ts = Date.now();
+
+    // Handle ITEM action
+    if (queued.actionType === 'ITEM') {
+      const itemLog = this.executeInventoryItemEffect(
+        room,
+        activeRoom,
+        player,
+        queued.itemSlotIndex ?? 0,
+        queued.itemId,
+        queued.targetPlayerId,
+        queued.targetEnemyId,
+        visualEvents
+      );
+      if (itemLog) {
+        logParts.push(itemLog);
+      } else {
+        logParts.push(`${player.name} intenta usar un objeto, pero ya fue consumido.`);
+      }
+
+      const victory = this.checkAndResolveCombatVictoryIfCleared(
+        room,
+        activeRoom,
+        player,
+        logParts,
+        visualEvents,
+        ts
+      );
+      if (!victory) {
+        activeRoom.outcomeLog = logParts.join(' ');
+      }
+      this.emitVisualEventBatch(room, visualEvents, player.id, 'USE_ITEM');
+      return victory;
+    }
+
+    const action = queued.actionType;
+
+    // Dead Target Fallback (Section 7): If the chosen target Enemy A died earlier in the phase,
+    // automatically retarget another living enemy!
+    let target = livingEnemies.find((e) => e.id === queued.targetEnemyId);
+    let retargetedFromDead = false;
+    if (!target) {
+      target = livingEnemies[0];
+      retargetedFromDead = Boolean(queued.targetEnemyId);
+    }
+
+    // Enemy Protection Redirection (Section 18, 19, 50):
+    // If the target enemy is protected by an ally enemy that is still alive, redirect the hit!
+    if (action !== 'DEFEND' && target.protectedByEnemyId) {
+      const protector = livingEnemies.find(
+        (e) => e.id === target!.protectedByEnemyId && e.hp > 0
+      );
+      if (protector && protector.id !== target.id) {
+        logParts.push(`¡${protector.name} intercepta el ataque dirigido a ${target.name}!`);
+        target = protector;
+      }
+    }
+
     const charDef = player.characterId
       ? CRIPTA_CHARACTERS_CATALOG[player.characterId]
       : null;
@@ -2094,10 +2546,6 @@ export class LaCriptaServer {
     const magStat = (charDef ? charDef.stats.magic : 4) + (player.bonusMagic || 0);
     const defStat = (charDef ? charDef.stats.defense : 5) + (player.bonusDefense || 0);
 
-    const visualEvents: CriptaVisualEvent[] = [];
-    const ts = Date.now();
-
-    // Class-specific VFX style
     const classVfx: NonNullable<CriptaVisualEvent['vfxStyle']> =
       player.characterId === 'mago'
         ? 'arcane'
@@ -2109,7 +2557,6 @@ export class LaCriptaServer {
         ? 'alchemy'
         : 'slash';
 
-    // 1. Check active player status modifiers (CONFUSION, FROST, CURSE, FEAR, WEAKENED, BLESSED, BLEED)
     const hasConfusion = Boolean(playerHasStatus(player, 'CONFUSION'));
     const hasFrost = Boolean(playerHasStatus(player, 'FROST'));
     const hasCurse = Boolean(playerHasStatus(player, 'CURSE'));
@@ -2134,25 +2581,28 @@ export class LaCriptaServer {
     if ((target.poisonStacks || 0) > 0 && this.hasPartyRelic(room, 'toxina_real')) {
       dmgMultiplier += 0.25;
     }
+    if ((target.vulnerableTurns || 0) > 0) {
+      dmgMultiplier += 0.2;
+    }
     dmgMultiplier = Math.max(0.45, dmgMultiplier);
 
-    const logParts: string[] = [];
+    if (retargetedFromDead && action !== 'DEFEND') {
+      logParts.push(`(Objetivo previo derrotado -> redirigido a ${target.name})`);
+    }
 
-    // Confusion check: may redirect attack or reduce accuracy
     if (hasConfusion && action !== 'DEFEND') {
-      const randomIdx = currentTurn % livingEnemies.length;
+      const randomIdx = (currentTurn + player.seatIndex) % livingEnemies.length;
       target = livingEnemies[randomIdx];
       dmgMultiplier *= 0.8;
       logParts.push(`¡CONFUSIÓN desvía el golpe de ${player.name} hacia ${target.name}!`);
     }
 
-    // Bleed on offensive action
     if (bleedInstance && (action === 'ATTACK' || action === 'ABILITY')) {
       const bleedDmg = 2 * Math.max(1, bleedInstance.stacks);
       player.hp = Math.max(1, player.hp - bleedDmg);
       logParts.push(`(${player.name} pierde -${bleedDmg} PV por SANGRADO al atacar)`);
       visualEvents.push({
-        id: `ev_${ts}_bleed_act`,
+        id: `ev_${ts}_bleed_act_${player.id}`,
         kind: 'DAMAGE_PLAYER',
         targetType: 'PLAYER',
         targetId: player.id,
@@ -2165,8 +2615,6 @@ export class LaCriptaServer {
     }
 
     const healMult = hasCurse ? 0.65 : 1;
-
-    // Critical hit determination (Pícaro & Cazador crit more frequently; Blessed also boosts crit)
     const critMod =
       player.characterId === 'picaro' || player.characterId === 'cazador' ? 2 : 3;
     const isCrit =
@@ -2177,48 +2625,76 @@ export class LaCriptaServer {
 
     if (!room.runStats) room.runStats = buildDefaultRunStats();
 
+    // Account for enemy defending armor bonus (Section 17 & 42)
+    const targetEffectiveArmor =
+      target.armor +
+      (target.armorBuffBonus || 0) +
+      ((target.defendingRoundsRemaining || 0) > 0 ? 4 : 0);
+
+    const recordPlayerDamageAndThreat = (enemyHit: CriptaRoomEnemy, dmgDealt: number) => {
+      player.recentDamageDealt = (player.recentDamageDealt || 0) + dmgDealt;
+      player.threatScore = (player.threatScore || 0) + Math.round(dmgDealt * 0.75);
+      if (!enemyHit.memory) {
+        enemyHit.memory = createInitialEnemyMemory();
+      }
+      enemyHit.memory.recentDamageByPlayer[player.id] =
+        (enemyHit.memory.recentDamageByPlayer[player.id] || 0) + dmgDealt;
+    };
+
     if (action === 'DEFEND') {
+      player.isDefendingThisRound = true;
+      player.threatScore = (player.threatScore || 0) + 6;
       const healAmt = Math.max(3, Math.round(6 * healMult));
-      // Reinforce living party armor, apply SHIELDED, and counter-strike
-      for (const p of room.players) {
-        if (!p.isDead && p.hp > 0) {
-          p.armor = Math.min(24, p.armor + 2);
-          p.hp = Math.min(p.maxHp, p.hp + healAmt);
-          room.runStats.healingDone += healAmt;
-          applyStatusEffectToPlayer(p, 'SHIELDED', player.id, currentTurn, 2);
-          visualEvents.push(
-            {
-              id: `ev_${ts}_def_${p.id}`,
-              kind: 'SHIELD_PLAYER',
-              targetType: 'PLAYER',
-              targetId: p.id,
-              sourcePlayerId: player.id,
-              value: 2,
-              label: '+2 ARMADURA',
-              sublabel: 'ESCUDO (2T)',
-              color: '#69A8A5',
-              statusType: 'SHIELDED',
-              vfxStyle: 'shield',
-            },
-            {
-              id: `ev_${ts}_def_heal_${p.id}`,
-              kind: 'HEAL_PLAYER',
-              targetType: 'PLAYER',
-              targetId: p.id,
-              value: healAmt,
-              label: `+${healAmt} PV`,
-              color: '#5EA87A',
-              vfxStyle: 'heal',
-            }
-          );
+      player.armor = Math.min(24, player.armor + 2);
+      player.hp = Math.min(player.maxHp, player.hp + healAmt);
+      room.runStats.healingDone += healAmt;
+      applyStatusEffectToPlayer(player, 'SHIELDED', player.id, currentTurn, 2);
+
+      // If Caballero defends, also protect the most wounded ally!
+      if (player.characterId === 'caballero') {
+        player.tauntTurnsRemaining = 1;
+        const woundedAlly = room.players
+          .filter((p) => p.id !== player.id && !p.isDead && p.hp > 0)
+          .sort((a, b) => a.hp / Math.max(1, a.maxHp) - b.hp / Math.max(1, b.maxHp))[0];
+        if (woundedAlly) {
+          woundedAlly.protectedByPlayerId = player.id;
         }
       }
+
+      visualEvents.push(
+        {
+          id: `ev_${ts}_def_${player.id}`,
+          kind: 'SHIELD_PLAYER',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          sourcePlayerId: player.id,
+          value: 2,
+          label: 'DEFENSA +2 ARMADURA',
+          sublabel: 'ESCUDO (2T)',
+          color: '#69A8A5',
+          statusType: 'SHIELDED',
+          vfxStyle: 'shield',
+        },
+        {
+          id: `ev_${ts}_def_heal_${player.id}`,
+          kind: 'HEAL_PLAYER',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          value: healAmt,
+          label: `+${healAmt} PV`,
+          color: '#5EA87A',
+          vfxStyle: 'heal',
+        }
+      );
+
       const prevTargetHp = target.hp;
-      const dmg = Math.max(4, Math.round(defStat * 1.4 * dmgMultiplier));
+      const dmg = Math.max(4, Math.round(defStat * 1.25 * dmgMultiplier));
       target.hp = Math.max(0, target.hp - dmg);
       room.runStats.damageDealt += dmg;
+      recordPlayerDamageAndThreat(target, dmg);
+
       visualEvents.push({
-        id: `ev_${ts}_def_strike_${target.id}`,
+        id: `ev_${ts}_def_strike_${target.id}_${player.id}`,
         kind: 'DAMAGE_ENEMY',
         targetType: 'ENEMY',
         targetId: target.id,
@@ -2233,7 +2709,7 @@ export class LaCriptaServer {
         this.handleEnemyKilledSideEffects(room, activeRoom, target, visualEvents, ts);
       }
       logParts.push(
-        `${player.name} alza la guardia (+2 ARMADURA, ESCUDO 2T) y golpea a ${target.name} (-${dmg} PV).`
+        `${player.name} adopta postura defensiva (+2 ARMADURA, ESCUDO, +${healAmt} PV) y golpea a ${target.name} (-${dmg} PV).`
       );
     } else if (action === 'ABILITY') {
       const abilityName = charDef?.abilities[0]?.name || 'Técnica Arcana';
@@ -2241,14 +2717,15 @@ export class LaCriptaServer {
       const critFactor = isCrit ? (hasCalizRelic ? 1.7 : 1.35) : 1;
       const dmg = Math.max(
         7,
-        Math.round((rawPower - target.armor * 0.3) * dmgMultiplier * critFactor)
+        Math.round((rawPower - targetEffectiveArmor * 0.35) * dmgMultiplier * critFactor)
       );
       const prevTargetHp = target.hp;
       target.hp = Math.max(0, target.hp - dmg);
       room.runStats.damageDealt += dmg;
+      recordPlayerDamageAndThreat(target, dmg);
 
       visualEvents.push({
-        id: `ev_${ts}_ab_${target.id}`,
+        id: `ev_${ts}_ab_${target.id}_${player.id}`,
         kind: isCrit ? 'CRIT_ENEMY' : 'DAMAGE_ENEMY',
         targetType: 'ENEMY',
         targetId: target.id,
@@ -2266,11 +2743,12 @@ export class LaCriptaServer {
       }
 
       if (player.characterId === 'clerigo') {
-        // Clérigo heals, purifies 1 debuff, and if an ally is fallen, revives them!
         const fallenAlly = room.players.find((p) => p.isDead || (p.characterId && p.hp <= 0));
         if (fallenAlly) {
           this.revivePlayerAuthoritatively(fallenAlly, 0.4, 'BLESSED', currentTurn);
           room.runStats.playersRevived += 1;
+          player.recentHealingDone = (player.recentHealingDone || 0) + fallenAlly.hp;
+          player.threatScore = (player.threatScore || 0) + 18;
           visualEvents.push({
             id: `ev_${ts}_cler_rev_${fallenAlly.id}`,
             kind: 'REVIVE_PLAYER',
@@ -2292,6 +2770,7 @@ export class LaCriptaServer {
             if (!p.isDead && p.hp > 0) {
               p.hp = Math.min(p.maxHp, p.hp + healAmt);
               room.runStats.healingDone += healAmt;
+              player.recentHealingDone = (player.recentHealingDone || 0) + healAmt;
               const removed = purifyPlayerDebuffs(p, 1);
               applyStatusEffectToPlayer(p, 'BLESSED', player.id, currentTurn, 2);
               visualEvents.push({
@@ -2308,16 +2787,21 @@ export class LaCriptaServer {
               });
             }
           }
+          player.threatScore = (player.threatScore || 0) + 14;
           logParts.push(
-            `${player.name} invoca ${abilityName} (-${dmg} PV a ${target.name}), restaura vida, purifica 1 aflicción y otorga BENDECIDO.`
+            `${player.name} invoca ${abilityName} (-${dmg} PV a ${target.name}), restaura +${healAmt} PV al grupo y purifica 1 aflicción.`
           );
         }
       } else if (player.characterId === 'alquimista') {
         const healAmt = Math.round(9 * healMult);
+        if (target.hp > 0) {
+          target.poisonStacks = (target.poisonStacks || 0) + 2;
+        }
         for (const p of room.players) {
           if (!p.isDead && p.hp > 0) {
             p.hp = Math.min(p.maxHp, p.hp + healAmt);
             room.runStats.healingDone += healAmt;
+            player.recentHealingDone = (player.recentHealingDone || 0) + healAmt;
             const removed = purifyPlayerDebuffs(p, 1);
             applyStatusEffectToPlayer(p, 'REGENERATION', player.id, currentTurn, 2);
             visualEvents.push({
@@ -2334,10 +2818,20 @@ export class LaCriptaServer {
             });
           }
         }
+        player.threatScore = (player.threatScore || 0) + 12;
         logParts.push(
-          `${player.name} lanza ${abilityName} (-${dmg} PV a ${target.name}), purifica toxinas y otorga REGENERACIÓN (2T).`
+          `${player.name} lanza ${abilityName} (-${dmg} PV y veneno a ${target.name}), purifica toxinas y otorga REGENERACIÓN.`
         );
       } else if (player.characterId === 'caballero') {
+        // Caballero provokes enemies and shields the party + protects the lowest HP ally!
+        player.tauntTurnsRemaining = 1;
+        player.threatScore = (player.threatScore || 0) + 22;
+        const woundedAlly = room.players
+          .filter((p) => p.id !== player.id && !p.isDead && p.hp > 0)
+          .sort((a, b) => a.hp / Math.max(1, a.maxHp) - b.hp / Math.max(1, b.maxHp))[0];
+        if (woundedAlly) {
+          woundedAlly.protectedByPlayerId = player.id;
+        }
         for (const p of room.players) {
           if (!p.isDead && p.hp > 0) {
             p.armor = Math.min(24, p.armor + 2);
@@ -2349,7 +2843,7 @@ export class LaCriptaServer {
               targetId: p.id,
               value: 2,
               label: '+2 ARMADURA',
-              sublabel: '+ESCUDO (2T)',
+              sublabel: p.id === player.id ? 'PROVOCACIÓN + ESCUDO' : '+ESCUDO (2T)',
               color: '#69A8A5',
               statusType: 'SHIELDED',
               vfxStyle: 'shield',
@@ -2357,18 +2851,22 @@ export class LaCriptaServer {
           }
         }
         logParts.push(
-          `${player.name} ejecuta ${abilityName} (-${dmg} PV a ${target.name}) y protege al grupo con ESCUDO (2T).`
+          `${player.name} ejecuta ${abilityName} (-${dmg} PV a ${target.name}), provoca a los enemigos y protege al grupo con ESCUDO.`
         );
       } else {
-        // Splash damage to other living enemies
+        // Mago / Cazador / Pícaro: high threat + splash damage or vulnerability
+        if (player.characterId === 'cazador' && target.hp > 0) {
+          target.vulnerableTurns = (target.vulnerableTurns || 0) + 2;
+        }
         for (const other of livingEnemies) {
-          if (other.id !== target.id) {
+          if (other.id !== target.id && other.hp > 0) {
             const prevOtherHp = other.hp;
             const splashDmg = Math.round(dmg * 0.45);
             other.hp = Math.max(0, other.hp - splashDmg);
             room.runStats.damageDealt += splashDmg;
+            recordPlayerDamageAndThreat(other, splashDmg);
             visualEvents.push({
-              id: `ev_${ts}_splash_${other.id}`,
+              id: `ev_${ts}_splash_${other.id}_${player.id}`,
               kind: 'DAMAGE_ENEMY',
               targetType: 'ENEMY',
               targetId: other.id,
@@ -2393,14 +2891,15 @@ export class LaCriptaServer {
       const critFactor = isCrit ? (hasCalizRelic ? 1.8 : 1.45) : 1;
       const dmg = Math.max(
         5,
-        Math.round((rawDmg - target.armor * 0.5) * dmgMultiplier * critFactor)
+        Math.round((rawDmg - targetEffectiveArmor * 0.5) * dmgMultiplier * critFactor)
       );
       const prevTargetHp = target.hp;
       target.hp = Math.max(0, target.hp - dmg);
       room.runStats.damageDealt += dmg;
+      recordPlayerDamageAndThreat(target, dmg);
 
       visualEvents.push({
-        id: `ev_${ts}_atk_${target.id}`,
+        id: `ev_${ts}_atk_${target.id}_${player.id}`,
         kind: isCrit ? 'CRIT_ENEMY' : 'DAMAGE_ENEMY',
         targetType: 'ENEMY',
         targetId: target.id,
@@ -2417,14 +2916,13 @@ export class LaCriptaServer {
         this.handleEnemyKilledSideEffects(room, activeRoom, target, visualEvents, ts);
       }
 
-      // Passive Relic: Espina Viva poisons target and deals +6 extra damage
       if (playerHasRelic(player, room.partyRelics || [], 'espina_viva') && target.hp > 0) {
         target.poisonStacks = (target.poisonStacks || 0) + 1;
         const prevHp = target.hp;
         target.hp = Math.max(0, target.hp - 6);
         room.runStats.damageDealt += 6;
         visualEvents.push({
-          id: `ev_${ts}_thorn_atk_${target.id}`,
+          id: `ev_${ts}_thorn_atk_${target.id}_${player.id}`,
           kind: 'DAMAGE_ENEMY',
           targetType: 'ENEMY',
           targetId: target.id,
@@ -2438,11 +2936,11 @@ export class LaCriptaServer {
       }
 
       logParts.push(
-        `${player.name} ataca a ${target.name} e inflige ${isCrit ? '¡DAÑO CRÍTICO! ' : ''}${dmg} de daño.`
+        `${player.name} ataca a ${target.name} (${isCrit ? '¡CRÍTICO! ' : ''}-${dmg} PV).`
       );
     }
 
-    const victoryOrPhaseTriggered = this.checkAndResolveCombatVictoryIfCleared(
+    const victoryOrPhase2 = this.checkAndResolveCombatVictoryIfCleared(
       room,
       activeRoom,
       player,
@@ -2451,96 +2949,382 @@ export class LaCriptaServer {
       ts
     );
 
-    if (!victoryOrPhaseTriggered) {
-      const remainingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
-      // 2. Living enemy counterattack + Biome Status Application
-      const attacker = remainingEnemies[0];
-      const hasFrostDebuff = Boolean(playerHasStatus(player, 'FROST'));
-      const effectiveArmor = hasFrostDebuff ? Math.max(0, player.armor - 2) : player.armor;
-      const shieldBuff = playerHasStatus(player, 'SHIELDED');
-      const markedDebuff = playerHasStatus(player, 'MARKED');
+    if (!victoryOrPhase2) {
+      activeRoom.outcomeLog = logParts.join(' ');
+    }
 
-      const mitigation = Math.min(
-        attacker.intentValue - 3,
-        Math.round(effectiveArmor * 0.6) + (shieldBuff ? shieldBuff.potency : 0)
-      );
-      let netDamage = Math.max(4, attacker.intentValue - Math.max(0, mitigation));
+    this.emitVisualEventBatch(room, visualEvents, player.id, action);
+    return victoryOrPhase2;
+  }
 
-      if (markedDebuff) {
-        netDamage = Math.round(netDamage * 1.35);
-        // Consume MARKED after boosted hit
-        player.statuses = player.statuses.filter((s) => s.effectType !== 'MARKED');
-        logParts.push(`¡MARCADO amplifica el golpe!`);
-      }
+  private executeSingleEnemyTacticalAction(
+    room: ServerCriptaRoom,
+    activeRoom: CriptaDungeonRoom,
+    enemy: CriptaRoomEnemy,
+    alreadyTargetedThisRoundCounts: Record<string, number>,
+    currentRound: number,
+    enemyStepIndex: number
+  ) {
+    const decision = chooseEnemyTacticalAction(
+      enemy,
+      activeRoom,
+      room.players,
+      alreadyTargetedThisRoundCounts,
+      room.dungeonSeed || room.seed,
+      currentRound,
+      enemyStepIndex
+    );
 
-      // Real damage: player HP can reach 0!
-      player.hp = Math.max(0, player.hp - netDamage);
-      room.runStats.damageReceived += netDamage;
+    if (!decision) return;
+
+    const { ability, actionKind, targetPlayers, targetAllyEnemy } = decision;
+    const visualEvents: CriptaVisualEvent[] = [];
+    const logParts: string[] = [];
+    const ts = Date.now();
+
+    activeRoom.activeTargetedPlayerIds = targetPlayers.map((p) => p.id);
+    activeRoom.combatBannerText = `FASE ENEMIGA — ${enemy.name.toUpperCase()} · ${ability.name.toUpperCase()}`;
+
+    // Track multi-enemy target distribution for anti-focus-fire fairness
+    for (const tp of targetPlayers) {
+      alreadyTargetedThisRoundCounts[tp.id] =
+        (alreadyTargetedThisRoundCounts[tp.id] || 0) + 1;
+    }
+
+    // 1. HEAL_SELF or HEAL_ALLY (Section 16 & 49: e.g. Chamán Fúngico)
+    if (actionKind === 'HEAL_SELF' || actionKind === 'HEAL_ALLY') {
+      const healTarget = targetAllyEnemy || enemy;
+      const pctHeal = Math.round(healTarget.maxHp * (ability.healPercentOfMax || 0.2));
+      const rawHeal = Math.max(ability.healAmount || 16, pctHeal);
+      const beforeHp = healTarget.hp;
+      healTarget.hp = Math.min(healTarget.maxHp, healTarget.hp + rawHeal);
+      const actualHeal = Math.max(1, healTarget.hp - beforeHp);
 
       visualEvents.push(
         {
-          id: `ev_${ts}_en_lunge_${attacker.id}`,
+          id: `ev_${ts}_en_cast_${enemy.id}`,
           kind: 'ENEMY_ATTACK',
           targetType: 'ENEMY',
-          targetId: attacker.id,
-          label: `${attacker.intent} -${netDamage}`,
-          color: '#C93B5B',
-          vfxStyle: 'claw',
+          targetId: enemy.id,
+          label: ability.name.toUpperCase(),
+          sublabel: healTarget.id === enemy.id ? 'AUTOCURACIÓN' : `CURA A ${healTarget.name.toUpperCase()}`,
+          color: '#5EA87A',
+          vfxStyle: 'alchemy',
         },
         {
-          id: `ev_${ts}_p_hit_${player.id}`,
-          kind: 'DAMAGE_PLAYER',
-          targetType: 'PLAYER',
-          targetId: player.id,
-          value: -netDamage,
-          label: `-${netDamage} PV`,
-          sublabel: attacker.name.toUpperCase(),
-          color: '#C93B5B',
-          vfxStyle: 'claw',
+          id: `ev_${ts}_en_heal_${healTarget.id}`,
+          kind: 'HEAL_ENEMY',
+          targetType: 'ENEMY',
+          targetId: healTarget.id,
+          value: actualHeal,
+          label: `+${actualHeal} PV`,
+          sublabel: ability.name.toUpperCase(),
+          color: '#5EA87A',
+          vfxStyle: 'heal',
         }
       );
 
-      // Passive Relic: Espina Viva reflects 3 damage to attacker
-      if (playerHasRelic(player, room.partyRelics || [], 'espina_viva') && attacker.hp > 0) {
-        const prevAttHp = attacker.hp;
-        attacker.hp = Math.max(0, attacker.hp - 3);
+      logParts.push(
+        healTarget.id === enemy.id
+          ? `¡${enemy.name} canaliza ${ability.name} y restaura +${actualHeal} PV!`
+          : `¡${enemy.name} alza su báculo con ${ability.name} y cura a ${healTarget.name} (+${actualHeal} PV)!`
+      );
+      activeRoom.outcomeLog = logParts.join(' ');
+      this.emitVisualEventBatch(room, visualEvents, enemy.id, 'ENEMY_HEAL');
+      return;
+    }
+
+    // 2. DEFEND_SELF (Section 17 & 42)
+    if (actionKind === 'DEFEND_SELF') {
+      const armorGain = ability.armorBonus || 4;
+      enemy.defendingRoundsRemaining = 1;
+      enemy.armorBuffBonus = armorGain;
+      enemy.armorBuffRounds = 1;
+
+      visualEvents.push({
+        id: `ev_${ts}_en_def_${enemy.id}`,
+        kind: 'DEFEND_ENEMY',
+        targetType: 'ENEMY',
+        targetId: enemy.id,
+        value: armorGain,
+        label: `DEFENSA +${armorGain}`,
+        sublabel: ability.name.toUpperCase(),
+        color: '#69A8A5',
+        vfxStyle: 'shield',
+      });
+
+      logParts.push(
+        `¡${enemy.name} adopta ${ability.name} y refuerza su defensa (+${armorGain} ARMADURA por 1 ronda)!`
+      );
+      activeRoom.outcomeLog = logParts.join(' ');
+      this.emitVisualEventBatch(room, visualEvents, enemy.id, 'ENEMY_DEFEND');
+      return;
+    }
+
+    // 3. PROTECT_ALLY (Section 18, 19, 50: e.g. Guardián / Gólem protecting wounded ally or shaman)
+    if (actionKind === 'PROTECT_ALLY') {
+      const protectedAlly =
+        targetAllyEnemy ||
+        activeRoom.enemies.find((e) => e.hp > 0 && e.id !== enemy.id) ||
+        enemy;
+      if (protectedAlly.id !== enemy.id) {
+        protectedAlly.protectedByEnemyId = enemy.id;
+        if (!enemy.memory) enemy.memory = createInitialEnemyMemory();
+        enemy.memory.protectedAllyId = protectedAlly.id;
+      }
+      const armorGain = ability.armorBonus || 3;
+      enemy.defendingRoundsRemaining = 1;
+      enemy.armorBuffBonus = armorGain;
+
+      visualEvents.push({
+        id: `ev_${ts}_en_prot_${protectedAlly.id}`,
+        kind: 'PROTECT_ENEMY',
+        targetType: 'ENEMY',
+        targetId: protectedAlly.id,
+        value: armorGain,
+        label: `PROTEGIDO POR ${enemy.name.toUpperCase()}`,
+        sublabel: ability.name.toUpperCase(),
+        color: '#69A8A5',
+        vfxStyle: 'shield',
+      });
+
+      logParts.push(
+        `¡${enemy.name} usa ${ability.name} y se interpone para PROTEGER a ${protectedAlly.name}!`
+      );
+      activeRoom.outcomeLog = logParts.join(' ');
+      this.emitVisualEventBatch(room, visualEvents, enemy.id, 'ENEMY_PROTECT');
+      return;
+    }
+
+    // 4. BUFF_ALLY (Section 42: Commander / Support buffing allies)
+    if (actionKind === 'BUFF_ALLY') {
+      const livingAllies = activeRoom.enemies.filter((e) => e.hp > 0);
+      const atkBonus = ability.attackBonus || 3;
+      const armBonus = ability.armorBonus || 2;
+      for (const ally of livingAllies) {
+        ally.attackBuffBonus = atkBonus;
+        ally.attackBuffRounds = 2;
+        ally.armorBuffBonus = Math.max(ally.armorBuffBonus || 0, armBonus);
+        ally.armorBuffRounds = 2;
+        visualEvents.push({
+          id: `ev_${ts}_en_buff_${ally.id}`,
+          kind: 'BUFF_ENEMY',
+          targetType: 'ENEMY',
+          targetId: ally.id,
+          value: atkBonus,
+          label: `+${atkBonus} ATQ / +${armBonus} DEF`,
+          sublabel: ability.name.toUpperCase(),
+          color: '#E7A54A',
+          vfxStyle: 'holy',
+        });
+      }
+      logParts.push(
+        `¡${enemy.name} entona ${ability.name} y potencia a las fuerzas enemigas (+${atkBonus} ATAQUE, +${armBonus} DEFENSA)!`
+      );
+      activeRoom.outcomeLog = logParts.join(' ');
+      this.emitVisualEventBatch(room, visualEvents, enemy.id, 'ENEMY_BUFF');
+      return;
+    }
+
+    // 5. PREPARE_ATTACK (Section 41: Telegraphed heavy attack preparation)
+    if (actionKind === 'PREPARE_ATTACK') {
+      if (!enemy.memory) enemy.memory = createInitialEnemyMemory();
+      enemy.memory.preparedAbilityId = ability.id;
+      enemy.memory.preparedTargetIds = targetPlayers.map((p) => p.id);
+      enemy.preparedTelegraphLabel =
+        ability.telegraphLabel || `PREPARANDO: ${ability.name.toUpperCase()}`;
+      enemy.intent = 'CATACLISMO';
+      enemy.intentCategory = 'TELEGRAPH';
+
+      visualEvents.push({
+        id: `ev_${ts}_en_tele_${enemy.id}`,
+        kind: 'TELEGRAPH_ENEMY',
+        targetType: 'ENEMY',
+        targetId: enemy.id,
+        label: `⚠ ${enemy.preparedTelegraphLabel}`,
+        sublabel: '¡DEFENDEOS O INTERRUMPID EL ATAQUE!',
+        color: '#FFD166',
+        vfxStyle: 'arcane',
+      });
+
+      logParts.push(
+        `⚠ ¡${enemy.name} acumula energía oscura (${enemy.preparedTelegraphLabel})! Se desatará en la siguiente ronda.`
+      );
+      activeRoom.outcomeLog = logParts.join(' ');
+      this.emitVisualEventBatch(room, visualEvents, enemy.id, 'ENEMY_TELEGRAPH');
+      return;
+    }
+
+    // 6. SUMMON (Section 43: Controlled summon with cap <= 3 enemies)
+    if (actionKind === 'SUMMON') {
+      const livingAllies = activeRoom.enemies.filter((e) => e.hp > 0);
+      if (livingAllies.length < 3) {
+        const summonHp = Math.max(18, Math.round(enemy.maxHp * 0.28));
+        const summonedBase: CriptaRoomEnemy = {
+          id: `summon_${currentRound}_${Date.now()}`,
+          slug: enemy.isFinalBoss ? 'esquirla_del_vacio' : 'engendro_invocado',
+          name: enemy.isFinalBoss ? 'Esquirla del Vacío' : 'Siervo de la Cripta',
+          title: 'INVOCACIÓN',
+          isElite: false,
+          isBoss: false,
+          hp: summonHp,
+          maxHp: summonHp,
+          attack: Math.max(7, Math.round(enemy.attack * 0.65)),
+          armor: 1,
+          intent: 'ATAQUE',
+          intentCategory: 'ATTACK',
+          intentValue: Math.max(7, Math.round(enemy.attack * 0.65)),
+          accentColor: enemy.accentColor,
+          statusThreat: enemy.statusThreat,
+          spriteArchetype: enemy.spriteArchetype,
+        };
+        const aiBuilt = buildEnemyAiProfileForArchetype(summonedBase, activeRoom.index);
+        activeRoom.enemies.push({
+          ...summonedBase,
+          roleTag: aiBuilt.roleTag,
+          aiProfile: aiBuilt.aiProfile,
+          memory: createInitialEnemyMemory(),
+        });
+        visualEvents.push({
+          id: `ev_${ts}_en_sum_${enemy.id}`,
+          kind: 'BUFF_ENEMY',
+          targetType: 'ENEMY',
+          targetId: enemy.id,
+          label: `¡INVOCÓ A ${summonedBase.name.toUpperCase()}!`,
+          color: '#9B72CF',
+          vfxStyle: 'arcane',
+        });
+        logParts.push(`¡${enemy.name} invoca un ${summonedBase.name} (${summonHp} PV) al combate!`);
+        activeRoom.outcomeLog = logParts.join(' ');
+        this.emitVisualEventBatch(room, visualEvents, enemy.id, 'ENEMY_SUMMON');
+        return;
+      }
+    }
+
+    // 7. OFFENSIVE / STATUS / BOSS ACTIONS against 1 or multiple targetPlayers
+    const effectiveEnemyAttack = enemy.attack + (enemy.attackBuffBonus || 0);
+    const dmgMult = ability.damageMultiplier ?? 1.0;
+
+    visualEvents.push({
+      id: `ev_${ts}_en_lunge_${enemy.id}`,
+      kind: 'ENEMY_ATTACK',
+      targetType: 'ENEMY',
+      targetId: enemy.id,
+      label: ability.name.toUpperCase(),
+      color: '#C93B5B',
+      vfxStyle: 'claw',
+    });
+
+    for (let tIdx = 0; tIdx < targetPlayers.length; tIdx++) {
+      let targetPlayer = targetPlayers[tIdx];
+      if (!targetPlayer || targetPlayer.isDead || targetPlayer.hp <= 0) {
+        // Fallback to any living player if the chosen player died earlier in the enemy phase
+        const fallbackPlayer = room.players.find((p) => p.isConnected && !p.isDead && p.hp > 0);
+        if (!fallbackPlayer) break;
+        targetPlayer = fallbackPlayer;
+      }
+
+      // Check if an allied player (e.g. Caballero) is protecting this player!
+      let interceptedByProtector: CriptaPlayer | null = null;
+      if (
+        targetPlayer.protectedByPlayerId &&
+        targetPlayer.protectedByPlayerId !== targetPlayer.id &&
+        targetPlayers.length === 1
+      ) {
+        const protector = room.players.find(
+          (p) =>
+            p.id === targetPlayer.protectedByPlayerId &&
+            p.isConnected &&
+            !p.isDead &&
+            p.hp > 0
+        );
+        if (protector) {
+          interceptedByProtector = protector;
+          targetPlayer = protector;
+        }
+      }
+
+      const hasFrostDebuff = Boolean(playerHasStatus(targetPlayer, 'FROST'));
+      const effectiveArmor = hasFrostDebuff
+        ? Math.max(0, targetPlayer.armor - 2)
+        : targetPlayer.armor;
+      const shieldBuff = playerHasStatus(targetPlayer, 'SHIELDED');
+      const markedDebuff = playerHasStatus(targetPlayer, 'MARKED');
+
+      let rawEnemyDmg = Math.round(effectiveEnemyAttack * dmgMult);
+      if (
+        ability.comboAfterStatus &&
+        playerHasStatus(targetPlayer, ability.comboAfterStatus)
+      ) {
+        rawEnemyDmg = Math.round(rawEnemyDmg * (ability.comboBonusMultiplier || 1.3));
+      }
+
+      const mitigation = Math.min(
+        rawEnemyDmg - 3,
+        Math.round(effectiveArmor * 0.55) + (shieldBuff ? shieldBuff.potency : 0)
+      );
+      let netDamage = Math.max(3, rawEnemyDmg - Math.max(0, mitigation));
+
+      if (targetPlayer.isDefendingThisRound) {
+        netDamage = Math.max(2, Math.round(netDamage * 0.62));
+      }
+
+      if (markedDebuff) {
+        netDamage = Math.round(netDamage * 1.35);
+        targetPlayer.statuses = targetPlayer.statuses.filter((s) => s.effectType !== 'MARKED');
+        logParts.push(`¡MARCADO amplifica el golpe sobre ${targetPlayer.name}!`);
+      }
+
+      targetPlayer.hp = Math.max(0, targetPlayer.hp - netDamage);
+      if (!room.runStats) room.runStats = buildDefaultRunStats();
+      room.runStats.damageReceived += netDamage;
+
+      visualEvents.push({
+        id: `ev_${ts}_p_hit_${targetPlayer.id}_${tIdx}`,
+        kind: 'DAMAGE_PLAYER',
+        targetType: 'PLAYER',
+        targetId: targetPlayer.id,
+        value: -netDamage,
+        label: `-${netDamage} PV`,
+        sublabel: interceptedByProtector
+          ? `INTERCEPTÓ POR ALIADO · ${ability.name.toUpperCase()}`
+          : `${enemy.name.toUpperCase()} · ${ability.name.toUpperCase()}`,
+        color: '#C93B5B',
+        vfxStyle: 'claw',
+      });
+
+      // Relic: Espina Viva reflects 3 damage to attacker
+      if (
+        playerHasRelic(targetPlayer, room.partyRelics || [], 'espina_viva') &&
+        enemy.hp > 0
+      ) {
+        const prevAttHp = enemy.hp;
+        enemy.hp = Math.max(0, enemy.hp - 3);
         room.runStats.damageDealt += 3;
         visualEvents.push({
-          id: `ev_${ts}_thorn_${attacker.id}`,
+          id: `ev_${ts}_thorn_${enemy.id}_${targetPlayer.id}`,
           kind: 'DAMAGE_ENEMY',
           targetType: 'ENEMY',
-          targetId: attacker.id,
+          targetId: enemy.id,
           value: -3,
           label: '-3 PV',
           sublabel: 'ESPINA VIVA',
           color: '#E7A54A',
         });
-        if (prevAttHp > 0 && attacker.hp <= 0) {
-          this.handleEnemyKilledSideEffects(room, activeRoom, attacker, visualEvents, ts);
+        if (prevAttHp > 0 && enemy.hp <= 0) {
+          this.handleEnemyKilledSideEffects(room, activeRoom, enemy, visualEvents, ts);
         }
       }
 
-      // Apply biome status effect if enemy intent is AFLICCIÓN / MALDICIÓN or on Elite/Boss strikes
-      const shouldInflictStatus =
-        player.hp > 0 &&
-        attacker.statusThreat &&
-        (attacker.intent === 'AFLICCIÓN' ||
-          attacker.intent === 'MALDICIÓN' ||
-          attacker.isBoss ||
-          attacker.isElite ||
-          currentTurn % 2 === 1);
-
-      let statusAppliedLog = '';
-      if (shouldInflictStatus && attacker.statusThreat) {
-        const statusToApply =
-          currentTurn % 3 === 0 && attacker.statusSecondaryThreat
-            ? attacker.statusSecondaryThreat
-            : attacker.statusThreat;
+      // Apply status if ability specifies statusToApply
+      let statusLog = '';
+      if (targetPlayer.hp > 0 && ability.statusToApply) {
         const applied = applyStatusEffectToPlayer(
-          player,
-          statusToApply,
-          attacker.id,
-          currentTurn
+          targetPlayer,
+          ability.statusToApply,
+          enemy.id,
+          currentRound,
+          ability.statusTurns || 2
         );
         if (applied) {
           if (
@@ -2550,115 +3334,225 @@ export class LaCriptaServer {
             applied.remainingTurns = Math.max(1, applied.remainingTurns - 1);
           }
           const sDef = CRIPTA_STATUS_EFFECTS_REGISTRY[applied.effectType];
-          const abilityLabel = attacker.abilityName ? ` con ${attacker.abilityName}` : '';
-          statusAppliedLog = ` y aplica ${applied.name} (${applied.remainingTurns}T)${abilityLabel}`;
+          statusLog = ` y aplica ${applied.name} (${applied.remainingTurns}T)`;
           visualEvents.push({
-            id: `ev_${ts}_st_${player.id}`,
+            id: `ev_${ts}_st_${targetPlayer.id}_${tIdx}`,
             kind: 'STATUS_APPLIED',
             targetType: 'PLAYER',
-            targetId: player.id,
+            targetId: targetPlayer.id,
             label: `+${applied.name} (${applied.remainingTurns}T)`,
-            sublabel: attacker.abilityName || undefined,
+            sublabel: ability.name,
             color: sDef?.visualTreatment.color || '#E7A54A',
             statusType: applied.effectType,
           });
         }
       }
 
-      // Cycle enemy intent
-      const nextIntents: CriptaDungeonRoom['enemies'][0]['intent'][] = [
-        'ATAQUE',
-        'AFLICCIÓN',
-        'GUARDIA',
-        'MALDICIÓN',
-        'FURIA',
-      ];
-      attacker.intent =
-        nextIntents[(attacker.hp + currentTurn) % nextIntents.length];
-
       logParts.push(
-        `${attacker.name} contraataca (-${netDamage} PV${statusAppliedLog}).`
+        interceptedByProtector
+          ? `¡${targetPlayer.name} protege a su aliado y recibe ${ability.name} de ${enemy.name} (-${netDamage} PV${statusLog})!`
+          : `${enemy.name} usa ${ability.name} contra ${targetPlayer.name} (-${netDamage} PV${statusLog}).`
       );
 
-      // Check if player died from direct hit
-      if (player.hp <= 0) {
-        player.hp = 0;
-        player.isDead = true;
-        player.deathsCount = (player.deathsCount || 0) + 1;
-        player.statuses = [];
-        logParts.push(`¡${player.name} ha CAÍDO en combate!`);
+      if (targetPlayer.hp <= 0) {
+        targetPlayer.hp = 0;
+        targetPlayer.isDead = true;
+        targetPlayer.deathsCount = (targetPlayer.deathsCount || 0) + 1;
+        targetPlayer.statuses = [];
+        logParts.push(`¡${targetPlayer.name} ha CAÍDO en combate!`);
         this.broadcastMessage(room, {
           type: 'NOTIFICATION',
-          text: `¡${player.name} ha caído en combate!`,
+          text: `¡${targetPlayer.name} ha caído en combate!`,
           variant: 'danger',
         });
-      } else {
-        // 3. End-of-turn status ticks (POISON, BURN, BLEED, REGENERATION)
-        const tickResult = resolvePlayerTurnEndStatusTicks(player);
-        if (tickResult.damageTaken > 0) {
-          room.runStats.damageReceived += tickResult.damageTaken;
-          visualEvents.push({
-            id: `ev_${ts}_dot_${player.id}`,
-            kind: 'DAMAGE_PLAYER',
-            targetType: 'PLAYER',
-            targetId: player.id,
-            value: -tickResult.damageTaken,
-            label: `-${tickResult.damageTaken} PV`,
-            sublabel: 'AFLICCIÓN',
-            color: '#C93B5B',
-          });
-        }
-        if (tickResult.healedAmount > 0) {
-          room.runStats.healingDone += tickResult.healedAmount;
-          visualEvents.push({
-            id: `ev_${ts}_hot_${player.id}`,
-            kind: 'HEAL_PLAYER',
-            targetType: 'PLAYER',
-            targetId: player.id,
-            value: tickResult.healedAmount,
-            label: `+${tickResult.healedAmount} PV`,
-            sublabel: 'REGENERACIÓN',
-            color: '#5EA87A',
-            statusType: 'REGENERATION',
-          });
-        }
-        if (tickResult.logSegments.length > 0) {
-          logParts.push(`[${tickResult.logSegments.join(' · ')}]`);
-        }
-        if (tickResult.diedFromStatus) {
-          this.broadcastMessage(room, {
-            type: 'NOTIFICATION',
-            text: `¡${player.name} ha caído por sus aflicciones!`,
-            variant: 'danger',
-          });
-        }
       }
-
-      // Advance turn pointer to next living connected player
-      const livingConnected = room.players.filter(
-        (p) => p.isConnected && !p.isDead && p.hp > 0
-      );
-      if (
-        activeRoom.actedPlayerIdsThisRound &&
-        activeRoom.actedPlayerIdsThisRound.length >= livingConnected.length
-      ) {
-        activeRoom.actedPlayerIdsThisRound = [];
-      }
-      activeRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(
-        room,
-        activeRoom,
-        player.id
-      );
-
-      // Check if entire party is defeated
-      if (this.checkAndApplyPartyDefeat(room)) {
-        logParts.push('¡TODA LA EXPEDICIÓN HA CAÍDO EN LA CRIPTA!');
-      }
-
-      activeRoom.outcomeLog = logParts.join(' ');
     }
 
-    this.emitVisualEventBatch(room, visualEvents, player.id, action);
+    // Check if Espina Viva killed the last enemy
+    this.checkAndResolveCombatVictoryIfCleared(
+      room,
+      activeRoom,
+      room.players[0],
+      logParts,
+      visualEvents,
+      ts
+    );
+
+    if (this.checkAndApplyPartyDefeat(room)) {
+      logParts.push('¡TODA LA EXPEDICIÓN HA CAÍDO EN LA CRIPTA!');
+    }
+
+    activeRoom.outcomeLog = logParts.join(' ');
+    this.emitVisualEventBatch(room, visualEvents, enemy.id, 'ENEMY_ACTION');
+  }
+
+  private resolveEndOfCombatRound(
+    room: ServerCriptaRoom,
+    activeRoom: CriptaDungeonRoom
+  ) {
+    if (room.expeditionDefeated || activeRoom.resolved) {
+      room.isResolvingRound = false;
+      return;
+    }
+
+    activeRoom.combatRoundPhase = 'END_OF_ROUND';
+    const ts = Date.now();
+    const visualEvents: CriptaVisualEvent[] = [];
+    const logParts: string[] = [];
+
+    // 1. Resolve enemy end-of-round Poison stacks & decrement temporary buffs/vulnerability
+    for (const enemy of activeRoom.enemies) {
+      if (enemy.hp <= 0) continue;
+      if ((enemy.poisonStacks || 0) > 0) {
+        const pDmg = enemy.poisonStacks! * 4;
+        const prevHp = enemy.hp;
+        enemy.hp = Math.max(0, enemy.hp - pDmg);
+        if (!room.runStats) room.runStats = buildDefaultRunStats();
+        room.runStats.damageDealt += pDmg;
+        visualEvents.push({
+          id: `ev_${ts}_en_pois_${enemy.id}`,
+          kind: 'DAMAGE_ENEMY',
+          targetType: 'ENEMY',
+          targetId: enemy.id,
+          value: -pDmg,
+          label: `-${pDmg} PV (VENENO)`,
+          color: '#5EA87A',
+        });
+        logParts.push(`${enemy.name} sufre -${pDmg} PV por veneno.`);
+        enemy.poisonStacks = Math.max(0, (enemy.poisonStacks || 0) - 1);
+        if (prevHp > 0 && enemy.hp <= 0) {
+          this.handleEnemyKilledSideEffects(room, activeRoom, enemy, visualEvents, ts);
+        }
+      }
+      if ((enemy.vulnerableTurns || 0) > 0) {
+        enemy.vulnerableTurns = Math.max(0, enemy.vulnerableTurns! - 1);
+      }
+      if ((enemy.attackBuffRounds || 0) > 0) {
+        enemy.attackBuffRounds = Math.max(0, enemy.attackBuffRounds! - 1);
+        if (enemy.attackBuffRounds === 0) enemy.attackBuffBonus = 0;
+      }
+      if ((enemy.armorBuffRounds || 0) > 0) {
+        enemy.armorBuffRounds = Math.max(0, enemy.armorBuffRounds! - 1);
+        if (enemy.armorBuffRounds === 0) enemy.armorBuffBonus = 0;
+      }
+    }
+
+    const clearedByPoison = this.checkAndResolveCombatVictoryIfCleared(
+      room,
+      activeRoom,
+      room.players[0],
+      logParts,
+      visualEvents,
+      ts
+    );
+
+    if (clearedByPoison) {
+      room.isResolvingRound = false;
+      activeRoom.activeCombatActorId = null;
+      activeRoom.activeTargetedPlayerIds = [];
+      this.emitVisualEventBatch(room, visualEvents, undefined, 'END_OF_ROUND');
+      this.syncLegacyNodes(room);
+      this.broadcastRoomState(room);
+      return;
+    }
+
+    // 2. Resolve player end-of-round status ticks (POISON, BURN, BLEED, REGENERATION)
+    for (const player of room.players) {
+      if (!player.isConnected || player.isDead || player.hp <= 0) continue;
+
+      const tickResult = resolvePlayerTurnEndStatusTicks(player);
+      if (tickResult.damageTaken > 0) {
+        if (!room.runStats) room.runStats = buildDefaultRunStats();
+        room.runStats.damageReceived += tickResult.damageTaken;
+        visualEvents.push({
+          id: `ev_${ts}_dot_${player.id}`,
+          kind: 'DAMAGE_PLAYER',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          value: -tickResult.damageTaken,
+          label: `-${tickResult.damageTaken} PV`,
+          sublabel: 'FIN DE RONDA · AFLICCIÓN',
+          color: '#C93B5B',
+        });
+      }
+      if (tickResult.healedAmount > 0) {
+        if (!room.runStats) room.runStats = buildDefaultRunStats();
+        room.runStats.healingDone += tickResult.healedAmount;
+        visualEvents.push({
+          id: `ev_${ts}_hot_${player.id}`,
+          kind: 'HEAL_PLAYER',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          value: tickResult.healedAmount,
+          label: `+${tickResult.healedAmount} PV`,
+          sublabel: 'REGENERACIÓN',
+          color: '#5EA87A',
+          statusType: 'REGENERATION',
+        });
+      }
+      if (tickResult.logSegments.length > 0) {
+        logParts.push(`[${player.name}: ${tickResult.logSegments.join(' · ')}]`);
+      }
+      if (tickResult.diedFromStatus) {
+        this.broadcastMessage(room, {
+          type: 'NOTIFICATION',
+          text: `¡${player.name} ha caído por sus aflicciones!`,
+          variant: 'danger',
+        });
+      }
+
+      // Decay short-term threat & recent counters for next round
+      player.recentDamageDealt = Math.round((player.recentDamageDealt || 0) * 0.5);
+      player.recentHealingDone = Math.round((player.recentHealingDone || 0) * 0.5);
+      player.threatScore = Math.round((player.threatScore || 0) * 0.7);
+      player.isDefendingThisRound = false;
+      if ((player.tauntTurnsRemaining || 0) > 0) {
+        player.tauntTurnsRemaining = Math.max(0, player.tauntTurnsRemaining! - 1);
+      }
+    }
+
+    if (this.checkAndApplyPartyDefeat(room)) {
+      logParts.push('¡TODA LA EXPEDICIÓN HA CAÍDO EN LA CRIPTA!');
+      activeRoom.outcomeLog = logParts.join(' ');
+      room.isResolvingRound = false;
+      activeRoom.activeCombatActorId = null;
+      activeRoom.activeTargetedPlayerIds = [];
+      this.emitVisualEventBatch(room, visualEvents, undefined, 'END_OF_ROUND');
+      this.syncLegacyNodes(room);
+      this.broadcastRoomState(room);
+      return;
+    }
+
+    // 3. Advance to NEXT ROUND -> PLAYER_PHASE
+    const nextRound = (activeRoom.combatTurn || 1) + 1;
+    activeRoom.combatTurn = nextRound;
+    activeRoom.combatRoundPhase = 'PLAYER_PHASE';
+    activeRoom.combatBannerText = `RONDA ${nextRound} — FASE DE JUGADORES`;
+    activeRoom.queuedPlayerActions = {};
+    activeRoom.actedPlayerIdsThisRound = [];
+    activeRoom.activeCombatActorId = null;
+    activeRoom.activeTargetedPlayerIds = [];
+
+    // Update visible enemy intents for the new round
+    for (const enemy of activeRoom.enemies) {
+      if (enemy.hp > 0) {
+        refreshEnemyIntentPreview(
+          enemy,
+          activeRoom,
+          room.players,
+          room.dungeonSeed || room.seed
+        );
+      }
+    }
+
+    if (logParts.length > 0) {
+      activeRoom.outcomeLog = `${logParts.join(' ')} — Comienza la RONDA ${nextRound}.`;
+    }
+
+    room.isResolvingRound = false;
+    if (visualEvents.length > 0) {
+      this.emitVisualEventBatch(room, visualEvents, undefined, 'END_OF_ROUND');
+    }
     this.syncLegacyNodes(room);
     this.broadcastRoomState(room);
   }
@@ -3529,6 +4423,12 @@ export class LaCriptaServer {
     }
 
     if (nextRoom.enemies.length > 0) {
+      nextRoom.combatTurn = 1;
+      nextRoom.combatRoundPhase = 'PLAYER_PHASE';
+      nextRoom.combatBannerText = 'RONDA 1 — FASE DE JUGADORES';
+      nextRoom.queuedPlayerActions = {};
+      nextRoom.activeCombatActorId = null;
+      nextRoom.activeTargetedPlayerIds = [];
       nextRoom.actedPlayerIdsThisRound = [];
       nextRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, nextRoom);
     }
@@ -3717,6 +4617,7 @@ export class LaCriptaServer {
       this.evaluateAndResolveDoorVotes(room);
     } else {
       this.broadcastRoomState(room);
+      this.checkAndTriggerRoundResolutionIfReady(room);
     }
 
     // Preserve character ownership during the 25s reconnect grace window
@@ -3743,6 +4644,7 @@ export class LaCriptaServer {
 
     if (room.players.length === 0) {
       if (room.doorOpeningTimer) clearTimeout(room.doorOpeningTimer);
+      if (room.combatRoundTimer) clearTimeout(room.combatRoundTimer);
       this.rooms.delete(room.roomCode);
       roomRegistry.unregister(room.roomCode);
       return;

@@ -1,4 +1,4 @@
-import {
+import type {
   CriptaDungeonId,
   CriptaPlayer,
   CriptaPlayerStatusEffect,

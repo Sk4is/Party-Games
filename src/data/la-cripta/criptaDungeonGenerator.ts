@@ -1,4 +1,4 @@
-import {
+import type {
   CriptaCanonicalRoomType,
   CriptaDungeonId,
   CriptaDungeonLengthTier,
@@ -8,6 +8,10 @@ import {
   CriptaRoomNode,
 } from '../../types/laCripta';
 import { CRIPTA_DUNGEONS_REGISTRY } from './criptaCatalog';
+import {
+  buildEnemyAiProfileForArchetype,
+  createInitialEnemyMemory,
+} from './criptaEnemyAiEngine';
 import {
   CRIPTA_STATUS_EFFECTS_REGISTRY,
   DUNGEON_BIOME_THREAT_PROFILES,
@@ -265,6 +269,23 @@ const ROOM_TYPE_SUBTITLES: Record<CriptaCanonicalRoomType, string> = {
   BOSS: 'JEFE DE LA MAZMORRA · EL ENFRENTAMIENTO FINAL',
 };
 
+function enrichEnemyInstance(enemy: CriptaRoomEnemy, roomIndex: number): CriptaRoomEnemy {
+  const { roleTag, aiProfile } = buildEnemyAiProfileForArchetype(enemy, roomIndex);
+  return {
+    ...enemy,
+    roleTag,
+    aiProfile,
+    memory: createInitialEnemyMemory(),
+    defendingRoundsRemaining: 0,
+    protectedByEnemyId: null,
+    attackBuffBonus: 0,
+    attackBuffRounds: 0,
+    armorBuffBonus: 0,
+    armorBuffRounds: 0,
+    preparedTelegraphLabel: null,
+  };
+}
+
 function buildEnemiesForRoom(
   dungeonId: CriptaDungeonId,
   roomType: 'COMBAT' | 'ELITE' | 'BOSS',
@@ -283,25 +304,29 @@ function buildEnemiesForRoom(
     const bossSlug = dungeon.bossPool[0] || 'guardian_del_abismo';
     const bossMaxHp = Math.round(95 * scaleFactor);
     return [
-      {
-        id: `enemy_boss_${roomIndex}_0`,
-        slug: bossSlug,
-        name: formatSlugTitle(bossSlug),
-        title: `Señor de ${dungeon.name}`,
-        isElite: false,
-        isBoss: true,
-        hp: bossMaxHp,
-        maxHp: bossMaxHp,
-        attack: Math.round(14 + roomIndex * 1.2),
-        armor: 6,
-        intent: 'AFLICCIÓN',
-        intentValue: Math.round(15 + roomIndex * 1.2),
-        accentColor: dungeon.palette.glow,
-        statusThreat: threatProfile.primaryStatus,
-        statusSecondaryThreat: threatProfile.secondaryStatus,
-        abilityName: threatProfile.bossAbilityLabel,
-        spriteArchetype: config.spriteArchetype,
-      },
+      enrichEnemyInstance(
+        {
+          id: `enemy_boss_${roomIndex}_0`,
+          slug: bossSlug,
+          name: formatSlugTitle(bossSlug),
+          title: `Señor de ${dungeon.name}`,
+          isElite: false,
+          isBoss: true,
+          hp: bossMaxHp,
+          maxHp: bossMaxHp,
+          attack: Math.round(14 + roomIndex * 1.2),
+          armor: 6,
+          intent: 'AFLICCIÓN',
+          intentCategory: 'MAGIC',
+          intentValue: Math.round(15 + roomIndex * 1.2),
+          accentColor: dungeon.palette.glow,
+          statusThreat: threatProfile.primaryStatus,
+          statusSecondaryThreat: threatProfile.secondaryStatus,
+          abilityName: threatProfile.bossAbilityLabel,
+          spriteArchetype: config.spriteArchetype,
+        },
+        roomIndex
+      ),
     ];
   }
 
@@ -310,25 +335,29 @@ function buildEnemiesForRoom(
       dungeon.elitePool[Math.floor(rng() * dungeon.elitePool.length)] || 'campeon_maldito';
     const eliteMaxHp = Math.round(62 * scaleFactor);
     return [
-      {
-        id: `enemy_elite_${roomIndex}_0`,
-        slug: eliteSlug,
-        name: formatSlugTitle(eliteSlug),
-        title: 'Campeón de Élite',
-        isElite: true,
-        isBoss: false,
-        hp: eliteMaxHp,
-        maxHp: eliteMaxHp,
-        attack: Math.round(11 + roomIndex),
-        armor: 4,
-        intent: 'AFLICCIÓN',
-        intentValue: Math.round(12 + roomIndex),
-        accentColor: dungeon.palette.highlight,
-        statusThreat: threatProfile.primaryStatus,
-        statusSecondaryThreat: threatProfile.secondaryStatus,
-        abilityName: threatProfile.enemyAbilityLabel,
-        spriteArchetype: config.spriteArchetype,
-      },
+      enrichEnemyInstance(
+        {
+          id: `enemy_elite_${roomIndex}_0`,
+          slug: eliteSlug,
+          name: formatSlugTitle(eliteSlug),
+          title: 'Campeón de Élite',
+          isElite: true,
+          isBoss: false,
+          hp: eliteMaxHp,
+          maxHp: eliteMaxHp,
+          attack: Math.round(11 + roomIndex),
+          armor: 4,
+          intent: 'AFLICCIÓN',
+          intentCategory: 'ATTACK',
+          intentValue: Math.round(12 + roomIndex),
+          accentColor: dungeon.palette.highlight,
+          statusThreat: threatProfile.primaryStatus,
+          statusSecondaryThreat: threatProfile.secondaryStatus,
+          abilityName: threatProfile.enemyAbilityLabel,
+          spriteArchetype: config.spriteArchetype,
+        },
+        roomIndex
+      ),
     ];
   }
 
@@ -336,34 +365,55 @@ function buildEnemiesForRoom(
   const count = playerCount <= 1 ? (rng() > 0.45 ? 2 : 1) : rng() > 0.55 ? 3 : 2;
   const enemies: CriptaRoomEnemy[] = [];
   for (let i = 0; i < count; i++) {
-    const slug =
+    let slug =
       dungeon.enemyPool[(roomIndex + i) % Math.max(1, dungeon.enemyPool.length)] ||
       'centinela_de_cripta';
+
+    // Ensure rich tactical variety across multi-enemy encounters (Tank, Healer/Shaman, Controller, Predator)
+    if (count >= 2 && i === 1 && (roomIndex + i) % 3 === 0) {
+      slug =
+        config.spriteArchetype === 'plague_bloom'
+          ? 'chaman_fungico'
+          : config.spriteArchetype === 'skeleton_warrior' ||
+            config.spriteArchetype === 'bone_colossus'
+          ? 'acolyto_de_hueso_chaman'
+          : `${slug}_chaman`;
+    } else if (count >= 2 && i === 0 && roomIndex % 2 === 1) {
+      slug = `${slug}_guardian`;
+    }
+
     const baseHp = count === 1 ? 38 : count === 2 ? 26 : 22;
     const maxHp = Math.round(baseHp * scaleFactor);
     const intents: CriptaRoomEnemy['intent'][] = ['ATAQUE', 'AFLICCIÓN', 'GUARDIA', 'MALDICIÓN'];
     const intent = intents[(roomIndex + i) % intents.length];
     const assignedStatus =
       i % 2 === 0 ? threatProfile.primaryStatus : threatProfile.secondaryStatus;
-    enemies.push({
-      id: `enemy_${roomIndex}_${i}`,
-      slug,
-      name: formatSlugTitle(slug),
-      title: `Guardián de ${dungeon.name}`,
-      isElite: false,
-      isBoss: false,
-      hp: maxHp,
-      maxHp,
-      attack: Math.round(7 + roomIndex * 0.8),
-      armor: 2 + (i % 2),
-      intent,
-      intentValue: Math.round(7 + roomIndex * 0.8),
-      accentColor: dungeon.palette.glow,
-      statusThreat: assignedStatus,
-      statusSecondaryThreat: threatProfile.secondaryStatus,
-      abilityName: threatProfile.enemyAbilityLabel,
-      spriteArchetype: config.spriteArchetype,
-    });
+    enemies.push(
+      enrichEnemyInstance(
+        {
+          id: `enemy_${roomIndex}_${i}`,
+          slug,
+          name: formatSlugTitle(slug),
+          title: `Guardián de ${dungeon.name}`,
+          isElite: false,
+          isBoss: false,
+          hp: maxHp,
+          maxHp,
+          attack: Math.round(7 + roomIndex * 0.8),
+          armor: 2 + (i % 2),
+          intent,
+          intentCategory:
+            intent === 'GUARDIA' ? 'DEFEND' : intent === 'ATAQUE' ? 'ATTACK' : 'MAGIC',
+          intentValue: Math.round(7 + roomIndex * 0.8),
+          accentColor: dungeon.palette.glow,
+          statusThreat: assignedStatus,
+          statusSecondaryThreat: threatProfile.secondaryStatus,
+          abilityName: threatProfile.enemyAbilityLabel,
+          spriteArchetype: config.spriteArchetype,
+        },
+        roomIndex + i
+      )
+    );
   }
   return enemies;
 }
@@ -798,6 +848,12 @@ export function generateProceduralDungeon(
       groundDrops: [],
       shopInventory,
       puzzleRunes,
+      combatTurn: isCombatLike ? 1 : undefined,
+      combatRoundPhase: isCombatLike ? 'PLAYER_PHASE' : undefined,
+      combatBannerText: isCombatLike ? 'RONDA 1 — FASE DE JUGADORES' : null,
+      queuedPlayerActions: isCombatLike ? {} : undefined,
+      activeCombatActorId: null,
+      activeTargetedPlayerIds: [],
       secretHook:
         idx === secretHostIndex
           ? {

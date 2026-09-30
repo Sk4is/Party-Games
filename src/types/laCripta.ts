@@ -271,6 +271,125 @@ export interface CriptaPlayerStatusEffect {
   appliedAtTurn: number;
 }
 
+export type CriptaEnemyAiPersonality =
+  | 'CHAOTIC'
+  | 'AGGRESSIVE'
+  | 'OPPORTUNIST'
+  | 'TACTICAL'
+  | 'PROTECTOR'
+  | 'SUPPORT'
+  | 'CONTROLLER'
+  | 'PREDATOR'
+  | 'BERSERKER'
+  | 'COWARD'
+  | 'COMMANDER'
+  | 'BOSS';
+
+export type CriptaEnemyActionKind =
+  | 'ATTACK'
+  | 'SPECIAL_ATTACK'
+  | 'APPLY_STATUS'
+  | 'HEAL_SELF'
+  | 'HEAL_ALLY'
+  | 'DEFEND_SELF'
+  | 'DEFEND_ALLY'
+  | 'BUFF_ALLY'
+  | 'DEBUFF_PLAYER'
+  | 'PROTECT_ALLY'
+  | 'PREPARE_ATTACK'
+  | 'SUMMON'
+  | 'SPECIAL_BOSS_ACTION';
+
+export type CriptaEnemyTargetScope =
+  | 'ONE_PLAYER'
+  | 'MULTIPLE_PLAYERS'
+  | 'ALL_PLAYERS'
+  | 'RANDOM_N_PLAYERS'
+  | 'SELF'
+  | 'ALLY_ENEMY';
+
+export interface CriptaEnemyAbilityDefinition {
+  id: string;
+  name: string;
+  actionKind: CriptaEnemyActionKind;
+  targetScope: CriptaEnemyTargetScope;
+  randomTargetsCount?: number;
+  basePriority: number;
+  cooldownRounds?: number;
+  maxCharges?: number;
+  damageMultiplier?: number;
+  healAmount?: number;
+  healPercentOfMax?: number;
+  armorBonus?: number;
+  attackBonus?: number;
+  statusToApply?: CriptaStatusEffectType;
+  statusTurns?: number;
+  requiresTelegraph?: boolean;
+  telegraphLabel?: string;
+  comboAfterStatus?: CriptaStatusEffectType;
+  comboBonusMultiplier?: number;
+  minAllyMissingHpRatio?: number;
+  maxSelfHpRatio?: number;
+}
+
+export interface CriptaEnemyAiProfile {
+  personality: CriptaEnemyAiPersonality;
+  aggression: number;
+  selfPreservation: number;
+  allyProtection: number;
+  statusPreference: number;
+  coordination?: number;
+  randomness: number;
+  targetWeights: {
+    lowHp: number;
+    lowDefense: number;
+    highThreat: number;
+    highMagic?: number;
+    highAttack?: number;
+    vulnerableOrDebuffed?: number;
+  };
+  abilities?: CriptaEnemyAbilityDefinition[];
+  phase2Profile?: Partial<CriptaEnemyAiProfile>;
+}
+
+export interface CriptaEnemyMemory {
+  lastTargetId?: string | null;
+  timesTargetedPlayer: Record<string, number>;
+  consecutiveTargetCount?: number;
+  lastAbilityId?: string | null;
+  recentDamageByPlayer: Record<string, number>;
+  protectedAllyId?: string | null;
+  abilityCooldowns: Record<string, number>;
+  abilityChargesUsed: Record<string, number>;
+  preparedAbilityId?: string | null;
+  preparedTargetIds?: string[];
+}
+
+export type CriptaPlayerRoundActionType = 'ATTACK' | 'ABILITY' | 'ITEM' | 'DEFEND';
+
+export type CriptaCombatRoundPhase =
+  | 'PLAYER_PHASE'
+  | 'RESOLVING_PLAYERS'
+  | 'ENEMY_PHASE_WARNING'
+  | 'ENEMY_PHASE'
+  | 'RESOLVING_ENEMIES'
+  | 'END_OF_ROUND'
+  | 'ROUND_END';
+
+export interface CriptaQueuedPlayerAction {
+  playerId: string;
+  actionType: CriptaPlayerRoundActionType | 'USE_ITEM';
+  abilityId?: string;
+  targetId?: string;
+  targetEnemyId?: string;
+  targetPlayerId?: string;
+  itemSlotIndex?: number;
+  itemId?: CriptaItemId;
+  locked?: boolean;
+  lockedAt?: number;
+  submittedAt?: number;
+}
+
 export type CriptaRoomEnemy = {
   id: string;
   slug: string;
@@ -284,14 +403,40 @@ export type CriptaRoomEnemy = {
   maxHp: number;
   attack: number;
   armor: number;
-  intent: 'ATAQUE' | 'GUARDIA' | 'MALDICIÓN' | 'FURIA' | 'AFLICCIÓN' | 'CATACLISMO' | 'INVOCACIÓN';
+  intent:
+    | 'ATAQUE'
+    | 'GUARDIA'
+    | 'MALDICIÓN'
+    | 'FURIA'
+    | 'AFLICCIÓN'
+    | 'CATACLISMO'
+    | 'INVOCACIÓN'
+    | 'CURACIÓN'
+    | 'DEFENSA'
+    | 'PROTECCIÓN'
+    | 'PREPARANDO';
   intentValue: number;
+  intentCategory?: 'ATTACK' | 'DEFEND' | 'MAGIC' | 'HEAL' | 'SPECIAL' | 'TELEGRAPH';
   accentColor: string;
   statusThreat?: CriptaStatusEffectType;
   statusSecondaryThreat?: CriptaStatusEffectType;
   abilityName?: string;
   poisonStacks?: number;
   vulnerableTurns?: number;
+  roleTag?: 'TANK' | 'HEALER' | 'CASTER' | 'ASSASSIN' | 'BRUTE' | 'SWARM' | 'SUPPORT' | 'BOSS';
+  aiProfile?: CriptaEnemyAiProfile;
+  memory?: CriptaEnemyMemory;
+  isDefending?: boolean;
+  defendingRoundsRemaining?: number;
+  armorBuffBonus?: number;
+  armorBuffRounds?: number;
+  attackBuffBonus?: number;
+  attackBuffRounds?: number;
+  protectingEnemyId?: string | null;
+  protectedByEnemyId?: string | null;
+  protectedByEnemyName?: string | null;
+  preparedTelegraphLabel?: string | null;
+  lastTargetedPlayerIds?: string[];
   spriteArchetype:
     | 'skeleton_warrior'
     | 'plague_bloom'
@@ -506,6 +651,12 @@ export interface CriptaDungeonRoom {
   outcomeLog: string | null;
   biomeVariant: number;
   combatTurn?: number;
+  combatRoundPhase?: CriptaCombatRoundPhase;
+  combatBannerText?: string | null;
+  queuedPlayerActions?: Record<string, CriptaQueuedPlayerAction>;
+  activeCombatActorId?: string | null;
+  activeEnemyActorId?: string | null;
+  activeTargetedPlayerIds?: string[];
   activeTurnPlayerId?: string | null;
   actedPlayerIdsThisRound?: string[];
   enemies: CriptaRoomEnemy[];
@@ -531,6 +682,12 @@ export type CriptaVisualEventKind =
   | 'CRIT_ENEMY'
   | 'ENEMY_DEATH'
   | 'ENEMY_ATTACK'
+  | 'HEAL_ENEMY'
+  | 'DEFEND_ENEMY'
+  | 'BUFF_ENEMY'
+  | 'SHIELD_ENEMY'
+  | 'PROTECT_ENEMY'
+  | 'TELEGRAPH_ENEMY'
   | 'DAMAGE_PLAYER'
   | 'HEAL_PLAYER'
   | 'SHIELD_PLAYER'
@@ -542,6 +699,8 @@ export type CriptaVisualEventKind =
   | 'STATUS_APPLIED'
   | 'STATUS_REMOVED'
   | 'LOOT_ITEM'
+  | 'ITEM_ACQUIRED'
+  | 'ITEM_CONSUMED'
   | 'RELIC_OBTAINED'
   | 'RELIC_ACQUIRED'
   | 'ITEM_USED'
@@ -556,6 +715,7 @@ export interface CriptaVisualEvent {
   targetType: 'ENEMY' | 'PLAYER' | 'PARTY' | 'ROOM';
   targetId?: string;
   sourcePlayerId?: string;
+  sourceEnemyId?: string;
   value?: number;
   label: string;
   sublabel?: string;
@@ -586,6 +746,8 @@ export interface CriptaVisualEventBatch {
   createdAt: number;
   actorPlayerId?: string;
   actorAction?: string;
+  actorEnemyId?: string;
+  targetedPlayerIds?: string[];
   events: CriptaVisualEvent[];
 }
 
@@ -627,6 +789,14 @@ export interface CriptaPlayer {
   isDead?: boolean;
   deathsCount?: number;
   statuses: CriptaPlayerStatusEffect[];
+  /** Internal combat threat & protection/taunt tracking */
+  threatScore?: number;
+  recentDamageDealt?: number;
+  recentHealingDone?: number;
+  isDefendingThisRound?: boolean;
+  tauntTurnsRemaining?: number;
+  protectedByPlayerId?: string | null;
+  votedFinalBossDoor?: boolean;
 }
 
 export type CriptaPhase =
@@ -753,6 +923,17 @@ export type CriptaClientMessage =
       type: 'ROOM_COMBAT_ACTION';
       action: 'ATTACK' | 'ABILITY' | 'DEFEND';
       targetEnemyId?: string;
+    }
+  | {
+      type: 'LOCK_ROUND_ACTION';
+      actionType: CriptaPlayerRoundActionType;
+      abilityId?: string;
+      targetEnemyId?: string;
+      targetPlayerId?: string;
+      itemSlotIndex?: number;
+    }
+  | {
+      type: 'UNLOCK_ROUND_ACTION';
     }
   | {
       type: 'USE_INVENTORY_ITEM';

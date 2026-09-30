@@ -4,6 +4,7 @@ import {
   CriptaClientMessage,
   CriptaDungeonId,
   CriptaExpeditionState,
+  CriptaPlayerRoundActionType,
   CriptaRemoteCursor,
   CriptaSceneId,
   CriptaServerMessage,
@@ -562,6 +563,30 @@ export function useLaCriptaSocket({
     [sendMessage]
   );
 
+  const sendLockRoundAction = useCallback(
+    (payload: {
+      actionType: CriptaPlayerRoundActionType;
+      abilityId?: string;
+      targetEnemyId?: string;
+      targetPlayerId?: string;
+      itemSlotIndex?: number;
+    }) => {
+      sendMessage({
+        type: 'LOCK_ROUND_ACTION',
+        actionType: payload.actionType,
+        abilityId: payload.abilityId,
+        targetEnemyId: payload.targetEnemyId,
+        targetPlayerId: payload.targetPlayerId,
+        itemSlotIndex: payload.itemSlotIndex,
+      });
+    },
+    [sendMessage]
+  );
+
+  const sendUnlockRoundAction = useCallback(() => {
+    sendMessage({ type: 'UNLOCK_ROUND_ACTION' });
+  }, [sendMessage]);
+
   const sendUseInventoryItem = useCallback(
     (slotIndex: number, targetPlayerId?: string, targetEnemyId?: string) => {
       sendMessage({
@@ -672,6 +697,8 @@ export function useLaCriptaSocket({
     voteFinalBossDoor,
     retryDungeonInit,
     sendCombatAction,
+    sendLockRoundAction,
+    sendUnlockRoundAction,
     sendUseInventoryItem,
     sendClaimGroundDrop,
     sendBuyShopSlot,

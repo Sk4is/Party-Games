@@ -1,4 +1,4 @@
-import {
+import type {
   CriptaAcquiredRelic,
   CriptaDungeonId,
   CriptaDungeonRoom,
@@ -11,6 +11,10 @@ import {
   CriptaRoomGroundDrop,
   CriptaShopSlot,
 } from '../../types/laCripta';
+import {
+  buildEnemyAiProfileForArchetype,
+  createInitialEnemyMemory,
+} from './criptaEnemyAiEngine';
 
 export const NORMAL_INVENTORY_MAX_SLOTS = 6;
 
@@ -577,14 +581,14 @@ export function generateShopInventoryForRoom(
 export function buildFinalBossChamber(
   seed: number,
   playerCount: number,
-  completedDungeonIds: CriptaDungeonId[]
+  completedDungeonIds: CriptaDungeonId[] = []
 ): CriptaDungeonRoom {
   const partyScale = 1 + Math.max(0, playerCount - 1) * 0.42;
   const phase1Hp = Math.round(135 * partyScale);
 
-  const primaryDungeonId = completedDungeonIds[2] || 'el_abismo';
+  const primaryDungeonId = completedDungeonIds?.[2] || 'el_abismo';
 
-  const bossPhase1: CriptaRoomEnemy = {
+  const bossPhase1Base: CriptaRoomEnemy = {
     id: `final_boss_core_${seed}`,
     slug: 'soberano_del_umbral',
     name: 'Malkorath, Soberano Encadenado',
@@ -598,6 +602,7 @@ export function buildFinalBossChamber(
     attack: 16,
     armor: 5,
     intent: 'MALDICIÓN',
+    intentCategory: 'MAGIC',
     intentValue: 16,
     accentColor: '#E7A54A',
     statusThreat: 'CURSE',
@@ -606,6 +611,15 @@ export function buildFinalBossChamber(
     poisonStacks: 0,
     vulnerableTurns: 0,
     spriteArchetype: 'final_boss_phase1',
+  };
+  const p1Ai = buildEnemyAiProfileForArchetype(bossPhase1Base, 0);
+  const bossPhase1: CriptaRoomEnemy = {
+    ...bossPhase1Base,
+    roleTag: p1Ai.roleTag,
+    aiProfile: p1Ai.aiProfile,
+    memory: createInitialEnemyMemory(),
+    defendingRoundsRemaining: 0,
+    protectedByEnemyId: null,
   };
 
   return {
@@ -626,6 +640,11 @@ export function buildFinalBossChamber(
     outcomeLog: null,
     biomeVariant: 0,
     combatTurn: 1,
+    combatRoundPhase: 'PLAYER_PHASE',
+    combatBannerText: 'RONDA 1 — FASE DE JUGADORES',
+    queuedPlayerActions: {},
+    activeCombatActorId: null,
+    activeTargetedPlayerIds: [],
     activeTurnPlayerId: null,
     actedPlayerIdsThisRound: [],
     enemies: [bossPhase1],
@@ -652,7 +671,7 @@ export function transformFinalBossToPhase2(
   room.narrative =
     '¡LAS CADENAS SE ROMPEN! El Corazón de la Cripta abre sus alas abisales, invoca una Esquirla del Vacío y desata ataques grupales.';
 
-  const bossPhase2: CriptaRoomEnemy = {
+  const bossPhase2Base: CriptaRoomEnemy = {
     id: `final_boss_core_${seed}`,
     slug: 'corazon_de_la_cripta',
     name: 'El Corazón Desatado de la Cripta',
@@ -666,6 +685,7 @@ export function transformFinalBossToPhase2(
     attack: 20,
     armor: 4,
     intent: 'CATACLISMO',
+    intentCategory: 'TELEGRAPH',
     intentValue: 19,
     accentColor: '#C93B5B',
     statusThreat: 'BURN',
@@ -675,10 +695,19 @@ export function transformFinalBossToPhase2(
     vulnerableTurns: 1,
     spriteArchetype: 'final_boss_phase2',
   };
+  const p2Ai = buildEnemyAiProfileForArchetype(bossPhase2Base, 1);
+  const bossPhase2: CriptaRoomEnemy = {
+    ...bossPhase2Base,
+    roleTag: p2Ai.roleTag,
+    aiProfile: p2Ai.aiProfile,
+    memory: createInitialEnemyMemory(),
+    defendingRoundsRemaining: 0,
+    protectedByEnemyId: null,
+  };
 
-  const voidShard: CriptaRoomEnemy = {
+  const voidShardBase: CriptaRoomEnemy = {
     id: `final_boss_shard_${seed}`,
-    slug: 'esquirla_del_vacio',
+    slug: 'esquirla_del_vacio_chaman',
     name: 'Esquirla del Corazón',
     title: 'CONDUCTO DE ENERGÍA ABISAL',
     isElite: false,
@@ -688,6 +717,7 @@ export function transformFinalBossToPhase2(
     attack: 11,
     armor: 1,
     intent: 'AFLICCIÓN',
+    intentCategory: 'HEAL',
     intentValue: 11,
     accentColor: '#9B72CF',
     statusThreat: 'POISON',
@@ -696,6 +726,20 @@ export function transformFinalBossToPhase2(
     vulnerableTurns: 0,
     spriteArchetype: 'crystal_sentinel',
   };
+  const shardAi = buildEnemyAiProfileForArchetype(voidShardBase, 1);
+  const voidShard: CriptaRoomEnemy = {
+    ...voidShardBase,
+    roleTag: shardAi.roleTag,
+    aiProfile: shardAi.aiProfile,
+    memory: createInitialEnemyMemory(),
+    defendingRoundsRemaining: 0,
+    protectedByEnemyId: null,
+  };
 
   room.enemies = [bossPhase2, voidShard];
+  room.combatRoundPhase = 'PLAYER_PHASE';
+  room.queuedPlayerActions = {};
+  room.activeCombatActorId = null;
+  room.activeTargetedPlayerIds = [];
+  room.combatBannerText = `RONDA ${room.combatTurn || 1} — FASE II: EL CORAZÓN DESATADO`;
 }

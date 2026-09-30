@@ -1,4 +1,4 @@
-import {
+import type {
   CriptaCharacterDefinition,
   CriptaCharacterId,
   CriptaDungeonDefinition,
