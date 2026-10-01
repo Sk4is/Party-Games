@@ -8,6 +8,7 @@ import {
   CriptaRemoteCursor,
   CriptaSceneId,
   CriptaServerMessage,
+  CriptaWeaponRuneId,
 } from '../types/laCripta';
 import {
   createOnlineRoom,
@@ -703,6 +704,13 @@ export function useLaCriptaSocket({
     sendMessage({ type: 'UPGRADE_WEAPON' });
   }, [sendMessage]);
 
+  const sendEquipWeaponRune = useCallback(
+    (runeId: CriptaWeaponRuneId | null) => {
+      sendMessage({ type: 'EQUIP_WEAPON_RUNE', runeId });
+    },
+    [sendMessage]
+  );
+
   const sendRoomAdvance = useCallback(() => {
     sendMessage({ type: 'ROOM_ADVANCE' });
   }, [sendMessage]);
@@ -744,6 +752,7 @@ export function useLaCriptaSocket({
     sendRoomDiscoverSecret,
     sendInteractRoomObject,
     sendUpgradeWeapon,
+    sendEquipWeaponRune,
     sendRoomAdvance,
     returnToLobby,
   };

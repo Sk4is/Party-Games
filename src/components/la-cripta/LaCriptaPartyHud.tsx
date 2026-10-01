@@ -87,6 +87,7 @@ interface LaCriptaPartyHudProps {
   isInventoryOpen?: boolean;
   onInspectPlayer?: (playerId: string) => void;
   inspectedPlayerId?: string | null;
+  onOpenStatusCodex?: () => void;
 }
 
 /**
@@ -100,6 +101,7 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
   currentPlayerId,
   onLeaveExpedition,
   onReturnToLobby,
+  onOpenStatusCodex,
 }) => {
   const [copied, setCopied] = useState(false);
   const [muted, setMuted] = useState(() => laCriptaAudio.isMuted());
@@ -139,7 +141,7 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
     expeditionState.phase === 'FINAL_BOSS_COMBAT';
 
   return (
-    <header className="relative z-20 w-full border-b border-[#282039]/90 bg-[#07050B]/68 shrink-0">
+    <header className="relative z-20 w-full border-b border-[#282039]/45 bg-[#06050A]/42 shrink-0">
       {inspectedRelic && (
         <LaCriptaRelicDetailModal
           relic={inspectedRelic}
@@ -286,6 +288,33 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
                 <span>{expeditionState.partyGold ?? 0} ORO</span>
               </div>
             </LaCriptaPixelTooltip>
+          )}
+
+          {onOpenStatusCodex && (
+            <button
+              type="button"
+              onClick={() => {
+                laCriptaAudio.playStoneClick();
+                onOpenStatusCodex();
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#16101E] hover:bg-[#261B38] border border-[#9B72CF]/70 hover:border-[#FFD166] text-[10px] font-cripta-pixel font-bold text-[#E0AAFF] hover:text-[#FFD166] transition-colors cursor-pointer"
+              title="Abrir Códice de Estados, Ventajas, Desventajas y Efectos"
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 12 12"
+                shapeRendering="crispEdges"
+                className="shrink-0"
+              >
+                <rect x="2" y="1" width="8" height="10" fill="#7656A8" />
+                <rect x="3" y="2" width="6" height="8" fill="#181126" />
+                <rect x="4" y="4" width="4" height="1" fill="#FFD166" />
+                <rect x="4" y="6" width="4" height="1" fill="#E0AAFF" />
+                <rect x="4" y="8" width="3" height="1" fill="#E0AAFF" />
+              </svg>
+              <span>? ESTADOS</span>
+            </button>
           )}
 
           {expeditionState.phase !== 'LOBBY' && isHost && onReturnToLobby && (

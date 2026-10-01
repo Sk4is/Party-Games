@@ -25,6 +25,7 @@ export const ROOM_TYPE_LABELS: Record<CriptaCanonicalRoomType, string> = {
   SHRINE: 'Santuario',
   TRAP: 'Trampa',
   PUZZLE: 'Acertijo',
+  MINIGAME: 'Minijuego',
   SECRET: 'Secreto',
   MINIBOSS: 'Minijefe',
   BOSS: 'Jefe Final',
@@ -47,6 +48,17 @@ export const LaCriptaRoomTypeIcon: React.FC<LaCriptaRoomTypeIconProps> = ({
       className="shrink-0"
       aria-hidden="true"
     >
+      {type === 'MINIGAME' && (
+        <g fill={color}>
+          {/* Runic Roulette / Mechanism Wheel */}
+          <rect x="4" y="1" width="4" height="2" />
+          <rect x="4" y="9" width="4" height="2" />
+          <rect x="1" y="4" width="2" height="4" />
+          <rect x="9" y="4" width="2" height="4" />
+          <rect x="3" y="3" width="6" height="6" />
+          <rect x="5" y="5" width="2" height="2" fill="#E7A54A" />
+        </g>
+      )}
       {type === 'UNEXPLORED' && (
         <g fill={color}>
           <rect x="4" y="2" width="4" height="1" />

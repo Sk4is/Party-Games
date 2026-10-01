@@ -29,6 +29,10 @@ import {
   LaCriptaBossPhaseTransitionOverlay,
   LaCriptaRunVictoryScreen,
 } from './LaCriptaFinalBossComponents';
+import {
+  LaCriptaExitExpeditionModal,
+  LaCriptaStatusCodexModal,
+} from './LaCriptaStatusEffectBadge';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 
 interface LaCriptaGameProps {
@@ -131,6 +135,7 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     sendRoomDiscoverSecret,
     sendInteractRoomObject,
     sendUpgradeWeapon,
+    sendEquipWeaponRune,
     sendRoomAdvance,
     returnToLobby,
   } = useLaCriptaSocket({
@@ -217,9 +222,23 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     [activeSceneId, expeditionState, sendCursorMove]
   );
 
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [showStatusCodex, setShowStatusCodex] = useState(false);
+
   const handleLeaveExpedition = useCallback(() => {
+    setShowExitModal(true);
+  }, []);
+
+  const handleConfirmReturnToLobby = useCallback(() => {
+    setShowExitModal(false);
+    returnToLobby();
+  }, [returnToLobby]);
+
+  const handleConfirmReturnToMenu = useCallback(() => {
+    setShowExitModal(false);
     leaveRoom();
-  }, [leaveRoom]);
+    onBackToMenu();
+  }, [leaveRoom, onBackToMenu]);
 
   // Phase 3 & 4: Visual Gameplay Feedback, Floating Popups, Player Portrait States & Enemy Hit/Death States
   const lastProcessedBatchIdRef = useRef<number>(0);
@@ -544,8 +563,23 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
           currentPlayerId={playerId}
           onLeaveExpedition={handleLeaveExpedition}
           onReturnToLobby={returnToLobby}
+          onOpenStatusCodex={() => setShowStatusCodex(true)}
         />
       )}
+
+      {/* Status & Effect Codex Modal (? ESTADOS) */}
+      <LaCriptaStatusCodexModal
+        isOpen={showStatusCodex}
+        onClose={() => setShowStatusCodex(false)}
+      />
+
+      {/* Dark Fantasy Exit Confirmation Modal (SALIR -> VOLVER AL LOBBY / VOLVER AL MENÚ / CANCELAR) */}
+      <LaCriptaExitExpeditionModal
+        isOpen={showExitModal}
+        onCancel={() => setShowExitModal(false)}
+        onReturnToLobby={handleConfirmReturnToLobby}
+        onReturnToMenu={handleConfirmReturnToMenu}
+      />
 
       {/* Main Interactive Stage */}
       {(!expeditionState || expeditionState.phase === 'LOBBY') && (
@@ -605,6 +639,7 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
             onInteractOption={sendRoomInteractOption}
             onInteractRoomObject={sendInteractRoomObject}
             onUpgradeWeapon={sendUpgradeWeapon}
+            onEquipWeaponRune={sendEquipWeaponRune}
             onPuzzleInput={sendRoomPuzzleInput}
             onDiscoverSecret={sendRoomDiscoverSecret}
             onAdvanceRoom={sendRoomAdvance}

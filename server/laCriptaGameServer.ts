@@ -58,10 +58,13 @@ import {
   computePlayerEffectiveStats,
   CRIPTA_ACCESSORIES_REGISTRY,
   CRIPTA_ARMORS_REGISTRY,
+  CRIPTA_DAMAGE_TYPE_META,
+  CRIPTA_WEAPON_RUNES_REGISTRY,
   CRIPTA_WEAPONS_REGISTRY,
   estimatePlayerActionDamage,
   getEquippedWeaponForPlayer,
   getWeaponUpgradeCost,
+  pickWeaponRuneDropForDungeon,
   rollAuthoritativePlayerDamage,
   STARTER_WEAPON_BY_CLASS,
 } from '../src/data/la-cripta/criptaEquipmentAndEvents';
@@ -163,6 +166,8 @@ function buildDefaultPlayer(
     bonusMagic: 0,
     equippedWeaponId: null,
     weaponUpgradeLevel: 1,
+    equippedWeaponRuneId: null,
+    ownedWeaponRunes: [],
     weaponSpecialCooldown: 0,
     abilityCooldowns: {},
     basicAttackUsedThisTurn: false,
@@ -357,7 +362,100 @@ export class LaCriptaServer {
     return livingPlayers[0].id;
   }
 
+  private assignFreshPlayerTurn(
+    activeRoom: CriptaDungeonRoom,
+    nextPlayerId: string | null
+  ) {
+    const seq = (activeRoom.turnSequenceNumber || 0) + 1;
+    const roundNum = activeRoom.combatTurn || 1;
+    activeRoom.turnSequenceNumber = seq;
+    activeRoom.activeTurnPlayerId = nextPlayerId;
+    activeRoom.turnId = nextPlayerId
+      ? `turn_${activeRoom.id}_r${roundNum}_${nextPlayerId}_${seq}`
+      : null;
+    activeRoom.turnActionConsumed = false;
+    activeRoom.currentTurnAp = 1;
+    activeRoom.maxTurnAp = 1;
+    activeRoom.consumableUsedThisTurn = false;
+  }
+
+  private computeAuthoritativeRunPhase(room: ServerCriptaRoom) {
+    const completedCount = room.completedDoorCount ?? 0;
+    if (room.phase === 'LOBBY') return 'LOBBY' as const;
+    if (room.phase === 'RUN_VICTORY' || room.expeditionDefeated) {
+      return 'RUN_END' as const;
+    }
+    if (
+      room.phase === 'FINAL_BOSS_COMBAT' ||
+      room.phase === 'FINAL_BOSS_ENTRANCE' ||
+      room.phase === 'FINAL_BOSS_DOOR_READY' ||
+      (room.phase === 'THREE_DOORS' && completedCount >= 3)
+    ) {
+      return 'MAJOR_BOSS' as const;
+    }
+    if (room.phase === 'ENTERING_DUNGEON' || room.phase === 'DOOR_OPENING') {
+      return 'ENTERING_DUNGEON' as const;
+    }
+    if (room.phase === 'THREE_DOORS' || room.phase === 'RETURNING_TO_DOORS') {
+      return 'DOOR_SELECTION' as const;
+    }
+    if (room.dungeonCompleted) {
+      return 'DUNGEON_COMPLETE' as const;
+    }
+    if (completedCount === 0) return 'DUNGEON_1' as const;
+    if (completedCount === 1) return 'DUNGEON_2' as const;
+    return 'DUNGEON_3' as const;
+  }
+
+  private computeAuthoritativeRoomPhase(
+    room: ServerCriptaRoom,
+    activeRoom: CriptaDungeonRoom | null
+  ) {
+    if (!activeRoom) return 'COMPLETE' as const;
+    if (room.roomDoorTransition?.active) return 'EXITING' as const;
+    if (room.isResolvingRound) return 'RESOLVING' as const;
+    const unclaimed = (activeRoom.groundDrops || []).filter((d) => !d.claimedByPlayerId);
+    if (activeRoom.resolved) {
+      if (unclaimed.length > 0) return 'REWARD_PENDING' as const;
+      return 'READY_TO_LEAVE' as const;
+    }
+    if (activeRoom.lifecyclePhase === 'ENTERING') return 'ENTERING' as const;
+    return 'ACTIVE' as const;
+  }
+
+  private logRejectedTransition(
+    room: ServerCriptaRoom,
+    action: string,
+    reason: string
+  ) {
+    const activeRoom = this.getActiveDungeonRoom(room);
+    const runPhase = this.computeAuthoritativeRunPhase(room);
+    const roomPhase = this.computeAuthoritativeRoomPhase(room, activeRoom);
+    console.warn(
+      [
+        '[LA CRIPTA STATE]',
+        'Rejected transition:',
+        `action: ${action}`,
+        `currentRunPhase: ${runPhase} (${room.phase})`,
+        `currentRoomPhase: ${roomPhase}`,
+        `roomId: ${activeRoom?.id || 'none'}`,
+        `dungeon: ${room.selectedDungeonId || 'none'}`,
+        `completedDungeonCount: ${room.completedDoorCount ?? 0}`,
+        `reason: ${reason}`,
+      ].join('\n')
+    );
+  }
+
   private serializeRoom(room: ServerCriptaRoom): CriptaExpeditionState {
+    const activeRoom = this.getActiveDungeonRoom(room);
+    const completedCount = room.completedDoorCount ?? 0;
+    const completedIds = room.completedDungeonIds ? [...room.completedDungeonIds] : [];
+    const runPhase = this.computeAuthoritativeRunPhase(room);
+    const currentRoomPhase = this.computeAuthoritativeRoomPhase(room, activeRoom);
+    const unclaimedDrops = (activeRoom?.groundDrops || []).filter(
+      (d) => !d.claimedByPlayerId
+    );
+
     return {
       roomId: room.roomCode,
       code: room.roomCode,
@@ -370,6 +468,7 @@ export class LaCriptaServer {
       maxPlayers: 4,
       hostId: room.hostId,
       phase: room.phase,
+      runPhase,
       players: room.players.map((p) => ({
         ...p,
         characterId: p.characterId ?? null,
@@ -381,6 +480,8 @@ export class LaCriptaServer {
           p.equippedWeaponId ??
           (p.characterId ? STARTER_WEAPON_BY_CLASS[p.characterId] : null),
         weaponUpgradeLevel: p.weaponUpgradeLevel ?? 1,
+        equippedWeaponRuneId: p.equippedWeaponRuneId ?? null,
+        ownedWeaponRunes: p.ownedWeaponRunes ? [...p.ownedWeaponRunes] : [],
         weaponSpecialCooldown: p.weaponSpecialCooldown ?? 0,
         abilityCooldowns: p.abilityCooldowns ? { ...p.abilityCooldowns } : {},
         basicAttackUsedThisTurn: Boolean(p.basicAttackUsedThisTurn),
@@ -405,14 +506,50 @@ export class LaCriptaServer {
       voteTieWarning: Boolean(room.voteTieWarning),
       initializationError: room.initializationError ?? null,
       selectedDungeonId: room.selectedDungeonId,
+      currentDungeonId: room.selectedDungeonId,
+      currentDungeonInstanceId: room.selectedDungeonId
+        ? `${room.expeditionId}_${room.selectedDungeonId}_${completedCount + 1}`
+        : null,
       doorOpeningStartedAt: room.doorOpeningStartedAt,
       returningToDoorsStartedAt: room.returningToDoorsStartedAt ?? null,
       exitingDungeonId: room.exitingDungeonId ?? null,
       floor: room.floor,
       currentNodeId: room.currentNodeId,
+      currentRoomId: activeRoom?.id ?? room.currentNodeId,
+      currentRoomPhase,
+      completedRoomIds: (room.roomSequence || [])
+        .filter((r) => r.resolved)
+        .map((r) => r.id),
+      currentRewardState: activeRoom?.resolved
+        ? {
+            roomId: activeRoom.id,
+            hasUnclaimedDrops: unclaimedDrops.length > 0,
+            unclaimedDropCount: unclaimedDrops.length,
+            goldEarned: activeRoom.rewardSummary?.goldGranted ?? 0,
+            healGranted: activeRoom.rewardSummary?.healGranted ?? 0,
+          }
+        : null,
+      currentTransitionState: room.roomDoorTransition?.active
+        ? {
+            active: true,
+            kind: room.roomDoorTransition.isReturningToDoors
+              ? 'RETURNING_TO_DOORS'
+              : 'ROOM_TO_ROOM',
+            startedAt: room.roomDoorTransition.startedAt,
+          }
+        : room.phase === 'ENTERING_DUNGEON' && room.doorOpeningStartedAt
+        ? {
+            active: true,
+            kind: 'ENTERING_DUNGEON',
+            startedAt: room.doorOpeningStartedAt,
+          }
+        : null,
+      majorBossUnlocked: completedCount >= 3,
       generatedNodes: [...room.generatedNodes],
-      completedDoorCount: room.completedDoorCount ?? 0,
-      completedDungeonIds: room.completedDungeonIds ? [...room.completedDungeonIds] : [],
+      completedDoorCount: completedCount,
+      completedDungeonCount: completedCount,
+      completedDungeonIds: completedIds,
+      completedBiomes: completedIds,
       partyRelics: room.partyRelics ? room.partyRelics.map((r) => ({ ...r })) : [],
       discoveredEnemyAbilityIds: room.discoveredEnemyAbilityIds
         ? [...room.discoveredEnemyAbilityIds]
@@ -737,6 +874,8 @@ export class LaCriptaServer {
           p.bonusMagic = 0;
           p.equippedWeaponId = p.characterId ? STARTER_WEAPON_BY_CLASS[p.characterId] : 'espada_oxidada';
           p.weaponUpgradeLevel = 1;
+          p.equippedWeaponRuneId = null;
+          p.ownedWeaponRunes = [];
           p.weaponSpecialCooldown = 0;
           p.abilityCooldowns = {};
           p.basicAttackUsedThisTurn = false;
@@ -764,9 +903,37 @@ export class LaCriptaServer {
       }
 
       case 'VOTE_DOOR': {
-        if (room.phase !== 'THREE_DOORS' || room.decisionResolved) return;
-        if ((room.completedDoorCount ?? 0) >= 3) return;
-        if (!room.offeredDungeons.includes(msg.dungeonId)) return;
+        if (room.phase === 'RETURNING_TO_DOORS') {
+          if (room.doorOpeningTimer) {
+            clearTimeout(room.doorOpeningTimer);
+            room.doorOpeningTimer = null;
+          }
+          room.phase = 'THREE_DOORS';
+        }
+        if (room.phase !== 'THREE_DOORS' || room.decisionResolved) {
+          this.logRejectedTransition(
+            room,
+            'VOTE_DOOR',
+            `Invalid phase (${room.phase}) or decision already resolved (${room.decisionResolved})`
+          );
+          return;
+        }
+        if ((room.completedDoorCount ?? 0) >= 3) {
+          this.logRejectedTransition(
+            room,
+            'VOTE_DOOR',
+            '3 dungeons already completed; Final Boss threshold is unlocked instead of normal doors'
+          );
+          return;
+        }
+        if (!room.offeredDungeons.includes(msg.dungeonId)) {
+          this.logRejectedTransition(
+            room,
+            'VOTE_DOOR',
+            `Dungeon ${msg.dungeonId} is not in offeredDungeons (${room.offeredDungeons.join(', ')})`
+          );
+          return;
+        }
 
         // One active vote per player; clicking another door moves their vote
         room.doorVotes[player.id] = msg.dungeonId;
@@ -794,6 +961,8 @@ export class LaCriptaServer {
         this.handleLockRoundAction(ws, room, player, {
           actionType: msg.action,
           targetEnemyId: msg.targetEnemyId,
+          turnId: msg.turnId,
+          actionNonce: msg.actionNonce,
         });
         break;
       }
@@ -805,6 +974,9 @@ export class LaCriptaServer {
           targetEnemyId: msg.targetEnemyId,
           targetPlayerId: msg.targetPlayerId,
           itemSlotIndex: msg.itemSlotIndex,
+          turnId: msg.turnId,
+          actionNonce: msg.actionNonce,
+          cardId: msg.cardId,
         });
         break;
       }
@@ -876,6 +1048,57 @@ export class LaCriptaServer {
         break;
       }
 
+      case 'EQUIP_WEAPON_RUNE': {
+        const nextRuneId = msg.runeId ?? null;
+        if (nextRuneId !== null) {
+          const rDef = CRIPTA_WEAPON_RUNES_REGISTRY[nextRuneId];
+          if (!rDef || !(player.ownedWeaponRunes || []).includes(nextRuneId)) {
+            this.sendError(ws, 'No posees esa runa de arma en tu inventario de infusiones.');
+            break;
+          }
+        }
+        const prevRune = player.equippedWeaponRuneId
+          ? CRIPTA_WEAPON_RUNES_REGISTRY[player.equippedWeaponRuneId]
+          : null;
+        const nextRune = nextRuneId ? CRIPTA_WEAPON_RUNES_REGISTRY[nextRuneId] : null;
+        if (prevRune?.maxHpPenalty) {
+          player.maxHp += prevRune.maxHpPenalty;
+        }
+        if (nextRune?.maxHpPenalty) {
+          player.maxHp = Math.max(12, player.maxHp - nextRune.maxHpPenalty);
+          player.hp = Math.min(player.hp, player.maxHp);
+        }
+        player.equippedWeaponRuneId = nextRuneId;
+        const activeRoom = this.getActiveDungeonRoom(room);
+        const eq = getEquippedWeaponForPlayer(player);
+        if (activeRoom) {
+          activeRoom.outcomeLog = nextRune
+            ? `¡${player.name} engarza ${nextRune.name} en ${eq.weapon.name} (Daño ${eq.activeDamageType})!`
+            : `${player.name} retira la runa de ${eq.weapon.name}, restaurando su daño original (${eq.activeDamageType}).`;
+        }
+        this.emitVisualEventBatch(
+          room,
+          [
+            {
+              id: `ev_rune_${Date.now()}_${player.id}`,
+              kind: 'WEAPON_UPGRADED',
+              targetType: 'PLAYER',
+              targetId: player.id,
+              label: nextRune
+                ? `INFUSIÓN: ${nextRune.name.toUpperCase()}`
+                : 'RUNA DESENGARZADA',
+              sublabel: `${eq.weapon.name.toUpperCase()} · DAÑO ${eq.activeDamageType}`,
+              color: nextRune ? nextRune.accentColor : eq.weapon.accentColor,
+              vfxStyle: 'arcane',
+            },
+          ],
+          player.id,
+          'EQUIP_WEAPON_RUNE'
+        );
+        this.broadcastRoomState(room);
+        break;
+      }
+
       case 'ROOM_ADVANCE': {
         this.handleRoomAdvance(room, player);
         break;
@@ -887,6 +1110,8 @@ export class LaCriptaServer {
           room.doorOpeningTimer = null;
         }
         room.phase = 'LOBBY';
+        room.roomDoorTransition = null;
+        room.isResolvingRound = false;
         room.doorVotes = {};
         room.finalBossDoorVotes = {};
         room.decisionResolved = false;
@@ -914,6 +1139,8 @@ export class LaCriptaServer {
           p.bonusAttack = 0;
           p.bonusDefense = 0;
           p.bonusMagic = 0;
+          p.equippedWeaponRuneId = null;
+          p.ownedWeaponRunes = [];
           p.normalInventory = ['venda'];
           p.personalRelics = [];
           p.pendingInventoryReplacement = null;
@@ -1604,19 +1831,93 @@ export class LaCriptaServer {
     const activeRoom = this.getActiveDungeonRoom(room);
     if (!activeRoom || !activeRoom.groundDrops) return;
 
-    const drop = activeRoom.groundDrops.find((d) => d.id === dropId && !d.claimedByPlayerId);
+    const drop = activeRoom.groundDrops.find(
+      (d) => (d.id === dropId || d.dropId === dropId) && !d.claimedByPlayerId && !d.claimed
+    );
     if (!drop) return;
 
     const visualEvents: CriptaVisualEvent[] = [];
+    const livingConnected = room.players.filter((p) => p.isConnected && !p.isDead && p.hp > 0);
+    const isSharedBossOrEliteLoot =
+      activeRoom.type === 'MINIBOSS' ||
+      activeRoom.type === 'BOSS' ||
+      activeRoom.type === 'ELITE' ||
+      drop.id.includes('miniboss');
 
     if (drop.kind === 'RELIC' && drop.relicId) {
+      drop.claimed = true;
       drop.claimedByPlayerId = player.id;
       drop.claimedByPlayerName = player.name;
       const acq = this.grantRelicAuthoritatively(room, player, drop.relicId, visualEvents);
       const rDef = CRIPTA_RELICS_REGISTRY[drop.relicId];
+      // In multiplayer, if a personal relic is claimed from a boss/miniboss/elite, also bless living teammates so everyone benefits from the victory
+      if (rDef && rDef.ownershipType !== 'PARTY' && livingConnected.length > 1) {
+        for (const mate of livingConnected) {
+          if (mate.id === player.id) continue;
+          mate.hp = Math.min(mate.maxHp, mate.hp + 10);
+          mate.armor = Math.min(24, mate.armor + 2);
+          applyStatusEffectToPlayer(mate, 'BLESSED', 'shared_relic', 1, 2);
+        }
+      }
       if (acq && rDef) {
         activeRoom.outcomeLog = `¡${player.name} ha reclamado la Reliquia Ancestral: ${rDef.name} (${rDef.description})!`;
       }
+    } else if (drop.kind === 'WEAPON' && drop.weaponId) {
+      drop.claimed = true;
+      drop.claimedByPlayerId = player.id;
+      drop.claimedByPlayerName = player.name;
+      const dungeonId = room.selectedDungeonId || 'catacumbas_del_rey';
+      for (const member of livingConnected) {
+        const assignedWepId =
+          member.id === player.id
+            ? drop.weaponId
+            : pickWeaponDropForDungeon(
+                dungeonId,
+                activeRoom.index + member.seatIndex + 1,
+                true,
+                member.characterId ? [member.characterId] : []
+              );
+        const wDef = CRIPTA_WEAPONS_REGISTRY[assignedWepId];
+        if (wDef) {
+          member.equippedWeaponId = wDef.id;
+          member.weaponSpecialCooldown = 0;
+          visualEvents.push({
+            id: `ev_drop_wep_${Date.now()}_${member.id}`,
+            kind: 'WEAPON_EQUIPPED',
+            targetType: 'PLAYER',
+            targetId: member.id,
+            sourcePlayerId: member.id,
+            label: `EQUIPÓ: ${wDef.name.toUpperCase()}`,
+            sublabel: `${wDef.baseMinDamage}–${wDef.baseMaxDamage} DAÑO`,
+            color: wDef.accentColor,
+            vfxStyle: 'slash',
+          });
+        }
+      }
+      const mainWep = CRIPTA_WEAPONS_REGISTRY[drop.weaponId];
+      activeRoom.outcomeLog =
+        livingConnected.length > 1
+          ? `¡${player.name} abre el armero del guardián! El grupo equipa armamento forjado (${mainWep?.name || 'Arma'}).`
+          : `¡${player.name} reclama y equipa ${mainWep?.name || 'el arma'}!`;
+    } else if (drop.kind === 'GOLD' || drop.type === 'GOLD_POUCH') {
+      drop.claimed = true;
+      drop.claimedByPlayerId = player.id;
+      drop.claimedByPlayerName = player.name;
+      const amt = drop.goldAmount || 28;
+      room.partyGold = (room.partyGold ?? 0) + amt;
+      if (!room.runStats) room.runStats = buildDefaultRunStats();
+      room.runStats.goldEarned += amt;
+      visualEvents.push({
+        id: `ev_drop_gold_${Date.now()}`,
+        kind: 'GAIN_GOLD',
+        targetType: 'PARTY',
+        value: amt,
+        label: `+${amt} ORO`,
+        sublabel: 'BOTÍN COMPARTIDO DEL GRUPO',
+        color: '#E7A54A',
+        vfxStyle: 'gold',
+      });
+      activeRoom.outcomeLog = `${player.name} recoge la bolsa de oro (+${amt} ORO para la expedición).`;
     } else if (drop.kind === 'ITEM' && drop.itemId) {
       const status = this.grantNormalItemAuthoritatively(
         room,
@@ -1628,13 +1929,43 @@ export class LaCriptaServer {
         visualEvents
       );
       if (status === 'ADDED') {
+        drop.claimed = true;
         drop.claimedByPlayerId = player.id;
         drop.claimedByPlayerName = player.name;
         const iDef = CRIPTA_ITEMS_REGISTRY[drop.itemId];
-        activeRoom.outcomeLog = `${player.name} recoge ${iDef?.name || 'un objeto'} y lo guarda en su inventario.`;
+        // Shared enemy/miniboss/boss loot: in multiplayer, also grant living teammates a supply item when claiming boss/miniboss/elite caches!
+        if (isSharedBossOrEliteLoot && livingConnected.length > 1) {
+          const companionItems: CriptaItemId[] = ['pocion_curacion', 'venda', 'sal_purificadora'];
+          for (const mate of livingConnected) {
+            if (mate.id === player.id) continue;
+            if ((mate.normalInventory || []).length < NORMAL_INVENTORY_MAX_SLOTS) {
+              const mateItem =
+                companionItems[(activeRoom.index + mate.seatIndex) % companionItems.length];
+              this.grantNormalItemAuthoritatively(
+                room,
+                mate,
+                mateItem,
+                'DROP',
+                undefined,
+                undefined,
+                visualEvents
+              );
+            }
+          }
+          activeRoom.outcomeLog = `${player.name} reclama ${iDef?.name || 'el botín'} y reparte suministros de campaña con el grupo.`;
+        } else {
+          activeRoom.outcomeLog = `${player.name} recoge ${iDef?.name || 'un objeto'} y lo guarda en su inventario.`;
+        }
       } else {
         activeRoom.outcomeLog = `El inventario de ${player.name} está lleno (6/6). Elige qué objeto reemplazar.`;
       }
+    }
+
+    const remainingUnclaimed = (activeRoom.groundDrops || []).filter(
+      (d) => !d.claimed && !d.claimedByPlayerId
+    );
+    if (activeRoom.resolved && remainingUnclaimed.length === 0) {
+      activeRoom.lifecyclePhase = 'READY_TO_LEAVE';
     }
 
     this.emitVisualEventBatch(room, visualEvents, player.id, 'CLAIM_DROP');
@@ -1686,12 +2017,6 @@ export class LaCriptaServer {
       const excludedWeapons = room.players
         .map((p) => p.equippedWeaponId)
         .filter((w): w is NonNullable<typeof w> => Boolean(w));
-      const excludedArmors = room.players
-        .map((p) => p.equippedArmorId)
-        .filter((a): a is NonNullable<typeof a> => Boolean(a));
-      const excludedAccessories = room.players
-        .map((p) => p.equippedAccessoryId)
-        .filter((a): a is NonNullable<typeof a> => Boolean(a));
 
       const refreshed = generateShopInventoryForRoom(
         (room.dungeonSeed || room.seed) + activeRoom.index * 131,
@@ -1700,8 +2025,6 @@ export class LaCriptaServer {
         preferredClasses,
         excludedRelics,
         excludedWeapons,
-        excludedArmors,
-        excludedAccessories,
         activeRoom.shopRerollCount
       );
       activeRoom.shopInventory = refreshed;
@@ -1865,6 +2188,54 @@ export class LaCriptaServer {
         }
       );
       activeRoom.outcomeLog = `¡${player.name} equipa ${accDef.name} (${accDef.specialEffectText}) por ${slot.priceGold} ORO!`;
+    } else if (slot.kind === 'WEAPON_RUNE' && slot.weaponRuneId) {
+      const runeDef = CRIPTA_WEAPON_RUNES_REGISTRY[slot.weaponRuneId];
+      if (!runeDef) return;
+      room.partyGold = currentGold - slot.priceGold;
+      slot.soldOut = true;
+      slot.buyerName = player.name;
+      if (!room.runStats) room.runStats = buildDefaultRunStats();
+      room.runStats.goldSpent += slot.priceGold;
+
+      if (!player.ownedWeaponRunes) player.ownedWeaponRunes = [];
+      if (!player.ownedWeaponRunes.includes(runeDef.id)) {
+        player.ownedWeaponRunes.push(runeDef.id);
+      }
+      const prevRune = player.equippedWeaponRuneId
+        ? CRIPTA_WEAPON_RUNES_REGISTRY[player.equippedWeaponRuneId]
+        : null;
+      if (prevRune?.maxHpPenalty) {
+        player.maxHp += prevRune.maxHpPenalty;
+      }
+      if (runeDef.maxHpPenalty) {
+        player.maxHp = Math.max(12, player.maxHp - runeDef.maxHpPenalty);
+        player.hp = Math.min(player.hp, player.maxHp);
+      }
+      player.equippedWeaponRuneId = runeDef.id;
+      const eq = getEquippedWeaponForPlayer(player);
+
+      visualEvents.push(
+        {
+          id: `ev_shop_gold_${Date.now()}`,
+          kind: 'LOSE_GOLD',
+          targetType: 'PARTY',
+          value: -slot.priceGold,
+          label: `-${slot.priceGold} ORO`,
+          color: '#E7A54A',
+          vfxStyle: 'gold',
+        },
+        {
+          id: `ev_shop_rune_${Date.now()}`,
+          kind: 'WEAPON_UPGRADED',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          label: `INFUSIÓN: ${runeDef.name.toUpperCase()}`,
+          sublabel: `${eq.weapon.name.toUpperCase()} -> DAÑO ${runeDef.infusedDamageType}`,
+          color: runeDef.accentColor,
+          vfxStyle: 'arcane',
+        }
+      );
+      activeRoom.outcomeLog = `¡${player.name} adquiere e infunde ${runeDef.name} en su ${eq.weapon.name} (${runeDef.benefitText} · ${runeDef.tradeoffText})!`;
     } else if (slot.kind === 'FORGE_UPGRADE') {
       const currLevel = player.weaponUpgradeLevel || 1;
       if (currLevel >= 3) {
@@ -1957,6 +2328,8 @@ export class LaCriptaServer {
         ? CRIPTA_ARMORS_REGISTRY[slot.armorId]?.name || 'Armadura'
         : slot.kind === 'ACCESSORY' && slot.accessoryId
         ? CRIPTA_ACCESSORIES_REGISTRY[slot.accessoryId]?.name || 'Accesorio'
+        : slot.kind === 'WEAPON_RUNE' && slot.weaponRuneId
+        ? CRIPTA_WEAPON_RUNES_REGISTRY[slot.weaponRuneId]?.name || 'Runa de Arma'
         : slot.kind === 'FORGE_UPGRADE'
         ? 'Mejora de Forja'
         : slot.itemId
@@ -2008,9 +2381,22 @@ export class LaCriptaServer {
     const visualEvents: CriptaVisualEvent[] = [];
 
     if (replaceSlotIndex === null) {
-      // Leave the new item behind
+      // Leave the new item behind — if it came from a ground drop, mark that ground drop as discarded so it never blocks room exit!
+      if (pending.sourceType === 'DROP' && pending.sourceRefId && activeRoom?.groundDrops) {
+        const drop = activeRoom.groundDrops.find(
+          (d) => d.id === pending.sourceRefId && !d.claimedByPlayerId
+        );
+        if (drop) {
+          drop.claimedByPlayerId = player.id;
+          drop.claimedByPlayerName = player.name;
+        }
+      }
       player.pendingInventoryReplacement = null;
       if (activeRoom) {
+        const remainingDrops = (activeRoom.groundDrops || []).filter((d) => !d.claimedByPlayerId);
+        if (activeRoom.resolved && remainingDrops.length === 0) {
+          activeRoom.lifecyclePhase = 'READY_TO_LEAVE';
+        }
         activeRoom.outcomeLog = `${player.name} decide conservar su inventario actual.`;
       }
       this.broadcastRoomState(room);
@@ -2110,9 +2496,10 @@ export class LaCriptaServer {
     const firstLiving = [...connectedPlayers]
       .filter((p) => !p.isDead && p.hp > 0)
       .sort((a, b) => a.seatIndex - b.seatIndex)[0];
-    bossChamber.activeTurnPlayerId = firstLiving ? firstLiving.id : connectedPlayers[0]?.id || null;
-    bossChamber.currentTurnAp = 2;
-    bossChamber.maxTurnAp = 2;
+    this.assignFreshPlayerTurn(
+      bossChamber,
+      firstLiving ? firstLiving.id : connectedPlayers[0]?.id || null
+    );
     bossChamber.actedPlayerIdsThisRound = [];
 
     room.decisionResolved = true;
@@ -2222,7 +2609,42 @@ export class LaCriptaServer {
         activeRoom.groundDrops.push(drop);
       }
 
-      // Dungeon Minibosses also drop a guaranteed high-tier tonic/potion alongside their Relic drop!
+      // Dungeon Minibosses and Elites also award a tactical Weapon Rune / Elemental Infusion!
+      if (killedEnemy.isElite || killedEnemy.isMiniboss || (killedEnemy.isBoss && !killedEnemy.isFinalBoss)) {
+        const droppedRuneId = pickWeaponRuneDropForDungeon(
+          room.selectedDungeonId || 'catacumbas_del_rey',
+          activeRoom.index,
+          Boolean(killedEnemy.isMiniboss || killedEnemy.isBoss)
+        );
+        const runeDef = CRIPTA_WEAPON_RUNES_REGISTRY[droppedRuneId];
+        if (runeDef) {
+          for (const p of room.players) {
+            if (!p.isConnected) continue;
+            if (!p.ownedWeaponRunes) p.ownedWeaponRunes = [];
+            if (!p.ownedWeaponRunes.includes(droppedRuneId)) {
+              p.ownedWeaponRunes.push(droppedRuneId);
+              if (!p.equippedWeaponRuneId) {
+                if (runeDef.maxHpPenalty) {
+                  p.maxHp = Math.max(12, p.maxHp - runeDef.maxHpPenalty);
+                  p.hp = Math.min(p.hp, p.maxHp);
+                }
+                p.equippedWeaponRuneId = droppedRuneId;
+              }
+            }
+          }
+          visualEvents.push({
+            id: `ev_${ts}_rune_drop_${droppedRuneId}`,
+            kind: 'WEAPON_UPGRADED',
+            targetType: 'PARTY',
+            label: `✦ RUNA OBTENIDA: ${runeDef.name.toUpperCase()}`,
+            sublabel: `INFUSIÓN ${runeDef.infusedDamageType} DISPONIBLE EN TU ARMA`,
+            color: runeDef.accentColor,
+            vfxStyle: 'arcane',
+          });
+        }
+      }
+
+      // Dungeon Minibosses also drop a guaranteed high-tier tonic/potion AND a biome-forged weapon cache alongside their Relic drop!
       if (killedEnemy.isMiniboss || (killedEnemy.isBoss && !killedEnemy.isFinalBoss)) {
         if (!activeRoom.groundDrops) activeRoom.groundDrops = [];
         const bonusMinibossItems: CriptaItemId[] = [
@@ -2235,14 +2657,48 @@ export class LaCriptaServer {
           bonusMinibossItems[
             ((room.dungeonSeed || room.seed) + activeRoom.index) % bonusMinibossItems.length
           ];
+        const bonusItemDef = CRIPTA_ITEMS_REGISTRY[pickedBonusItem];
+        const bonusDropId = `drop_miniboss_bonus_${activeRoom.index}_${ts}`;
         activeRoom.groundDrops.push({
-          id: `drop_miniboss_bonus_${activeRoom.index}_${ts}`,
+          id: bonusDropId,
+          dropId: bonusDropId,
           kind: 'ITEM',
+          type: 'ITEM',
+          label: bonusItemDef?.name || 'Elixir del Custodio',
           itemId: pickedBonusItem,
           droppedByEnemyName: killedEnemy.name,
           xPercent: 34,
+          claimed: false,
           claimedByPlayerId: null,
         });
+
+        // Also drop a canonical Biome Weapon from the Miniboss so the party can claim a real weapon reward card!
+        const preferredClasses = room.players
+          .filter((p) => p.isConnected)
+          .map((p) => p.characterId)
+          .filter((c): c is CriptaCharacterId => Boolean(c));
+        const minibossWeaponId = pickWeaponDropForDungeon(
+          room.selectedDungeonId || 'catacumbas_del_rey',
+          activeRoom.index + 3,
+          true,
+          preferredClasses
+        );
+        const minibossWepDef = CRIPTA_WEAPONS_REGISTRY[minibossWeaponId];
+        if (minibossWepDef) {
+          const wepDropId = `drop_miniboss_weapon_${activeRoom.index}_${ts}`;
+          activeRoom.groundDrops.push({
+            id: wepDropId,
+            dropId: wepDropId,
+            kind: 'WEAPON',
+            type: 'WEAPON',
+            label: minibossWepDef.name,
+            weaponId: minibossWeaponId,
+            droppedByEnemyName: killedEnemy.name,
+            xPercent: 66,
+            claimed: false,
+            claimedByPlayerId: null,
+          });
+        }
       }
     }
   }
@@ -2296,9 +2752,16 @@ export class LaCriptaServer {
 
     activeRoom.resolved = true;
     activeRoom.state = 'RESOLVED';
-    activeRoom.lifecyclePhase = 'REWARDING';
+    const unclaimedDropsAfterKill = (activeRoom.groundDrops || []).filter(
+      (d) => !d.claimedByPlayerId
+    );
+    activeRoom.lifecyclePhase =
+      unclaimedDropsAfterKill.length > 0 ? 'REWARD_PENDING' : 'READY_TO_LEAVE';
     activeRoom.resolvedAtTimestamp = ts;
     activeRoom.activeTurnPlayerId = null;
+    activeRoom.turnId = null;
+    activeRoom.turnActionConsumed = true;
+    activeRoom.currentTurnAp = 0;
 
     const isMinibossRoom =
       activeRoom.type === 'MINIBOSS' ||
@@ -2313,6 +2776,14 @@ export class LaCriptaServer {
       ? 38
       : 22;
     const goldReward = baseGoldReward + (hasGoldRelic ? 8 : 0);
+    const victoryHeal = isMinibossRoom ? 12 : 8;
+
+    activeRoom.rewardSummary = {
+      goldGranted: goldReward,
+      healGranted: victoryHeal,
+      itemDropsCount: unclaimedDropsAfterKill.filter((d) => d.kind === 'ITEM').length,
+      relicDropsCount: unclaimedDropsAfterKill.filter((d) => d.kind === 'RELIC').length,
+    };
 
     room.partyGold = (room.partyGold ?? 45) + goldReward;
     if (!room.runStats) room.runStats = buildDefaultRunStats();
@@ -2334,7 +2805,6 @@ export class LaCriptaServer {
     });
 
     // Post-combat victory breath for living players
-    const victoryHeal = isMinibossRoom ? 12 : 8;
     for (const p of room.players) {
       if (!p.isDead && p.hp > 0) {
         p.hp = Math.min(p.maxHp, p.hp + victoryHeal);
@@ -2564,12 +3034,24 @@ export class LaCriptaServer {
       targetEnemyId?: string;
       targetPlayerId?: string;
       itemSlotIndex?: number;
+      turnId?: string;
+      actionNonce?: string;
+      cardId?: string;
     }
   ) {
-    if (!this.isInsideExploreOrBossPhase(room)) return;
-    if (room.expeditionDefeated) return;
+    if (!this.isInsideExploreOrBossPhase(room)) {
+      this.logRejectedTransition(room, 'LOCK_ROUND_ACTION', 'Not inside an active dungeon or boss phase');
+      return;
+    }
+    if (room.expeditionDefeated) {
+      this.logRejectedTransition(room, 'LOCK_ROUND_ACTION', 'Expedition is defeated');
+      return;
+    }
     const activeRoom = this.getActiveDungeonRoom(room);
-    if (!activeRoom || activeRoom.resolved) return;
+    if (!activeRoom || activeRoom.resolved) {
+      this.logRejectedTransition(room, 'LOCK_ROUND_ACTION', 'Active room is missing or already resolved');
+      return;
+    }
 
     if (player.isDead || player.hp <= 0) {
       this.sendError(ws, 'Has caído en combate. Espera a que un compañero te reviva.');
@@ -2580,6 +3062,7 @@ export class LaCriptaServer {
     if (livingEnemies.length === 0) {
       activeRoom.resolved = true;
       activeRoom.state = 'RESOLVED';
+      activeRoom.lifecyclePhase = 'READY_TO_LEAVE';
       this.syncLegacyNodes(room);
       this.broadcastRoomState(room);
       return;
@@ -2587,6 +3070,11 @@ export class LaCriptaServer {
 
     const currentRoundPhase = activeRoom.combatRoundPhase || 'PLAYER_PHASE';
     if (currentRoundPhase !== 'PLAYER_PHASE' || room.isResolvingRound) {
+      this.logRejectedTransition(
+        room,
+        'LOCK_ROUND_ACTION',
+        `Combat round is not in PLAYER_PHASE (${currentRoundPhase}) or is currently resolving`
+      );
       return;
     }
 
@@ -2604,35 +3092,49 @@ export class LaCriptaServer {
     if (!currentTurnPlayer) {
       const nextId = this.computeNextTurnPlayerId(room, activeRoom);
       currentTurnPlayer = livingConnected.find((p) => p.id === nextId) || livingConnected[0];
-      activeRoom.activeTurnPlayerId = currentTurnPlayer.id;
-      activeRoom.currentTurnAp = 2;
-      activeRoom.maxTurnAp = 2;
+      this.assignFreshPlayerTurn(activeRoom, currentTurnPlayer.id);
     }
 
     // Enforce individual sequential player turns!
     if (player.id !== currentTurnPlayer.id) {
+      this.logRejectedTransition(
+        room,
+        'LOCK_ROUND_ACTION',
+        `Player ${player.id} attempted to act on ${currentTurnPlayer.id}'s turn`
+      );
       this.sendError(ws, `Es el turno de ${currentTurnPlayer.name}.`);
       return;
     }
 
-    const maxAp = activeRoom.maxTurnAp || 2;
-    const currentAp =
-      typeof activeRoom.currentTurnAp === 'number' ? activeRoom.currentTurnAp : maxAp;
-
-    const apCost = payload.actionType === 'PASS' ? 0 : 1;
-
-    if (payload.actionType !== 'PASS' && currentAp < apCost) {
-      this.sendError(
-        ws,
-        `Puntos de Acción insuficientes (${currentAp}/${maxAp} AP). Necesitas ${apCost} AP.`
+    // STRICT ONE-CARD-PER-TURN VALIDATION (Section 7):
+    // Reject if this turn's main action was already consumed or if turnId/actionNonce is stale
+    if (
+      activeRoom.turnActionConsumed ||
+      activeRoom.actedPlayerIdsThisRound.includes(player.id) ||
+      (typeof activeRoom.currentTurnAp === 'number' && activeRoom.currentTurnAp <= 0)
+    ) {
+      this.logRejectedTransition(
+        room,
+        'LOCK_ROUND_ACTION',
+        `Turn action already consumed for player ${player.id} on turnId=${activeRoom.turnId}`
       );
       return;
     }
 
-    if (payload.actionType === 'ATTACK' && player.basicAttackUsedThisTurn) {
-      this.sendError(
-        ws,
-        'Ya has ejecutado tu Ataque Básico en este turno. Combina tu segundo PA con una Técnica de Arma, Habilidad de Clase o Guardia.'
+    if (payload.turnId && activeRoom.turnId && payload.turnId !== activeRoom.turnId) {
+      this.logRejectedTransition(
+        room,
+        'LOCK_ROUND_ACTION',
+        `Stale turnId (${payload.turnId} !== ${activeRoom.turnId})`
+      );
+      return;
+    }
+
+    if (payload.actionNonce && activeRoom.lastActionNonce === payload.actionNonce) {
+      this.logRejectedTransition(
+        room,
+        'LOCK_ROUND_ACTION',
+        `Duplicate actionNonce (${payload.actionNonce})`
       );
       return;
     }
@@ -2677,6 +3179,17 @@ export class LaCriptaServer {
       resolvedItemId = itemId;
     }
 
+    // Immediately lock the turn action BEFORE resolving card effects (Section 7)
+    activeRoom.turnActionConsumed = true;
+    activeRoom.currentTurnAp = 0;
+    activeRoom.maxTurnAp = 1;
+    if (payload.actionNonce) {
+      activeRoom.lastActionNonce = payload.actionNonce;
+    }
+    if (!activeRoom.actedPlayerIdsThisRound.includes(player.id)) {
+      activeRoom.actedPlayerIdsThisRound.push(player.id);
+    }
+
     const validEnemy =
       (payload.targetEnemyId && livingEnemies.find((e) => e.id === payload.targetEnemyId)) ||
       livingEnemies[0];
@@ -2710,54 +3223,30 @@ export class LaCriptaServer {
         ? 'USAR OBJETO'
         : 'FINALIZAR TURNO';
 
-    // Execute the played card immediately!
-    const shouldExecuteAction =
-      payload.actionType !== 'PASS' || currentAp > 0;
-    let victoryOrPhase2 = false;
-
-    if (shouldExecuteAction) {
-      victoryOrPhase2 = this.executeSinglePlayerRoundAction(
-        room,
-        activeRoom,
-        player,
-        queued,
-        currentRound
-      );
-    }
-
-    const remainingAp =
-      payload.actionType === 'PASS' ? 0 : Math.max(0, currentAp - apCost);
-    activeRoom.currentTurnAp = remainingAp;
-    activeRoom.maxTurnAp = maxAp;
+    // Execute the ONE played card immediately!
+    const victoryOrPhase2 = this.executeSinglePlayerRoundAction(
+      room,
+      activeRoom,
+      player,
+      queued,
+      currentRound
+    );
 
     if (victoryOrPhase2 || activeRoom.resolved || room.expeditionDefeated) {
       room.isResolvingRound = false;
       activeRoom.activeCombatActorId = null;
       if (!activeRoom.resolved && !room.expeditionDefeated) {
-        // Transitioned to Final Boss Phase 2 -> reset round turn order with 2 AP
+        // Transitioned to Final Boss Phase 2 -> reset round turn order with 1 main action per player turn
         activeRoom.actedPlayerIdsThisRound = [];
-        activeRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, activeRoom);
-        activeRoom.currentTurnAp = 2;
-        activeRoom.maxTurnAp = 2;
-        activeRoom.consumableUsedThisTurn = false;
+        const nextPlayerId = this.computeNextTurnPlayerId(room, activeRoom);
+        this.assignFreshPlayerTurn(activeRoom, nextPlayerId);
       }
       this.syncLegacyNodes(room);
       this.broadcastRoomState(room);
       return;
     }
 
-    // If the active player still has AP remaining (e.g. 1/2 AP after playing a 1 AP card), stay on their turn!
-    if (remainingAp > 0 && payload.actionType !== 'PASS') {
-      this.syncLegacyNodes(room);
-      this.broadcastRoomState(room);
-      return;
-    }
-
-    // Otherwise, this player's turn is complete! Advance to next player or Enemy Turn.
-    if (!activeRoom.actedPlayerIdsThisRound.includes(player.id)) {
-      activeRoom.actedPlayerIdsThisRound.push(player.id);
-    }
-
+    // Advance immediately to next living player or Enemy Turn (1 player turn = 1 main action card)
     this.advanceSequentialTurnOrTriggerEnemyPhase(room, activeRoom);
   }
 
@@ -2772,14 +3261,11 @@ export class LaCriptaServer {
     const actedSet = new Set(activeRoom.actedPlayerIdsThisRound || []);
     const unactedPlayers = livingConnected.filter((p) => !actedSet.has(p.id));
 
-    if ( unactedPlayers.length > 0) {
+    if (unactedPlayers.length > 0) {
       const nextPlayer = unactedPlayers[0];
       nextPlayer.basicAttackUsedThisTurn = false;
-      activeRoom.activeTurnPlayerId = nextPlayer.id;
+      this.assignFreshPlayerTurn(activeRoom, nextPlayer.id);
       activeRoom.activeCombatActorId = null;
-      activeRoom.currentTurnAp = 2;
-      activeRoom.maxTurnAp = 2;
-      activeRoom.consumableUsedThisTurn = false;
       activeRoom.combatRoundPhase = 'PLAYER_PHASE';
       activeRoom.combatBannerText = `TURNO DE ${nextPlayer.name.toUpperCase()}`;
       this.syncLegacyNodes(room);
@@ -2789,6 +3275,9 @@ export class LaCriptaServer {
 
     // All living connected players have completed their individual turns -> start Enemy Phase!
     activeRoom.activeTurnPlayerId = null;
+    activeRoom.turnId = null;
+    activeRoom.turnActionConsumed = true;
+    activeRoom.currentTurnAp = 0;
     this.syncLegacyNodes(room);
     this.broadcastRoomState(room);
     this.runAuthoritativeRoundResolution(room, activeRoom);
@@ -3173,7 +3662,7 @@ export class LaCriptaServer {
       );
     } else if (action === 'WEAPON_SPECIAL') {
       const spec = eqWeapon.weapon.specialAttack;
-      const cdReduction = player.equippedAccessoryId === 'anillo_de_ceniza' ? 1 : 0;
+      const cdReduction = player.equippedAccessoryId === 'reloj_de_arena_astral' ? 1 : 0;
       player.weaponSpecialCooldown = Math.max(1, spec.cooldownRounds - cdReduction);
 
       const isSupportOnlyWeaponSpecial =
@@ -3242,12 +3731,26 @@ export class LaCriptaServer {
             room.partyRelics || [],
             i > 0 && spec.targetRule === 'CHAIN_2'
           );
-          const dmg = rolled.damage;
+          let dmg = rolled.damage;
+          if (
+            eqWeapon.activeRune?.executeBonusPctVsHalfHp &&
+            en.hp <= en.maxHp * 0.5
+          ) {
+            dmg = Math.round(dmg * (1 + eqWeapon.activeRune.executeBonusPctVsHalfHp / 100));
+          }
           const prevHp = en.hp;
           en.hp = Math.max(0, en.hp - dmg);
           room.runStats.damageDealt += dmg;
           recordPlayerDamageAndThreat(en, dmg);
-          hitLogNames.push(`${en.name} (-${dmg} PV)`);
+          const dmgTypeMeta =
+            CRIPTA_DAMAGE_TYPE_META[rolled.damageType] || CRIPTA_DAMAGE_TYPE_META.FISICO;
+          const matchupNote =
+            rolled.matchupState === 'WEAKNESS'
+              ? ` · ¡VULNERABLE A ${dmgTypeMeta.shortLabel}!`
+              : rolled.matchupState === 'RESISTANCE'
+              ? ` · RESISTE ${dmgTypeMeta.shortLabel}`
+              : '';
+          hitLogNames.push(`${en.name} (-${dmg} PV ${dmgTypeMeta.shortLabel}${matchupNote})`);
 
           if (en.hp > 0) {
             if (spec.armorBreak && spec.armorBreak > 0) {
@@ -3257,10 +3760,13 @@ export class LaCriptaServer {
               en.vulnerableTurns = (en.vulnerableTurns || 0) + spec.vulnerableTurns;
             }
             if (spec.poisonStacks && spec.poisonStacks > 0) {
-              const extraPoison = playerHasRelic(player, room.partyRelics || [], 'guantes_del_boticario')
-                ? 1
-                : 0;
+              const extraPoison =
+                (playerHasRelic(player, room.partyRelics || [], 'guantes_del_boticario') ? 1 : 0) +
+                (eqWeapon.activeRune?.extraPoisonStacksOnHit || 0);
               en.poisonStacks = (en.poisonStacks || 0) + spec.poisonStacks + extraPoison;
+            } else if (eqWeapon.activeRune?.extraPoisonStacksOnHit) {
+              en.poisonStacks =
+                (en.poisonStacks || 0) + eqWeapon.activeRune.extraPoisonStacksOnHit;
             }
             if (rolled.appliedOnHitStatus) {
               if (
@@ -3274,6 +3780,13 @@ export class LaCriptaServer {
                 rolled.appliedOnHitStatus === 'MARKED'
               ) {
                 en.vulnerableTurns = (en.vulnerableTurns || 0) + 2;
+              } else if (
+                rolled.appliedOnHitStatus === 'FROST' ||
+                rolled.appliedOnHitStatus === 'BLINDED' ||
+                rolled.appliedOnHitStatus === 'WEAKENED'
+              ) {
+                en.attackBuffBonus = -2;
+                en.attackBuffRounds = 2;
               }
             }
           }
@@ -3286,8 +3799,13 @@ export class LaCriptaServer {
             sourcePlayerId: player.id,
             value: -dmg,
             label: rolled.isCrit ? `¡CRÍTICO! -${dmg} PV` : `-${dmg} PV`,
-            sublabel: `${spec.name.toUpperCase()} (${eqWeapon.weapon.name.toUpperCase()})`,
-            color: rolled.isCrit ? '#FFD166' : eqWeapon.weapon.accentColor,
+            sublabel: `${spec.name.toUpperCase()} · ${dmgTypeMeta.shortLabel}${matchupNote}`,
+            color:
+              rolled.matchupState === 'WEAKNESS'
+                ? '#68D391'
+                : rolled.isCrit
+                ? '#FFD166'
+                : dmgTypeMeta.color,
             vfxStyle:
               spec.targetRule === 'CLEAVE_2' || spec.targetRule === 'ALL_ENEMIES'
                 ? 'cleave'
@@ -3401,7 +3919,7 @@ export class LaCriptaServer {
         };
 
       if (!player.abilityCooldowns) player.abilityCooldowns = {};
-      const cdReduction = player.equippedAccessoryId === 'anillo_de_ceniza' ? 1 : 0;
+      const cdReduction = player.equippedAccessoryId === 'reloj_de_arena_astral' ? 1 : 0;
       player.abilityCooldowns[ability.id] = Math.max(
         1,
         (ability.cooldownTurns || 2) - cdReduction
@@ -3650,19 +4168,75 @@ export class LaCriptaServer {
         currentTurn,
         room.partyRelics || []
       );
-      const dmg = Math.max(2, Math.round(rolledAtk.damage * (player.passedLastRound ? 1.15 : 1)));
+      let dmg = Math.max(2, Math.round(rolledAtk.damage * (player.passedLastRound ? 1.15 : 1)));
+      if (
+        eqWeapon.activeRune?.executeBonusPctVsHalfHp &&
+        target.hp <= target.maxHp * 0.5
+      ) {
+        dmg = Math.round(dmg * (1 + eqWeapon.activeRune.executeBonusPctVsHalfHp / 100));
+      }
       const atkIsCrit = rolledAtk.isCrit || isCrit;
       const prevTargetHp = target.hp;
       target.hp = Math.max(0, target.hp - dmg);
       room.runStats.damageDealt += dmg;
       recordPlayerDamageAndThreat(target, dmg);
 
-      if (rolledAtk.appliedOnHitStatus && target.hp > 0) {
-        if (rolledAtk.appliedOnHitStatus === 'POISON') {
-          target.poisonStacks = (target.poisonStacks || 0) + 1;
-        } else if (rolledAtk.appliedOnHitStatus === 'CURSE') {
-          target.vulnerableTurns = (target.vulnerableTurns || 0) + 2;
+      const dmgTypeMeta =
+        CRIPTA_DAMAGE_TYPE_META[rolledAtk.damageType] || CRIPTA_DAMAGE_TYPE_META.FISICO;
+      const matchupNote =
+        rolledAtk.matchupState === 'WEAKNESS'
+          ? ` · ¡VULNERABLE A ${dmgTypeMeta.shortLabel}!`
+          : rolledAtk.matchupState === 'RESISTANCE'
+          ? ` · RESISTE ${dmgTypeMeta.shortLabel}`
+          : '';
+
+      if (target.hp > 0) {
+        if (eqWeapon.activeRune?.extraPoisonStacksOnHit) {
+          target.poisonStacks =
+            (target.poisonStacks || 0) + eqWeapon.activeRune.extraPoisonStacksOnHit;
         }
+        if (rolledAtk.appliedOnHitStatus) {
+          if (
+            rolledAtk.appliedOnHitStatus === 'POISON' ||
+            rolledAtk.appliedOnHitStatus === 'BLEED' ||
+            rolledAtk.appliedOnHitStatus === 'BURN'
+          ) {
+            target.poisonStacks = (target.poisonStacks || 0) + 1;
+          } else if (
+            rolledAtk.appliedOnHitStatus === 'CURSE' ||
+            rolledAtk.appliedOnHitStatus === 'MARKED'
+          ) {
+            target.vulnerableTurns = (target.vulnerableTurns || 0) + 2;
+          } else if (
+            rolledAtk.appliedOnHitStatus === 'FROST' ||
+            rolledAtk.appliedOnHitStatus === 'BLINDED' ||
+            rolledAtk.appliedOnHitStatus === 'WEAKENED'
+          ) {
+            target.attackBuffBonus = -2;
+            target.attackBuffRounds = 2;
+          }
+        }
+      }
+
+      // Weapon Rune Vampiric / Self-Recoil mechanics (e.g. Runa de Filo Vampírico)
+      if (eqWeapon.activeRune?.selfRecoilHpOnAttack) {
+        const recoil = eqWeapon.activeRune.selfRecoilHpOnAttack;
+        player.hp = Math.max(1, player.hp - recoil);
+      }
+      if (eqWeapon.activeRune?.onHitDrainHp) {
+        const drainAmt = Math.max(1, Math.round(eqWeapon.activeRune.onHitDrainHp * healMult));
+        player.hp = Math.min(player.maxHp, player.hp + drainAmt);
+        room.runStats.healingDone += drainAmt;
+        visualEvents.push({
+          id: `ev_${ts}_rune_drain_${player.id}`,
+          kind: 'HEAL_PLAYER',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          value: drainAmt,
+          label: `+${drainAmt} PV (FILO VAMPÍRICO)`,
+          color: '#E03E52',
+          vfxStyle: 'heal',
+        });
       }
 
       visualEvents.push({
@@ -3673,8 +4247,13 @@ export class LaCriptaServer {
         sourcePlayerId: player.id,
         value: -dmg,
         label: atkIsCrit ? `¡CRÍTICO! -${dmg} PV` : `-${dmg} PV`,
-        sublabel: `${eqWeapon.weapon.name.toUpperCase()}${eqWeapon.level > 1 ? ` +${eqWeapon.level}` : ''}`,
-        color: atkIsCrit ? '#E7A54A' : '#C93B5B',
+        sublabel: `${eqWeapon.weapon.name.toUpperCase()} · ${dmgTypeMeta.shortLabel}${matchupNote}`,
+        color:
+          rolledAtk.matchupState === 'WEAKNESS'
+            ? '#68D391'
+            : atkIsCrit
+            ? '#E7A54A'
+            : dmgTypeMeta.color,
         vfxStyle: classVfx,
         isCrit: atkIsCrit,
       });
@@ -3948,16 +4527,18 @@ export class LaCriptaServer {
       return;
     }
 
-    // 6. SUMMON (Section 43: Controlled summon with cap <= 3 enemies)
+    // 6. SUMMON (Section 14 & 43: Controlled summon with max 1 active summoned creature and cap <= 3 enemies)
     if (actionKind === 'SUMMON') {
       const livingAllies = activeRoom.enemies.filter((e) => e.hp > 0);
-      if (livingAllies.length < 3) {
+      const hasActiveSummon = livingAllies.some((e) => e.id.startsWith('summon_'));
+      if (!hasActiveSummon && livingAllies.length < 3) {
         const summonHp = Math.max(18, Math.round(enemy.maxHp * 0.28));
         const summonedBase: CriptaRoomEnemy = {
           id: `summon_${currentRound}_${Date.now()}`,
           slug: enemy.isFinalBoss ? 'esquirla_del_vacio' : 'engendro_invocado',
           name: enemy.isFinalBoss ? 'Esquirla del Vacío' : 'Siervo de la Cripta',
           title: 'INVOCACIÓN',
+          profession: 'GUERRERO',
           isElite: false,
           isBoss: false,
           hp: summonHp,
@@ -3975,6 +4556,7 @@ export class LaCriptaServer {
         activeRoom.enemies.push({
           ...summonedBase,
           roleTag: aiBuilt.roleTag,
+          profession: aiBuilt.profession,
           aiProfile: aiBuilt.aiProfile,
           memory: createInitialEnemyMemory(),
         });
@@ -3995,7 +4577,17 @@ export class LaCriptaServer {
     }
 
     // 7. OFFENSIVE / STATUS / BOSS ACTIONS against 1 or multiple targetPlayers
-    const effectiveEnemyAttack = enemy.attack + (enemy.attackBuffBonus || 0);
+    // Section 15: BERSERKER FURIA (Below 35% HP: +25% damage, -15% defense)
+    const isBerserkerFuria =
+      (enemy.profession === 'BERSERKER' || enemy.aiProfile?.personality === 'BERSERKER') &&
+      enemy.hp / Math.max(1, enemy.maxHp) <= 0.35;
+    if (isBerserkerFuria && !enemy.furiaActive) {
+      enemy.furiaActive = true;
+      enemy.armor = Math.max(0, Math.floor((enemy.armor || 2) * 0.85));
+    }
+    const effectiveEnemyAttack = Math.round(
+      (enemy.attack + (enemy.attackBuffBonus || 0)) * (isBerserkerFuria ? 1.25 : 1.0)
+    );
     const dmgMult = ability.damageMultiplier ?? 1.0;
 
     visualEvents.push({
@@ -4335,10 +4927,8 @@ export class LaCriptaServer {
     activeRoom.actedPlayerIdsThisRound = [];
     activeRoom.activeCombatActorId = null;
     activeRoom.activeTargetedPlayerIds = [];
-    activeRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, activeRoom);
-    activeRoom.currentTurnAp = 2;
-    activeRoom.maxTurnAp = 2;
-    activeRoom.consumableUsedThisTurn = false;
+    const nextTurnPlayerId = this.computeNextTurnPlayerId(room, activeRoom);
+    this.assignFreshPlayerTurn(activeRoom, nextTurnPlayerId);
     const firstTurnPlayer = room.players.find((p) => p.id === activeRoom.activeTurnPlayerId);
     activeRoom.combatBannerText = firstTurnPlayer
       ? `RONDA ${nextRound} — TURNO DE ${firstTurnPlayer.name.toUpperCase()}`
@@ -4384,15 +4974,15 @@ export class LaCriptaServer {
       return;
     }
 
-    const opt = activeRoom.options.find((o) => o.id === optionId);
+    let opt = activeRoom.options.find((o) => o.id === optionId);
     if (!opt || opt.resolved) return;
 
     const connectedPlayers = room.players.filter((p) => p.isConnected);
     const livingConnected = connectedPlayers.filter((p) => !p.isDead && p.hp > 0);
     const isSolo = livingConnected.length <= 1;
 
-    // For DECISION rooms in multiplayer, allow group voting among living players
-    if (activeRoom.type === 'DECISION' && !isSolo && !activeRoom.resolved) {
+    // For non-SHOP rooms in multiplayer, use authoritative group voting among living connected players
+    if (activeRoom.type !== 'SHOP' && !isSolo && !activeRoom.resolved) {
       activeRoom.optionVotes[player.id] = optionId;
       const votedCount = livingConnected.filter(
         (p) => Boolean(activeRoom.optionVotes[p.id])
@@ -4402,9 +4992,25 @@ export class LaCriptaServer {
       ).length;
 
       if (votesForThis < Math.ceil(livingConnected.length / 2) && votedCount < livingConnected.length) {
-        activeRoom.outcomeLog = `${player.name} señala: ${opt.label} (${votesForThis}/${livingConnected.length} votos).`;
+        activeRoom.outcomeLog = `${player.name} propone: ${opt.label} (${votesForThis}/${livingConnected.length} votos).`;
         this.broadcastRoomState(room);
         return;
+      }
+
+      // If all living players voted and split their votes, resolve the option with the highest vote tally
+      if (votedCount >= livingConnected.length && votesForThis < Math.ceil(livingConnected.length / 2)) {
+        let bestOpt = opt;
+        let bestTally = votesForThis;
+        for (const candidate of activeRoom.options) {
+          const tally = livingConnected.filter(
+            (p) => activeRoom.optionVotes[p.id] === candidate.id
+          ).length;
+          if (tally > bestTally) {
+            bestTally = tally;
+            bestOpt = candidate;
+          }
+        }
+        opt = bestOpt;
       }
     }
 
@@ -4951,49 +5557,70 @@ export class LaCriptaServer {
       }
     }
 
-    // Apply Weapon / Armor / Accessory / Upgrade / Event Flags if specified on the option!
+    // Apply Weapon / Armor / Accessory / Upgrade / Event Flags to the party when the decision resolves!
+    const recipients = livingConnected.length > 0 ? livingConnected : [player];
+
     if (opt.grantsWeaponId && CRIPTA_WEAPONS_REGISTRY[opt.grantsWeaponId]) {
-      const wDef = CRIPTA_WEAPONS_REGISTRY[opt.grantsWeaponId];
-      player.equippedWeaponId = wDef.id;
-      player.weaponSpecialCooldown = 0;
-      visualEvents.push({
-        id: `ev_${ts}_opt_wep_${player.id}`,
-        kind: 'WEAPON_EQUIPPED',
-        targetType: 'PLAYER',
-        targetId: player.id,
-        sourcePlayerId: player.id,
-        label: `EQUIPÓ: ${wDef.name.toUpperCase()}`,
-        sublabel: `${wDef.baseMinDamage}–${wDef.baseMaxDamage} DAÑO`,
-        color: wDef.accentColor,
-        vfxStyle: 'slash',
-      });
+      for (const recipient of recipients) {
+        const assignedWepId =
+          recipient.id === player.id
+            ? opt.grantsWeaponId
+            : pickWeaponDropForDungeon(
+                dungeonId,
+                activeRoom.index + recipient.seatIndex,
+                activeRoom.type === 'TREASURE' || activeRoom.type === 'SECRET',
+                recipient.characterId ? [recipient.characterId] : []
+              );
+        const wDef = CRIPTA_WEAPONS_REGISTRY[assignedWepId] || CRIPTA_WEAPONS_REGISTRY[opt.grantsWeaponId];
+        if (wDef) {
+          recipient.equippedWeaponId = wDef.id;
+          recipient.weaponSpecialCooldown = 0;
+          visualEvents.push({
+            id: `ev_${ts}_opt_wep_${recipient.id}`,
+            kind: 'WEAPON_EQUIPPED',
+            targetType: 'PLAYER',
+            targetId: recipient.id,
+            sourcePlayerId: recipient.id,
+            label: `EQUIPÓ: ${wDef.name.toUpperCase()}`,
+            sublabel: `${wDef.baseMinDamage}–${wDef.baseMaxDamage} DAÑO`,
+            color: wDef.accentColor,
+            vfxStyle: 'slash',
+          });
+        }
+      }
     }
     if (opt.grantsArmorId && CRIPTA_ARMORS_REGISTRY[opt.grantsArmorId]) {
       const aDef = CRIPTA_ARMORS_REGISTRY[opt.grantsArmorId];
-      player.equippedArmorId = aDef.id;
-      player.maxHp += aDef.bonusMaxHp;
-      player.hp = Math.min(player.maxHp, player.hp + aDef.bonusMaxHp);
-      player.armor = Math.min(24, player.armor + aDef.bonusDefense);
+      for (const recipient of recipients) {
+        recipient.equippedArmorId = aDef.id;
+        recipient.maxHp += aDef.bonusMaxHp;
+        recipient.hp = Math.min(recipient.maxHp, recipient.hp + aDef.bonusMaxHp);
+        recipient.armor = Math.min(24, recipient.armor + aDef.bonusDefense);
+      }
     }
     if (opt.grantsAccessoryId && CRIPTA_ACCESSORIES_REGISTRY[opt.grantsAccessoryId]) {
       const accDef = CRIPTA_ACCESSORIES_REGISTRY[opt.grantsAccessoryId];
-      player.equippedAccessoryId = accDef.id;
+      for (const recipient of recipients) {
+        recipient.equippedAccessoryId = accDef.id;
+      }
     }
     if (opt.isWeaponUpgradeOption) {
-      const currLvl = player.weaponUpgradeLevel || 1;
-      if (currLvl < 3) {
-        player.weaponUpgradeLevel = (currLvl + 1) as 2 | 3;
-        const eq = getEquippedWeaponForPlayer(player);
-        visualEvents.push({
-          id: `ev_${ts}_opt_wup_${player.id}`,
-          kind: 'WEAPON_UPGRADED',
-          targetType: 'PLAYER',
-          targetId: player.id,
-          label: `¡ARMA NIVEL ${player.weaponUpgradeLevel}!`,
-          sublabel: `${eq.weapon.name.toUpperCase()} (${eq.scaledMin}–${eq.scaledMax} DAÑO)`,
-          color: '#FFD166',
-          vfxStyle: 'slash',
-        });
+      for (const recipient of recipients) {
+        const currLvl = recipient.weaponUpgradeLevel || 1;
+        if (currLvl < 3) {
+          recipient.weaponUpgradeLevel = (currLvl + 1) as 2 | 3;
+          const eq = getEquippedWeaponForPlayer(recipient);
+          visualEvents.push({
+            id: `ev_${ts}_opt_wup_${recipient.id}`,
+            kind: 'WEAPON_UPGRADED',
+            targetType: 'PLAYER',
+            targetId: recipient.id,
+            label: `¡ARMA NIVEL ${recipient.weaponUpgradeLevel}!`,
+            sublabel: `${eq.weapon.name.toUpperCase()} (${eq.scaledMin}–${eq.scaledMax} DAÑO)`,
+            color: '#FFD166',
+            vfxStyle: 'slash',
+          });
+        }
       }
     }
 
@@ -5262,8 +5889,322 @@ export class LaCriptaServer {
         }
       };
 
-      if (mg.minigameType === 'ALCHEMICAL_BALANCE') {
-        const currentMeter = mg.alchemicalMeter ?? 20;
+      const currentMeter = mg.alchemicalMeter ?? 20;
+      const maxMistakes = mg.maxMistakes ?? 2;
+      const family = mg.family;
+
+      // 1. CURSED_ROULETTE
+      if (family === 'CURSED_ROULETTE') {
+        const sectors = mg.rouletteSectors || [];
+        if (sectors.length > 0) {
+          if (runeIndex === 0 || (runeIndex === 2 && mg.rouletteCanReroll)) {
+            // Spin or Paid Reroll
+            if (runeIndex === 2) {
+              const rerollCost = mg.rouletteRerollCostGold ?? 18;
+              if ((room.partyGold ?? 0) < rerollCost) {
+                this.sendError(ws, 'Oro insuficiente para forzar un nuevo giro.');
+                return;
+              }
+              room.partyGold = Math.max(0, (room.partyGold ?? 0) - rerollCost);
+              mg.rouletteCanReroll = false;
+            }
+            const landedIdx =
+              (Math.abs(room.seed + ts + activeRoom.index * 31) +
+                (mg.rouletteSpinCount || 0) * 3) %
+              sectors.length;
+            const degPerSector = 360 / sectors.length;
+            // Land pointer at top (-sector angle + 5 full rotations)
+            const targetDeg = 360 * 5 + (360 - landedIdx * degPerSector);
+            mg.rouletteLandedSectorIndex = landedIdx;
+            mg.rouletteLandingAngleDeg = targetDeg;
+            mg.rouletteSpinStartedAt = ts;
+            mg.rouletteSpinCount = (mg.rouletteSpinCount || 0) + 1;
+            const landedSec = sectors[landedIdx];
+            activeRoom.outcomeLog = `¡${player.name} hace girar la Ruleta del Destino! La aguja se detiene en «${landedSec.label}»: ${landedSec.description}`;
+            this.syncLegacyNodes(room);
+            this.broadcastRoomState(room);
+            return;
+          }
+
+          if (runeIndex === 1) {
+            // Claim / Resolve landed sector
+            const landedIdx = mg.rouletteLandedSectorIndex ?? 0;
+            const sec = sectors[landedIdx] || sectors[0];
+            mg.completed = true;
+            mg.succeeded = sec.isPositive;
+            activeRoom.resolved = true;
+            activeRoom.state = 'RESOLVED';
+            activeRoom.lifecyclePhase = 'READY_TO_LEAVE';
+
+            if (sec.goldDelta && sec.goldDelta !== 0) {
+              room.partyGold = Math.max(0, (room.partyGold ?? 0) + sec.goldDelta);
+              if (sec.goldDelta > 0) room.runStats.goldEarned += sec.goldDelta;
+              visualEvents.push({
+                id: `ev_${ts}_roul_g`,
+                kind: sec.goldDelta > 0 ? 'GAIN_GOLD' : 'LOSE_GOLD',
+                targetType: 'PARTY',
+                value: sec.goldDelta,
+                label: `${sec.goldDelta > 0 ? '+' : ''}${sec.goldDelta} ORO`,
+                color: sec.goldDelta > 0 ? '#FFD166' : '#C93B5B',
+                vfxStyle: 'gold',
+              });
+            }
+            if (sec.relicId) {
+              this.grantRelicAuthoritatively(room, player, sec.relicId, visualEvents);
+            }
+            if (sec.itemId) {
+              this.grantNormalItemAuthoritatively(
+                room,
+                player,
+                sec.itemId,
+                'CHEST',
+                'CURSED_ROULETTE',
+                undefined,
+                visualEvents
+              );
+            }
+            if (sec.weaponId) {
+              player.equippedWeaponId = sec.weaponId;
+            }
+            for (const p of room.players) {
+              if (!p.isDead && p.hp > 0) {
+                if (sec.hpDelta && sec.hpDelta > 0) {
+                  p.hp = Math.min(p.maxHp, p.hp + sec.hpDelta);
+                } else if (sec.hpDelta && sec.hpDelta < 0) {
+                  p.hp = Math.max(4, p.hp + sec.hpDelta);
+                }
+                if (sec.statusType) {
+                  applyStatusEffectToPlayer(
+                    p,
+                    sec.statusType,
+                    'roulette',
+                    1,
+                    sec.statusTurns || 2
+                  );
+                }
+              }
+            }
+            mg.rewardSummary = sec.label;
+            activeRoom.outcomeLog = `Destino sellado en la Ruleta: «${sec.label}». ${sec.description}`;
+            this.emitVisualEventBatch(room, visualEvents, player.id, 'PUZZLE');
+            this.syncLegacyNodes(room);
+            this.broadcastRoomState(room);
+            return;
+          }
+        }
+      }
+
+      // 2. CRYPT_LOCK (3 Concentric Rings)
+      if (family === 'CRYPT_LOCK') {
+        const angles = mg.lockRingAngles || [90, 180, 270];
+        if (runeIndex >= 0 && runeIndex <= 2) {
+          angles[runeIndex] = (angles[runeIndex] + 45) % 360;
+          mg.lockRingAngles = [...angles];
+          mg.lockRingLocked = angles.map((a) => a % 360 === 0);
+          const alignedCount = mg.lockRingLocked.filter(Boolean).length;
+          mg.currentStep = alignedCount;
+          activeRoom.outcomeLog = `${player.name} gira el anillo #${
+            runeIndex + 1
+          } (${alignedCount}/3 anillos alineados en el Cenit 0°).`;
+          this.syncLegacyNodes(room);
+          this.broadcastRoomState(room);
+          return;
+        }
+        if (runeIndex === 99) {
+          const allAligned = angles.every((a) => a % 360 === 0);
+          if (allAligned) {
+            grantMinigameSuccessReward(48, 16, 'DEFENSE', true);
+            mg.rewardSummary = '+48 ORO · RELIQUIA/ELIXIR · +3 ARMADURA';
+            activeRoom.outcomeLog = `¡${player.name} alinea los 3 anillos astrales en el Cenit y abre la Cerradura de la Cripta! (${mg.rewardSummary})`;
+          } else {
+            mg.mistakes = (mg.mistakes ?? 0) + 1;
+            player.hp = Math.max(4, player.hp - 6);
+            if ((mg.mistakes ?? 0) >= maxMistakes) {
+              mg.completed = true;
+              mg.succeeded = false;
+              activeRoom.resolved = true;
+              activeRoom.state = 'RESOLVED';
+              room.partyGold = (room.partyGold ?? 0) + 18;
+              activeRoom.outcomeLog = `El cerrojo astral descarga energía (-6 PV), pero cede dejando +18 ORO.`;
+            } else {
+              activeRoom.outcomeLog = `Aún hay anillos fuera del Cenit (0°). ¡Alinéalos todos antes de sellar (-6 PV)!`;
+            }
+          }
+          this.emitVisualEventBatch(room, visualEvents, player.id, 'PUZZLE');
+          this.syncLegacyNodes(room);
+          this.broadcastRoomState(room);
+          return;
+        }
+      }
+
+      // 3. SHADOW_MIRRORS (4 Rotatable Optical Mirrors)
+      if (family === 'SHADOW_MIRRORS') {
+        const orients = mg.mirrorOrientations || [0, 0, 0, 0];
+        const sol = mg.mirrorSolution || [1, 2, 0, 3];
+        if (runeIndex >= 0 && runeIndex <= 3) {
+          orients[runeIndex] = (orients[runeIndex] + 1) % 4;
+          mg.mirrorOrientations = [...orients];
+          const alignedCount = orients.filter((o, i) => o === sol[i]).length;
+          mg.currentStep = alignedCount;
+          mg.mirrorTargetLit = alignedCount === 4;
+          activeRoom.outcomeLog = `${player.name} rota el Espejo #${
+            runeIndex + 1
+          } (${alignedCount}/4 espejos en resonancia con el haz astral).`;
+          this.syncLegacyNodes(room);
+          this.broadcastRoomState(room);
+          return;
+        }
+        if (runeIndex === 99) {
+          const allAligned = orients.every((o, i) => o === sol[i]);
+          if (allAligned) {
+            grantMinigameSuccessReward(52, 18, 'MAGIC', true);
+            mg.rewardSummary = '+52 ORO · RELIQUIA · +1 MAGIA · BENDECIDO';
+            activeRoom.outcomeLog = `¡El haz purificador ilumina el Cristal del Eclipse! (${mg.rewardSummary})`;
+          } else {
+            mg.mistakes = (mg.mistakes ?? 0) + 1;
+            player.hp = Math.max(4, player.hp - 6);
+            if ((mg.mistakes ?? 0) >= maxMistakes) {
+              mg.completed = true;
+              mg.succeeded = false;
+              activeRoom.resolved = true;
+              activeRoom.state = 'RESOLVED';
+              room.partyGold = (room.partyGold ?? 0) + 18;
+              activeRoom.outcomeLog = `El haz refractado sobrecarga los pedestales (-6 PV) y abre el umbral (+18 ORO).`;
+            } else {
+              activeRoom.outcomeLog = `El haz aún no alcanza el Cristal Receptor. ¡Alinea los 4 espejos antes de canalizar!`;
+            }
+          }
+          this.emitVisualEventBatch(room, visualEvents, player.id, 'PUZZLE');
+          this.syncLegacyNodes(room);
+          this.broadcastRoomState(room);
+          return;
+        }
+      }
+
+      // 4. SOUL_CHAINS (Sever 2 Weak Links, Avoid Trap Link)
+      if (family === 'SOUL_CHAINS') {
+        const weak = mg.chainsWeakIndices || [0, 2];
+        const broken = mg.chainsBroken || [false, false, false, false];
+        if (weak.includes(runeIndex)) {
+          broken[runeIndex] = true;
+          mg.chainsBroken = [...broken];
+          const cutWeakCount = weak.filter((idx) => broken[idx]).length;
+          mg.currentStep = cutWeakCount;
+          if (cutWeakCount >= weak.length) {
+            grantMinigameSuccessReward(46, 16, 'ATTACK', true);
+            mg.rewardSummary = '+46 ORO · +1 ATAQUE · RELIQUIA LIBERADA';
+            activeRoom.outcomeLog = `¡${player.name} rompe las Cadenas de Ánima y libera el relicario! (${mg.rewardSummary})`;
+          } else {
+            activeRoom.outcomeLog = `¡${player.name} parte el eslabón fisurado #${
+              runeIndex + 1
+            }! Falta 1 cadena débil por cortar.`;
+          }
+        } else {
+          mg.mistakes = (mg.mistakes ?? 0) + 1;
+          const dmg = runeIndex === mg.chainsTrapIndex ? 9 : 5;
+          player.hp = Math.max(4, player.hp - dmg);
+          applyStatusEffectToPlayer(player, 'VULNERABLE', 'chains', 1, 2);
+          if ((mg.mistakes ?? 0) >= maxMistakes) {
+            mg.completed = true;
+            mg.succeeded = false;
+            activeRoom.resolved = true;
+            activeRoom.state = 'RESOLVED';
+            room.partyGold = (room.partyGold ?? 0) + 16;
+            activeRoom.outcomeLog = `La cadena maldita descarga su furia (-${dmg} PV) antes de romperse (+16 ORO).`;
+          } else {
+            activeRoom.outcomeLog = `¡Eslabón equivocado (-${dmg} PV a ${player.name})! Corta solo las cadenas con fisuras incandescentes.`;
+          }
+        }
+        this.emitVisualEventBatch(room, visualEvents, player.id, 'PUZZLE');
+        this.syncLegacyNodes(room);
+        this.broadcastRoomState(room);
+        return;
+      }
+
+      // 5. COOP_GAMBLE_CHEST (Push-Your-Luck Coffer)
+      if (family === 'COOP_GAMBLE_CHEST') {
+        const tier = mg.gambleChestTier || 1;
+        const accGold = mg.gambleAccumulatedGold || 28;
+        if (runeIndex === 1) {
+          // Cash out safely
+          grantMinigameSuccessReward(accGold, 14, 'DEFENSE', tier >= 2);
+          mg.rewardSummary = `+${accGold} ORO SEGURO · +14 PV`;
+          activeRoom.outcomeLog = `¡${player.name} asegura el botín del Arca de las Ánimas en el Nivel ${tier} (+${accGold} ORO)!`;
+        } else {
+          // Push luck
+          const roll = Math.abs(room.seed + ts + activeRoom.index * 19 + tier * 37) % 100;
+          const curseChance = mg.gambleCurseChancePct || 20;
+          if (roll < curseChance) {
+            // Triggered curse!
+            mg.completed = true;
+            mg.succeeded = false;
+            activeRoom.resolved = true;
+            activeRoom.state = 'RESOLVED';
+            for (const p of room.players) {
+              if (!p.isDead && p.hp > 0) {
+                p.hp = Math.max(4, p.hp - 8);
+                applyStatusEffectToPlayer(p, 'CURSE', 'gamble_chest', 1, 2);
+              }
+            }
+            const consolation = Math.max(12, Math.floor(accGold * 0.4));
+            room.partyGold = (room.partyGold ?? 0) + consolation;
+            activeRoom.outcomeLog = `¡El Sello Abisal despierta una maldición (-8 PV y MALDICIÓN)! Rescatáis +${consolation} ORO entre las brasas.`;
+          } else {
+            const nextTier = tier + 1;
+            const nextGold = accGold + 30;
+            mg.gambleChestTier = nextTier;
+            mg.gambleAccumulatedGold = nextGold;
+            mg.gambleCurseChancePct = Math.min(65, curseChance + 20);
+            mg.currentStep = nextTier - 1;
+            if (nextTier >= (mg.gambleMaxTier || 3)) {
+              grantMinigameSuccessReward(nextGold, 20, 'ATTACK', true);
+              mg.rewardSummary = `+${nextGold} ORO · RELIQUIA · +20 PV`;
+              activeRoom.outcomeLog = `¡${player.name} conquista el Sello Maestro del Arca de las Ánimas! (${mg.rewardSummary})`;
+            } else {
+              activeRoom.outcomeLog = `¡Sello de Nivel ${nextTier} abierto! Botín acumulado: +${nextGold} ORO. ¿Plantarse o arriesgar el sello final?`;
+            }
+          }
+        }
+        this.emitVisualEventBatch(room, visualEvents, player.id, 'PUZZLE');
+        this.syncLegacyNodes(room);
+        this.broadcastRoomState(room);
+        return;
+      }
+
+      // 6. FORBIDDEN_COFFERS (Deduction of 3 Relic Coffers)
+      if (family === 'FORBIDDEN_COFFERS') {
+        const trueIdx = mg.cofferTrueIndex ?? 0;
+        const mimicIdx = mg.cofferMimicIndex ?? 1;
+        if (runeIndex === trueIdx) {
+          grantMinigameSuccessReward(54, 18, 'MAGIC', true);
+          mg.rewardSummary = '+54 ORO · RELIQUIA VERDADERA · +18 PV';
+          activeRoom.outcomeLog = `¡${player.name} deduce las inscripciones y abre el Cofre Verdadero! (${mg.rewardSummary})`;
+        } else if (runeIndex === mimicIdx) {
+          mg.completed = true;
+          mg.succeeded = false;
+          activeRoom.resolved = true;
+          activeRoom.state = 'RESOLVED';
+          player.hp = Math.max(4, player.hp - 10);
+          applyStatusEffectToPlayer(player, 'BLEED', 'mimic_coffer', 1, 2);
+          room.partyGold = (room.partyGold ?? 0) + 15;
+          activeRoom.outcomeLog = `¡Trampa de Cofre Mímico (-10 PV y SANGRADO a ${player.name})! Halláis +15 ORO tras destruir el mecanismo.`;
+        } else {
+          // Minor coffer
+          mg.completed = true;
+          mg.succeeded = true;
+          activeRoom.resolved = true;
+          activeRoom.state = 'RESOLVED';
+          room.partyGold = (room.partyGold ?? 0) + 28;
+          room.runStats.goldEarned += 28;
+          activeRoom.outcomeLog = `${player.name} abre el cofre secundario: obtenéis +28 ORO sin activar la trampa.`;
+        }
+        this.emitVisualEventBatch(room, visualEvents, player.id, 'PUZZLE');
+        this.syncLegacyNodes(room);
+        this.broadcastRoomState(room);
+        return;
+      }
+
+      if (mg.minigameType === 'ALCHEMICAL_BALANCE' || family === 'ALCHEMICAL_BALANCE') {
         if (runeIndex === 3) {
           // Stabilize flask now!
           if (currentMeter >= 65 && currentMeter <= 90) {
@@ -5271,7 +6212,7 @@ export class LaCriptaServer {
             mg.rewardSummary = '+38 ORO · +18 PV · +1 MAGIA · ELIXIR DESTILADO';
             activeRoom.outcomeLog = `¡${player.name} estabiliza el matraz al ${currentMeter}% de resonancia exacta! (${mg.rewardSummary})`;
           } else {
-            mg.mistakes += 1;
+            mg.mistakes = (mg.mistakes ?? 0) + 1;
             player.hp = Math.max(4, player.hp - 6);
             visualEvents.push({
               id: `ev_${ts}_mg_err_${player.id}`,
@@ -5282,7 +6223,7 @@ export class LaCriptaServer {
               label: '-6 PV (MEZCLA INESTABLE)',
               color: '#C93B5B',
             });
-            if (mg.mistakes >= mg.maxMistakes) {
+            if ((mg.mistakes ?? 0) >= maxMistakes) {
               mg.completed = true;
               mg.succeeded = false;
               activeRoom.resolved = true;
@@ -5294,18 +6235,19 @@ export class LaCriptaServer {
             }
           }
         } else {
-          const delta = runeIndex === 0 ? 25 : runeIndex === 1 ? 35 : 15;
-          const nextMeter = currentMeter + delta;
+          const delta = runeIndex === 0 ? 22 : runeIndex === 1 ? -12 : 14;
+          const nextMeter = Math.max(0, currentMeter + delta);
           mg.alchemicalMeter = nextMeter;
+          if (!mg.playerInputs) mg.playerInputs = [];
           mg.playerInputs.push(runeIndex);
-          mg.currentStep += 1;
+          mg.currentStep = (mg.currentStep ?? 0) + 1;
 
           if (nextMeter >= 70 && nextMeter <= 86) {
             grantMinigameSuccessReward(38, 18, 'MAGIC', true);
             mg.rewardSummary = '+38 ORO · +18 PV · +1 MAGIA · ELIXIR PERFECTO';
             activeRoom.outcomeLog = `¡${player.name} alcanza la resonancia alquímica perfecta (${nextMeter}%)! (${mg.rewardSummary})`;
           } else if (nextMeter > 90) {
-            mg.mistakes += 1;
+            mg.mistakes = (mg.mistakes ?? 0) + 1;
             mg.alchemicalMeter = 25;
             mg.currentStep = 0;
             mg.playerInputs = [];
@@ -5319,7 +6261,7 @@ export class LaCriptaServer {
               label: '-7 PV (SOBRECARGA ALQUÍMICA)',
               color: '#C93B5B',
             });
-            if (mg.mistakes >= mg.maxMistakes) {
+            if ((mg.mistakes ?? 0) >= maxMistakes) {
               mg.completed = true;
               mg.succeeded = false;
               activeRoom.resolved = true;
@@ -5341,17 +6283,25 @@ export class LaCriptaServer {
       }
 
       // RUNE_SEQUENCE, LOCKPICK_TIMING, TRAP_STEPPING
-      const expectedTarget = mg.targetSequence[mg.currentStep] ?? 0;
+      const targetSeq = mg.targetSequence || mg.targetPattern || [];
+      const currStep = mg.currentStep ?? mg.step ?? 0;
+      const expectedTarget = targetSeq[currStep] ?? 0;
       const isTimingSuccess = runeIndex === 100 || runeIndex === expectedTarget;
 
       if (isTimingSuccess) {
+        if (!mg.playerInputs) mg.playerInputs = [];
         mg.playerInputs.push(expectedTarget);
-        mg.currentStep += 1;
+        if (mg.family === 'PRESSURE_SIGILS') {
+          mg.sigilLockedPlates = [...(mg.sigilLockedPlates || []), expectedTarget];
+        }
+        const updatedStep = currStep + 1;
+        mg.currentStep = updatedStep;
+        mg.step = updatedStep;
         if (activeRoom.puzzleRunes && !activeRoom.puzzleRunes.currentInput.includes(expectedTarget)) {
           activeRoom.puzzleRunes.currentInput.push(expectedTarget);
         }
 
-        if (mg.currentStep >= mg.maxSteps) {
+        if (updatedStep >= mg.maxSteps) {
           if (mg.minigameType === 'LOCKPICK_TIMING') {
             grantMinigameSuccessReward(50, 15, 'DEFENSE', true);
             mg.rewardSummary = '+50 ORO · RELIQUIA/BOTÍN · +3 ARMADURA';
@@ -5370,14 +6320,14 @@ export class LaCriptaServer {
             id: `ev_${ts}_mg_step`,
             kind: 'ROOM_REWARD',
             targetType: 'ROOM',
-            label: `✦ PASO ${mg.currentStep}/${mg.maxSteps} COMPLETADO`,
+            label: `✦ PASO ${updatedStep}/${mg.maxSteps} COMPLETADO`,
             color: '#FFD166',
             vfxStyle: 'arcane',
           });
-          activeRoom.outcomeLog = `${player.name} acierta el paso ${mg.currentStep}/${mg.maxSteps} de «${mg.title}».`;
+          activeRoom.outcomeLog = `${player.name} acierta el paso ${updatedStep}/${mg.maxSteps} de «${mg.title}».`;
         }
       } else {
-        mg.mistakes += 1;
+        mg.mistakes = (mg.mistakes ?? 0) + 1;
         const trapDmg = mg.minigameType === 'TRAP_STEPPING' ? 7 : 5;
         player.hp = Math.max(4, player.hp - trapDmg);
         visualEvents.push({
@@ -5390,7 +6340,7 @@ export class LaCriptaServer {
           color: '#C93B5B',
         });
 
-        if (mg.mistakes >= mg.maxMistakes) {
+        if ((mg.mistakes ?? 0) >= maxMistakes) {
           mg.completed = true;
           mg.succeeded = false;
           activeRoom.resolved = true;
@@ -5403,11 +6353,12 @@ export class LaCriptaServer {
         } else {
           if (mg.minigameType === 'RUNE_SEQUENCE') {
             mg.currentStep = 0;
+            mg.step = 0;
             mg.playerInputs = [];
             if (activeRoom.puzzleRunes) activeRoom.puzzleRunes.currentInput = [];
           }
           activeRoom.outcomeLog = `¡Fallo en «${mg.title}» (-${trapDmg} PV a ${player.name})! Intentos restantes: ${
-            mg.maxMistakes - mg.mistakes
+            maxMistakes - (mg.mistakes ?? 0)
           }.`;
         }
       }
@@ -5528,19 +6479,33 @@ export class LaCriptaServer {
   }
 
   private handleRoomAdvance(room: ServerCriptaRoom, player: CriptaPlayer) {
-    if (room.phase !== 'DUNGEON' && room.phase !== 'DUNGEON_ARRIVAL') return;
-    if (room.expeditionDefeated) return;
-    // Prevent double transitions or transitioning while combat round is still resolving (Sections 1, 33, 60)
-    if (room.roomDoorTransition?.active || room.isResolvingRound) return;
+    if (room.phase !== 'DUNGEON' && room.phase !== 'DUNGEON_ARRIVAL') {
+      this.logRejectedTransition(
+        room,
+        'ROOM_ADVANCE',
+        `Cannot advance room while run phase is ${room.phase}`
+      );
+      return;
+    }
+    if (room.expeditionDefeated) {
+      this.logRejectedTransition(room, 'ROOM_ADVANCE', 'Expedition is defeated');
+      return;
+    }
+    // Prevent double transitions or transitioning while combat round is still resolving
+    if (room.roomDoorTransition?.active || room.isResolvingRound) {
+      this.logRejectedTransition(
+        room,
+        'ROOM_ADVANCE',
+        `Door transition already active (${Boolean(room.roomDoorTransition?.active)}) or round resolving (${room.isResolvingRound})`
+      );
+      return;
+    }
 
     const activeRoom = this.getActiveDungeonRoom(room);
-    if (!activeRoom) return;
-
-    // Never transition if any connected player is currently resolving a full-inventory replacement modal
-    const anyPendingReplacement = room.players.some(
-      (p) => p.isConnected && Boolean(p.pendingInventoryReplacement)
-    );
-    if (anyPendingReplacement) return;
+    if (!activeRoom) {
+      this.logRejectedTransition(room, 'ROOM_ADVANCE', 'No active room found');
+      return;
+    }
 
     // Allow SHOP, REST, and LOOT rooms to be exited once players choose to leave
     const canLeaveRoom =
@@ -5549,7 +6514,63 @@ export class LaCriptaServer {
       activeRoom.type === 'REST' ||
       activeRoom.type === 'LOOT';
 
-    if (!canLeaveRoom) return;
+    if (!canLeaveRoom) {
+      this.logRejectedTransition(
+        room,
+        'ROOM_ADVANCE',
+        `Room ${activeRoom.id} (${activeRoom.type}) is not yet resolved`
+      );
+      return;
+    }
+
+    // Clear any stale pendingInventoryReplacement so it never soft-locks room exit!
+    for (const p of room.players) {
+      if (p.pendingInventoryReplacement) {
+        p.pendingInventoryReplacement = null;
+      }
+    }
+
+    // Auto-claim any unclaimed Relics and fitting Consumable Drops on the floor before exiting!
+    if (activeRoom.groundDrops && activeRoom.groundDrops.length > 0) {
+      const claimEvents: CriptaVisualEvent[] = [];
+      const recipient =
+        !player.isDead && player.hp > 0
+          ? player
+          : room.players.find((p) => p.isConnected && !p.isDead && p.hp > 0) || player;
+      for (const drop of activeRoom.groundDrops) {
+        if (drop.claimedByPlayerId) continue;
+        if (drop.kind === 'RELIC' && drop.relicId) {
+          drop.claimedByPlayerId = recipient.id;
+          drop.claimedByPlayerName = recipient.name;
+          this.grantRelicAuthoritatively(room, recipient, drop.relicId, claimEvents);
+        } else if (drop.kind === 'ITEM' && drop.itemId) {
+          const recipientWithSpace =
+            room.players.find(
+              (p) =>
+                p.isConnected &&
+                !p.isDead &&
+                p.hp > 0 &&
+                (p.normalInventory || []).length < NORMAL_INVENTORY_MAX_SLOTS
+            ) || null;
+          if (recipientWithSpace) {
+            this.grantNormalItemAuthoritatively(
+              room,
+              recipientWithSpace,
+              drop.itemId,
+              'DROP',
+              drop.id,
+              undefined,
+              claimEvents
+            );
+          }
+          drop.claimedByPlayerId = (recipientWithSpace || recipient).id;
+          drop.claimedByPlayerName = (recipientWithSpace || recipient).name;
+        }
+      }
+      if (claimEvents.length > 0) {
+        this.emitVisualEventBatch(room, claimEvents, recipient.id, 'CLAIM_DROP');
+      }
+    }
 
     activeRoom.resolved = true;
     activeRoom.state = 'RESOLVED';
@@ -5583,16 +6604,23 @@ export class LaCriptaServer {
     const currentIdx = room.currentRoomIndex ?? 0;
     const nextIdx = currentIdx + 1;
     const isLeavingSecret = Boolean(room.inSecretRoom);
-    const isEndOfDungeon = !isLeavingSecret && nextIdx >= seq.length;
+    const mainRoomWhenLeavingSecret = isLeavingSecret ? seq[currentIdx] : null;
+    const isEndOfDungeon = isLeavingSecret
+      ? Boolean(mainRoomWhenLeavingSecret?.resolved && nextIdx >= seq.length)
+      : nextIdx >= seq.length;
 
     const targetNextRoom = isLeavingSecret
-      ? seq[Math.min(seq.length - 1, currentIdx + (seq[currentIdx]?.resolved ? 1 : 0))]
+      ? !mainRoomWhenLeavingSecret?.resolved
+        ? mainRoomWhenLeavingSecret
+        : !isEndOfDungeon
+        ? seq[nextIdx]
+        : null
       : !isEndOfDungeon
       ? seq[nextIdx]
       : null;
 
     // Begin STAGE 1-3 of Giant Door Transition (Door Closes & Seals over the current room for 820ms)
-    activeRoom.lifecyclePhase = 'TRANSITIONING_OUT';
+    activeRoom.lifecyclePhase = 'EXITING';
     const transitionStartedAt = Date.now();
     room.transitioningToRoomIndex = isEndOfDungeon
       ? currentIdx
@@ -5625,7 +6653,7 @@ export class LaCriptaServer {
     room.roomTransitionTimer = setTimeout(() => {
       room.roomTransitionTimer = null;
 
-      if (isLeavingSecret) {
+      if (isLeavingSecret && !isEndOfDungeon) {
         room.inSecretRoom = false;
         const mainRoom = (room.roomSequence || [])[room.currentRoomIndex ?? 0];
         if (mainRoom && mainRoom.resolved) {
@@ -5633,11 +6661,15 @@ export class LaCriptaServer {
           if (room.roomSequence && nIdx < room.roomSequence.length) {
             this.activateDungeonRoomAtIndex(room, nIdx);
           }
+        } else if (mainRoom) {
+          mainRoom.lifecyclePhase = 'ACTIVE';
+          mainRoom.readyToAdvancePlayerIds = [];
         }
         this.syncLegacyNodes(room);
         this.broadcastRoomState(room);
       } else if (isEndOfDungeon) {
         // Leaving completed Miniboss room -> return to Three Doors chamber!
+        room.inSecretRoom = false;
         const finishedDungeonId = room.selectedDungeonId;
         if (!room.completedDungeonIds) room.completedDungeonIds = [];
         if (finishedDungeonId && !room.completedDungeonIds.includes(finishedDungeonId)) {
@@ -5696,6 +6728,7 @@ export class LaCriptaServer {
           room.offeredDungeons = [];
         }
         room.doorVotes = {};
+        room.finalBossDoorVotes = {};
         room.voteTieWarning = false;
         room.decisionResolved = false;
         room.selectedDungeonId = null;
@@ -5718,7 +6751,7 @@ export class LaCriptaServer {
             room.phase = 'THREE_DOORS';
             this.broadcastRoomState(room);
           }
-        }, 1500);
+        }, 1400);
         return;
       } else {
         this.activateDungeonRoomAtIndex(room, nextIdx);
@@ -5733,7 +6766,7 @@ export class LaCriptaServer {
         room.roomDoorTransition = null;
         const currRoom = this.getActiveDungeonRoom(room);
         if (currRoom) {
-          currRoom.lifecyclePhase = 'ACTIVE';
+          currRoom.lifecyclePhase = currRoom.resolved ? 'READY_TO_LEAVE' : 'ACTIVE';
         }
         this.broadcastRoomState(room);
       }, 780);
@@ -5764,12 +6797,6 @@ export class LaCriptaServer {
       const excludedWeapons = room.players
         .map((p) => p.equippedWeaponId)
         .filter((w): w is NonNullable<typeof w> => Boolean(w));
-      const excludedArmors = room.players
-        .map((p) => p.equippedArmorId)
-        .filter((a): a is NonNullable<typeof a> => Boolean(a));
-      const excludedAccessories = room.players
-        .map((p) => p.equippedAccessoryId)
-        .filter((a): a is NonNullable<typeof a> => Boolean(a));
 
       const freshShop = generateShopInventoryForRoom(
         (room.dungeonSeed || room.seed) + nextRoom.index * 97,
@@ -5778,8 +6805,6 @@ export class LaCriptaServer {
         preferredClasses,
         excludedRelics,
         excludedWeapons,
-        excludedArmors,
-        excludedAccessories,
         nextRoom.shopRerollCount || 0
       );
       nextRoom.shopInventory = freshShop;
@@ -5819,9 +6844,8 @@ export class LaCriptaServer {
       nextRoom.activeCombatActorId = null;
       nextRoom.activeTargetedPlayerIds = [];
       nextRoom.actedPlayerIdsThisRound = [];
-      nextRoom.activeTurnPlayerId = this.computeNextTurnPlayerId(room, nextRoom);
-      nextRoom.currentTurnAp = 2;
-      nextRoom.maxTurnAp = 2;
+      const firstPlayerId = this.computeNextTurnPlayerId(room, nextRoom);
+      this.assignFreshPlayerTurn(nextRoom, firstPlayerId);
     }
   }
 
@@ -5937,9 +6961,7 @@ export class LaCriptaServer {
         const firstLiving = [...connectedPlayers]
           .filter((p) => !p.isDead && p.hp > 0)
           .sort((a, b) => a.seatIndex - b.seatIndex)[0];
-        firstRoom.activeTurnPlayerId = firstLiving ? firstLiving.id : null;
-        firstRoom.currentTurnAp = 2;
-        firstRoom.maxTurnAp = 2;
+        this.assignFreshPlayerTurn(firstRoom, firstLiving ? firstLiving.id : null);
       }
 
       room.dungeonStartGold = room.partyGold ?? 45;

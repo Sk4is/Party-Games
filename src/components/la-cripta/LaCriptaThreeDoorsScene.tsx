@@ -17,6 +17,7 @@ import {
   CriptaExpeditionState,
   CriptaPlayerRoundActionType,
   CriptaVisualEvent,
+  CriptaWeaponRuneId,
 } from '../../types/laCripta';
 import {
   CRIPTA_CHARACTERS_CATALOG,
@@ -31,6 +32,7 @@ import {
 import {
   computeEnemyApproxDamageRange,
   computePlayerEffectiveStats,
+  CRIPTA_WEAPON_RUNES_REGISTRY,
   CRIPTA_WEAPONS_REGISTRY,
   estimatePlayerActionDamage,
   formatDamageRange,
@@ -50,12 +52,18 @@ import {
   LaCriptaFloatingEventBadge,
 } from './LaCriptaVisualFeedback';
 import {
+  LaCriptaDamageTypeBadge,
   LaCriptaDoorCounterBadge,
   LaCriptaGroundDropsOverlay,
   LaCriptaItemPixelIcon,
+  LaCriptaWeaponRunePixelIcon,
 } from './LaCriptaItemRelicArt';
 import { LaCriptaFinalBossDoorScene } from './LaCriptaFinalBossComponents';
 import { LaCriptaGiantDoorTransition } from './LaCriptaGiantDoorTransition';
+import {
+  LaCriptaContextualDecisionArt,
+  LaCriptaDoorCardIllustration,
+} from './LaCriptaContextualArtSystem';
 import {
   LaCriptaBiomeStageBackdrop,
   LaCriptaCardPixelIllustration,
@@ -68,6 +76,10 @@ import {
   LaCriptaContextualSidePanel,
 } from './LaCriptaSidePanels';
 import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
+import {
+  LaCriptaMinigameControlBoard,
+  LaCriptaMinigameStageArt,
+} from './LaCriptaMinigameRoomView';
 import { CRIPTA_STATUS_EFFECTS_REGISTRY } from '../../data/la-cripta/criptaStatusEffects';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 
@@ -140,6 +152,7 @@ interface LaCriptaThreeDoorsSceneProps {
   onBuyShopSlot?: (slotId: string) => void;
   onInteractRoomObject?: (objectId: string) => void;
   onUpgradeWeapon?: () => void;
+  onEquipWeaponRune?: (runeId: CriptaWeaponRuneId | null) => void;
   onReviveAlly?: (
     targetPlayerId: string,
     method: 'GOLD' | 'BLOOD' | 'SHRINE'
@@ -175,6 +188,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   onUseConsumable,
   onBuyShopSlot,
   onUpgradeWeapon,
+  onEquipWeaponRune,
   onReviveAlly,
   onInteractOption,
   onPuzzleInput,
@@ -196,6 +210,8 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   const [hoveredDoorId, setHoveredDoorId] = useState<CriptaDungeonId | null>(null);
   const [selectedEnemyId, setSelectedEnemyId] = useState<string | null>(null);
   const [lockpickTick, setLockpickTick] = useState(0);
+  const [localLockedTurnKey, setLocalLockedTurnKey] = useState<string | null>(null);
+  const [claimingDropIds, setClaimingDropIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -278,7 +294,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
       .filter((p) => p.isConnected && !p.isDead && p.hp > 0)
       .sort((a, b) => a.seatIndex - b.seatIndex);
 
-    // Individual Player Turn & AP State
+    // Individual Player Turn & Strict 1-Card-Per-Turn Action Lock
     const combatRoundPhase = activeRoom.combatRoundPhase || 'PLAYER_PHASE';
     const isPlayerPhase = combatRoundPhase === 'PLAYER_PHASE';
     const activeTurnPlayerId =
@@ -292,8 +308,16 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
         !iAmDead &&
         (!activeTurnPlayerId || activeTurnPlayerId === currentPlayerId)
     );
-    const currentTurnAp = activeRoom.currentTurnAp ?? 2;
-    const maxTurnAp = activeRoom.maxTurnAp ?? 2;
+    const currentTurnAp = activeRoom.currentTurnAp ?? 1;
+    const maxTurnAp = activeRoom.maxTurnAp ?? 1;
+    const authoritativeTurnKey = `${activeRoom.id}_${
+      activeRoom.turnId ?? activeRoom.roundNumber ?? 1
+    }_${activeTurnPlayerId || 'none'}_${currentTurnAp}`;
+    const isTurnActionLocked = Boolean(
+      activeRoom.actionConsumedThisTurn ||
+        activeRoom.turnActionLocked ||
+        localLockedTurnKey === authoritativeTurnKey
+    );
 
     // Room Center Visual Events
     const roomCenterEvents = activeVisualEvents.filter(
@@ -377,8 +401,8 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
       !isDefeated &&
       !isFinalBossCombat &&
       !isTransitioningDoor &&
-      unclaimedDrops.length === 0 &&
       (activeRoom.resolved ||
+        !hasActiveCombat ||
         activeRoom.type === 'SHOP' ||
         activeRoom.type === 'REST' ||
         activeRoom.type === 'LOOT');
@@ -392,6 +416,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
       abilityIdOverride?: string
     ) => {
       if (iAmDead || !isPlayerPhase || !isMyTurn) return;
+      if (actionType !== 'USE_ITEM' && isTurnActionLocked) return;
+      if (actionType !== 'USE_ITEM') {
+        setLocalLockedTurnKey(authoritativeTurnKey);
+      }
       laCriptaAudio.playDoorVote();
       if (onLockRoundAction) {
         onLockRoundAction(
@@ -691,6 +719,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             <div className="text-[9px] font-cripta-display font-bold text-[#F5EFE6] truncate">
                               {enemy.name}
                             </div>
+                            <div className="mt-0.5 text-[7px] font-cripta-pixel font-bold text-[#FFD166] uppercase tracking-wider truncate">
+                              {enemy.profession ||
+                                buildEnemyAiProfileForArchetype(enemy).profession}
+                            </div>
                             <div className="mt-1 h-2 w-full bg-[#161020] border border-[#2D223B] overflow-hidden">
                               <div
                                 className="h-full bg-gradient-to-r from-[#9E2A45] to-[#E63956] transition-all duration-300"
@@ -730,6 +762,19 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       </div>
                     </div>
                   )}
+                </div>
+              ) : activeRoom.minigame &&
+                !activeRoom.resolved &&
+                !activeRoom.minigame.completed ? (
+                /* Interactive Minigame Room Stage Mechanism (Roulette, Obelisk, Lock, Mirrors, Chains, Alchemical Cauldron) */
+                <div className="flex flex-col items-center justify-center">
+                  <LaCriptaMinigameStageArt
+                    room={activeRoom}
+                    dungeon={chosenDungeon}
+                    minigame={activeRoom.minigame}
+                    players={expeditionState.players}
+                    currentPlayerId={currentPlayerId}
+                  />
                 </div>
               ) : (
                 /* Non-Combat Room Large Stage Portrait (Merchant / Chest / Shrine / Rest / Forge / Event) */
@@ -819,11 +864,18 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     className="cursor-pointer"
                     title="Haz clic para examinar estadísticas, debilidades y resistencias"
                   >
-                    <div className="flex items-center justify-between text-xs font-cripta-pixel mb-1">
-                      <span className="text-[#F5EFE6] font-bold uppercase">
-                        SALUD DE {activeTargetEnemy.name}
-                      </span>
-                      <span className="text-[#FFD166] font-bold">
+                    <div className="flex items-center justify-between text-xs font-cripta-pixel mb-1 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[#F5EFE6] font-bold uppercase truncate">
+                          SALUD DE {activeTargetEnemy.name}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-[#241838] border border-[#7656A8] text-[8px] font-cripta-pixel font-bold text-[#FFD166] uppercase tracking-wider shrink-0">
+                          {activeTargetEnemy.profession ||
+                            buildEnemyAiProfileForArchetype(activeTargetEnemy)
+                              .profession}
+                        </span>
+                      </div>
+                      <span className="text-[#FFD166] font-bold shrink-0">
                         {activeTargetEnemy.hp} / {activeTargetEnemy.maxHp} PV
                       </span>
                     </div>
@@ -892,9 +944,9 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
           </section>
 
           {/* =================================================================
-              RIGHT SIDE: LARGE TACTICAL CARD & DECISION BOARD (58-62vw)
+              RIGHT SIDE: LARGE TACTICAL CARD & DECISION BOARD (58-62vw, ZERO VERTICAL SCROLL)
               ================================================================= */}
-          <section className="relative min-h-0 h-full flex flex-col justify-between p-4 sm:p-6 lg:p-7 bg-[#090710]/36 overflow-y-auto">
+          <section className="relative min-h-0 h-full flex flex-col justify-between p-3 sm:p-4 lg:p-5 bg-[#090710]/36 overflow-hidden">
             {/* Subtle Biome Radial Accent Over Right Board */}
             <div
               className="pointer-events-none absolute inset-0 opacity-25"
@@ -904,14 +956,14 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
             />
 
             {/* TOP BAR OF RIGHT BOARD: TURN BANNER + AP CRYSTALS OR ENCOUNTER CONTEXT */}
-            <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pb-3.5 border-b border-[#2A1F36]">
+            <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-[#2A1F36] shrink-0">
               {hasActiveCombat ? (
                 <>
                   {/* Active Turn Banner */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <div
-                      className={`px-3 py-1.5 border-2 font-cripta-pixel text-xs font-bold uppercase tracking-widest transition-all ${
-                        !isPlayerPhase
+                      className={`px-3 py-1 border-2 font-cripta-pixel text-xs font-bold uppercase tracking-widest transition-all ${
+                        !isPlayerPhase || isTurnActionLocked
                           ? 'bg-[#2A1019] border-[#E63956] text-[#FF8FA3] animate-pulse'
                           : isMyTurn
                           ? 'bg-[#261A0E] border-[#FFD166] text-[#FFD166] shadow-[0_0_20px_rgba(255,209,102,0.3)]'
@@ -920,8 +972,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     >
                       {!isPlayerPhase
                         ? '⚔ TURNO DEL ENEMIGO · RESOLVIENDO...'
+                        : isTurnActionLocked
+                        ? '✦ ACCIÓN ENVIADA · RESOLVIENDO TURNO...'
                         : isMyTurn
-                        ? `✦ ¡TU TURNO, ${me?.name || 'HÉROE'}! · ELIGE UNA CARTA`
+                        ? `✦ ¡TU TURNO, ${me?.name || 'HÉROE'}! · ELIGE 1 CARTA`
                         : `TURNO DE: ${activeTurnPlayer?.name || 'COMPAÑERO'}`}
                     </div>
 
@@ -938,18 +992,21 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     )}
                   </div>
 
-                  {/* Action Points (AP) Crystal Counter */}
-                  <div className="flex items-center gap-2.5 px-3 py-1.5 bg-[#120D1A] border border-[#4A3B5C]">
-                    <span className="text-[10px] font-cripta-pixel text-[#D8C6A0] uppercase tracking-wider">
-                      PUNTOS DE ACCIÓN:
+                  {/* Action Points (1 Card Per Turn Lock) Crystal Counter */}
+                  <div className="flex items-center gap-2 px-2.5 py-1 bg-[#120D1A] border border-[#4A3B5C]">
+                    <span className="text-[9px] font-cripta-pixel text-[#D8C6A0] uppercase tracking-wider">
+                      ACCIÓN DE TURNO:
                     </span>
                     <div className="flex items-center gap-1.5">
                       {Array.from({ length: maxTurnAp }).map((_, idx) => {
-                        const filled = idx < currentTurnAp && isPlayerPhase;
+                        const filled =
+                          idx < currentTurnAp &&
+                          isPlayerPhase &&
+                          !isTurnActionLocked;
                         return (
                           <span
                             key={idx}
-                            className={`w-3.5 h-3.5 rotate-45 border transition-all ${
+                            className={`w-3 h-3 rotate-45 border transition-all ${
                               filled
                                 ? 'bg-[#FFD166] border-[#FFF3B0] shadow-[0_0_8px_rgba(255,209,102,0.85)]'
                                 : 'bg-[#1B1426] border-[#4A3B5C] opacity-45'
@@ -958,8 +1015,8 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         );
                       })}
                     </div>
-                    <span className="text-xs font-cripta-pixel font-bold text-[#FFD166]">
-                      {isPlayerPhase ? currentTurnAp : 0} / {maxTurnAp} AP
+                    <span className="text-[11px] font-cripta-pixel font-bold text-[#FFD166]">
+                      {isPlayerPhase && !isTurnActionLocked ? currentTurnAp : 0} / {maxTurnAp} CARTA
                     </span>
                   </div>
                 </>
@@ -1047,45 +1104,71 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   )}
 
                   {/* TACTICAL COMBAT CARDS (Basic Attack + Guard + Weapon Special + 2 Active Class Abilities) */}
-                  <div className="w-full flex flex-wrap items-stretch justify-center gap-3 sm:gap-3.5">
-                    {/* CARD 1: BASIC WEAPON ATTACK (1 AP, max 1 per turn to prevent mindless spam) */}
+                  <div className="w-full flex flex-wrap items-stretch justify-center gap-2.5 sm:gap-3">
+                    {/* CARD 1: BASIC WEAPON ATTACK (1 Card Per Turn) */}
                     {(() => {
                       const basicUsed = Boolean(me?.basicAttackUsedThisTurn);
+                      const dmgTag = attackEst?.damageTypeLabel || 'FÍSICO';
+                      const matchupBadge =
+                        attackEst?.matchupState === 'WEAKNESS'
+                          ? `✦ VULNERABLE (+${attackEst.matchupDeltaPct}%)`
+                          : attackEst?.matchupState === 'RESISTANCE'
+                          ? `⚠ RESISTE (${attackEst.matchupDeltaPct}%)`
+                          : `OBJETIVO: ${activeTargetEnemy?.name.slice(0, 12) || 'ENEMIGO'}`;
                       return (
                         <LaCriptaPlayableCard
                           title={myWeapon ? myWeapon.name : 'Ataque Básico'}
-                          categoryLabel="ATAQUE DE ARMA (MÁX. 1/T)"
+                          categoryLabel={`ARMA · DAÑO ${dmgTag}`}
                           costLabel="1 AP"
-                          cooldownLabel={basicUsed ? 'USADO ESTE TURNO' : `NV.${myWeaponLv}`}
+                          cooldownLabel={
+                            basicUsed
+                              ? 'EJECUTADO'
+                              : myEquippedWeapon?.activeRune
+                              ? `◈ ${myEquippedWeapon.activeRune.infusedDamageType}`
+                              : `NV.${myWeaponLv}`
+                          }
                           headlineValue={
                             attackEst
                               ? `${formatDamageRange(attackEst.min, attackEst.max)} DAÑO`
                               : '4–6 DAÑO'
                           }
                           summary={
-                            basicUsed
-                              ? 'Ya atacaste este turno. Combina tu 2.º AP con Técnica, Habilidad o Guardia.'
-                              : `Golpe directo contra ${
-                                  activeTargetEnemy?.name || 'objetivo'
-                                }.`
+                            myEquippedWeapon?.activeRune
+                              ? `${myEquippedWeapon.activeRune.benefitText} (${myEquippedWeapon.activeRune.tradeoffText})`
+                              : `Golpe ${dmgTag.toLowerCase()} con ${
+                                  myWeapon ? myWeapon.name : 'tu arma'
+                                } contra ${activeTargetEnemy?.name || 'objetivo'}.`
                           }
                           tooltipDescription={
                             myWeapon
-                              ? `${myWeapon.specialEffectText} Escala con ${myWeapon.scalingStat}. Límite: 1 golpe básico por turno para fomentar combinaciones tácticas.`
-                              : 'Ataque físico básico con tu arma equipada (máximo 1 vez por turno).'
+                              ? `${myWeapon.specialEffectText} Escala con ${myWeapon.scalingStat}.${
+                                  myEquippedWeapon?.activeRune
+                                    ? ` Infusión activa: ${myEquippedWeapon.activeRune.name} (${myEquippedWeapon.activeRune.benefitText} · ${myEquippedWeapon.activeRune.tradeoffText}).`
+                                    : ''
+                                }`
+                              : 'Ataque básico con tu arma equipada.'
                           }
-                          accentColor={basicUsed ? 'slate' : 'crimson'}
+                          accentColor={
+                            basicUsed
+                              ? 'slate'
+                              : attackEst?.matchupState === 'WEAKNESS'
+                              ? 'emerald'
+                              : 'crimson'
+                          }
                           disabled={!isMyTurn || currentTurnAp < 1 || basicUsed}
+                          turnLocked={isTurnActionLocked}
+                          weaponId={myWeapon?.id}
+                          upgradeLevel={myWeaponLv}
                           illustration={
-                            <LaCriptaCardPixelIllustration kind="ATTACK_SWORD" />
+                            <LaCriptaCardPixelIllustration
+                              kind="ATTACK_SWORD"
+                              weaponId={myWeapon?.id}
+                              upgradeLevel={myWeaponLv}
+                            />
                           }
                           onClick={() => submitPlayerCombatChoice('ATTACK')}
                           footerBadge={
-                            basicUsed
-                              ? 'USADO · ELIGE OTRA ACCIÓN'
-                              : `OBJETIVO: ${
-                                  activeTargetEnemy?.name.slice(0, 14) || 'ENEMIGO'
-                                }`
+                            isTurnActionLocked ? 'TURNO EN RESOLUCIÓN' : matchupBadge
                           }
                         />
                       );
@@ -1102,6 +1185,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       tooltipDescription="Postura puramente defensiva (no inflige daño directo). Otorga +2–4 Armadura, Escudo por 2 rondas, recupera +5 PV y potencia un +18% tu siguiente ataque."
                       accentColor="cyan"
                       disabled={!isMyTurn || currentTurnAp < 1}
+                      turnLocked={isTurnActionLocked}
                       illustration={
                         <LaCriptaCardPixelIllustration kind="DEFEND_SHIELD" />
                       }
@@ -1113,7 +1197,9 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     {myWeapon && (
                       <LaCriptaPlayableCard
                         title={myWeapon.specialAttack?.name || 'Técnica de Arma'}
-                        categoryLabel={`ARMA · ${myWeapon.name.toUpperCase()}`}
+                        categoryLabel={`TÉCNICA · ${
+                          specialEst?.damageTypeLabel || myWeapon.name.toUpperCase()
+                        }`}
                         costLabel="1 AP"
                         cooldownLabel={
                           mySpecialCd > 0 ? `CD: ${mySpecialCd}T` : 'LISTA'
@@ -1146,16 +1232,30 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           myWeapon.specialAttack?.cooldownRounds || 2
                         } rondas.`}
                         accentColor={
-                          myWeapon.specialAttack?.dealsDamage === false ? 'emerald' : 'amber'
+                          myWeapon.specialAttack?.dealsDamage === false ||
+                          specialEst?.matchupState === 'WEAKNESS'
+                            ? 'emerald'
+                            : 'amber'
                         }
                         disabled={!isMyTurn || currentTurnAp < 1 || mySpecialCd > 0}
+                        turnLocked={isTurnActionLocked}
+                        weaponId={myWeapon.id}
+                        upgradeLevel={myWeaponLv}
                         illustration={
-                          <LaCriptaCardPixelIllustration kind="WEAPON_TECHNIQUE" />
+                          <LaCriptaCardPixelIllustration
+                            kind="WEAPON_TECHNIQUE"
+                            weaponId={myWeapon.id}
+                            upgradeLevel={myWeaponLv}
+                          />
                         }
                         onClick={() => submitPlayerCombatChoice('WEAPON_SPECIAL')}
                         footerBadge={
                           mySpecialCd > 0
                             ? `ENFRIAMIENTO (${mySpecialCd}T)`
+                            : specialEst?.matchupState === 'WEAKNESS'
+                            ? `✦ VULNERABLE (+${specialEst.matchupDeltaPct}%)`
+                            : specialEst?.matchupState === 'RESISTANCE'
+                            ? `⚠ RESISTE (${specialEst.matchupDeltaPct}%)`
                             : `CD: ${myWeapon.specialAttack?.cooldownRounds || 2} RONDAS`
                         }
                       />
@@ -1225,6 +1325,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                                 : 'purple'
                             }
                             disabled={!isMyTurn || currentTurnAp < 1 || abCd > 0}
+                            turnLocked={isTurnActionLocked}
                             illustration={
                               <LaCriptaCardPixelIllustration
                                 kind={
@@ -1247,8 +1348,51 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       })}
                   </div>
 
-                  {/* Secondary Bottom Strip under Combat Cards: Dedicated MOCHILA Control + End Turn Button */}
-                  <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+                  {/* Secondary Bottom Strip under Combat Cards: Weapon Damage Identity + Rune Infusion Switcher + Dedicated MOCHILA Control */}
+                  <div className="mt-2 flex flex-wrap items-center justify-center gap-2.5">
+                    {myEquippedWeapon && (
+                      <div className="px-2.5 py-1.5 bg-[#120D1A] border border-[#3E2F4B] flex flex-wrap items-center gap-2">
+                        <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 uppercase">
+                          ARMA:
+                        </span>
+                        <LaCriptaDamageTypeBadge
+                          damageType={myEquippedWeapon.activeDamageType}
+                          secondaryType={myEquippedWeapon.secondaryDamageType}
+                          compact
+                        />
+                        {(me?.ownedWeaponRunes || []).length > 0 && onEquipWeaponRune && (
+                          <div className="flex items-center gap-1 pl-1.5 border-l border-[#2E223D]">
+                            <span className="text-[8px] font-cripta-pixel text-[#B57CFF] uppercase">
+                              RUNAS:
+                            </span>
+                            {(me?.ownedWeaponRunes || []).map((rId) => {
+                              const rDef = CRIPTA_WEAPON_RUNES_REGISTRY[rId];
+                              if (!rDef) return null;
+                              const isEquippedRune = me?.equippedWeaponRuneId === rId;
+                              return (
+                                <button
+                                  key={rId}
+                                  type="button"
+                                  onClick={() => {
+                                    laCriptaAudio.playDoorVote();
+                                    onEquipWeaponRune(isEquippedRune ? null : rId);
+                                  }}
+                                  title={`${rDef.name}\n✦ ${rDef.benefitText}\n⚠ ${rDef.tradeoffText}`}
+                                  className={`px-1.5 py-0.5 border flex items-center gap-1 text-[8px] font-cripta-pixel cursor-pointer transition-all ${
+                                    isEquippedRune
+                                      ? 'bg-[#26193A] border-[#FFD166] text-[#FFD166] font-bold'
+                                      : 'bg-[#171122] hover:bg-[#221933] border-[#4A3B5C] text-[#D9D0BC]'
+                                  }`}
+                                >
+                                  <LaCriptaWeaponRunePixelIcon runeId={rId} size={13} />
+                                  <span>{rDef.infusedDamageType}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {onOpenInventory && (
                       <button
                         type="button"
@@ -1301,68 +1445,125 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     </p>
                   </div>
 
-                  {/* UNCLAIMED PHYSICAL DROPS AS PLAYABLE LOOT CARDS */}
+                  {/* UNCLAIMED PHYSICAL DROPS AS PLAYABLE LOOT CARDS WITH 60 FPS CLAIM FEEDBACK */}
                   {unclaimedDrops.length > 0 && onClaimGroundDrop && (
                     <div className="w-full flex flex-col items-center gap-2">
                       <div className="text-[10px] font-cripta-pixel font-bold text-[#FFD166] uppercase tracking-widest animate-pulse">
-                        ✦ RECOGE EL BOTÍN DE LA SALA ANTES DE CONTINUAR ✦
+                        ✦ RECOMPENSAS DE LA CÁMARA · HAZ CLIC PARA RECLAMAR ✦
                       </div>
-                      <div className="flex flex-wrap items-stretch justify-center gap-3.5">
+                      <div className="flex flex-wrap items-stretch justify-center gap-3">
                         {unclaimedDrops.map((drop) => {
+                          const resolvedDropId = drop.dropId || drop.id;
                           const itemDef = drop.itemId
                             ? CRIPTA_ITEMS_REGISTRY[drop.itemId]
                             : undefined;
                           const relicDef = drop.relicId
                             ? CRIPTA_RELICS_REGISTRY[drop.relicId]
                             : undefined;
+                          const weaponDef = drop.weaponId
+                            ? CRIPTA_WEAPONS_REGISTRY[drop.weaponId]
+                            : undefined;
+                          const runeDef = drop.weaponRuneId
+                            ? CRIPTA_WEAPON_RUNES_REGISTRY[drop.weaponRuneId]
+                            : undefined;
+                          const resolvedTitle =
+                            drop.label ||
+                            itemDef?.name ||
+                            relicDef?.name ||
+                            weaponDef?.name ||
+                            runeDef?.name ||
+                            'Botín de la Cámara';
                           const resolvedSummary =
                             itemDef?.description ||
                             relicDef?.description ||
+                            (weaponDef
+                              ? `${weaponDef.baseMinDamage}–${weaponDef.baseMaxDamage} DAÑO · ${weaponDef.specialEffectText}`
+                              : undefined) ||
+                            (runeDef
+                              ? `${runeDef.benefitText} · ${runeDef.tradeoffText}`
+                              : undefined) ||
                             (drop.type === 'GOLD_POUCH' && drop.goldAmount
                               ? `Bolsa con +${drop.goldAmount} de oro para el grupo.`
-                              : `Botín hallado en la cámara: ${drop.label}.`);
+                              : `Botín hallado en la cámara: ${resolvedTitle}.`);
                           const resolvedRarity =
                             relicDef?.rarity ||
-                            (drop.type === 'RELIC_PEDESTAL'
+                            runeDef?.rarity ||
+                            (weaponDef
+                              ? 'ARMA FORJADA'
+                              : drop.type === 'RELIC_PEDESTAL' || drop.kind === 'RELIC'
                               ? 'RELIQUIA'
-                              : drop.type === 'GOLD_POUCH'
+                              : drop.type === 'GOLD_POUCH' || drop.kind === 'GOLD'
                               ? 'ORO'
                               : 'CONSUMIBLE');
+                          const isClaimingThis = Boolean(claimingDropIds[resolvedDropId]);
 
                           return (
-                            <LaCriptaPlayableCard
-                              key={drop.dropId}
-                              title={drop.label}
-                              categoryLabel={
-                                drop.type === 'GOLD_POUCH'
-                                  ? 'BOTÍN DE ORO'
-                                  : drop.type === 'RELIC_PEDESTAL'
-                                  ? 'RELIQUIA ANCESTRAL'
-                                  : 'OBJETO DE CRIPTA'
-                              }
-                              costLabel="RECOGER"
-                              cooldownLabel={resolvedRarity}
-                              summary={resolvedSummary}
-                              accentColor={
-                                drop.type === 'RELIC_PEDESTAL'
-                                  ? 'purple'
-                                  : drop.type === 'GOLD_POUCH'
-                                  ? 'amber'
-                                  : 'emerald'
-                              }
-                              illustration={
-                                <LaCriptaCardPixelIllustration
-                                  kind="TREASURE_CHEST"
-                                  itemId={drop.itemId}
-                                  relicId={drop.relicId}
-                                />
-                              }
-                              onClick={() => {
-                                laCriptaAudio.playDoorVote();
-                                onClaimGroundDrop(drop.dropId);
-                              }}
-                              footerBadge="CLIC PARA RECOGER"
-                            />
+                            <div
+                              key={resolvedDropId}
+                              className={`transition-all duration-300 ${
+                                isClaimingThis
+                                  ? 'scale-75 -translate-y-8 opacity-0 pointer-events-none'
+                                  : 'scale-100 opacity-100'
+                              }`}
+                            >
+                              <LaCriptaPlayableCard
+                                title={resolvedTitle}
+                                categoryLabel={
+                                  drop.weaponRuneId
+                                    ? `RUNA DE ARMA · ${runeDef?.infusedDamageType || 'INFUSIÓN'}`
+                                    : weaponDef
+                                    ? `ARMA · ${weaponDef.baseMinDamage}–${weaponDef.baseMaxDamage} DAÑO`
+                                    : drop.type === 'GOLD_POUCH' || drop.kind === 'GOLD'
+                                    ? 'BOTÍN DE ORO'
+                                    : drop.type === 'RELIC_PEDESTAL' || drop.kind === 'RELIC'
+                                    ? 'RELIQUIA ANCESTRAL'
+                                    : 'OBJETO DE CRIPTA'
+                                }
+                                costLabel="RECLAMAR"
+                                cooldownLabel={resolvedRarity}
+                                summary={resolvedSummary}
+                                accentColor={
+                                  drop.weaponRuneId ||
+                                  drop.type === 'RELIC_PEDESTAL' ||
+                                  drop.kind === 'RELIC'
+                                    ? 'purple'
+                                    : weaponDef
+                                    ? 'crimson'
+                                    : drop.type === 'GOLD_POUCH' || drop.kind === 'GOLD'
+                                    ? 'amber'
+                                    : 'emerald'
+                                }
+                                itemId={drop.itemId}
+                                relicId={drop.relicId}
+                                weaponId={drop.weaponId}
+                                illustration={
+                                  drop.weaponRuneId ? (
+                                    <div className="flex items-center justify-center py-2">
+                                      <LaCriptaWeaponRunePixelIcon
+                                        runeId={drop.weaponRuneId}
+                                        size={46}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <LaCriptaCardPixelIllustration
+                                      kind={weaponDef ? 'WEAPON_TECHNIQUE' : 'TREASURE_CHEST'}
+                                      itemId={drop.itemId}
+                                      relicId={drop.relicId}
+                                      weaponId={drop.weaponId}
+                                    />
+                                  )
+                                }
+                                onClick={() => {
+                                  laCriptaAudio.playDoorVote();
+                                  setClaimingDropIds((prev) => ({
+                                    ...prev,
+                                    [resolvedDropId]: true,
+                                  }));
+                                  onClaimGroundDrop(resolvedDropId);
+                                }}
+                                footerBadge="✦ RECLAMAR BOTÍN"
+                              />
+                            </div>
                           );
                         })}
                       </div>
@@ -1371,8 +1572,8 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
 
                   {/* SHOP ROOM: LARGE PLAYABLE MERCHANT CARDS + DYNAMIC REROLL */}
                   {activeRoom.type === 'SHOP' && (
-                    <div className="w-full flex flex-col items-center gap-3">
-                      <div className="w-full flex flex-wrap items-stretch justify-center gap-3.5">
+                    <div className="w-full flex flex-col items-center gap-2.5">
+                      <div className="w-full flex flex-wrap items-stretch justify-center gap-3">
                         {(activeRoom.shopSlots && activeRoom.shopSlots.length > 0
                           ? activeRoom.shopSlots
                           : activeRoom.shopInventory || []
@@ -1393,25 +1594,48 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                               accentColor={
                                 isSold
                                   ? 'slate'
-                                  : slot.kind === 'RELIC'
+                                  : slot.kind === 'RELIC' || slot.kind === 'WEAPON_RUNE'
                                   ? 'purple'
                                   : slot.kind === 'WEAPON'
                                   ? 'crimson'
                                   : 'amber'
                               }
                               disabled={isSold || !canAfford || iAmDead}
+                              itemId={slot.itemId}
+                              relicId={slot.relicId}
+                              weaponId={slot.weaponId}
+                              armorId={slot.armorId}
+                              accessoryId={slot.accessoryId}
                               illustration={
-                                <LaCriptaCardPixelIllustration
-                                  kind={
-                                    slot.kind === 'FORGE_UPGRADE'
-                                      ? 'FORGE_ANVIL'
-                                      : slot.kind === 'WEAPON'
-                                      ? 'WEAPON_TECHNIQUE'
-                                      : 'SHOP_MERCHANT'
-                                  }
-                                  itemId={slot.itemId}
-                                  relicId={slot.relicId}
-                                />
+                                slot.kind === 'WEAPON_RUNE' && slot.weaponRuneId ? (
+                                  <div className="flex items-center justify-center py-2">
+                                    <LaCriptaWeaponRunePixelIcon
+                                      runeId={slot.weaponRuneId}
+                                      size={46}
+                                    />
+                                  </div>
+                                ) : slot.kind === 'FORGE_UPGRADE' ? (
+                                  <LaCriptaContextualDecisionArt
+                                    biomeId={chosenDungeon.id}
+                                    roomType="FORGE"
+                                    cardTitle="FORJAR Y MEJORAR ARMA"
+                                    equippedWeaponId={me?.equippedWeaponId}
+                                    equippedWeaponLevel={myWeaponLv}
+                                  />
+                                ) : (
+                                  <LaCriptaCardPixelIllustration
+                                    kind={
+                                      slot.kind === 'WEAPON'
+                                        ? 'WEAPON_TECHNIQUE'
+                                        : 'SHOP_MERCHANT'
+                                    }
+                                    itemId={slot.itemId}
+                                    relicId={slot.relicId}
+                                    weaponId={slot.weaponId}
+                                    armorId={slot.armorId}
+                                    accessoryId={slot.accessoryId}
+                                  />
+                                )
                               }
                               onClick={() => {
                                 if (onBuyShopSlot && !isSold && canAfford) {
@@ -1421,7 +1645,9 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                               }}
                               footerBadge={
                                 isSold
-                                  ? 'VENDIDO'
+                                  ? slot.buyerName
+                                    ? `VENDIDO A ${slot.buyerName.toUpperCase()}`
+                                    : 'VENDIDO'
                                   : canAfford
                                   ? 'COMPRAR AHORA'
                                   : 'ORO INSUFICIENTE'
@@ -1459,256 +1685,25 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     </div>
                   )}
 
-                  {/* INTERACTIVE MINIGAME ROOMS (RUNE_SEQUENCE, LOCKPICK_TIMING, TRAP_STEPPING, ALCHEMICAL_BALANCE) */}
+                  {/* INTERACTIVE MINIGAME ROOMS (ALL 10 COOPERATIVE / SOLO MINIGAME FAMILIES) */}
                   {!activeRoom.resolved &&
                     activeRoom.minigame &&
-                    !activeRoom.minigame.completed &&
-                    (() => {
-                      const mg = activeRoom.minigame;
-                      const attemptsLeft = Math.max(0, mg.maxMistakes - mg.mistakes);
-                      // Ping-pong needle between 4% and 96% using lockpickTick (0..39)
-                      const rawPhase = lockpickTick <= 20 ? lockpickTick : 40 - lockpickTick;
-                      const needlePct = Math.round(4 + (rawPhase / 20) * 92);
-                      const sweetStart = mg.sweetSpotStart ?? 36;
-                      const sweetEnd = mg.sweetSpotEnd ?? 66;
-                      const inSweetSpot = needlePct >= sweetStart && needlePct <= sweetEnd;
-
-                      return (
-                        <div className="w-full max-w-3xl bg-[#110C1B]/95 border-2 border-[#E7A54A]/80 p-4 flex flex-col items-center gap-3 shadow-[0_0_28px_rgba(0,0,0,0.85)]">
-                          <div className="w-full flex flex-wrap items-center justify-between gap-2 border-b border-[#2E223D] pb-2">
-                            <div>
-                              <div className="text-[9px] font-cripta-pixel text-[#FFD166] uppercase tracking-widest">
-                                ✦ MINIJUEGO INTERACTIVO DE CÁMARA · PASO {mg.currentStep + 1} /{' '}
-                                {mg.maxSteps}
-                              </div>
-                              <div className="font-cripta-display text-base sm:text-lg font-black text-[#F5EFE6] uppercase">
-                                {mg.title}
-                              </div>
-                            </div>
-                            <div className="px-2.5 py-1 bg-[#1D142B] border border-[#4A3B5C] text-[9px] font-cripta-pixel text-[#E8DFCE]">
-                              MARGEN DE FALLO: {attemptsLeft} INTENTO{attemptsLeft === 1 ? '' : 'S'}
-                            </div>
-                          </div>
-
-                          <p className="text-xs font-cripta-pixel text-[#D8C6A0] text-center">
-                            {mg.instructions}
-                          </p>
-
-                          {/* 1. RUNE_SEQUENCE */}
-                          {mg.minigameType === 'RUNE_SEQUENCE' && (
-                            <div className="w-full flex flex-col items-center gap-3">
-                              <div className="px-3 py-1.5 bg-[#1A1228] border border-[#9B72CF] text-[10px] font-cripta-pixel text-[#E0AAFF] uppercase tracking-wider">
-                                SECUENCIA ARCANO-RÚNICA:{' '}
-                                {mg.targetSequence
-                                  .map((idx, stepIdx) => {
-                                    const names = ['SOLAR', 'VACÍO', 'SANGRE', 'ESCARCELA'];
-                                    const done = stepIdx < mg.currentStep;
-                                    return `${done ? '✓' : `${stepIdx + 1}.º`} ${
-                                      names[idx] || `GLIFO #${idx + 1}`
-                                    }`;
-                                  })
-                                  .join('  →  ')}
-                              </div>
-                              <div className="flex flex-wrap items-stretch justify-center gap-3">
-                                {['SOLAR', 'VACÍO', 'SANGRE', 'ESCARCELA'].map((rName, rIdx) => {
-                                  const isNextExpected =
-                                    mg.targetSequence[mg.currentStep] === rIdx;
-                                  const alreadyPressed = mg.playerInputs.includes(rIdx);
-                                  return (
-                                    <button
-                                      key={rName}
-                                      type="button"
-                                      disabled={iAmDead}
-                                      onClick={() => {
-                                        if (onPuzzleInput && !iAmDead) {
-                                          laCriptaAudio.playDoorVote();
-                                          onPuzzleInput(rIdx);
-                                        }
-                                      }}
-                                      className={`w-36 p-3 border-2 flex flex-col items-center gap-1.5 cursor-pointer transition-all ${
-                                        alreadyPressed
-                                          ? 'bg-[#13291E] border-[#5EA87A] text-[#8EE6AE]'
-                                          : isNextExpected
-                                          ? 'bg-[#221638] hover:bg-[#2E1E4A] border-[#FFD166] text-[#F5EFE6] shadow-[0_0_14px_rgba(255,209,102,0.3)]'
-                                          : 'bg-[#171124] hover:bg-[#231936] border-[#4A3B5C] text-[#D8C6A0]'
-                                      }`}
-                                    >
-                                      <span className="text-[9px] font-cripta-pixel uppercase text-[#E7A54A]">
-                                        PEDESTAL #{rIdx + 1}
-                                      </span>
-                                      <span className="font-cripta-display text-sm font-black uppercase">
-                                        GLIFO {rName}
-                                      </span>
-                                      <span className="text-[8px] font-cripta-pixel uppercase opacity-80">
-                                        {alreadyPressed ? '✓ SELLADO' : 'PULSAR RUNA'}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 2. LOCKPICK_TIMING */}
-                          {mg.minigameType === 'LOCKPICK_TIMING' && (
-                            <div className="w-full max-w-xl flex flex-col items-center gap-3">
-                              {/* Live Lockpick Timing Bar */}
-                              <div className="w-full bg-[#09070E] border-2 border-[#4A3B5C] h-8 relative overflow-hidden">
-                                {/* Sweet Spot Zone */}
-                                <div
-                                  className="absolute inset-y-0 bg-[#5EA87A]/35 border-x-2 border-[#5EA87A]"
-                                  style={{
-                                    left: `${sweetStart}%`,
-                                    width: `${sweetEnd - sweetStart}%`,
-                                  }}
-                                />
-                                {/* Moving Needle */}
-                                <div
-                                  className={`absolute inset-y-0 w-2 -ml-1 transition-all duration-75 ${
-                                    inSweetSpot
-                                      ? 'bg-[#FFD166] shadow-[0_0_12px_#FFD166]'
-                                      : 'bg-[#FF4D6D]'
-                                  }`}
-                                  style={{ left: `${needlePct}%` }}
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-[9px] font-cripta-pixel font-bold text-[#F5EFE6] uppercase">
-                                  ZONA MAESTRA ({sweetStart}%–{sweetEnd}%) · PERNO{' '}
-                                  {mg.currentStep + 1} DE {mg.maxSteps}
-                                </div>
-                              </div>
-
-                              <div className="flex flex-wrap items-center justify-center gap-3">
-                                <button
-                                  type="button"
-                                  disabled={iAmDead}
-                                  onClick={() => {
-                                    if (onPuzzleInput && !iAmDead) {
-                                      laCriptaAudio.playDoorVote();
-                                      onPuzzleInput(inSweetSpot ? 100 : 200);
-                                    }
-                                  }}
-                                  className={`px-5 py-2.5 border-2 font-cripta-pixel text-xs font-bold uppercase tracking-wider cursor-pointer transition-all ${
-                                    inSweetSpot
-                                      ? 'bg-[#183626] border-[#6EE7B7] text-[#FFD166] shadow-[0_0_16px_rgba(110,231,183,0.45)]'
-                                      : 'bg-[#231834] hover:bg-[#2F2046] border-[#E7A54A] text-[#F5EFE6]'
-                                  }`}
-                                >
-                                  ⚡ FIJAR PERNO #{mg.currentStep + 1} AHORA
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 3. TRAP_STEPPING */}
-                          {mg.minigameType === 'TRAP_STEPPING' && (
-                            <div className="w-full flex flex-col items-center gap-2.5">
-                              <div className="text-[10px] font-cripta-pixel text-[#FFD166] uppercase">
-                                HILERA ACTUAL: PASO {mg.currentStep + 1} DE {mg.maxSteps} (OBSERVA EL GRABADO FIRME)
-                              </div>
-                              <div className="flex flex-wrap items-center justify-center gap-3.5">
-                                {[0, 1, 2].map((tileIdx) => {
-                                  const isSafeTile =
-                                    mg.targetSequence[mg.currentStep] === tileIdx;
-                                  const tileNames = [
-                                    'LOSA IZQUIERDA',
-                                    'LOSA CENTRAL',
-                                    'LOSA DERECHA',
-                                  ];
-                                  return (
-                                    <button
-                                      key={tileIdx}
-                                      type="button"
-                                      disabled={iAmDead}
-                                      onClick={() => {
-                                        if (onPuzzleInput && !iAmDead) {
-                                          laCriptaAudio.playDoorVote();
-                                          onPuzzleInput(tileIdx);
-                                        }
-                                      }}
-                                      className={`w-44 p-3 border-2 flex flex-col items-center gap-1 cursor-pointer transition-all ${
-                                        isSafeTile
-                                          ? 'bg-[#1A162B] hover:bg-[#26203D] border-[#E7A54A] text-[#F5EFE6]'
-                                          : 'bg-[#161120] hover:bg-[#221A30] border-[#3E2F4B] text-[#D8C6A0]/85'
-                                      }`}
-                                    >
-                                      <span className="font-cripta-display text-xs font-black uppercase">
-                                        {tileNames[tileIdx]}
-                                      </span>
-                                      <span className="text-[9px] font-cripta-pixel text-[#FFD166]">
-                                        {isSafeTile
-                                          ? '✦ SELLO INTACTO (FIRME)'
-                                          : '≈ LOSA FISURADA'}
-                                      </span>
-                                      <span className="mt-1 text-[8px] font-cripta-pixel uppercase text-[#6EE7B7]">
-                                        PISAR LOSA →
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 4. ALCHEMICAL_BALANCE */}
-                          {mg.minigameType === 'ALCHEMICAL_BALANCE' && (
-                            <div className="w-full max-w-xl flex flex-col items-center gap-3">
-                              <div className="w-full bg-[#09070E] border-2 border-[#4A3B5C] h-7 relative overflow-hidden">
-                                {/* Optimal 70-86% Zone */}
-                                <div
-                                  className="absolute inset-y-0 bg-[#5EA87A]/35 border-x-2 border-[#5EA87A]"
-                                  style={{ left: '70%', width: '16%' }}
-                                />
-                                {/* Current Alchemical Fill */}
-                                <div
-                                  className="h-full bg-gradient-to-r from-[#69A8A5] via-[#9B72CF] to-[#FFD166] transition-all duration-300"
-                                  style={{
-                                    width: `${Math.min(100, mg.alchemicalMeter ?? 20)}%`,
-                                  }}
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center text-[9px] font-cripta-pixel font-bold text-[#F5EFE6] uppercase">
-                                  RESONANCIA ACTUAL: {mg.alchemicalMeter ?? 20}% (ZONA PERFECTA: 70%–86%)
-                                </div>
-                              </div>
-
-                              <div className="flex flex-wrap items-center justify-center gap-2.5">
-                                <button
-                                  type="button"
-                                  disabled={iAmDead}
-                                  onClick={() => onPuzzleInput?.(2)}
-                                  className="px-3 py-2 bg-[#181326] hover:bg-[#241C38] border border-[#69A8A5] text-[10px] font-cripta-pixel text-[#A5F3FC] uppercase cursor-pointer"
-                                >
-                                  +15% ESENCIA CENIZA
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={iAmDead}
-                                  onClick={() => onPuzzleInput?.(0)}
-                                  className="px-3 py-2 bg-[#181326] hover:bg-[#241C38] border border-[#9B72CF] text-[10px] font-cripta-pixel text-[#E0AAFF] uppercase cursor-pointer"
-                                >
-                                  +25% GOTA LUNAR
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={iAmDead}
-                                  onClick={() => onPuzzleInput?.(1)}
-                                  className="px-3 py-2 bg-[#181326] hover:bg-[#241C38] border border-[#E7A54A] text-[10px] font-cripta-pixel text-[#FFD166] uppercase cursor-pointer"
-                                >
-                                  +35% CATALIZADOR SOLAR
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={iAmDead}
-                                  onClick={() => onPuzzleInput?.(3)}
-                                  className="px-3.5 py-2 bg-[#14291E] hover:bg-[#1E3D2D] border-2 border-[#5EA87A] text-[10px] font-cripta-pixel font-bold text-[#8EE6AE] uppercase cursor-pointer"
-                                >
-                                  ✓ ESTABILIZAR MATRAZ
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    !activeRoom.minigame.completed && (
+                      <LaCriptaMinigameControlBoard
+                        room={activeRoom}
+                        dungeon={chosenDungeon}
+                        minigame={activeRoom.minigame}
+                        players={expeditionState.players}
+                        currentPlayerId={currentPlayerId}
+                        partyGold={partyGold}
+                        iAmDead={iAmDead}
+                        onPuzzleInput={(code) => {
+                          if (onPuzzleInput && !iAmDead) {
+                            onPuzzleInput(code);
+                          }
+                        }}
+                      />
+                    )}
 
                   {/* INTERACTIVE ROOM OPTIONS (EVENTS, SHRINES, TREASURE, REST, TRAP) AS LARGE PLAYABLE CARDS */}
                   {!activeRoom.resolved &&
@@ -1716,23 +1711,6 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     activeRoom.options.length > 0 && (
                       <div className="w-full flex flex-wrap items-stretch justify-center gap-4">
                         {activeRoom.options.map((opt, idx) => {
-                          const cardIllustrationKind =
-                            activeRoom.type === 'SHRINE'
-                              ? 'SHRINE_ALTAR'
-                              : activeRoom.type === 'TREASURE'
-                              ? 'TREASURE_CHEST'
-                              : activeRoom.type === 'REST'
-                              ? 'REST_CAMPFIRE'
-                              : activeRoom.type === 'FORGE'
-                              ? 'FORGE_ANVIL'
-                              : activeRoom.type === 'TRAP'
-                              ? 'EVENT_TRAP'
-                              : idx === 0
-                              ? 'EVENT_PACT'
-                              : idx === 1
-                              ? 'EVENT_RUNE'
-                              : 'EVENT_PATH';
-
                           const hasHpCost = Boolean(opt.costHp && opt.costHp > 0);
                           const hasGoldCost = Boolean(
                             opt.costGold && opt.costGold > 0
@@ -1746,11 +1724,26 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             ? `${opt.costGold} ORO`
                             : hasHpCost
                             ? `-${opt.costHp} PV`
-                            : opt.subtitle || 'DECISIÓN';
+                            : opt.riskLabel || opt.subtitle || 'DECISIÓN';
                           const resolvedSummary =
                             opt.effectText ||
                             opt.subtitle ||
                             'Ejecutar esta decisión en la cámara.';
+
+                          const optionVoters = expeditionState.players
+                            .filter(
+                              (p) =>
+                                p.isConnected &&
+                                activeRoom.optionVotes?.[p.id] === opt.id
+                            )
+                            .map((p) => ({
+                              id: p.id,
+                              name: p.name,
+                              color: '#FFD166',
+                            }));
+                          const isMyVotedOption =
+                            Boolean(currentPlayerId) &&
+                            activeRoom.optionVotes?.[currentPlayerId] === opt.id;
 
                           return (
                             <LaCriptaPlayableCard
@@ -1760,17 +1753,28 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                                 ROOM_TYPE_LABELS[activeRoom.type] || 'EVENTO'
                               }`}
                               costLabel={resolvedCostLabel}
-                              cooldownLabel={`OPCIÓN ${idx + 1}`}
+                              cooldownLabel={
+                                opt.ownershipScope
+                                  ? `${opt.ownershipScope} · OPCIÓN ${idx + 1}`
+                                  : `OPCIÓN ${idx + 1}`
+                              }
                               summary={resolvedSummary}
                               accentColor={accent}
+                              selected={isMyVotedOption}
+                              voterBadges={optionVoters}
                               disabled={
                                 iAmDead ||
                                 (hasGoldCost &&
                                   partyGold < (opt.costGold || 0))
                               }
                               illustration={
-                                <LaCriptaCardPixelIllustration
-                                  kind={cardIllustrationKind}
+                                <LaCriptaContextualDecisionArt
+                                  biomeId={chosenDungeon.id}
+                                  roomType={activeRoom.type}
+                                  option={opt}
+                                  cardTitle={opt.label}
+                                  equippedWeaponId={me?.equippedWeaponId}
+                                  equippedWeaponLevel={myWeaponLv}
                                 />
                               }
                               onClick={() => {
@@ -1779,7 +1783,11 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                                   onInteractOption(opt.id);
                                 }
                               }}
-                              footerBadge="ELEGIR DESTINO"
+                              footerBadge={
+                                isMyVotedOption
+                                  ? '✓ VOTO REGISTRADO'
+                                  : 'ELEGIR DESTINO'
+                              }
                             />
                           );
                         })}
@@ -1795,7 +1803,13 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             accentColor="amber"
                             disabled={partyGold < forgeUpgradeCost || iAmDead}
                             illustration={
-                              <LaCriptaCardPixelIllustration kind="FORGE_ANVIL" />
+                              <LaCriptaContextualDecisionArt
+                                biomeId={chosenDungeon.id}
+                                roomType="FORGE"
+                                cardTitle={`FORJAR Y MEJORAR ARMA ${myWeapon.name}`}
+                                equippedWeaponId={me?.equippedWeaponId}
+                                equippedWeaponLevel={myWeaponLv}
+                              />
                             }
                             onClick={() => {
                               if (partyGold >= forgeUpgradeCost && !iAmDead) {
@@ -1830,7 +1844,13 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             accentColor="purple"
                             disabled={iAmDead}
                             illustration={
-                              <LaCriptaCardPixelIllustration kind="EVENT_RUNE" />
+                              <LaCriptaContextualDecisionArt
+                                biomeId={chosenDungeon.id}
+                                roomType="SECRET"
+                                cardTitle="INVESTIGAR GRIETA RÚNICA"
+                                equippedWeaponId={me?.equippedWeaponId}
+                                equippedWeaponLevel={myWeaponLv}
+                              />
                             }
                             onClick={() => {
                               laCriptaAudio.playDoorVote();
@@ -1863,20 +1883,39 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             ? 'Esperando a que el resto del grupo confirme cruzar la compuerta...'
                             : isLastRoomInDungeon
                             ? 'Has derrotado al Guardián. Regresa a la Cámara de las Puertas con el sello conquistado.'
-                            : 'Las pesadas hojas de piedra se cerrarán tras el grupo para abrir la siguiente cámara.'
+                            : 'Las pesadas hojas de piedra se abrirán ante el grupo para cruzar hacia la siguiente cámara.'
                         }
                         accentColor="amber"
                         selected={iAmReadyToAdvance}
+                        voterBadges={expeditionState.players
+                          .filter(
+                            (p) => p.isConnected && readyPlayerIds.includes(p.id)
+                          )
+                          .map((p) => ({
+                            id: p.id,
+                            name: p.name,
+                            color: '#FFD166',
+                          }))}
                         illustration={
-                          <LaCriptaCardPixelIllustration kind="LEAVE_DOOR" />
+                          <LaCriptaDoorCardIllustration
+                            dungeon={chosenDungeon}
+                            isReadyOrSelected={iAmReadyToAdvance}
+                          />
                         }
                         onClick={() => {
                           laCriptaAudio.playDoorVote();
+                          if (unclaimedDrops.length > 0 && onClaimGroundDrop) {
+                            unclaimedDrops.forEach((d) =>
+                              onClaimGroundDrop(d.dropId || d.id)
+                            );
+                          }
                           onAdvanceRoom();
                         }}
                         footerBadge={
                           iAmReadyToAdvance
                             ? '✓ ESPERANDO GRUPO'
+                            : unclaimedDrops.length > 0
+                            ? 'RECLAMAR Y AVANZAR →'
                             : 'CRUZAR PUERTA →'
                         }
                       />
@@ -1958,6 +1997,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
               selectedTargetEnemyId={activeTargetEnemy?.id || null}
               onSelectTargetEnemy={(enemyId) => setSelectedEnemyId(enemyId)}
               onUseConsumable={onUseConsumable}
+              onEquipWeaponRune={onEquipWeaponRune}
             />
           </section>
         </div>
@@ -2082,141 +2122,171 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
         )}
       </header>
 
-      {/* THREE ARCHITECTURAL DOORS SIDE-BY-SIDE */}
-      <section className="grid grid-cols-3 gap-2.5 sm:gap-6 md:gap-8 items-end max-w-5xl mx-auto w-full">
-        {expeditionState.offeredDungeons.map((dungeonId) => {
-          const dungeon = CRIPTA_DUNGEONS_REGISTRY[dungeonId];
-          if (!dungeon) return null;
+      {/* THREE ARCHITECTURAL DOORS SIDE-BY-SIDE (FIXED FLOOR BASELINE) */}
+      <section className="relative max-w-5xl mx-auto w-full pt-2">
+        {/* Continuous Stone Threshold Floor Line shared by all 3 doors */}
+        <div
+          className="pointer-events-none absolute left-2 right-2 top-[233px] sm:top-[276px] lg:top-[310px] h-[3px] z-0"
+          style={{
+            background:
+              'linear-gradient(90deg, transparent 0%, rgba(216,198,160,0.28) 12%, rgba(231,165,74,0.45) 50%, rgba(216,198,160,0.28) 88%, transparent 100%)',
+          }}
+        />
 
-          const voters = connectedPlayers.filter(
-            (p) => expeditionState.doorVotes[p.id] === dungeonId
-          );
-          const isVotedByMe = myVotedDoor === dungeonId;
-          const isThisDoorOpening =
-            isOpeningPhase && expeditionState.selectedDungeonId === dungeonId;
-          const isDimmedOtherDoor =
-            isOpeningPhase && expeditionState.selectedDungeonId !== dungeonId;
-          const isHovered = hoveredDoorId === dungeonId;
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-6 md:gap-8 items-start w-full relative z-10">
+          {expeditionState.offeredDungeons.map((dungeonId) => {
+            const dungeon = CRIPTA_DUNGEONS_REGISTRY[dungeonId];
+            if (!dungeon) return null;
 
-          return (
-            <div
-              key={dungeonId}
-              role="button"
-              tabIndex={isOpeningPhase ? -1 : 0}
-              aria-label={`Puerta a ${dungeon.name}`}
-              onMouseEnter={() => {
-                setHoveredDoorId(dungeonId);
-                if (!isOpeningPhase) {
-                  laCriptaAudio.playDoorHover();
-                }
-              }}
-              onMouseLeave={() => {
-                setHoveredDoorId((prev) => (prev === dungeonId ? null : prev));
-              }}
-              onClick={() => {
-                if (isOpeningPhase) return;
-                laCriptaAudio.playDoorVote();
-                onVoteDoor(dungeonId);
-              }}
-              onKeyDown={(e) => {
-                if (isOpeningPhase) return;
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
+            const voters = connectedPlayers.filter(
+              (p) => expeditionState.doorVotes[p.id] === dungeonId
+            );
+            const isVotedByMe = myVotedDoor === dungeonId;
+            const isThisDoorOpening =
+              isOpeningPhase && expeditionState.selectedDungeonId === dungeonId;
+            const isDimmedOtherDoor =
+              isOpeningPhase && expeditionState.selectedDungeonId !== dungeonId;
+            const isHovered = hoveredDoorId === dungeonId;
+
+            return (
+              <div
+                key={dungeonId}
+                role="button"
+                tabIndex={isOpeningPhase ? -1 : 0}
+                aria-label={`Puerta a ${dungeon.name}`}
+                onMouseEnter={() => {
+                  setHoveredDoorId(dungeonId);
+                  if (!isOpeningPhase) {
+                    laCriptaAudio.playDoorHover();
+                  }
+                }}
+                onMouseLeave={() => {
+                  setHoveredDoorId((prev) => (prev === dungeonId ? null : prev));
+                }}
+                onClick={() => {
+                  if (isOpeningPhase) return;
                   laCriptaAudio.playDoorVote();
                   onVoteDoor(dungeonId);
-                }
-              }}
-              className={`group relative flex flex-col items-center transition-all duration-700 outline-none ${
-                isDimmedOtherDoor
-                  ? 'opacity-15 scale-[0.92] blur-[1px] pointer-events-none'
-                  : isThisDoorOpening
-                  ? 'scale-[1.10] -translate-y-2 z-30'
-                  : isVotedByMe
-                  ? '-translate-y-1 cursor-pointer'
-                  : 'hover:-translate-y-1 cursor-pointer'
-              }`}
-            >
-              {/* The Physical Pixel-Art Doorway */}
-              <div
-                className="relative w-full transition-all duration-500"
-                style={{
-                  filter:
-                    isThisDoorOpening
-                      ? `drop-shadow(0 0 36px ${dungeon.palette.glow})`
-                      : isVotedByMe || voters.length > 0
-                      ? `drop-shadow(0 0 14px ${dungeon.palette.glow}55)`
-                      : isHovered
-                      ? `drop-shadow(0 0 10px ${dungeon.palette.highlight}44)`
-                      : 'none',
                 }}
+                onKeyDown={(e) => {
+                  if (isOpeningPhase) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    laCriptaAudio.playDoorVote();
+                    onVoteDoor(dungeonId);
+                  }
+                }}
+                className={`group relative flex flex-col items-center transition-all duration-700 outline-none ${
+                  isDimmedOtherDoor
+                    ? 'opacity-15 scale-[0.92] blur-[1px] pointer-events-none'
+                    : isThisDoorOpening
+                    ? 'scale-[1.12] z-30'
+                    : 'cursor-pointer'
+                }`}
               >
-                <LaCriptaDoorArtwork
-                  dungeon={dungeon}
-                  isHovered={isHovered}
-                  isVotedByMe={isVotedByMe}
-                  isOpening={isThisDoorOpening}
-                  voteCount={voters.length}
-                />
-
-                {isThisDoorOpening && (
-                  <div
-                    className="pointer-events-none absolute inset-x-[22%] top-[18%] bottom-[6%] flex flex-col items-center justify-end pb-3 animate-pulse"
-                    style={{
-                      background: `radial-gradient(ellipse at 50% 60%, ${dungeon.palette.highlight}66 0%, ${dungeon.palette.glow}44 45%, rgba(8,6,12,0.92) 90%)`,
-                      boxShadow: `inset 0 0 28px ${dungeon.palette.glow}`,
-                    }}
-                  >
-                    <span
-                      className="px-2 py-0.5 bg-[#09070D]/90 border text-[9px] font-cripta-pixel font-bold uppercase tracking-widest"
-                      style={{
-                        borderColor: dungeon.palette.highlight,
-                        color: dungeon.palette.highlight,
-                      }}
-                    >
-                      UMBRAL ABIERTO
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Dungeon Name Directly Beneath the Door */}
-              <div className="mt-2 text-center px-1">
-                <h2
-                  className="font-cripta-display text-sm sm:text-lg md:text-xl font-bold tracking-wide transition-colors leading-tight"
+                {/* Fixed Door Stage — All 3 doors share identical height & bottom=0 anchor */}
+                <div
+                  className="relative w-full h-[225px] sm:h-[268px] lg:h-[302px] flex items-end justify-center transition-all duration-500"
                   style={{
-                    color:
-                      isThisDoorOpening || isVotedByMe || isHovered
-                        ? dungeon.palette.highlight
-                        : '#D9D0BC',
+                    filter:
+                      isThisDoorOpening
+                        ? `drop-shadow(0 0 42px ${dungeon.palette.glow})`
+                        : isVotedByMe || voters.length > 0
+                        ? `drop-shadow(0 0 18px ${dungeon.palette.glow}77)`
+                        : isHovered
+                        ? `drop-shadow(0 0 14px ${dungeon.palette.highlight}66)`
+                        : 'none',
                   }}
                 >
-                  {dungeon.name}
-                </h2>
-                <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/65 uppercase tracking-wider mt-0.5">
-                  {dungeon.biomeTag}
-                </div>
+                  <LaCriptaDoorArtwork
+                    dungeon={dungeon}
+                    isHovered={isHovered}
+                    isVotedByMe={isVotedByMe}
+                    isOpening={isThisDoorOpening}
+                    voteCount={voters.length}
+                  />
 
-                {/* Compact Player Selection Indicators */}
-                <div className="mt-1 min-h-[20px] flex flex-wrap items-center justify-center gap-1.5">
-                  {voters.map((voter) => (
-                    <span
-                      key={voter.id}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#140F1A] border text-[10px] font-cripta-pixel text-[#D9D0BC]"
-                      style={{ borderColor: voter.color }}
+                  {isThisDoorOpening && (
+                    <div
+                      className="pointer-events-none absolute inset-x-[22%] top-[21%] bottom-[8%] flex flex-col items-center justify-end pb-3 animate-pulse z-30"
+                      style={{
+                        background: `radial-gradient(ellipse at 50% 55%, ${dungeon.palette.highlight}99 0%, ${dungeon.palette.glow}66 45%, rgba(8,6,12,0.92) 90%)`,
+                        boxShadow: `inset 0 0 34px ${dungeon.palette.glow}, 0 0 36px ${dungeon.palette.highlight}66`,
+                      }}
                     >
                       <span
-                        className="w-2 h-2 shrink-0"
-                        style={{ backgroundColor: voter.color }}
-                      />
-                      <span className="truncate max-w-[80px]">{voter.name}</span>
-                    </span>
-                  ))}
+                        className="px-2.5 py-0.5 bg-[#09070D]/95 border text-[9px] font-cripta-pixel font-bold uppercase tracking-widest shadow-lg"
+                        style={{
+                          borderColor: dungeon.palette.highlight,
+                          color: dungeon.palette.highlight,
+                        }}
+                      >
+                        ✦ UMBRAL ABIERTO ✦
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Fixed-Baseline Label Block Directly Beneath the Door */}
+                <div className="mt-3 w-full min-h-[82px] flex flex-col items-center justify-start text-center px-1">
+                  <h2
+                    className="font-cripta-display text-sm sm:text-lg md:text-xl font-bold tracking-wide transition-colors leading-tight line-clamp-1"
+                    style={{
+                      color:
+                        isThisDoorOpening || isVotedByMe || isHovered
+                          ? dungeon.palette.highlight
+                          : '#D9D0BC',
+                    }}
+                  >
+                    {dungeon.name}
+                  </h2>
+                  <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-wider mt-0.5 line-clamp-1">
+                    {dungeon.biomeTag}
+                  </div>
+
+                  {/* Compact Player Selection Indicators */}
+                  <div className="mt-1.5 min-h-[22px] flex flex-wrap items-center justify-center gap-1.5">
+                    {voters.map((voter) => (
+                      <span
+                        key={voter.id}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#140F1A] border text-[10px] font-cripta-pixel text-[#D9D0BC]"
+                        style={{ borderColor: voter.color }}
+                      >
+                        <span
+                          className="w-2 h-2 shrink-0"
+                          style={{ backgroundColor: voter.color }}
+                        />
+                        <span className="truncate max-w-[80px]">{voter.name}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </section>
+
+      {/* 60 FPS DUNGEON ENTRY CINEMATIC OVERLAY BANNER */}
+      {openingDungeonDef && (
+        <div
+          className="pointer-events-none mx-auto max-w-xl w-full px-5 py-2.5 bg-[#0C0913]/95 border-2 text-center transition-all duration-500"
+          style={{
+            borderColor: openingDungeonDef.palette.highlight,
+            boxShadow: `0 0 36px ${openingDungeonDef.palette.glow}66, inset 0 0 22px ${openingDungeonDef.palette.glow}33`,
+          }}
+        >
+          <div
+            className="text-[10px] font-cripta-pixel uppercase tracking-[0.25em] font-bold"
+            style={{ color: openingDungeonDef.palette.highlight }}
+          >
+            ✦ DESCENDIENDO AL UMBRAL · {openingDungeonDef.biomeTag} ✦
+          </div>
+          <div className="mt-0.5 text-xs font-cripta-body text-[#E8DFCE]/90 italic">
+            «{openingDungeonDef.atmosphereHint}»
+          </div>
+        </div>
+      )}
     </div>
   );
 };

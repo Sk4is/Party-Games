@@ -8,6 +8,7 @@ import {
   CriptaPlayer,
   CriptaRoomEnemy,
   CriptaStatusEffectType,
+  CriptaWeaponRuneId,
 } from '../../types/laCripta';
 import {
   CRIPTA_CHARACTERS_CATALOG,
@@ -15,6 +16,7 @@ import {
 } from '../../data/la-cripta/criptaCatalog';
 import {
   CRIPTA_ITEMS_REGISTRY,
+  CRIPTA_RELICS_REGISTRY,
   NORMAL_INVENTORY_MAX_SLOTS,
 } from '../../data/la-cripta/criptaItemsAndRelics';
 import {
@@ -22,19 +24,26 @@ import {
   computePlayerEffectiveStats,
   CRIPTA_ACCESSORIES_REGISTRY,
   CRIPTA_ARMORS_REGISTRY,
+  CRIPTA_DAMAGE_TYPE_META,
+  CRIPTA_WEAPON_RUNES_REGISTRY,
   CriptaEnemyTraitEntry,
   estimatePlayerActionDamage,
   formatDamageRange,
   getEnemyWeaknessAndResistanceProfile,
   getEquippedWeaponForPlayer,
+  getWeaponVsEnemyMatchupSummary,
 } from '../../data/la-cripta/criptaEquipmentAndEvents';
 import { buildEnemyAiProfileForArchetype } from '../../data/la-cripta/criptaEnemyAiEngine';
 import { CRIPTA_STATUS_EFFECTS_REGISTRY } from '../../data/la-cripta/criptaStatusEffects';
 import {
-  CRIPTA_MINIBOSS_ARENAS_REGISTRY,
-  resolveEnemyVisualBlueprint,
-} from '../../data/la-cripta/criptaBiomeBestiary';
-import { LaCriptaItemPixelIcon } from './LaCriptaItemRelicArt';
+  LaCriptaAccessoryPixelIcon,
+  LaCriptaArmorPixelIcon,
+  LaCriptaDamageTypeBadge,
+  LaCriptaItemPixelIcon,
+  LaCriptaRelicPixelIcon,
+  LaCriptaWeaponPixelIcon,
+  LaCriptaWeaponRunePixelIcon,
+} from './LaCriptaItemRelicArt';
 import {
   LaCriptaStatusEffectBadge,
   LaCriptaStatusPixelIcon,
@@ -219,6 +228,7 @@ export interface LaCriptaContextualSidePanelProps {
     targetEnemyId?: string,
     targetPlayerId?: string
   ) => void;
+  onEquipWeaponRune?: (runeId: CriptaWeaponRuneId | null) => void;
 }
 
 export const LaCriptaContextualSidePanel: React.FC<
@@ -238,6 +248,7 @@ export const LaCriptaContextualSidePanel: React.FC<
   selectedTargetEnemyId,
   onSelectTargetEnemy,
   onUseConsumable,
+  onEquipWeaponRune,
 }) => {
   const [pendingSlotIndex, setPendingSlotIndex] = useState<number | null>(null);
   const [recentUsedItemBanner, setRecentUsedItemBanner] = useState<{
@@ -521,7 +532,7 @@ export const LaCriptaContextualSidePanel: React.FC<
         )}
 
         {/* ===================================================================
-            MODE 2: PLAYER_INSPECTION (SELF OR TEAMMATE INSPECTION PANEL)
+            MODE 2: PLAYER_INSPECTION (REDESIGNED CHARACTER INSPECT SHEET)
             =================================================================== */}
         {mode === 'PLAYER_INSPECTION' && inspectedPlayer && (
           <>
@@ -541,6 +552,9 @@ export const LaCriptaContextualSidePanel: React.FC<
                 : null;
               const isDowned = Boolean(
                 inspectedPlayer.isDead || inspectedPlayer.hp <= 0
+              );
+              const isSelf = Boolean(
+                localPlayer && inspectedPlayer.id === localPlayer.id
               );
 
               const baseAtk = charDef?.stats.attack || 5;
@@ -568,14 +582,29 @@ export const LaCriptaContextualSidePanel: React.FC<
               const groupedInv = groupPlayerInventoryItems(
                 inspectedPlayer.normalInventory || []
               );
+              const playerRelics = [
+                ...(partyRelics || []),
+                ...(inspectedPlayer.personalRelics || []),
+              ];
+              const hpPct = Math.max(
+                0,
+                Math.min(
+                  100,
+                  Math.round(
+                    (Math.max(0, inspectedPlayer.hp) /
+                      Math.max(1, inspectedPlayer.maxHp)) *
+                      100
+                  )
+                )
+              );
 
               return (
                 <>
-                  {/* Header: Portrait + Name + Class */}
-                  <div className="px-4 py-3 bg-[#171123] border-b-2 border-[#2E223D] flex items-center justify-between gap-3">
+                  {/* Header: Hero Stage Portrait + Name + Class + Live Vital Bar */}
+                  <div className="px-4 py-3 bg-[#171123] border-b-2 border-[#2E223D] flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className="w-11 h-11 bg-[#0B0811] border-2 flex items-center justify-center shrink-0"
+                        className="w-14 h-14 bg-[#0B0811] border-2 flex items-center justify-center shrink-0 relative shadow-[inset_0_0_16px_rgba(0,0,0,0.85)]"
                         style={{
                           borderColor: isDowned
                             ? '#C93B5B'
@@ -584,14 +613,24 @@ export const LaCriptaContextualSidePanel: React.FC<
                       >
                         <LaCriptaPixelPortrait
                           characterId={charId}
-                          size={36}
+                          size={44}
                         />
+                        {(inspectedPlayer.armor || 0) > 0 && (
+                          <span className="absolute -bottom-1 -right-1 px-1 py-0.2 bg-[#0E1E26] border border-[#7BDFF2] font-cripta-mono text-[8px] font-bold text-[#7BDFF2]">
+                            +{inspectedPlayer.armor} ESC
+                          </span>
+                        )}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-cripta-display text-base font-black text-[#F5EFE6] uppercase truncate">
+                          <span className="font-cripta-display text-base sm:text-lg font-black text-[#F5EFE6] uppercase truncate">
                             {inspectedPlayer.name}
                           </span>
+                          {isSelf && (
+                            <span className="px-1.5 py-0.2 bg-[#231934] border border-[#E7A54A] text-[8px] font-cripta-pixel font-bold text-[#FFD166] uppercase">
+                              TÚ
+                            </span>
+                          )}
                           {isDowned && (
                             <span className="px-1.5 py-0.5 bg-[#2A0E17] border border-[#C93B5B] text-[8px] font-cripta-pixel font-bold text-[#FF8FA3] uppercase">
                               CAÍDO
@@ -600,6 +639,26 @@ export const LaCriptaContextualSidePanel: React.FC<
                         </div>
                         <div className="text-[10px] font-cripta-pixel text-[#E7A54A] uppercase tracking-wider">
                           {charDef?.className || 'AVENTURERO'} · {charDef?.name}
+                        </div>
+                        {/* Compact Vital Bar in Header */}
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="w-28 sm:w-36 h-2.5 bg-[#09060E] border border-[#38294A] overflow-hidden">
+                            <div
+                              className="h-full transition-all duration-300"
+                              style={{
+                                width: `${hpPct}%`,
+                                backgroundColor:
+                                  hpPct <= 30
+                                    ? '#C93B5B'
+                                    : hpPct <= 60
+                                    ? '#E7A54A'
+                                    : '#5EA87A',
+                              }}
+                            />
+                          </div>
+                          <span className="font-cripta-mono text-[10px] font-bold text-[#8EE6AE]">
+                            {Math.max(0, inspectedPlayer.hp)}/{inspectedPlayer.maxHp} PV
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -614,147 +673,341 @@ export const LaCriptaContextualSidePanel: React.FC<
                     </button>
                   </div>
 
-                  {/* Body */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {/* Body: Structured Dark-Fantasy Character Sheet */}
+                  <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
                     {/* 1. FOUR CANONICAL PRIMARY STATS + DERIVED */}
                     <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1.5">
-                        ATRIBUTOS PRIMARIOS
+                      <div className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest mb-1.5">
+                        ✦ ATRIBUTOS Y COMBATE
                       </div>
-                      <div className="grid grid-cols-2 gap-2 font-cripta-pixel">
-                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between">
-                          <span className="text-[10px] text-[#D8C6A0]">VIDA</span>
-                          <span className="text-xs font-bold text-[#8EE6AE]">
-                            {Math.max(0, inspectedPlayer.hp)} / {inspectedPlayer.maxHp}
-                          </span>
+                      <div className="grid grid-cols-4 gap-1.5 font-cripta-pixel text-center">
+                        <div className="p-1.5 bg-[#140E1E] border border-[#2E223D]">
+                          <div className="text-[8px] text-[#D8C6A0]/70">VIDA MÁX</div>
+                          <div className="text-xs font-bold text-[#8EE6AE] mt-0.5">
+                            {inspectedPlayer.maxHp}
+                          </div>
                         </div>
-                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between">
-                          <span className="text-[10px] text-[#D8C6A0]">ATAQUE</span>
-                          <span className="text-xs font-bold text-[#FF8FA3]">
-                            {baseAtk}
+                        <div className="p-1.5 bg-[#140E1E] border border-[#2E223D]">
+                          <div className="text-[8px] text-[#D8C6A0]/70">ATAQUE</div>
+                          <div className="text-xs font-bold text-[#FF8FA3] mt-0.5">
+                            {effStats.attack}
                             {bonusAtk > 0 && (
-                              <span className="text-[#FFD166] ml-1">
+                              <span className="text-[9px] text-[#FFD166] ml-0.5">
                                 (+{bonusAtk})
                               </span>
                             )}
-                          </span>
+                          </div>
                         </div>
-                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between">
-                          <span className="text-[10px] text-[#D8C6A0]">DEFENSA</span>
-                          <span className="text-xs font-bold text-[#7BDFF2]">
-                            {baseDef}
+                        <div className="p-1.5 bg-[#140E1E] border border-[#2E223D]">
+                          <div className="text-[8px] text-[#D8C6A0]/70">DEFENSA</div>
+                          <div className="text-xs font-bold text-[#7BDFF2] mt-0.5">
+                            {effStats.defense}
                             {bonusDef > 0 && (
-                              <span className="text-[#FFD166] ml-1">
+                              <span className="text-[9px] text-[#FFD166] ml-0.5">
                                 (+{bonusDef})
                               </span>
                             )}
-                          </span>
+                          </div>
                         </div>
-                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between">
-                          <span className="text-[10px] text-[#D8C6A0]">MAGIA</span>
-                          <span className="text-xs font-bold text-[#C8A6F5]">
-                            {baseMag}
+                        <div className="p-1.5 bg-[#140E1E] border border-[#2E223D]">
+                          <div className="text-[8px] text-[#D8C6A0]/70">MAGIA</div>
+                          <div className="text-xs font-bold text-[#C8A6F5] mt-0.5">
+                            {effStats.magic}
                             {bonusMag > 0 && (
-                              <span className="text-[#FFD166] ml-1">
+                              <span className="text-[9px] text-[#FFD166] ml-0.5">
                                 (+{bonusMag})
                               </span>
                             )}
-                          </span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Secondary Derived Strip */}
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[9px] font-cripta-pixel text-[#D8C6A0]/80">
-                        <span className="px-2 py-0.5 bg-[#120C1A] border border-[#2A1F38]">
-                          ARMADURA ACTUAL: <strong className="text-[#7BDFF2]">{inspectedPlayer.armor || 0}</strong>
-                        </span>
+                      {/* Derived Metrics Strip */}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[9px] font-cripta-pixel text-[#D8C6A0]/85">
                         <span className="px-2 py-0.5 bg-[#120C1A] border border-[#2A1F38]">
                           CRÍTICO: <strong className="text-[#FFD166]">{effStats.critChancePct}%</strong>
                         </span>
-                      </div>
-                    </div>
-
-                    {/* 2. ACTIVE STATUSES */}
-                    <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1.5">
-                        ESTADOS ACTIVOS
-                      </div>
-                      {(inspectedPlayer.statuses || []).length > 0 ? (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {inspectedPlayer.statuses.map((st) => (
-                            <LaCriptaStatusEffectBadge key={st.id} status={st} />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-[10px] font-cripta-pixel text-[#D8C6A0]/50">
-                          Sin estados alterados activos.
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 3. EQUIPPED WEAPON & GEAR */}
-                    <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1.5">
-                        ARMA Y EQUIPO
-                      </div>
-                      <div className="space-y-1.5">
-                        <LaCriptaPixelTooltip
-                          title={`${eqWeapon.weapon.name} (Nv.${eqWeapon.level})`}
-                          category="ARMA EQUIPADA"
-                          description={eqWeapon.weapon.specialEffectText}
-                          footerLabel={`DAÑO BASE: ~${eqWeapon.scaledMin}–${eqWeapon.scaledMax} · ESCALA CON ${eqWeapon.weapon.scalingStat}`}
-                          borderColor="#E7A54A"
-                          className="block w-full"
-                        >
-                          <div className="p-2.5 bg-[#150F20] border border-[#382A4B] flex items-center justify-between">
-                            <div>
-                              <div className="font-cripta-display text-xs font-bold text-[#FFD166] uppercase">
-                                {eqWeapon.weapon.name}{' '}
-                                <span className="text-[9px] font-cripta-pixel text-[#D8C6A0]">
-                                  NV.{eqWeapon.level}
-                                </span>
-                              </div>
-                              <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/80">
-                                {eqWeapon.weapon.specialEffectText}
-                              </div>
-                            </div>
-                            <span className="px-2 py-1 bg-[#241623] border border-[#C93B5B] font-cripta-mono text-[10px] font-bold text-[#FF8FA3] shrink-0">
-                              {formatDamageRange(weaponDmgEst.min, weaponDmgEst.max)} DAÑO
-                            </span>
-                          </div>
-                        </LaCriptaPixelTooltip>
-
-                        {(armorDef || accDef) && (
-                          <div className="grid grid-cols-2 gap-2">
-                            {armorDef && (
-                              <div className="p-2 bg-[#140E1E] border border-[#2E223D] text-[9px] font-cripta-pixel">
-                                <div className="text-[#7BDFF2] font-bold uppercase">
-                                  {armorDef.name}
-                                </div>
-                                <div className="text-[#D8C6A0]/75 mt-0.5">
-                                  {armorDef.specialEffectText}
-                                </div>
-                              </div>
-                            )}
-                            {accDef && (
-                              <div className="p-2 bg-[#140E1E] border border-[#2E223D] text-[9px] font-cripta-pixel">
-                                <div className="text-[#C8A6F5] font-bold uppercase">
-                                  {accDef.name}
-                                </div>
-                                <div className="text-[#D8C6A0]/75 mt-0.5">
-                                  {accDef.specialEffectText}
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                        <span className="px-2 py-0.5 bg-[#120C1A] border border-[#2A1F38]">
+                          ESCUDO ACTIVO: <strong className="text-[#7BDFF2]">{inspectedPlayer.armor || 0}</strong>
+                        </span>
+                        {effStats.potionBoostPct > 0 && (
+                          <span className="px-2 py-0.5 bg-[#120C1A] border border-[#2A1F38]">
+                            ALQUIMIA: <strong className="text-[#8EE6AE]">+{effStats.potionBoostPct}%</strong>
+                          </span>
+                        )}
+                        {effStats.healBoostPct > 0 && (
+                          <span className="px-2 py-0.5 bg-[#120C1A] border border-[#2A1F38]">
+                            CURACIÓN: <strong className="text-[#FFD166]">+{effStats.healBoostPct}%</strong>
+                          </span>
                         )}
                       </div>
                     </div>
 
-                    {/* 4. TECHNIQUES & CLASS ABILITIES (READ-ONLY) */}
+                    {/* 2. EQUIPPED WEAPON, ARMOR & ACCESSORY WITH HIGH-DETAIL PIXEL ART */}
                     <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1.5">
-                        TÉCNICAS Y HABILIDADES (SOLO LECTURA)
+                      <div className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest mb-1.5">
+                        ✦ EQUIPAMIENTO ACTIVO
+                      </div>
+                      <div className="space-y-1.5">
+                        {/* Primary Weapon Slot + Damage Identity + Active Weapon Rune */}
+                        <LaCriptaPixelTooltip
+                          title={`${eqWeapon.weapon.name} (Nv.${eqWeapon.level})`}
+                          category={`ARMA · ${eqWeapon.weapon.rarity}${
+                            eqWeapon.weapon.weaponArchetypeLabel
+                              ? ` · ${eqWeapon.weapon.weaponArchetypeLabel}`
+                              : ''
+                          }`}
+                          description={`${eqWeapon.weapon.specialEffectText}${
+                            eqWeapon.activeRune
+                              ? ` | INFUSIÓN ACTIVA (${eqWeapon.activeRune.name}): ${eqWeapon.activeRune.benefitText} · ${eqWeapon.activeRune.tradeoffText}`
+                              : ''
+                          }`}
+                          footerLabel={`DAÑO BASE: ~${eqWeapon.scaledMin}–${eqWeapon.scaledMax} · ESCALA CON ${eqWeapon.weapon.scalingStat}`}
+                          borderColor={eqWeapon.activeRune?.accentColor || '#E7A54A'}
+                          className="block w-full"
+                        >
+                          <div className="p-2 bg-[#150F20] border border-[#E7A54A]/70 flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between gap-2.5">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-11 h-11 bg-[#0B0811] border border-[#E7A54A] flex items-center justify-center shrink-0 relative">
+                                  <LaCriptaWeaponPixelIcon
+                                    weaponId={eqWeapon.weapon.id}
+                                    upgradeLevel={eqWeapon.level}
+                                    size={34}
+                                  />
+                                  <span className="absolute -bottom-1 -right-1 px-1 bg-[#09070D] border border-[#FFD166] font-cripta-mono text-[8px] font-bold text-[#FFD166]">
+                                    NV.{eqWeapon.level}
+                                  </span>
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-cripta-display text-xs font-black text-[#FFD166] uppercase truncate">
+                                      {eqWeapon.weapon.name}
+                                    </span>
+                                    <LaCriptaDamageTypeBadge
+                                      damageType={eqWeapon.activeDamageType}
+                                      secondaryType={eqWeapon.secondaryDamageType}
+                                      compact
+                                    />
+                                  </div>
+                                  {eqWeapon.weapon.weaponArchetypeLabel && (
+                                    <div className="text-[8px] font-cripta-pixel uppercase tracking-wider text-[#E7A54A]/90 mt-0.5">
+                                      {eqWeapon.weapon.weaponArchetypeLabel}
+                                    </div>
+                                  )}
+                                  <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/85 line-clamp-2 mt-0.5">
+                                    {eqWeapon.weapon.specialEffectText}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="px-2 py-1 bg-[#241623] border border-[#C93B5B] font-cripta-mono text-[10px] font-bold text-[#FF8FA3] shrink-0">
+                                {formatDamageRange(weaponDmgEst.min, weaponDmgEst.max)} DAÑO
+                              </span>
+                            </div>
+
+                            {/* WEAPON RUNE / ELEMENTAL INFUSION SLOT */}
+                            <div className="pt-1.5 border-t border-[#2E223D] flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[8px] font-cripta-pixel uppercase tracking-wider text-[#B57CFF] font-bold">
+                                  ◈ ENGARCE DE RUNA ELEMENTAL
+                                </span>
+                                {eqWeapon.activeRune && isSelf && onEquipWeaponRune && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      laCriptaAudio.playStoneClick();
+                                      onEquipWeaponRune(null);
+                                    }}
+                                    className="px-1.5 py-0.5 bg-[#1E142B] hover:bg-[#2E1F42] border border-[#B57CFF]/60 text-[8px] font-cripta-pixel text-[#D8C6A0] hover:text-[#FFD166] cursor-pointer"
+                                  >
+                                    QUITAR RUNA
+                                  </button>
+                                )}
+                              </div>
+
+                              {eqWeapon.activeRune ? (
+                                <div
+                                  className="p-1.5 bg-[#0D0914] border flex items-center gap-2"
+                                  style={{ borderColor: eqWeapon.activeRune.accentColor }}
+                                >
+                                  <LaCriptaWeaponRunePixelIcon
+                                    runeId={eqWeapon.activeRune.id}
+                                    size={24}
+                                  />
+                                  <div className="min-w-0 font-cripta-pixel">
+                                    <div
+                                      className="text-[10px] font-bold uppercase truncate"
+                                      style={{ color: eqWeapon.activeRune.accentColor }}
+                                    >
+                                      {eqWeapon.activeRune.name}
+                                    </div>
+                                    <div className="text-[8px] text-[#8EE6AE]">
+                                      ✦ {eqWeapon.activeRune.benefitText}
+                                    </div>
+                                    <div className="text-[8px] text-[#FF8FA3]">
+                                      ⚠ {eqWeapon.activeRune.tradeoffText}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="px-2 py-1 bg-[#0D0914] border border-dashed border-[#382A4B] text-[9px] font-cripta-pixel text-[#D8C6A0]/55">
+                                  Sin runa engarzada (daño original: {eqWeapon.activeDamageType}). Adquiere runas en Tiendas o derrotando Élites y Minibosses.
+                                </div>
+                              )}
+
+                              {/* Owned Weapon Runes Switcher */}
+                              {(inspectedPlayer.ownedWeaponRunes || []).length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                                  <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 mr-1">
+                                    RUNAS DISPONIBLES:
+                                  </span>
+                                  {(inspectedPlayer.ownedWeaponRunes || []).map((rId) => {
+                                    const rDef = CRIPTA_WEAPON_RUNES_REGISTRY[rId];
+                                    if (!rDef) return null;
+                                    const isEquippedRune =
+                                      inspectedPlayer.equippedWeaponRuneId === rId;
+                                    return (
+                                      <button
+                                        key={rId}
+                                        type="button"
+                                        disabled={!isSelf || !onEquipWeaponRune}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (!isSelf || !onEquipWeaponRune) return;
+                                          laCriptaAudio.playDoorVote();
+                                          onEquipWeaponRune(isEquippedRune ? null : rId);
+                                        }}
+                                        title={`${rDef.name}\n${rDef.benefitText}\n${rDef.tradeoffText}`}
+                                        className={`px-1.5 py-0.5 border flex items-center gap-1 text-[8px] font-cripta-pixel transition-all ${
+                                          isEquippedRune
+                                            ? 'bg-[#251838] border-[#FFD166] text-[#FFD166] font-bold'
+                                            : 'bg-[#120D1B] hover:bg-[#1E162B] border-[#4A3B5C] text-[#D9D0BC]'
+                                        } ${isSelf && onEquipWeaponRune ? 'cursor-pointer' : 'cursor-default'}`}
+                                      >
+                                        <LaCriptaWeaponRunePixelIcon runeId={rId} size={14} />
+                                        <span>{rDef.name.replace('Runa de ', '').replace('Runa del ', '')}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </LaCriptaPixelTooltip>
+
+                        {/* Armor & Accessory Slots */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center gap-2">
+                            <div className="w-9 h-9 bg-[#0B0811] border border-[#3E7B96] flex items-center justify-center shrink-0">
+                              {armorDef ? (
+                                <LaCriptaArmorPixelIcon
+                                  armorId={armorDef.id}
+                                  size={26}
+                                />
+                              ) : (
+                                <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/35">
+                                  ARM
+                                </span>
+                              )}
+                            </div>
+                            <div className="min-w-0 font-cripta-pixel">
+                              <div className="text-[9px] text-[#7BDFF2] font-bold uppercase truncate">
+                                {armorDef ? armorDef.name : 'Sin Armadura'}
+                              </div>
+                              <div className="text-[8px] text-[#D8C6A0]/75 truncate">
+                                {armorDef
+                                  ? armorDef.specialEffectText
+                                  : 'Ranura de coraza'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center gap-2">
+                            <div className="w-9 h-9 bg-[#0B0811] border border-[#7656A8] flex items-center justify-center shrink-0">
+                              {accDef ? (
+                                <LaCriptaAccessoryPixelIcon
+                                  accessoryId={accDef.id}
+                                  size={26}
+                                />
+                              ) : (
+                                <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/35">
+                                  ACC
+                                </span>
+                              )}
+                            </div>
+                            <div className="min-w-0 font-cripta-pixel">
+                              <div className="text-[9px] text-[#C8A6F5] font-bold uppercase truncate">
+                                {accDef ? accDef.name : 'Sin Accesorio'}
+                              </div>
+                              <div className="text-[8px] text-[#D8C6A0]/75 truncate">
+                                {accDef
+                                  ? accDef.specialEffectText
+                                  : 'Ranura de talismán'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. ACTIVE STATUSES & RELICS */}
+                    {(inspectedPlayer.statuses?.length > 0 ||
+                      playerRelics.length > 0) && (
+                      <div className="grid grid-cols-1 gap-2">
+                        {inspectedPlayer.statuses?.length > 0 && (
+                          <div>
+                            <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1">
+                              ESTADOS ACTIVOS
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {inspectedPlayer.statuses.map((st) => (
+                                <LaCriptaStatusEffectBadge key={st.id} status={st} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {playerRelics.length > 0 && (
+                          <div>
+                            <div className="text-[9px] font-cripta-pixel text-[#B57CFF] font-bold uppercase tracking-widest mb-1">
+                              ✦ RELIQUIAS ACTIVAS ({playerRelics.length})
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {playerRelics.map((acq, idx) => {
+                                const rDef = CRIPTA_RELICS_REGISTRY[acq.relicId];
+                                if (!rDef) return null;
+                                return (
+                                  <LaCriptaPixelTooltip
+                                    key={`${acq.relicId}_${idx}`}
+                                    title={rDef.name}
+                                    category="RELIQUIA ACTIVA"
+                                    description={rDef.description}
+                                    footerLabel={`HALLADA EN: ${
+                                      acq.obtainedInDungeonName || 'LA CRIPTA'
+                                    }`}
+                                    borderColor="#FFD166"
+                                  >
+                                    <div className="px-2 py-1 bg-[#1A1228] border border-[#9B72CF] flex items-center gap-1.5 text-[9px] font-cripta-pixel text-[#FFD166] cursor-help">
+                                      <LaCriptaRelicPixelIcon
+                                        relicId={acq.relicId}
+                                        size={16}
+                                      />
+                                      <span>{rDef.name}</span>
+                                    </div>
+                                  </LaCriptaPixelTooltip>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 4. TECHNIQUES & CLASS ABILITIES */}
+                    <div>
+                      <div className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest mb-1.5">
+                        ✦ TÉCNICAS Y HABILIDADES
                       </div>
                       <div className="space-y-1.5">
                         {/* Weapon Special */}
@@ -812,17 +1065,28 @@ export const LaCriptaContextualSidePanel: React.FC<
                       </div>
                     </div>
 
-                    {/* 5. PLAYER INVENTORY (READ-ONLY VIEW FOR CO-OP COORDINATION) */}
+                    {/* 5. PLAYER BACKPACK INVENTORY (6 SLOTS) */}
                     <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1.5">
-                        MOCHILA ({(inspectedPlayer.normalInventory || []).length}/
+                      <div className="text-[9px] font-cripta-pixel text-[#8EE6AE] font-bold uppercase tracking-widest mb-1.5">
+                        ✦ MOCHILA DE CONSUMIBLES (
+                        {(inspectedPlayer.normalInventory || []).length}/
                         {NORMAL_INVENTORY_MAX_SLOTS})
                       </div>
                       {groupedInv.length > 0 ? (
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="grid grid-cols-2 gap-1.5">
                           {groupedInv.map((g) => {
                             const itemDef = CRIPTA_ITEMS_REGISTRY[g.itemId];
                             if (!itemDef) return null;
+                            const canUseHere =
+                              isSelf &&
+                              !isDowned &&
+                              onUseConsumable &&
+                              (hasActiveCombat
+                                ? itemDef.combatUsable &&
+                                  isMyTurnInCombat &&
+                                  !activeRoom.consumableUsedThisTurn
+                                : itemDef.roomUsable);
+
                             return (
                               <LaCriptaPixelTooltip
                                 key={g.itemId}
@@ -838,15 +1102,33 @@ export const LaCriptaContextualSidePanel: React.FC<
                                   />
                                 }
                               >
-                                <div className="px-2 py-1 bg-[#140E1E] border border-[#382A4B] flex items-center gap-1.5 text-[10px] font-cripta-pixel text-[#F5EFE6] cursor-help">
-                                  <LaCriptaItemPixelIcon
-                                    itemId={g.itemId}
-                                    size={16}
-                                  />
-                                  <span>{itemDef.name}</span>
-                                  <span className="text-[#FFD166] font-bold">
-                                    ×{g.count}
-                                  </span>
+                                <div className="p-1.5 bg-[#140E1E] border border-[#382A4B] flex items-center justify-between gap-1.5 text-[10px] font-cripta-pixel text-[#F5EFE6]">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <LaCriptaItemPixelIcon
+                                      itemId={g.itemId}
+                                      size={20}
+                                    />
+                                    <span className="truncate">{itemDef.name}</span>
+                                    <span className="text-[#FFD166] font-bold shrink-0">
+                                      ×{g.count}
+                                    </span>
+                                  </div>
+                                  {canUseHere && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        laCriptaAudio.playDoorVote();
+                                        onUseConsumable(
+                                          g.firstSlotIndex,
+                                          selectedTargetEnemyId || undefined,
+                                          inspectedPlayer.id
+                                        );
+                                      }}
+                                      className="px-1.5 py-0.5 bg-[#1C2F23] hover:bg-[#274432] border border-[#5EA87A] text-[8px] font-bold text-[#8EE6AE] uppercase cursor-pointer shrink-0"
+                                    >
+                                      USAR
+                                    </button>
+                                  )}
                                 </div>
                               </LaCriptaPixelTooltip>
                             );
@@ -861,8 +1143,8 @@ export const LaCriptaContextualSidePanel: React.FC<
                   </div>
 
                   {/* Footer */}
-                  <div className="px-4 py-2.5 bg-[#140E1F] border-t border-[#2E223D] flex items-center justify-between text-[10px] font-cripta-pixel text-[#D8C6A0]/75">
-                    <span>INSPECCIÓN COOPERATIVA · SOLO LECTURA</span>
+                  <div className="px-4 py-2.5 bg-[#140E1F] border-t border-[#2E223D] flex items-center justify-between text-[10px] font-cripta-pixel text-[#D8C6A0]/75 shrink-0">
+                    <span>HOJA DE PERSONAJE · LA CRIPTA</span>
                     <span>ESC PARA CERRAR</span>
                   </div>
                 </>
@@ -879,20 +1161,15 @@ export const LaCriptaContextualSidePanel: React.FC<
             {(() => {
               const approxRange = computeEnemyApproxDamageRange(inspectedEnemy);
               const traits = getEnemyWeaknessAndResistanceProfile(inspectedEnemy);
+              const builtArchetype = buildEnemyAiProfileForArchetype(inspectedEnemy);
               const aiProfile =
-                inspectedEnemy.aiProfile ||
-                buildEnemyAiProfileForArchetype(inspectedEnemy).aiProfile;
+                inspectedEnemy.aiProfile || builtArchetype.aiProfile;
+              const enemyProfession =
+                inspectedEnemy.profession || builtArchetype.profession || 'GUERRERO';
               const enemyDef = inspectedEnemy.armor || 0;
               const magicRes = inspectedEnemy.magicResistance || 0;
               const resolvedDungeon =
                 dungeon || CRIPTA_DUNGEONS_REGISTRY.catacumbas_del_rey;
-              const creatureBlueprint = resolveEnemyVisualBlueprint(
-                inspectedEnemy,
-                resolvedDungeon.id
-              );
-              const minibossArena =
-                CRIPTA_MINIBOSS_ARENAS_REGISTRY[resolvedDungeon.id] ||
-                CRIPTA_MINIBOSS_ARENAS_REGISTRY.catacumbas_del_rey;
 
               // Collect statuses this creature can apply from its abilities & threats
               const statusCapabilities: Array<{
@@ -941,26 +1218,29 @@ export const LaCriptaContextualSidePanel: React.FC<
 
               return (
                 <>
-                  {/* 1. PANEL HEADER: Category, Large Name, Subtitle & Close Button */}
+                  {/* 1. PANEL HEADER: Category, Profession Badge, Large Name, Subtitle & Close Button */}
                   <div className="px-4 py-3.5 bg-[#171123] border-b-2 border-[#2E223D] flex items-start justify-between gap-3 shrink-0">
                     <div className="min-w-0">
-                      <div className="text-[9px] font-cripta-pixel font-bold text-[#E7A54A] uppercase tracking-widest">
-                        {inspectedEnemy.isFinalBoss
-                          ? 'SOBERANO DEL ABISMO'
-                          : inspectedEnemy.isMiniboss || inspectedEnemy.isBoss
-                          ? `MINIJFE DE LA MAZMORRA · ${minibossArena.arenaTitle}`
-                          : inspectedEnemy.isElite
-                          ? `CRIATURA ÉLITE · ${creatureBlueprint.title}`
-                          : `BESTIARIO · ${creatureBlueprint.title}`}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[9px] font-cripta-pixel font-bold text-[#E7A54A] uppercase tracking-widest">
+                          {inspectedEnemy.isFinalBoss || inspectedEnemy.isBoss
+                            ? 'SOBERANO DEL ABISMO'
+                            : inspectedEnemy.isMiniboss
+                            ? 'MINIJFE DE LA MAZMORRA'
+                            : inspectedEnemy.isElite
+                            ? 'CRIATURA ÉLITE'
+                            : 'CRIATURA DE CRIPTA'}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-[#241838] border border-[#7656A8] text-[8px] font-cripta-pixel font-bold text-[#FFD166] uppercase tracking-wider">
+                          ROL: {enemyProfession}
+                        </span>
                       </div>
                       <h3 className="mt-0.5 font-cripta-display text-lg sm:text-xl font-black text-[#F5EFE6] uppercase leading-tight tracking-wide">
                         {inspectedEnemy.name}
                       </h3>
                       <div className="mt-0.5 text-[10px] font-cripta-pixel text-[#D8C6A0]/80 uppercase tracking-wider">
                         {resolvedDungeon.name}
-                        {inspectedEnemy.title
-                          ? ` · ${inspectedEnemy.title}`
-                          : ` · ${creatureBlueprint.title}`}
+                        {inspectedEnemy.title ? ` · ${inspectedEnemy.title}` : ''}
                       </div>
                     </div>
 
@@ -1016,13 +1296,6 @@ export const LaCriptaContextualSidePanel: React.FC<
                           animState={inspectedEnemy.hp <= 0 ? 'death' : 'idle'}
                           customSizePx={spriteDisplaySize}
                         />
-                      </div>
-
-                      {/* Canonical Creature Signature Move & Role Tag Note */}
-                      <div className="relative z-10 mt-1.5 px-3 text-center">
-                        <p className="font-cripta-pixel text-[9px] text-[#E6DCCB]/85 leading-relaxed max-w-[340px] mx-auto">
-                          TÉCNICA INSIGNIA: {creatureBlueprint.signatureMoveName}
-                        </p>
                       </div>
 
                       {/* Active Status Badges Floating at Bottom of Bestiary Stage if any */}
@@ -1101,7 +1374,46 @@ export const LaCriptaContextualSidePanel: React.FC<
                       </div>
                     </div>
 
-                    {/* 4 & 5. WEAKNESSES & RESISTANCES (2 Columns on wide screens, separate visual levels per item) */}
+                    {/* 4 & 5. WEAKNESSES & RESISTANCES + LIVE WEAPON MATCHUP BANNER */}
+                    {localPlayer && (
+                      (() => {
+                        const myMatchup = getWeaponVsEnemyMatchupSummary(
+                          localPlayer,
+                          'ATTACK',
+                          inspectedEnemy
+                        );
+                        const myWeapon = getEquippedWeaponForPlayer(localPlayer);
+                        return (
+                          <div
+                            className={`p-2 border flex items-center justify-between gap-2 font-cripta-pixel text-[10px] ${
+                              myMatchup.state === 'WEAKNESS'
+                                ? 'bg-[#102419] border-[#48BB78] text-[#8EE6AE]'
+                                : myMatchup.state === 'RESISTANCE'
+                                ? 'bg-[#261219] border-[#E53E3E] text-[#FF8FA3]'
+                                : 'bg-[#140F1E] border-[#382A4B] text-[#D8C6A0]'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <LaCriptaDamageTypeBadge
+                                damageType={myWeapon.activeDamageType}
+                                secondaryType={myWeapon.secondaryDamageType}
+                                compact
+                              />
+                              <span className="truncate font-bold">
+                                TU ARMA ({myWeapon.weapon.name}):
+                              </span>
+                            </div>
+                            <span className="font-bold shrink-0">
+                              {myMatchup.state === 'WEAKNESS'
+                                ? `✦ VULNERABLE (+${myMatchup.deltaPct}% DAÑO)`
+                                : myMatchup.state === 'RESISTANCE'
+                                ? `⚠ RESISTENTE (${myMatchup.deltaPct}% DAÑO)`
+                                : 'DAÑO ESTÁNDAR (×1.0)'}
+                            </span>
+                          </div>
+                        );
+                      })()
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       {/* DEBILIDADES */}
                       <div>
@@ -1161,13 +1473,8 @@ export const LaCriptaContextualSidePanel: React.FC<
                         ATAQUES DE LA CRIATURA
                       </div>
                       <div className="space-y-2.5">
-                        {(aiProfile.abilities || []).map((ab, idx) => {
-                          const isKnown =
-                            idx === 0 ||
-                            discoveredAbilityIds.includes(ab.id) ||
-                            inspectedEnemy.isBoss ||
-                            inspectedEnemy.isFinalBoss ||
-                            Boolean(inspectedEnemy.isMiniboss);
+                        {(aiProfile.abilities || []).map((ab) => {
+                          const isKnown = true;
 
                           const mult = ab.damageMultiplier || 1;
                           const abMin = Math.max(
@@ -1182,6 +1489,9 @@ export const LaCriptaContextualSidePanel: React.FC<
                           const isSupportOrDefense =
                             ab.actionKind === 'DEFEND_SELF' ||
                             ab.actionKind === 'BUFF_ARMOR' ||
+                            ab.actionKind === 'BUFF_ALLY_ATTACK' ||
+                            ab.actionKind === 'CLEANSE_ALLY' ||
+                            ab.actionKind === 'SUMMON' ||
                             ab.actionKind === 'HEAL_SELF' ||
                             ab.actionKind === 'HEAL_ALLY';
 
@@ -1189,14 +1499,24 @@ export const LaCriptaContextualSidePanel: React.FC<
                             ab.actionKind === 'HEAL_SELF' ||
                             ab.actionKind === 'HEAL_ALLY'
                               ? 'Curación · Apoyo'
+                              : ab.actionKind === 'CLEANSE_ALLY'
+                              ? 'Purificación · Soporte'
+                              : ab.actionKind === 'BUFF_ALLY_ATTACK'
+                              ? 'Potenciación · Soporte'
+                              : ab.actionKind === 'SUMMON'
+                              ? 'Invocación · Esbirro'
                               : ab.actionKind === 'DEFEND_SELF' ||
                                 ab.actionKind === 'BUFF_ARMOR'
                               ? 'Defensa · Guardia'
+                              : ab.actionKind === 'DEBUFF_ARMOR'
+                              ? 'Debilitación · Control'
+                              : ab.actionKind === 'DRAIN_ATTACK'
+                              ? 'Drenaje Vital'
                               : ab.actionKind === 'AOE_ATTACK'
                               ? 'Ataque de área'
                               : ab.statusToApply
                               ? 'Ataque · Aflicción'
-                              : 'Ataque físico';
+                              : 'Ataque directo';
 
                           const statusName = ab.statusToApply
                             ? CRIPTA_STATUS_EFFECTS_REGISTRY[ab.statusToApply]
@@ -1214,12 +1534,28 @@ export const LaCriptaContextualSidePanel: React.FC<
                                 }`
                               : ab.actionKind === 'HEAL_SELF' ||
                                 ab.actionKind === 'HEAL_ALLY'
-                              ? `Restaura ~${ab.healAmount || 12} PV a un aliado.`
+                              ? `Restaura ~${ab.healAmount || 12} PV a sí mismo o a un aliado herido (<60% PV).`
+                              : ab.actionKind === 'CLEANSE_ALLY'
+                              ? `Purifica estados negativos de un aliado y restaura ~${
+                                  ab.healAmount || 8
+                                } PV.`
+                              : ab.actionKind === 'BUFF_ALLY_ATTACK'
+                              ? `Potencia el ataque de un aliado o propio (+25% ATQ) y otorga +${
+                                  ab.armorBonus || 2
+                                } DEF.`
+                              : ab.actionKind === 'SUMMON'
+                              ? `Invoca un esbirro menor en la sala (máx. 1 invocación activa, límite 3 enemigos).`
                               : ab.actionKind === 'DEFEND_SELF' ||
                                 ab.actionKind === 'BUFF_ARMOR'
                               ? `Alza su guardia y refuerza la defensa (+${
                                   ab.armorBonus || 3
                                 } DEF).`
+                              : ab.actionKind === 'DEBUFF_ARMOR'
+                              ? `Fractura la defensa del objetivo y aplica Vulnerabilidad.`
+                              : ab.actionKind === 'DRAIN_ATTACK'
+                              ? `Drena vitalidad del objetivo y se cura ~${
+                                  ab.healAmount || 8
+                                } PV.`
                               : statusName
                               ? `Puede aplicar ${statusName} durante ${
                                   ab.statusTurns || 2

@@ -1,5 +1,7 @@
 import type {
   CriptaDungeonId,
+  CriptaEnemyProfession,
+  CriptaEnemyVisualProfile,
   CriptaRoomEnemy,
   CriptaStatusEffectType,
 } from '../../types/laCripta';
@@ -197,6 +199,8 @@ export interface CriptaCreatureVisualBlueprint {
   dungeonId: CriptaDungeonId;
   tier: 'NORMAL' | 'ELITE' | 'MINIBOSS' | 'FINAL_BOSS';
   roleTag: NonNullable<CriptaRoomEnemy['roleTag']>;
+  profession?: CriptaEnemyProfession;
+  visualProfile?: CriptaEnemyVisualProfile;
   /**
    * Distinct anatomical family + silhouette variant so no two enemies in any biome
    * ever share the same silhouette, head, weapon, posture, or proportions.
@@ -724,12 +728,12 @@ const DUNGEON_CREATURE_SPECS: Record<CriptaDungeonId, CompactEntrySpec[]> = {
     ['devorador_de_nombres', 'BIBLIOTECA_DEVORADOR_NOMBRES', 'Devorador de Nombres', 'Entidad de los Códices Prohibidos', 'MINIBOSS', 'BOSS', 'VOID_TOME_NAME_EATER', '#3B0764', '#0F172A', '#E879F9', '#FDE047', 'FLOAT_SWAY', 'Borrado de la Existencia', 'CONFUSION', 'SPECTRAL'],
   ],
   torre_del_astrologo: [
-    ['acolito_del_zodiaco', 'ASTROLOGO_ACOLITO_ZODIACO', 'Acólito del Zodíaco', 'Astrónomo de Manto Estrellado', 'NORMAL', 'CASTER', 'ZODIAC_STARMAP_ACOLYTE', '#1D4ED8', '#1E1B4B', '#FDE047', '#60A5FA', 'RITUAL_PULSE', 'Rayo de Orión', 'BURN', 'HUMANOID'],
-    ['esfera_armilar', 'ASTROLOGO_ESFERA_ARMILAR', 'Esfera Armilar', 'Mecanismo de Anillos de Bronce', 'NORMAL', 'TANK', 'BRASS_ARMILLARY_SPHERE', '#D97706', '#1E3A8A', '#FDE047', '#38BDF8', 'FLOAT_SWAY', 'Órbita Aplastante', 'CONFUSION', 'CONSTRUCT'],
-    ['homunculo_de_eter', 'ASTROLOGO_HOMUNCULO_ETER', 'Homúnculo de Éter', 'Criatura Alquímica en Matraz Astral', 'NORMAL', 'HEALER', 'AETHER_FLASK_HOMUNCULUS', '#38BDF8', '#312E81', '#A5F3FC', '#FDE047', 'FLOAT_SWAY', 'Destilado Sidéreo', 'MARKED', 'CONSTRUCT'],
+    ['acolito_del_zodiaco', 'ASTROLOGO_ACOLITO_ZODIACO', 'Acólito del Eclipse', 'Ocultista Acorazado del Sol Negro', 'NORMAL', 'TANK', 'ZODIAC_STARMAP_ACOLYTE', '#1E3A8A', '#0F172A', '#F59E0B', '#38BDF8', 'HEAVY_BREATH', 'Impacto del Sol Negro', 'WEAKENED', 'CONSTRUCT'],
+    ['esfera_armilar', 'ASTROLOGO_ESFERA_ARMILAR', 'Esfera Armilar Chamán', 'Ocultista Armilar de las Estrellas', 'NORMAL', 'HEALER', 'BRASS_ARMILLARY_SPHERE', '#D97706', '#1E1B4B', '#FDE047', '#34D399', 'RITUAL_PULSE', 'Curación Oscura Astral', 'CURSE', 'CONSTRUCT'],
+    ['homunculo_de_eter', 'ASTROLOGO_HOMUNCULO_ETER', 'Homúnculo de Éter', 'Alquimista en Matraz Astral', 'NORMAL', 'CASTER', 'AETHER_FLASK_HOMUNCULUS', '#38BDF8', '#312E81', '#A5F3FC', '#FDE047', 'FLOAT_SWAY', 'Destilado Sidéreo', 'POISON', 'CONSTRUCT'],
     ['centinela_de_cometa', 'ASTROLOGO_CENTINELA_COMETA', 'Centinela de Cometa', 'Autómata Alabardero Solar', 'NORMAL', 'BRUTE', 'COMET_HALBERD_SENTINEL', '#93C5FD', '#1E3A8A', '#FBBF24', '#60A5FA', 'MARCH_GUARD', 'Lanza Meteorito', 'BURN', 'CONSTRUCT'],
-    ['tejedor_de_constelaciones', 'ASTROLOGO_TEJEDOR_CONSTELACIONES', 'Tejedor de Constelaciones', 'Oráculo de Seis Brazos Celestes', 'ELITE', 'CASTER', 'CONSTELLATION_LOOM_WEAVER', '#2563EB', '#1E1B4B', '#FDE047', '#C084FC', 'RITUAL_PULSE', 'Hilo del Destino', 'MARKED', 'SPECTRAL'],
-    ['guardian_del_eclipse', 'ASTROLOGO_GUARDIAN_ECLIPSE', 'Guardián del Eclipse', 'Caballero del Sol Negro y Luna', 'ELITE', 'TANK', 'SOLAR_ECLIPSE_WARDEN', '#1E293B', '#1E3A8A', '#F59E0B', '#38BDF8', 'HEAVY_BREATH', 'Escudo de Penumbra', 'CURSE', 'CONSTRUCT'],
+    ['tejedor_de_constelaciones', 'ASTROLOGO_TEJEDOR_CONSTELACIONES', 'Tejedor de Constelaciones', 'Controlador de Seis Brazos Celestes', 'ELITE', 'CASTER', 'CONSTELLATION_LOOM_WEAVER', '#2563EB', '#1E1B4B', '#FDE047', '#C084FC', 'RITUAL_PULSE', 'Hilo del Destino', 'MARKED', 'SPECTRAL'],
+    ['guardian_del_eclipse', 'ASTROLOGO_GUARDIAN_ECLIPSE', 'Baluarte del Planisferio', 'Coloso Escudero del Sol Negro', 'ELITE', 'TANK', 'SOLAR_ECLIPSE_WARDEN', '#1E293B', '#1E3A8A', '#F59E0B', '#38BDF8', 'HEAVY_BREATH', 'Escudo de Penumbra', 'CURSE', 'CONSTRUCT'],
     ['arconte_del_cenit', 'ASTROLOGO_ARCONTE_CENIT', 'Arconte del Cenit', 'Soberano del Planetario Mayor', 'MINIBOSS', 'BOSS', 'ZENITH_ASTROLABLE_ARCHON', '#1D4ED8', '#0F172A', '#FDE047', '#38BDF8', 'FLOAT_SWAY', 'Juicio de las Siete Estrellas', 'BURN', 'SPECTRAL'],
     ['observador_del_infinito', 'ASTROLOGO_OBSERVADOR_INFINITO', 'Observador del Infinito', 'Ojo Astral de los Anillos Dorados', 'MINIBOSS', 'BOSS', 'INFINITE_OCULUS_OBSERVER', '#3B82F6', '#1E1B4B', '#FBBF24', '#F43F5E', 'FLOAT_SWAY', 'Mirada del Cosmos Vacío', 'CONFUSION', 'SPECTRAL'],
   ],
@@ -815,7 +819,7 @@ const DUNGEON_CREATURE_SPECS: Record<CriptaDungeonId, CompactEntrySpec[]> = {
   ],
   cementerio_de_gigantes: [
     ['esqueleto_colosal', 'GIGANTES_ESQUELETO_COLOSAL', 'Esqueleto Colosal', 'Torso Titánico con Espadón Roto', 'NORMAL', 'BRUTE', 'COLOSSAL_RIB_SKELETON', '#E2E8F0', '#334155', '#A3E635', '#84CC16', 'HEAVY_BREATH', 'Mandoble de Titán', 'WEAKENED', 'UNDEAD'],
-    ['craneo_errante', 'GIGANTES_CRANEO_ERRANTE', 'Cráneo Errante', 'Calavera Gigante en Llamas Verdes', 'NORMAL', 'CASTER', 'ROLLING_GIANT_CRANIUM', '#D6D3D1', '#14532D', '#BEF264', '#4ADE80', 'FLOAT_SWAY', 'Fuego de Osario', 'FEAR', 'UNDEAD'],
+    ['craneo_errante', 'GIGANTES_CRANEO_ERRANTE', 'Sacerdote de Osario Gigante', 'Chamán Esquelético de Vértebras En Llamas', 'NORMAL', 'HEALER', 'ROLLING_GIANT_CRANIUM', '#D6D3D1', '#14532D', '#BEF264', '#4ADE80', 'RITUAL_PULSE', 'Fuego de Osario', 'FEAR', 'UNDEAD'],
     ['mano_desenterrada', 'GIGANTES_MANO_DESENTERRADA', 'Mano Desenterrada', 'Falange Colosal Reptante de Cinco Dedos', 'NORMAL', 'ASSASSIN', 'CRAWLING_TITAN_HAND', '#CBD5E1', '#1E293B', '#A3E635', '#34D399', 'SCUTTLE_TWITCH', 'Apretón Sepulcral', 'WEAKENED', 'UNDEAD'],
     ['perro_de_osario', 'GIGANTES_PERRO_OSARIO', 'Perro de Osario', 'Bestia Cuadrúpeda de Costillas Fusionadas', 'NORMAL', 'ASSASSIN', 'GRAVE_RIBCAGE_HOUND', '#A8A29E', '#1F2937', '#84CC16', '#EF4444', 'PREDATOR_CROUCH', 'Fauce de Fémur', 'BLEED', 'UNDEAD'],
     ['titan_decapitado', 'GIGANTES_TITAN_DECAPITADO', 'Titán Decapitado', 'Coloso sin Cabeza con Pilar Funerario', 'ELITE', 'BRUTE', 'HEADLESS_ATLAS_TITAN', '#94A3B8', '#1E293B', '#FACC15', '#A3E635', 'HEAVY_BREATH', 'Impacto de Mausoleo', 'WEAKENED', 'UNDEAD'],
@@ -856,6 +860,178 @@ function getTraitsByGroup(group: CompactEntrySpec[14]): {
 
 export const CRIPTA_BIOME_BESTIARY_BY_SLUG: Record<string, CriptaCreatureVisualBlueprint> = {};
 
+function deriveProfessionAndVisualProfile(
+  slug: string,
+  name: string,
+  dungeonId: CriptaDungeonId,
+  tier: CriptaCreatureVisualBlueprint['tier'],
+  roleTag: CriptaCreatureVisualBlueprint['roleTag'],
+  silhouetteType: CriptaCreatureVisualBlueprint['silhouetteType'],
+  primary: string,
+  secondary: string,
+  highlight: string,
+  eyeGlow: string,
+  traitGroup: CompactEntrySpec[14]
+): { profession: CriptaEnemyProfession; visualProfile: CriptaEnemyVisualProfile } {
+  const s = slug.toLowerCase();
+  const n = name.toLowerCase();
+  let profession: CriptaEnemyProfession = 'GUERRERO';
+
+  if (tier === 'MINIBOSS' || tier === 'FINAL_BOSS' || roleTag === 'BOSS') {
+    profession = 'JEFE';
+  } else if (
+    s === 'esfera_armilar' ||
+    s === 'acolito_de_hueso' ||
+    s === 'dama_de_las_esporas' ||
+    s === 'cantor_de_mareas' ||
+    s === 'chaman_del_totem' ||
+    s === 'craneo_errante' ||
+    s === 'cantor_de_la_nada' ||
+    s === 'bruja_del_invierno' ||
+    n.includes('chamán') ||
+    n.includes('chaman')
+  ) {
+    profession = 'CHAMÁN';
+  } else if (
+    s.includes('alquimista') ||
+    s.includes('homunculo') ||
+    s.includes('piromano') ||
+    s.includes('escarabajo_acido') ||
+    s.includes('capataz_del_grisu')
+  ) {
+    profession = 'ALQUIMISTA';
+  } else if (
+    s.includes('cazador') ||
+    s.includes('arquero') ||
+    s.includes('ballista') ||
+    s.includes('zangano_aguijon') ||
+    s.includes('cuervo')
+  ) {
+    profession = 'TIRADOR';
+  } else if (
+    s.includes('penitente') ||
+    s.includes('flagelante') ||
+    s.includes('herrero') ||
+    s.includes('contrabandista') ||
+    s.includes('jinete')
+  ) {
+    profession = 'BERSERKER';
+  } else if (
+    s.includes('larva_incubadora') ||
+    s.includes('enjambre') ||
+    s.includes('rata_de_peste') ||
+    s.includes('fragmento_resonante')
+  ) {
+    profession = 'INVOCADOR';
+  } else if (
+    s.includes('tejedor') ||
+    s.includes('archivero') ||
+    s.includes('alma_enjaulada') ||
+    s.includes('testigo_ciego') ||
+    s.includes('mascara_plateada') ||
+    s.includes('trampero') ||
+    s.includes('fuego_fatuo')
+  ) {
+    profession = 'CONTROLADOR';
+  } else if (
+    s === 'acolito_del_zodiaco' ||
+    s.includes('guardian') ||
+    s.includes('custodio') ||
+    s.includes('centinela_de_geoda') ||
+    s.includes('carcelero') ||
+    s.includes('alcaide')
+  ) {
+    profession = 'GUARDIÁN';
+  } else if (roleTag === 'TANK') {
+    profession = 'TANQUE';
+  } else if (roleTag === 'HEALER') {
+    profession = 'CURANDERO';
+  } else if (roleTag === 'SUPPORT') {
+    profession = 'SOPORTE';
+  } else if (roleTag === 'CASTER') {
+    profession = 'MAGO';
+  } else if (roleTag === 'ASSASSIN') {
+    profession = 'ASESINO';
+  } else if (roleTag === 'BRUTE') {
+    profession = tier === 'ELITE' ? 'BRUTO' : 'GUERRERO';
+  }
+
+  let ambientEffect: CriptaEnemyVisualProfile['ambientEffect'] = 'NONE';
+  if (profession === 'CHAMÁN') {
+    if (dungeonId === 'torre_del_astrologo') ambientEffect = 'ORBIT_STARS';
+    else if (dungeonId === 'cementerio_de_gigantes') ambientEffect = 'ORBIT_VERTEBRAE';
+    else if (dungeonId === 'jardin_podrido') ambientEffect = 'SPORE_DRIFT';
+    else if (dungeonId === 'fortaleza_goblin') ambientEffect = 'SMOKE_CHARMS';
+    else if (dungeonId === 'templo_sumergido') ambientEffect = 'ABYSSAL_BUBBLES';
+    else if (dungeonId === 'el_abismo') ambientEffect = 'VOID_FRAGMENTS';
+    else ambientEffect = 'RUNE_PULSE';
+  } else if (profession === 'ALQUIMISTA') {
+    ambientEffect = 'ALCHEMICAL_VAPOR';
+  } else if (dungeonId === 'torre_del_astrologo') {
+    ambientEffect = s === 'acolito_del_zodiaco' ? 'ECLIPSE_CORONA' : 'ORBIT_STARS';
+  } else if (dungeonId === 'forja_infernal') {
+    ambientEffect = 'EMBER_SPARKS';
+  } else if (dungeonId === 'cavernas_heladas') {
+    ambientEffect = 'FROST_MIST';
+  } else if (dungeonId === 'santuario_de_sangre') {
+    ambientEffect = 'BLOOD_DROPLETS';
+  } else if (dungeonId === 'el_abismo') {
+    ambientEffect = 'VOID_FRAGMENTS';
+  }
+
+  const silhouetteModifier: CriptaEnemyVisualProfile['silhouetteModifier'] =
+    s === 'acolito_del_zodiaco'
+      ? 'RECTANGULAR_FRAME'
+      : s === 'esfera_armilar'
+      ? 'CELESTIAL_TOTEM'
+      : profession === 'TANQUE' || profession === 'GUARDIÁN'
+      ? 'WIDE_PLANTED'
+      : profession === 'BRUTO' || profession === 'JEFE'
+      ? 'COLOSSAL'
+      : profession === 'ASESINO' || profession === 'TIRADOR'
+      ? 'TALL_LEAN'
+      : 'STANDARD';
+
+  const idleAnimation: CriptaEnemyVisualProfile['idleAnimation'] =
+    profession === 'CHAMÁN' || profession === 'CURANDERO' || profession === 'INVOCADOR'
+      ? 'RITUAL_SWAY'
+      : profession === 'BERSERKER'
+      ? 'BERSERK_TREMOR'
+      : profession === 'ASESINO' || profession === 'TIRADOR'
+      ? 'AGILE_CROUCH'
+      : traitGroup === 'CONSTRUCT'
+      ? 'MECHANICAL_PULSE'
+      : traitGroup === 'SPECTRAL'
+      ? 'FLOAT_BOB'
+      : 'HEAVY_BREATH';
+
+  return {
+    profession,
+    visualProfile: {
+      species: traitGroup,
+      archetype: profession,
+      biome: dungeonId,
+      bodyVariant: silhouetteType,
+      headVariant: `${silhouetteType}_HEAD`,
+      armorVariant: `${profession}_${dungeonId.toUpperCase()}`,
+      weaponVariant: `${profession}_WEAPON`,
+      accessoryVariants: [ambientEffect, silhouetteModifier],
+      accentPalette: {
+        primary,
+        secondary,
+        trim: highlight,
+        glow: eyeGlow,
+        eye: eyeGlow,
+      },
+      idleAnimation,
+      secondaryAnimations: ['WEAPON_SWAY', 'CORE_PULSE', ambientEffect],
+      ambientEffect,
+      combatEffects: [profession],
+      silhouetteModifier,
+    },
+  };
+}
+
 (Object.keys(DUNGEON_CREATURE_SPECS) as CriptaDungeonId[]).forEach((dungeonId) => {
   const list = DUNGEON_CREATURE_SPECS[dungeonId];
   list.forEach((spec) => {
@@ -879,6 +1055,19 @@ export const CRIPTA_BIOME_BESTIARY_BY_SLUG: Record<string, CriptaCreatureVisualB
     const traits = getTraitsByGroup(traitGroup);
     const scaleFactor =
       tier === 'MINIBOSS' ? 1.24 : tier === 'ELITE' ? 1.12 : 1.0;
+    const { profession, visualProfile } = deriveProfessionAndVisualProfile(
+      slug,
+      name,
+      dungeonId,
+      tier,
+      roleTag,
+      silhouetteType,
+      primary,
+      secondary,
+      highlight,
+      eyeGlow,
+      traitGroup
+    );
 
     CRIPTA_BIOME_BESTIARY_BY_SLUG[slug] = {
       id,
@@ -888,6 +1077,8 @@ export const CRIPTA_BIOME_BESTIARY_BY_SLUG: Record<string, CriptaCreatureVisualB
       dungeonId,
       tier,
       roleTag,
+      profession,
+      visualProfile,
       silhouetteType,
       palette: {
         primary,
@@ -962,83 +1153,177 @@ CRIPTA_BIOME_BESTIARY_BY_SLUG['soberano_del_umbral_p2'] = {
 const LEGACY_SLUG_ALIAS_MAP: Record<string, string> = {
   // Catacumbas
   centinela_de_hueso: 'guardian_de_la_cripta',
+  centinela_osario: 'guardian_de_la_cripta',
+  arquero_sepulcral: 'espectro_de_ceniza',
   acolito_sepulcral: 'acolito_de_hueso',
+  acolito_ceniza: 'acolito_de_hueso',
+  campeon_juramentado: 'caballero_tumular',
   senor_del_osario_real: 'senor_del_osario',
+  rey_bajo_el_marmol: 'regente_insepulto',
   // Jardín
   brote_venenoso: 'hongo_errante',
+  huesped_micelio: 'hongo_errante',
   espora_errante: 'mosca_carronera',
+  zarza_estranguladora: 'trepadora_espinosa',
+  jardinero_putrefacto: 'coloso_de_micelio',
   reina_micotica_del_jardin: 'matriarca_fungica',
+  madre_del_micelio: 'matriarca_fungica',
   // Forja
   automa_de_escoria: 'automata_de_escoria',
+  golem_escoria: 'automata_de_escoria',
   forjador_encadenado: 'herrero_de_ceniza',
+  herrador_ciego: 'herrero_de_ceniza',
+  sabueso_brasa: 'salamandra_de_crisol',
+  capataz_del_yunque: 'centurion_piroclasto',
   coloso_de_magma_imperial: 'titan_del_crisol',
+  coloso_de_la_caldera: 'titan_del_crisol',
   // Templo
   siervo_abisal: 'acolito_abisal',
+  sacerdote_salitre: 'acolito_abisal',
   merodeador_de_coral: 'guardian_de_coral',
+  acechador_coral: 'anguila_de_la_sima',
+  ahogado_del_coro: 'cantor_de_mareas',
+  eraldo_de_la_pleamar: 'caballero_ahogado',
   leviatan_del_altar_hundido: 'leviatan_del_altar',
+  leviatan_del_presbiterio: 'leviatan_del_altar',
   // Minas
   excavador_perdido: 'minero_descascarado',
+  minero_sepultado: 'minero_descascarado',
   acechador_de_veta: 'aranuelo_de_filon',
+  escarabajo_veta: 'aranuelo_de_filon',
+  vigia_de_farol: 'excavador_ciego',
+  capataz_de_la_grieta: 'capataz_del_grisu',
   capataz_de_la_veta_negra: 'perforador_profundo',
+  devorador_de_filones: 'devorador_de_vetas',
   // Verdugo
   carcelero_de_hierro: 'carcelero_real',
+  carcelero_encapuchado: 'carcelero_real',
+  mastin_de_hierro: 'sabueso_de_cadenas',
   verdugo_encapuchado: 'penitente_de_hierro',
+  penitente_encadenado: 'penitente_de_hierro',
+  juez_del_cadalso: 'inquisidor_escarlata',
   gran_inquisidor_del_patibulo: 'el_gran_verdugo',
+  gran_verdugo_real: 'el_gran_verdugo',
   // Bosque
   espectro_del_claro: 'sombra_de_las_ramas',
+  sombra_susurrante: 'sombra_de_las_ramas',
   ciervo_de_niebla: 'ciervo_de_osamenta',
+  ciervo_de_hueso: 'ciervo_de_osamenta',
+  lenador_hueco: 'lobo_de_niebla',
+  dama_del_sauce_blanco: 'cazador_espectral',
   ciervo_blanco_de_los_susurros: 'venado_de_la_corona_negra',
+  senor_de_la_asta_palida: 'venado_de_la_corona_negra',
   // Alcantarillas
   rata_de_plaga: 'rata_de_peste',
+  rata_de_alquimia: 'rata_de_peste',
+  contrabandista_infecto: 'contrabandista_mutado',
   masa_corrosiva: 'limo_de_cloaca',
+  rey_de_las_compuertas: 'alquimista_de_los_desagues',
   abominacion_del_canal_real: 'rey_de_las_ratas',
+  abominacion_del_colector: 'hidra_de_residuos',
   // Biblioteca
   archivero_ciego: 'escriba_sin_rostro',
   tomo_viviente: 'grimorio_animado',
+  tomo_voraz: 'grimorio_animado',
+  custodio_de_cera: 'custodio_de_tinta',
+  archivero_del_sello: 'archivero_sellado',
   gran_archivero_del_indice: 'censor_del_silencio',
+  el_lector_eterno: 'devorador_de_nombres',
   // Astrólogo
   tejedor_astral: 'acolito_del_zodiaco',
+  acolito_del_eclipse: 'acolito_del_zodiaco',
   centinela_celeste: 'esfera_armilar',
+  esfera_armilar_chaman: 'esfera_armilar',
+  espectro_cenital: 'homunculo_de_eter',
+  homunculo_astral: 'homunculo_de_eter',
+  centinela_de_laton: 'centinela_de_cometa',
+  cartografo_del_vacio: 'tejedor_de_constelaciones',
+  tejedor_del_vacio: 'tejedor_de_constelaciones',
   oraculo_del_eclipse_eterno: 'arconte_del_cenit',
+  oraculo_del_eclipse: 'arconte_del_cenit',
+  el_gran_astrologo: 'observador_del_infinito',
   // Colmena
   zangano_de_quitina: 'zangano_aguijon',
+  zangano_lancero: 'zangano_aguijon',
   obrera_acida: 'obrera_de_quitina',
+  obrera_quitina: 'obrera_de_quitina',
+  larva_explosiva: 'escarabajo_acido',
+  guardia_real_ambar: 'guardia_pretoriano',
   matriarca_de_la_colmena: 'reina_de_la_progenie',
+  soberana_del_enjambre: 'reina_de_la_progenie',
   // Cristal
   golem_de_cuarzo: 'centinela_de_geoda',
+  golem_cuarzo: 'centinela_de_geoda',
+  esquirla_animada: 'fragmento_resonante',
   espectro_prismatico: 'espectro_de_prisma',
+  espectro_refractado: 'espectro_de_prisma',
+  cantor_de_cristal: 'cantor_de_refraccion',
   arconte_del_prisma_eterno: 'coloso_prismatico',
+  arconte_del_cuarzo: 'serafin_de_cuarzo',
   // Prisión
   espectro_encadenado: 'alma_enjaulada',
+  jaula_andante: 'alma_enjaulada',
   torturador_del_bloque: 'torturador_ciego',
+  vigia_del_panoptico: 'torturador_ciego',
+  carcelero_de_almas: 'alcaide_de_hierro',
   alcaide_de_las_mil_cadenas: 'carcelero_eterno',
+  el_primer_condenado: 'juez_de_las_cadenas',
   // Sangre
   acolito_de_sangre: 'acolito_carmesi',
+  cantor_del_caliz: 'acolito_carmesi',
+  flagelante_carmesi: 'flagelante_del_caliz',
+  sabueso_de_altar: 'murcielago_vampirico',
   caballero_carmesi: 'caballero_de_la_arteria',
+  obispo_desangrado: 'sacerdotisa_hemo',
   cardenal_del_caliz_rojo: 'cardenal_desollado',
+  cardenal_de_la_espina: 'cardenal_desollado',
   // Ciudad Sepultada
   momia_del_desierto: 'guardia_momificado',
   guardian_del_obelisco: 'escarabajo_de_lapislazuli',
+  escorpion_de_bronce: 'escarabajo_de_lapislazuli',
+  sombra_del_obelisk: 'chacal_de_arena',
+  visir_de_ceniza: 'usurpador_dorado',
   faraon_de_las_arenas_negras: 'faraon_sin_sol',
   // Espejos
   reflejo_hostil: 'doble_fragmentado',
   dama_del_espejo: 'dama_de_azogue',
+  bailarina_de_azogue: 'dama_de_azogue',
+  mascara_de_porcelana: 'bufon_de_ilusion',
+  duque_del_azogue: 'duelista_del_reflejo',
   soberana_del_salon_espejado: 'monarca_de_los_reflejos',
+  la_reina_fragmentada: 'monarca_de_los_reflejos',
   // Heladas
   lobo_de_escarcha_legacy: 'lobo_de_escarcha',
+  espectro_ventisca: 'espectro_de_ventisca',
   aparecido_glacial: 'guerrero_congelado',
+  gigante_del_glaciar: 'troll_de_glaciar',
   alfa_de_la_ventisca_eterna: 'behemoth_de_permafrost',
+  wyrm_de_la_escarcha: 'senor_del_alud',
   // Goblin
   saqueador_goblin: 'lancero_chatarra',
+  lancero_saqueador: 'lancero_chatarra',
   piromano_de_empalizada: 'piromano_de_barril',
+  artificiero_goblin: 'piromano_de_barril',
+  domador_de_huargos: 'jinete_de_huargo',
+  caudillo_chatarrero: 'chaman_del_totem',
   gran_caudillo_rompehuesos: 'caudillo_corona_de_hierro',
+  rey_de_la_chatarra: 'caudillo_corona_de_hierro',
   // Gigantes
   coloso_de_hueso: 'esqueleto_colosal',
+  esqueleto_gigante: 'esqueleto_colosal',
+  saqueador_de_medula: 'craneo_errante',
+  cuervo_de_osario: 'mano_desenterrada',
   portador_de_lapida: 'guardian_de_la_fosa',
+  portador_del_femur: 'titan_decapitado',
   titan_del_cementerio_antiguo: 'rey_del_osario',
+  el_ultimo_titan_hueco: 'rey_del_osario',
   // Abismo
   heraldo_del_vacio_legacy: 'heraldo_del_vacio',
+  heraldo_sin_forma: 'heraldo_del_vacio',
   sombra_abisal: 'sombra_devoradora',
+  sombra_del_umbral: 'sombra_devoradora',
+  caballero_del_vacio: 'testigo_ciego',
+  arquitecto_de_la_grieta: 'caballero_del_eclipse',
   senor_del_umbral_abisal: 'el_primer_caido',
 };
 
@@ -1108,9 +1393,22 @@ export function resolveEnemyVisualBlueprint(
     return CRIPTA_BIOME_BESTIARY_BY_SLUG[LEGACY_SLUG_ALIAS_MAP[normName]];
   }
 
+  // Strip appended role suffixes like "_chaman" if needed after checking exact aliases
+  const strippedName = normName.replace(/_chaman$/, '');
+  if (CRIPTA_BIOME_BESTIARY_BY_SLUG[strippedName]) {
+    return CRIPTA_BIOME_BESTIARY_BY_SLUG[strippedName];
+  }
+  if (
+    LEGACY_SLUG_ALIAS_MAP[strippedName] &&
+    CRIPTA_BIOME_BESTIARY_BY_SLUG[LEGACY_SLUG_ALIAS_MAP[strippedName]]
+  ) {
+    return CRIPTA_BIOME_BESTIARY_BY_SLUG[LEGACY_SLUG_ALIAS_MAP[strippedName]];
+  }
+
   // Fuzzy match against bestiary names
   for (const bp of Object.values(CRIPTA_BIOME_BESTIARY_BY_SLUG)) {
-    if (normalizeText(bp.name) === normName) {
+    const bpNorm = normalizeText(bp.name);
+    if (bpNorm === normName || bpNorm === strippedName) {
       return bp;
     }
   }

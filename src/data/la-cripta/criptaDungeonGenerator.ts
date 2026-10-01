@@ -4,6 +4,7 @@ import type {
   CriptaDungeonId,
   CriptaDungeonLengthTier,
   CriptaDungeonRoom,
+  CriptaMinigameFamilyId,
   CriptaRelicId,
   CriptaRoomEnemy,
   CriptaRoomInteractiveOption,
@@ -12,6 +13,10 @@ import type {
   CriptaWeaponId,
 } from '../../types/laCripta';
 import { CRIPTA_DUNGEONS_REGISTRY } from './criptaCatalog';
+import {
+  createAuthoritativeMinigameState,
+  pickNextMinigameFamily,
+} from './criptaMinigames';
 import {
   buildEnemyAiProfileForArchetype,
   createInitialEnemyMemory,
@@ -24,10 +29,12 @@ import { generateShopInventoryForRoom } from './criptaItemsAndRelics';
 import {
   buildRoomEncounterSubjectAndObjects,
   computeEnemyApproxDamageRange,
+  pickMysteriousEventBlueprint,
   pickWeaponDropForDungeon,
 } from './criptaEquipmentAndEvents';
 import {
   CRIPTA_MINIBOSS_ARENAS_REGISTRY,
+  getBiomeBestiaryEntries,
   resolveEnemyVisualBlueprint,
 } from './criptaBiomeBestiary';
 
@@ -405,6 +412,12 @@ const ROOM_TYPE_TITLES: Record<CriptaCanonicalRoomType, string[]> = {
     'Pedestales del Orden Astral',
     'Enigma de las Runas Antiguas',
   ],
+  MINIGAME: [
+    'Cámara de Pruebas del Eclipse',
+    'Mecanismo de los Arquitectos',
+    'Santuario del Acertijo Viviente',
+    'Rueda y Sellos del Umbral',
+  ],
   SECRET: [
     'Sancta Sanctorum Oculto',
     'Cámara Prohibida tras el Muro',
@@ -433,17 +446,29 @@ const ROOM_TYPE_SUBTITLES: Record<CriptaCanonicalRoomType, string> = {
   REST: 'CAMPAMENTO · DESCANSA JUNTO AL FUEGO O REFUERZA EL EQUIPO',
   SHRINE: 'SANTUARIO · OFRECE UN TRIBUTO O RECIBE UNA GRACIA',
   TRAP: 'TRAMPA ACTIVA · DESACTIVA O SUPERA EL MECANISMO',
-  PUZZLE: 'ACERTIJO ARCANO · ACTIVA LAS RUNAS EN EL ORDEN CORRECTO',
+  PUZZLE: 'ACERTIJO ARCANO · RESUELVE EL DESAFÍO INTERACTIVO DE LA CÁMARA',
+  MINIGAME: 'DESAFÍO COOPERATIVO · SUPERA LA PRUEBA DE LA CÁMARA PARA OBTENER BOTÍN',
   SECRET: 'SALA SECRETA DESCUBIERTA · RELIQUIAS OCULTAS DEL REINO',
   MINIBOSS: 'MINIBOSS DE MAZMORRA · DERROTA AL CUSTODIO PARA COMPLETAR ESTA PUERTA',
   BOSS: 'JEFE FINAL DE LA EXPEDICIÓN · EL ENFRENTAMIENTO SUPREMO',
 };
 
-function enrichEnemyInstance(enemy: CriptaRoomEnemy, roomIndex: number): CriptaRoomEnemy {
-  const { roleTag, aiProfile } = buildEnemyAiProfileForArchetype(enemy, roomIndex);
-  return {
+function enrichEnemyInstance(
+  enemy: CriptaRoomEnemy,
+  roomIndex: number,
+  dungeonId?: CriptaDungeonId
+): CriptaRoomEnemy {
+  const bp = resolveEnemyVisualBlueprint(enemy, dungeonId);
+  const withVisuals: CriptaRoomEnemy = {
     ...enemy,
+    profession: enemy.profession || bp.profession || 'GUERRERO',
+    visualProfile: enemy.visualProfile || bp.visualProfile,
+  };
+  const { roleTag, aiProfile, profession } = buildEnemyAiProfileForArchetype(withVisuals, roomIndex);
+  return {
+    ...withVisuals,
     roleTag,
+    profession: profession || withVisuals.profession,
     aiProfile,
     memory: createInitialEnemyMemory(),
     defendingRoundsRemaining: 0,
@@ -453,6 +478,7 @@ function enrichEnemyInstance(enemy: CriptaRoomEnemy, roomIndex: number): CriptaR
     armorBuffBonus: 0,
     armorBuffRounds: 0,
     preparedTelegraphLabel: null,
+    furiaActive: false,
   };
 }
 
@@ -470,23 +496,23 @@ function buildEnemiesForRoom(
     DUNGEON_BIOME_THREAT_PROFILES.catacumbas_del_rey;
   const scaleFactor = 1 + (Math.max(1, playerCount) - 1) * 0.42 + roomIndex * 0.1;
 
+  const bestiaryPool = getBiomeBestiaryEntries(dungeonId);
+
   if (roomType === 'MINIBOSS' || roomType === 'BOSS') {
     const minibossDef =
       DUNGEON_MINIBOSS_REGISTRY[dungeonId] || DUNGEON_MINIBOSS_REGISTRY.catacumbas_del_rey;
-    const bossSlug =
-      roomType === 'BOSS'
-        ? dungeon.bossPool[0] || minibossDef.slug
-        : minibossDef.slug;
-    const blueprint = resolveEnemyVisualBlueprint(
-      {
-        slug: bossSlug,
-        name: minibossDef.name,
-        isMiniboss: roomType === 'MINIBOSS',
-        isBoss: true,
-        isFinalBoss: roomType === 'BOSS',
-      },
-      dungeonId
-    );
+    const blueprint =
+      bestiaryPool.minibosses[roomIndex % Math.max(1, bestiaryPool.minibosses.length)] ||
+      resolveEnemyVisualBlueprint(
+        {
+          slug: minibossDef.slug,
+          name: minibossDef.name,
+          isMiniboss: roomType === 'MINIBOSS',
+          isBoss: true,
+          isFinalBoss: roomType === 'BOSS',
+        },
+        dungeonId
+      );
     const bossMaxHp = Math.round(96 * scaleFactor);
     const baseAtk = Math.round(13 + roomIndex * 1.15);
     return [
@@ -495,7 +521,9 @@ function buildEnemiesForRoom(
           id: `enemy_miniboss_${roomIndex}_0`,
           slug: blueprint.slug,
           name: blueprint.name || minibossDef.name,
-          title: `MINIBOSS · ${blueprint.title}`,
+          title: `${ blueprint.profession || 'JEFE' } · ${blueprint.title}`,
+          profession: blueprint.profession || 'JEFE',
+          visualProfile: blueprint.visualProfile,
           isElite: false,
           isMiniboss: true,
           isBoss: true,
@@ -515,22 +543,17 @@ function buildEnemiesForRoom(
           abilityName: blueprint.signatureMoveName || minibossDef.signatureMoveName,
           spriteArchetype: config.spriteArchetype,
         },
-        roomIndex
+        roomIndex,
+        dungeonId
       ),
     ];
   }
 
   if (roomType === 'ELITE') {
-    const eliteSlug =
-      dungeon.elitePool[Math.floor(rng() * dungeon.elitePool.length)] || 'campeon_maldito';
-    const blueprint = resolveEnemyVisualBlueprint(
-      {
-        slug: eliteSlug,
-        name: formatSlugTitle(eliteSlug),
-        isElite: true,
-      },
-      dungeonId
-    );
+    const blueprint =
+      bestiaryPool.elites[Math.floor(rng() * Math.max(1, bestiaryPool.elites.length))] ||
+      bestiaryPool.elites[0] ||
+      bestiaryPool.normals[0];
     const eliteMaxHp = Math.round(62 * scaleFactor);
     return [
       enrichEnemyInstance(
@@ -538,7 +561,9 @@ function buildEnemiesForRoom(
           id: `enemy_elite_${roomIndex}_0`,
           slug: blueprint.slug,
           name: blueprint.name,
-          title: `ÉLITE · ${blueprint.title}`,
+          title: `ÉLITE · ${blueprint.profession || 'CAMPEÓN'} · ${blueprint.title}`,
+          profession: blueprint.profession,
+          visualProfile: blueprint.visualProfile,
           isElite: true,
           isBoss: false,
           hp: eliteMaxHp,
@@ -554,47 +579,52 @@ function buildEnemiesForRoom(
           abilityName: blueprint.signatureMoveName || threatProfile.enemyAbilityLabel,
           spriteArchetype: config.spriteArchetype,
         },
-        roomIndex
+        roomIndex,
+        dungeonId
       ),
     ];
   }
 
   // COMBAT: 1 to 2 enemies in solo, 2 to 3 enemies in multiplayer
-  // Every enemy in the room picks a DISTINCT canonical creature from dungeon.enemyPool
-  // so no two enemies in an encounter share the same sprite or role!
+  // Every enemy in the room picks a DISTINCT canonical creature from the biome's 4 normal creatures
+  // so no two enemies in an encounter ever share the same canonical name, sprite, or role!
   const count = playerCount <= 1 ? (rng() > 0.45 ? 2 : 1) : rng() > 0.55 ? 3 : 2;
-  const pool =
-    dungeon.enemyPool.length > 0 ? [...dungeon.enemyPool] : ['centinela_de_cripta'];
-  const pickedSlugs: string[] = [];
+  const canonicalNormals = bestiaryPool.normals;
+  const pickedBlueprints: typeof canonicalNormals = [];
 
   for (let i = 0; i < count; i++) {
-    // Rotate through the biome's 5 canonical enemies without repeating in the same room
-    const candidateIdx = (roomIndex * 2 + i) % pool.length;
-    let candidate = pool[candidateIdx];
-    if (pickedSlugs.includes(candidate)) {
-      const unused = pool.find((s) => !pickedSlugs.includes(s));
+    const candidateIdx = (roomIndex * 2 + i) % Math.max(1, canonicalNormals.length);
+    let candidate = canonicalNormals[candidateIdx];
+    if (pickedBlueprints.some((b) => b.slug === candidate.slug)) {
+      const unused = canonicalNormals.find(
+        (b) => !pickedBlueprints.some((p) => p.slug === b.slug)
+      );
       if (unused) candidate = unused;
     }
-    pickedSlugs.push(candidate);
+    if (candidate) {
+      pickedBlueprints.push(candidate);
+    }
   }
 
   const enemies: CriptaRoomEnemy[] = [];
-  for (let i = 0; i < pickedSlugs.length; i++) {
-    const rawSlug = pickedSlugs[i];
-    const blueprint = resolveEnemyVisualBlueprint(
-      {
-        slug: rawSlug,
-        name: formatSlugTitle(rawSlug),
-      },
-      dungeonId
-    );
+  for (let i = 0; i < pickedBlueprints.length; i++) {
+    const blueprint = pickedBlueprints[i];
+    const prof = blueprint.profession || 'GUERRERO';
 
     const isTankOrBrute =
-      blueprint.roleTag === 'TANK' || blueprint.roleTag === 'BRUTE';
+      prof === 'TANQUE' ||
+      prof === 'GUARDIÁN' ||
+      prof === 'BRUTO' ||
+      blueprint.roleTag === 'TANK' ||
+      blueprint.roleTag === 'BRUTE';
     const isCasterOrHealer =
-      blueprint.roleTag === 'CASTER' ||
-      blueprint.roleTag === 'HEALER' ||
-      blueprint.roleTag === 'SUPPORT';
+      prof === 'CHAMÁN' ||
+      prof === 'MAGO' ||
+      prof === 'CURANDERO' ||
+      prof === 'CONTROLADOR' ||
+      prof === 'INVOCADOR' ||
+      prof === 'ALQUIMISTA' ||
+      prof === 'SOPORTE';
 
     const baseHp = count === 1 ? 38 : count === 2 ? 26 : 22;
     const roleHpMod = isTankOrBrute ? 1.18 : isCasterOrHealer ? 0.88 : 1.0;
@@ -617,7 +647,9 @@ function buildEnemiesForRoom(
           id: `enemy_${roomIndex}_${i}`,
           slug: blueprint.slug,
           name: blueprint.name,
-          title: blueprint.title,
+          title: `${prof} · ${blueprint.title}`,
+          profession: prof,
+          visualProfile: blueprint.visualProfile,
           isElite: false,
           isBoss: false,
           hp: maxHp,
@@ -634,7 +666,8 @@ function buildEnemiesForRoom(
           abilityName: blueprint.signatureMoveName || threatProfile.enemyAbilityLabel,
           spriteArchetype: config.spriteArchetype,
         },
-        roomIndex + i
+        roomIndex + i,
+        dungeonId
       )
     );
   }
@@ -844,18 +877,22 @@ function buildInteractiveOptionsForRoom(
         },
       ];
 
-    case 'EVENT':
+    case 'EVENT': {
+      const evBlueprint = pickMysteriousEventBlueprint(dungeonId, roomIndex);
+      const isSubmergeWeapon = evBlueprint.respectLabel.includes('SUMERGIR EL ARMA');
+      const isRepairArmor = evBlueprint.respectLabel.includes('REPARAR ARMADURA');
       return [
         {
           id: `opt_${roomIndex}_event_inspect`,
-          label: `DESCIFRAR SELLO DE ${eventName.toUpperCase()}`,
-          subtitle: 'Examinar el encuentro mediante conocimiento arcano o alquímico',
-          effectText: '+28 ORO · +1 MAGIA · +12 VIDA Y OTORGA BENDECIDO (2 TURNOS)',
+          eventId: evBlueprint.eventId,
+          label: evBlueprint.inspectLabel,
+          subtitle: evBlueprint.inspectSubtitle,
+          effectText: '+30 ORO · +1 MAGIA · +12 VIDA Y BENDECIDO (3T)',
           recommendedClass: 'mago',
           recommendedStat: 'MAGIA',
           recommendedStatLevel: 7,
           riskLabel: 'PARECE SEGURO',
-          ownershipScope: 'PERSONAL',
+          ownershipScope: 'GRUPO',
           grantsAccessoryId: roomIndex % 2 === 0 ? 'colgante_de_cristal' : 'anillo_del_boticario',
           iconKey: 'rune',
           usedByPlayerIds: [],
@@ -863,25 +900,33 @@ function buildInteractiveOptionsForRoom(
         },
         {
           id: `opt_${roomIndex}_event_respect`,
-          label: 'RECLAMAR EL ACERO DEL PEDESTAL',
-          subtitle: 'Romper el sello marcial y tomar el armamento consagrado',
-          effectText: 'EQUIPA ARMA NUEVA DE CLASE · +1 ATAQUE Y ESCUDO DE COMBATE',
+          eventId: evBlueprint.eventId,
+          label: evBlueprint.respectLabel.trim(),
+          subtitle: evBlueprint.respectSubtitle,
+          effectText: isSubmergeWeapon
+            ? 'TEMPLA TU ARMA EQUIPADA (+NIVEL) · +20 VIDA · +2 ARMADURA Y PURIFICA'
+            : isRepairArmor
+            ? 'REPARA Y EQUIPA CORAZA · +20 VIDA · +2 ARMADURA Y PURIFICA'
+            : 'EQUIPA ARMA DE CLASE · +20 VIDA · +2 ARMADURA Y PURIFICA',
           isReviveOption: false,
-          grantsWeaponId: droppedWeaponId,
+          isWeaponUpgradeOption: isSubmergeWeapon,
+          grantsWeaponId: isSubmergeWeapon || isRepairArmor ? undefined : droppedWeaponId,
+          grantsArmorId: isRepairArmor ? 'placas_del_juramento' : undefined,
           recommendedClass: 'caballero',
           recommendedStat: 'ATAQUE',
           recommendedStatLevel: 6,
           riskLabel: 'ARRIESGADO',
-          ownershipScope: 'EXPEDICIÓN',
+          ownershipScope: isSubmergeWeapon || isRepairArmor ? 'PERSONAL' : 'EXPEDICIÓN',
           iconKey: 'sword',
           usedByPlayerIds: [],
           resolved: false,
         },
         {
           id: `opt_${roomIndex}_event_abandon`,
-          label: 'ACTUAR CON CAUTELA Y RETIRARSE',
-          subtitle: 'Evitar riesgos innecesarios y conservar las fuerzas del grupo',
-          effectText: '+12 ORO · PASO DESPEJADO SIN RIESGO DE MALDICIÓN',
+          eventId: evBlueprint.eventId,
+          label: evBlueprint.cautionLabel,
+          subtitle: evBlueprint.cautionSubtitle,
+          effectText: '+12 ORO · PASO DESPEJADO SIN RIESGO',
           riskLabel: 'PARECE SEGURO',
           ownershipScope: 'GRUPO',
           iconKey: 'shield',
@@ -889,6 +934,7 @@ function buildInteractiveOptionsForRoom(
           resolved: false,
         },
       ];
+    }
 
     case 'DECISION':
       return [
@@ -954,87 +1000,28 @@ function buildRoomMinigameForRoom(
   roomType: CriptaCanonicalRoomType,
   roomIndex: number,
   rng: () => number,
-  droppedWeaponId: CriptaWeaponId
+  droppedWeaponId: CriptaWeaponId,
+  recentFamilies: CriptaMinigameFamilyId[]
 ): CriptaRoomMinigameState | undefined {
-  const p0 = Math.floor(rng() * 4) % 4;
-  const p1 = (p0 + 1 + (Math.floor(rng() * 3) % 3)) % 4;
-  const p2 = (p1 + 1 + (Math.floor(rng() * 3) % 3)) % 4;
-
-  if (roomType === 'PUZZLE') {
-    const runeClue = `${RUNES_ORDER_NAMES[p0]} → ${RUNES_ORDER_NAMES[p1]} → ${RUNES_ORDER_NAMES[p2]}`;
-    return {
-      kind: 'RUNE_MEMORY',
-      title: 'OBELISCO DE MEMORIA RÚNICA',
-      instructions: `Inscripción del Altar: "${runeClue}". Pulsa los 4 glifos en el orden exacto para desbloquear la reliquia.`,
-      completed: false,
-      failed: false,
-      step: 0,
-      maxSteps: 3,
-      attemptsLeft: 2,
-      targetPattern: [p0, p1, p2],
-      currentProgress: [],
-      rewardGold: 36,
-    };
-  }
-
-  if (roomType === 'TREASURE') {
-    const sweetSpot0 = 1 + (Math.floor(rng() * 3) % 3); // 1..3
-    const sweetSpot1 = 1 + ((sweetSpot0 + 1) % 3);
-    const sweetSpot2 = 1 + ((sweetSpot1 + 1) % 3);
-    return {
-      kind: 'LOCKPICK_TUMBLER',
-      title: 'CERROJO MAESTRO DE TRES PERNOS',
-      instructions:
-        'Alinea los 3 pernos del cofre deteniendo el tensor en la Zona Dorada para obtener Botín Maestro (+Reliquia y +Arma de Clase).',
-      completed: false,
-      failed: false,
-      step: 0,
-      maxSteps: 3,
-      attemptsLeft: 2,
-      targetPattern: [sweetSpot0, sweetSpot1, sweetSpot2],
-      currentProgress: [],
-      rewardGold: 45,
-      rewardWeaponId: droppedWeaponId,
-    };
-  }
-
-  if (roomType === 'TRAP') {
-    const safeTile0 = Math.floor(rng() * 3) % 3;
-    const safeTile1 = (safeTile0 + 1 + (roomIndex % 2)) % 3;
-    const safeTile2 = (safeTile1 + 1) % 3;
-    return {
-      kind: 'TRAP_STEPPING_STONES',
-      title: 'PASO DE LOSAS DE PRESIÓN',
-      instructions: `Pista de losas grabadas: Columna ${safeTile0 + 1} → Columna ${
-        safeTile1 + 1
-      } → Columna ${safeTile2 + 1}. Cruza los 3 tramos sin activar las cuchillas.`,
-      completed: false,
-      failed: false,
-      step: 0,
-      maxSteps: 3,
-      attemptsLeft: 2,
-      targetPattern: [safeTile0, safeTile1, safeTile2],
-      currentProgress: [],
-      rewardGold: 30,
-    };
-  }
-
-  if (roomType === 'EVENT' || roomType === 'SHRINE') {
-    return {
-      kind: 'SOUL_WHEEL',
-      title: 'RUEDA DEL CÁLIZ ABISAL',
-      instructions:
-        'Haz girar la Rueda de las Ánimas y detenla en el Sello Dorado para reclamar una bendición mayor o reliquia.',
-      completed: false,
-      failed: false,
-      step: 0,
-      maxSteps: 1,
-      attemptsLeft: 1,
-      targetPattern: [dungeonId.length % 4],
-      currentProgress: [],
-      rewardGold: 35,
-      rewardWeaponId: droppedWeaponId,
-    };
+  if (
+    roomType === 'PUZZLE' ||
+    roomType === 'MINIGAME' ||
+    roomType === 'TRAP'
+  ) {
+    const chosenFamily = pickNextMinigameFamily(
+      dungeonId,
+      roomIndex,
+      rng,
+      recentFamilies
+    );
+    recentFamilies.push(chosenFamily);
+    return createAuthoritativeMinigameState(
+      chosenFamily,
+      dungeonId,
+      roomIndex,
+      rng,
+      droppedWeaponId
+    );
   }
 
   return undefined;
@@ -1111,7 +1098,7 @@ export function generateProceduralDungeon(
     // Determine candidate pool for early vs mid rooms
     const isEarly = i < Math.ceil(totalRooms * 0.36);
     const allowedTypes: CriptaCanonicalRoomType[] = isEarly
-      ? ['COMBAT', 'LOOT', 'EVENT', 'TRAP', 'DECISION']
+      ? ['COMBAT', 'LOOT', 'EVENT', 'MINIGAME', 'DECISION']
       : [
           'COMBAT',
           'ELITE',
@@ -1124,15 +1111,17 @@ export function generateProceduralDungeon(
           'SHRINE',
           'TRAP',
           'PUZZLE',
+          'MINIGAME',
         ];
 
     // Enforce anti-repetition rules
     const filtered = allowedTypes.filter((candidate) => {
-      // Never 2 SHOP or 2 REST or 2 PUZZLE or 2 ELITE back-to-back
+      // Never 2 SHOP or 2 REST or 2 PUZZLE or 2 MINIGAME or 2 ELITE back-to-back
       if (
         (candidate === 'SHOP' ||
           candidate === 'REST' ||
           candidate === 'PUZZLE' ||
+          candidate === 'MINIGAME' ||
           candidate === 'ELITE' ||
           candidate === 'SHRINE') &&
         prev1 === candidate
@@ -1154,7 +1143,7 @@ export function generateProceduralDungeon(
 
     const weightedPool = filtered.map((t) => ({
       type: t,
-      weight: config.weights[t] ?? 10,
+      weight: t === 'MINIGAME' ? 16 : config.weights[t] ?? 10,
     }));
     const sumWeights = weightedPool.reduce((acc, item) => acc + item.weight, 0);
     let r = rng() * sumWeights;
@@ -1169,8 +1158,18 @@ export function generateProceduralDungeon(
     roomTypes.push(selected);
   }
 
+  // Guarantee at least 1 interactive MINIGAME or PUZZLE room in every dungeon
+  const hasMinigameRoom = roomTypes.some(
+    (rt) => rt === 'MINIGAME' || rt === 'PUZZLE'
+  );
+  if (!hasMinigameRoom && totalRooms >= 4) {
+    const targetSlot = Math.max(1, Math.min(totalRooms - 3, Math.floor(totalRooms / 2)));
+    roomTypes[targetSlot] = 'MINIGAME';
+  }
+
   // Pick one mid-dungeon room to host a subtle secret room trigger
   const secretHostIndex = Math.max(1, Math.min(totalRooms - 2, Math.floor(totalRooms * 0.5)));
+  const recentMinigameFamilies: CriptaMinigameFamilyId[] = [];
 
   const rooms: CriptaDungeonRoom[] = roomTypes.map((rType, idx) => {
     const isFirst = idx === 0;
@@ -1188,7 +1187,11 @@ export function generateProceduralDungeon(
       ? buildEnemiesForRoom(dungeonId, rType, idx, playerCount, rng)
       : [];
     const options =
-      !isCombatLike && rType !== 'PUZZLE' && rType !== 'SHOP'
+      !isCombatLike &&
+      rType !== 'PUZZLE' &&
+      rType !== 'MINIGAME' &&
+      rType !== 'TRAP' &&
+      rType !== 'SHOP'
         ? buildInteractiveOptionsForRoom(dungeonId, rType, idx, rng)
         : [];
     const shopInventory =
@@ -1216,7 +1219,8 @@ export function generateProceduralDungeon(
       rType,
       idx,
       rng,
-      roomDroppedWeaponId
+      roomDroppedWeaponId,
+      recentMinigameFamilies
     );
 
     // 3-rune sequence for PUZZLE rooms (matching RUNE_MEMORY minigame pattern)
@@ -1262,10 +1266,20 @@ export function generateProceduralDungeon(
       title:
         rType === 'MINIBOSS' || rType === 'BOSS'
           ? minibossArena.arenaTitle
+          : (rType === 'PUZZLE' || rType === 'MINIGAME' || rType === 'TRAP') &&
+            minigame?.title
+          ? minigame.title
+          : rType === 'EVENT' && encounterSubject?.name
+          ? encounterSubject.name
           : specificTitle,
       subtitle:
         rType === 'MINIBOSS' || rType === 'BOSS'
           ? `${minibossArena.arenaSubtitle} · CUSTODIO: ${minibossEnemyName.toUpperCase()}`
+          : (rType === 'PUZZLE' || rType === 'MINIGAME' || rType === 'TRAP') &&
+            minigame?.subtitle
+          ? minigame.subtitle
+          : rType === 'EVENT' && encounterSubject?.roleSubtitle
+          ? encounterSubject.roleSubtitle
           : ROOM_TYPE_SUBTITLES[rType],
       narrative:
         idx === 0
@@ -1274,6 +1288,8 @@ export function generateProceduralDungeon(
           ? `${minibossArena.arenaTitle}: ${minibossEnemyName} aguarda en el santuario final de ${dungeon.name}. Derrotadlo para sellar esta puerta.`
           : rType === 'BOSS'
           ? `La cámara final de ${dungeon.name} tiembla ante la presencia de su guardián supremo.`
+          : rType === 'EVENT' && encounterSubject?.dialogueQuote
+          ? `${encounterSubject.name}: ${encounterSubject.dialogueQuote}`
           : `Sala ${idx + 1} de ${dungeon.name} (${dungeon.environmentModifiers.join(' · ')}).`,
       outcomeLog: null,
       biomeVariant: idx % 4,

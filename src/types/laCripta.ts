@@ -40,11 +40,16 @@ export interface CriptaAbilityPlaceholder {
   apCost?: number;
   dealsDamage?: boolean;
   healsParty?: boolean;
+  healsSelfOrParty?: boolean;
+  healAmount?: number;
   power?: number;
   shieldBonus?: number;
+  shieldGrant?: number;
+  purifyCount?: number;
   armorBreak?: number;
   statusToApply?: CriptaStatusEffectType;
   statusStacks?: number;
+  statusTurns?: number;
   cleansesNegativeStatus?: boolean;
   description: string;
   cooldownTurns?: number;
@@ -149,6 +154,7 @@ export interface CriptaDungeonDefinition {
   name: string;
   subtitle: string;
   description: string;
+  biomeTag?: string;
   palette: CriptaDungeonPalette;
   dangerProfile: {
     tier: 'MODERADO' | 'ALTO' | 'SEVERO' | 'EXTREMO';
@@ -186,6 +192,7 @@ export type CriptaRoomNodeType =
   | 'SHRINE'
   | 'TRAP'
   | 'PUZZLE'
+  | 'MINIGAME'
   | 'SECRET'
   | 'MINIBOSS'
   | 'BOSS'
@@ -204,6 +211,7 @@ export type CriptaCanonicalRoomType =
   | 'SHRINE'
   | 'TRAP'
   | 'PUZZLE'
+  | 'MINIGAME'
   | 'SECRET'
   | 'MINIBOSS'
   | 'BOSS';
@@ -212,10 +220,25 @@ export type CriptaRoomLifecyclePhase =
   | 'ENTERING'
   | 'ACTIVE'
   | 'RESOLVING'
+  | 'REWARD_PENDING'
+  | 'REWARD_ANIMATING'
   | 'REWARDING'
   | 'SETTLING'
   | 'READY_TO_LEAVE'
-  | 'TRANSITIONING_OUT';
+  | 'EXITING'
+  | 'TRANSITIONING_OUT'
+  | 'COMPLETE';
+
+export type CriptaRunPhase =
+  | 'LOBBY'
+  | 'DOOR_SELECTION'
+  | 'ENTERING_DUNGEON'
+  | 'DUNGEON_1'
+  | 'DUNGEON_2'
+  | 'DUNGEON_3'
+  | 'DUNGEON_COMPLETE'
+  | 'MAJOR_BOSS'
+  | 'RUN_END';
 
 export type CriptaDungeonLengthTier = 'CORTA' | 'MEDIA' | 'LARGA' | 'PROFUNDA';
 
@@ -227,25 +250,84 @@ export type CriptaRoomState =
   | 'SKIPPED';
 
 export type CriptaStatusEffectType =
+  // Negative / DoT / Debuff / Control (15)
   | 'POISON'
   | 'BURN'
   | 'BLEED'
   | 'CONFUSION'
+  | 'FEAR'
+  | 'VULNERABLE'
+  | 'MARKED'
+  | 'BLINDED'
+  | 'SILENCED'
+  | 'STUNNED'
   | 'FROST'
   | 'CURSE'
-  | 'FEAR'
+  | 'CORROSION'
   | 'WEAKENED'
-  | 'MARKED'
-  | 'BLESSED'
+  | 'SLOW'
+  // Positive / Buff / Defensive / Utility (16)
   | 'SHIELDED'
+  | 'ARMORED'
   | 'REGENERATION'
-  | 'TORCH_LIGHT';
+  | 'BLESSED'
+  | 'STRENGTHENED'
+  | 'HASTE'
+  | 'PRECISION'
+  | 'CRIT_BOOST'
+  | 'RESISTANCE'
+  | 'COUNTER'
+  | 'TAUNT'
+  | 'IMMUNITY'
+  | 'INSPIRATION'
+  | 'MAGIC_BARRIER'
+  | 'STEALTH'
+  | 'TORCH_LIGHT'
+  // Special / Boss Mystery Effect
+  | 'ECLIPSE_DOOM';
 
 export type CriptaStatusCategory =
   | 'DAMAGE_OVER_TIME'
   | 'CONTROL'
   | 'DEBUFF'
-  | 'BUFF';
+  | 'BUFF'
+  | 'NEGATIVE_STATUS'
+  | 'POSITIVE_STATUS'
+  | 'DEFENSIVE_EFFECT'
+  | 'CONTROL_EFFECT'
+  | 'SPECIAL_BOSS_EFFECT';
+
+export interface CriptaStatusCatalogEntry {
+  id: CriptaStatusEffectType;
+  category:
+    | 'NEGATIVE_STATUS'
+    | 'POSITIVE_STATUS'
+    | 'BUFF'
+    | 'DEBUFF'
+    | 'DEFENSIVE_EFFECT'
+    | 'CONTROL_EFFECT'
+    | 'SPECIAL_BOSS_EFFECT';
+  codexTab: 'POSITIVOS' | 'NEGATIVOS' | 'CONTROL' | 'ESPECIALES';
+  displayName: string;
+  code: string;
+  shortDescription: string;
+  fullDescription: string;
+  iconDefinition: string;
+  positiveOrNegative: 'POSITIVE' | 'NEGATIVE' | 'SPECIAL';
+  stackable: boolean;
+  maxStacks: number;
+  defaultDurationType: 'TURN_END' | 'ACTION_TRIGGER' | 'EXPEDITION';
+  defaultTurns: number;
+  visualAccent: {
+    color: string;
+    borderColor: string;
+    bgTint: string;
+  };
+  combatBehaviorReference: string;
+  stackingRuleText: string;
+  removalRuleText: string;
+  isBossMysteryUntilSeen?: boolean;
+}
 
 export interface CriptaStatusEffectDefinition {
   id: CriptaStatusEffectType;
@@ -254,20 +336,8 @@ export interface CriptaStatusEffectDefinition {
   category: CriptaStatusCategory;
   type: 'buff' | 'debuff' | 'relic';
   description: string;
-  icon:
-    | 'poison'
-    | 'burn'
-    | 'bleed'
-    | 'confusion'
-    | 'frost'
-    | 'curse'
-    | 'fear'
-    | 'weakened'
-    | 'marked'
-    | 'blessed'
-    | 'shielded'
-    | 'regeneration'
-    | 'torch';
+  shortDescription?: string;
+  icon: string;
   stackRule: 'REFRESH' | 'STACK_INTENSITY' | 'EXTEND_DURATION';
   maxStacks: number;
   defaultTurns: number;
@@ -287,11 +357,79 @@ export interface CriptaPlayerStatusEffect {
   code: string;
   type: 'buff' | 'debuff' | 'relic';
   sourceId?: string;
+  sourceName?: string;
   targetPlayerId?: string;
   remainingTurns: number;
   stacks: number;
   potency: number;
   appliedAtTurn: number;
+}
+
+export type CriptaEnemyProfession =
+  | 'GUERRERO'
+  | 'TANQUE'
+  | 'BRUTO'
+  | 'ASESINO'
+  | 'TIRADOR'
+  | 'CHAMÁN'
+  | 'MAGO'
+  | 'CURANDERO'
+  | 'CONTROLADOR'
+  | 'INVOCADOR'
+  | 'SOPORTE'
+  | 'ALQUIMISTA'
+  | 'BERSERKER'
+  | 'GUARDIÁN'
+  | 'JEFE';
+
+export interface CriptaEnemyVisualProfile {
+  species: string;
+  archetype: CriptaEnemyProfession;
+  biome: CriptaDungeonId;
+  bodyVariant: string;
+  headVariant: string;
+  armorVariant: string;
+  weaponVariant: string;
+  accessoryVariants: string[];
+  accentPalette: {
+    primary: string;
+    secondary: string;
+    trim: string;
+    glow: string;
+    eye: string;
+  };
+  idleAnimation:
+    | 'HEAVY_BREATH'
+    | 'FLOAT_BOB'
+    | 'RITUAL_SWAY'
+    | 'AGILE_CROUCH'
+    | 'MECHANICAL_PULSE'
+    | 'BERSERK_TREMOR';
+  secondaryAnimations: string[];
+  ambientEffect:
+    | 'ORBIT_STARS'
+    | 'ORBIT_VERTEBRAE'
+    | 'SPORE_DRIFT'
+    | 'SMOKE_CHARMS'
+    | 'ABYSSAL_BUBBLES'
+    | 'VOID_FRAGMENTS'
+    | 'RUNE_PULSE'
+    | 'ALCHEMICAL_VAPOR'
+    | 'EMBER_SPARKS'
+    | 'FROST_MIST'
+    | 'BLOOD_DROPLETS'
+    | 'ECLIPSE_CORONA'
+    | 'NONE';
+  combatEffects: string[];
+  silhouetteModifier:
+    | 'COMPACT'
+    | 'TALL_LEAN'
+    | 'WIDE_PLANTED'
+    | 'COLOSSAL'
+    | 'RECTANGULAR_FRAME'
+    | 'CELESTIAL_TOTEM'
+    | 'ASYMMETRIC_HULK'
+    | 'STANDARD';
 }
 
 export type CriptaEnemyAiPersonality =
@@ -408,6 +546,8 @@ export type CriptaActionCategory =
 export type CriptaActionTargetRule =
   | 'ENEMY_SINGLE'
   | 'ENEMY_MULTI'
+  | 'CLEAVE_2'
+  | 'CHAIN_2'
   | 'ALL_ENEMIES'
   | 'SELF'
   | 'ALLY_SINGLE'
@@ -470,6 +610,71 @@ export type CriptaWeaponFamily =
   | 'HALBERD'
   | 'RELIC_TOME';
 
+export type CriptaDamageType =
+  | 'FISICO'
+  | 'CONTUNDENTE'
+  | 'PERFORANTE'
+  | 'SAGRADO'
+  | 'MAGICO'
+  | 'FUEGO'
+  | 'HIELO'
+  | 'ALQUIMICO'
+  | 'VENENO'
+  | 'SOMBRA'
+  | 'ASTRAL';
+
+export type CriptaWeaponRuneId =
+  | 'runa_brasa_infernal'
+  | 'runa_escarcha_permafrost'
+  | 'runa_luz_consagrada'
+  | 'runa_plomo_contundente'
+  | 'runa_toxina_abisal'
+  | 'runa_vacio_umbrio'
+  | 'runa_aguja_perforante'
+  | 'runa_resonancia_astral';
+
+export interface CriptaWeaponRuneDefinition {
+  id: CriptaWeaponRuneId;
+  name: string;
+  subtitle: string;
+  rarity: 'UNCOMMON' | 'RARE' | 'LEGENDARY';
+  infusedDamageType: CriptaDamageType;
+  secondaryDamageType?: CriptaDamageType;
+  benefitText: string;
+  tradeoffText: string;
+  iconKind?:
+    | 'rune_fire'
+    | 'rune_ice'
+    | 'rune_poison'
+    | 'rune_holy'
+    | 'rune_blunt'
+    | 'rune_pierce'
+    | 'rune_blood'
+    | 'rune_shadow'
+    | 'rune_astral';
+  damageMultiplierDelta?: number;
+  critBonusDeltaPct?: number;
+  armorPierceBonus?: number;
+  bonusAttackDelta?: number;
+  bonusDefenseDelta?: number;
+  bonusMagicDelta?: number;
+  maxHpPenalty?: number;
+  specialCooldownDelta?: number;
+  specialHpCost?: number;
+  specialHealParty?: number;
+  executeBonusPctVsHalfHp?: number;
+  extraPoisonStacksOnHit?: number;
+  selfRecoilHpOnAttack?: number;
+  onHitDrainHp?: number;
+  onHitStatus?: CriptaStatusEffectType;
+  onCritStatus?: CriptaStatusEffectType;
+  disablesBleedAndPoison?: boolean;
+  heavyArmorNonCritPenaltyPct?: number;
+  magicScalingBonusPct?: number;
+  basePriceGold: number;
+  accentColor: string;
+}
+
 export interface CriptaWeaponSpecialAttack {
   id: string;
   name: string;
@@ -483,8 +688,12 @@ export interface CriptaWeaponSpecialAttack {
   secondaryMultiplier?: number;
   appliesStatus?: CriptaStatusEffectType;
   statusStacks?: number;
+  poisonStacks?: number;
+  vulnerableTurns?: number;
   partyHealBase?: number;
   partyShieldBase?: number;
+  shieldGrant?: number;
+  purifyCount?: number;
   armorPierce?: number;
   armorBreak?: number;
   lifestealFraction?: number;
@@ -498,6 +707,9 @@ export interface CriptaWeaponDefinition {
   rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'LEGENDARY';
   preferredClasses: CriptaCharacterId[];
   scalingStat: 'ATAQUE' | 'MAGIA';
+  baseDamageType?: CriptaDamageType;
+  secondaryDamageType?: CriptaDamageType;
+  weaponArchetypeLabel?: string;
   baseMinDamage: number;
   baseMaxDamage: number;
   bonusAttack?: number;
@@ -583,6 +795,7 @@ export type CriptaRoomEnemy = {
   maxHp: number;
   attack: number;
   armor: number;
+  defense?: number;
   intent:
     | 'ATAQUE'
     | 'GUARDIA'
@@ -604,6 +817,9 @@ export type CriptaRoomEnemy = {
   poisonStacks?: number;
   vulnerableTurns?: number;
   roleTag?: 'TANK' | 'HEALER' | 'CASTER' | 'ASSASSIN' | 'BRUTE' | 'SWARM' | 'SUPPORT' | 'BOSS';
+  profession?: CriptaEnemyProfession;
+  visualProfile?: CriptaEnemyVisualProfile;
+  furiaActive?: boolean;
   aiProfile?: CriptaEnemyAiProfile;
   memory?: CriptaEnemyMemory;
   isDefending?: boolean;
@@ -623,6 +839,8 @@ export type CriptaRoomEnemy = {
   healUsesRemaining?: number;
   healCooldownRounds?: number;
   totalHealedThisCombat?: number;
+  totalHealsUsedThisCombat?: number;
+  totalHpHealedThisCombat?: number;
   counterStanceActive?: boolean;
   spriteArchetype:
     | 'skeleton_warrior'
@@ -745,9 +963,18 @@ export interface CriptaAcquiredRelic {
 
 export interface CriptaRoomGroundDrop {
   id: string;
-  kind: 'ITEM' | 'RELIC';
+  dropId?: string;
+  kind: 'ITEM' | 'RELIC' | 'WEAPON' | 'ARMOR' | 'ACCESSORY' | 'WEAPON_RUNE' | 'GOLD';
+  type?: 'ITEM' | 'RELIC_PEDESTAL' | 'GOLD_POUCH' | 'WEAPON' | 'ARMOR' | 'ACCESSORY' | 'WEAPON_RUNE';
+  label?: string;
   itemId?: CriptaItemId;
   relicId?: CriptaRelicId;
+  weaponId?: CriptaWeaponId;
+  armorId?: CriptaArmorId;
+  accessoryId?: CriptaAccessoryId;
+  weaponRuneId?: CriptaWeaponRuneId;
+  goldAmount?: number;
+  ownershipScope?: 'SHARED_PARTY' | 'FIRST_CLAIM' | 'PERSONAL_CHOICE';
   droppedByEnemyName: string;
   xPercent: number;
   claimedByPlayerId?: string | null;
@@ -757,7 +984,7 @@ export interface CriptaRoomGroundDrop {
 export interface CriptaShopSlot {
   id: string;
   slotId?: string;
-  kind: 'ITEM' | 'RELIC' | 'WEAPON' | 'ARMOR' | 'ACCESSORY' | 'FORGE_UPGRADE';
+  kind: 'ITEM' | 'RELIC' | 'WEAPON' | 'ARMOR' | 'ACCESSORY' | 'FORGE_UPGRADE' | 'WEAPON_RUNE';
   name?: string;
   category?: string;
   rarity?: string;
@@ -767,6 +994,7 @@ export interface CriptaShopSlot {
   weaponId?: CriptaWeaponId;
   armorId?: CriptaArmorId;
   accessoryId?: CriptaAccessoryId;
+  weaponRuneId?: CriptaWeaponRuneId;
   priceGold: number;
   soldOut: boolean;
   sold?: boolean;
@@ -811,6 +1039,9 @@ export interface CriptaRoomInteractiveOption {
   grantsWeaponId?: CriptaWeaponId;
   grantsArmorId?: CriptaArmorId;
   grantsAccessoryId?: CriptaAccessoryId;
+  grantsWeaponRuneId?: CriptaWeaponRuneId;
+  grantsRelicId?: CriptaRelicId;
+  grantsItemId?: CriptaItemId;
   recommendedClass?: CriptaCharacterId;
   recommendedStat?: 'ATAQUE' | 'DEFENSA' | 'MAGIA' | 'VIDA';
   recommendedStatLevel?: number;
@@ -818,33 +1049,380 @@ export interface CriptaRoomInteractiveOption {
   ownershipScope?: 'PERSONAL' | 'GRUPO' | 'EXPEDICIÓN';
   requiresWeaponId?: CriptaWeaponId;
   requiresAccessoryId?: CriptaAccessoryId;
+  visualDefinitionId?: string;
+  eventId?: string;
+  decisionId?: string;
   iconKey: 'sword' | 'shield' | 'heart' | 'gold' | 'key' | 'rune' | 'flame' | 'eye' | 'chalice' | 'potion';
   usedByPlayerIds: string[];
   resolved: boolean;
+}
+
+export type CriptaWeaponVisualFamily =
+  | 'ESPADA'
+  | 'ESPADÓN'
+  | 'HACHA'
+  | 'MARTILLO'
+  | 'MAZA'
+  | 'DAGA'
+  | 'ARCO'
+  | 'BALLESTA'
+  | 'LANZA'
+  | 'BÁCULO'
+  | 'VARITA'
+  | 'TOMO'
+  | 'CETRO'
+  | 'ESCUDO'
+  | 'ARTEFACTO'
+  | 'ALQUÍMICO';
+
+export type CriptaWeaponEraStyle =
+  | 'HIERRO_OXIDADO'
+  | 'SEPULCRAL_ANTIGUO'
+  | 'SOBERANO_HUNDIDO'
+  | 'FORJA_INFERNAL'
+  | 'ENANO_RUNICO'
+  | 'BASTION_JURAMENTO'
+  | 'CENIZA_ARCANA'
+  | 'CRISTAL_ASTRAL'
+  | 'VACIO_PROHIBIDO'
+  | 'ECLIPSE_ABISAL'
+  | 'FILO_CALLEJERO'
+  | 'COLMILLO_MICOTICO'
+  | 'IMPERIAL_CARMESI'
+  | 'VERDUGO_SOMBRIO'
+  | 'CAZADOR_BOSQUE'
+  | 'RAIZ_ESPINOSA'
+  | 'ASEDIO_PESADO'
+  | 'AZUFRE_RUNICO'
+  | 'LITURGIA_ALBA'
+  | 'SERAFIN_SOLAR'
+  | 'BOTICARIO_VOLATIL';
+
+export interface WeaponVisualDefinition {
+  weaponId: CriptaWeaponId | string;
+  weaponFamily: CriptaWeaponVisualFamily;
+  eraStyle: CriptaWeaponEraStyle;
+  material: string;
+  biomeOrigin?: CriptaDungeonId;
+  rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'LEGENDARY';
+  spriteDefinition: {
+    silhouetteId: string;
+    primaryBladeOrHead: string;
+    secondaryShade: string;
+    deepShadow: string;
+    specularHighlight: string;
+    hiltOrShaft: string;
+    accentGemOrRune: string;
+  };
+  idleEffect?: 'SHIMMER' | 'EMBER_GLOW' | 'ASTRAL_PULSE' | 'VENOM_DRIP' | 'HOLY_HALO' | 'SHADOW_MIST' | 'NONE';
+  elementalEffect?: CriptaDamageType;
+  attackEffect?: 'SLASH' | 'CLEAVE' | 'PIERCE' | 'ARCANE_BEAM' | 'HOLY_WAVE' | 'ALCHEMICAL_BLAST';
+}
+
+export type CriptaDecisionSceneType =
+  | 'SUBMERGE_WEAPON_IN_WELL'
+  | 'EXTRACT_WELL_ESSENCE'
+  | 'SEAL_WELL_COVER'
+  | 'DECIPHER_SPECTRAL_RUNES'
+  | 'SHATTER_IRON_CHAINS'
+  | 'BYPASS_PEDESTAL_SILENTLY'
+  | 'STUDY_BLACKSMITH_PLANS'
+  | 'STOKE_FORGE_CLAIM_STEEL'
+  | 'TAKE_REMAINING_EMBERS'
+  | 'CONTEMPLATE_ASTRAL_MIRROR'
+  | 'SHATTER_MIRROR_WITH_STEEL'
+  | 'COVER_MIRROR_WITH_CLOAK'
+  | 'HEAL_INJURED_HOUND'
+  | 'CLAIM_EXPLORER_STASH'
+  | 'OFFER_RATIONS_AND_PASS'
+  | 'FORGE_ALLIANCE'
+  | 'PURIFY_BIOME_ALTAR_OR_FOUNTAIN'
+  | 'BREAK_MAGICAL_SEAL'
+  | 'SEARCH_FALLEN_CORPSE'
+  | 'DRINK_FROM_FOUNTAIN'
+  | 'IGNITE_BRAZIER_OR_CAMPFIRE'
+  | 'REPAIR_OR_EQUIP_ARMOR'
+  | 'FORGE_UPGRADE_EQUIPPED_WEAPON'
+  | 'TACTICAL_COMBAT_TRAINING'
+  | 'BLOOD_PACT_DARK_FORGE'
+  | 'OPEN_TREASURE_CHEST'
+  | 'DISARM_TRAP_GEARS'
+  | 'SHIELD_AGAINST_TRAP'
+  | 'BREACH_ARSENAL_GATE'
+  | 'DISCOVER_RUNIC_WALL_CRACK'
+  | 'BUY_PURIFYING_ELIXIR'
+  | 'CROSS_DUNGEON_DOOR';
+
+export type CriptaDecisionAnimationType =
+  | 'WATER_RIPPLES'
+  | 'WEAPON_SHIMMER'
+  | 'POTION_BUBBLES'
+  | 'FLAME_FLICKER'
+  | 'DOOR_TORCH_AND_PANELS'
+  | 'TREASURE_SPARKLE'
+  | 'RELIC_PULSE'
+  | 'SCROLL_FLUTTER'
+  | 'CRYSTAL_REFRACTION'
+  | 'SPARKS_ANVIL'
+  | 'CLEANSING_RAYS'
+  | 'SEAL_CRACKING';
+
+export interface DecisionVisualDefinition {
+  id: string;
+  biomeId: CriptaDungeonId;
+  eventId: string;
+  decisionId: string;
+  sceneType: CriptaDecisionSceneType;
+  subject: string;
+  secondarySubject?: string;
+  environmentElement?: string;
+  animationType: CriptaDecisionAnimationType;
+  palette: {
+    bgTop: string;
+    bgBottom: string;
+    stonePrimary: string;
+    stoneHighlight: string;
+    liquidOrGlow: string;
+    liquidSecondary: string;
+    accent: string;
+    particle: string;
+  };
+  visualLayers: {
+    background: string;
+    middle: string;
+    foreground: string;
+    effects: string[];
+  };
+  rarityTreatment?: 'COMMON' | 'UNCOMMON' | 'RARE' | 'LEGENDARY';
 }
 
 export type CriptaMinigameKind =
   | 'RUNE_MEMORY'
   | 'LOCKPICK_TUMBLER'
   | 'TRAP_STEPPING_STONES'
-  | 'SOUL_WHEEL';
+  | 'SOUL_WHEEL'
+  | 'GUARDIAN_SIGILS'
+  | 'ARCANE_LOCK'
+  | 'PRESSURE_PLATES'
+  | 'ALCHEMICAL_MIXTURE'
+  | 'TREASURE_MEMORY'
+  | 'CURSE_DODGE'
+  | 'SHARED_BEAM'
+  | 'CHEST_OF_GREED'
+  | 'PULSE_SEALS'
+  | 'FORBIDDEN_CHESTS';
+
+export type CriptaMinigameResultTier =
+  | 'PENDING'
+  | 'PERFECT_SUCCESS'
+  | 'SUCCESS'
+  | 'PARTIAL_SUCCESS'
+  | 'FAILURE';
+
+export type CriptaMinigameVisualSkin =
+  | 'CRYPT_STONE'
+  | 'ROTTEN_SPORES'
+  | 'INFERNAL_FORGE'
+  | 'SUNKEN_TEMPLE'
+  | 'ASTRAL_BRASS'
+  | 'MIRROR_SILVER'
+  | 'CURSED_CHAINS'
+  | 'GLACIAL_ICE'
+  | 'ABYSS_VOID';
+
+export interface CriptaRouletteSpinRecord {
+  spinId: string;
+  playerId: string;
+  playerName: string;
+  segmentIndex: number;
+  segmentId: string;
+  segmentLabel: string;
+  segmentCategory: 'GOLD' | 'HEAL' | 'BUFF' | 'ITEM' | 'RELIC' | 'WEAPON_UPGRADE' | 'NOTHING' | 'CURSE' | 'DAMAGE' | 'DEBUFF' | 'DOUBLE_PRIZE' | 'EXTRA_SPIN';
+  summaryText: string;
+  targetAngleDeg: number;
+  startedAt: number;
+  durationMs: number;
+}
+
+export type CriptaMinigameFamilyId =
+  | 'RUNIC_MEMORY'
+  | 'CURSED_ROULETTE'
+  | 'PRESSURE_SIGILS'
+  | 'CRYPT_LOCK'
+  | 'ALCHEMICAL_BALANCE'
+  | 'SOUL_CHAINS'
+  | 'SHADOW_MIRRORS'
+  | 'COOP_GAMBLE_CHEST'
+  | 'ECLIPSE_PULSE'
+  | 'FORBIDDEN_COFFERS';
+
+export interface CriptaMinigameRouletteSector {
+  id: string;
+  label: string;
+  shortLabel: string;
+  outcomeType: string;
+  isPositive: boolean;
+  color: string;
+  iconKind: string;
+  goldDelta?: number;
+  hpDelta?: number;
+  statusType?: CriptaStatusEffectType;
+  statusTurns?: number;
+  itemId?: CriptaItemId;
+  relicId?: CriptaRelicId;
+  weaponId?: CriptaWeaponId;
+  description: string;
+}
 
 export interface CriptaRoomMinigameState {
+  minigameInstanceId?: string;
+  family?: CriptaMinigameFamilyId;
   kind: CriptaMinigameKind;
+  minigameType?: 'RUNE_SEQUENCE' | 'LOCKPICK_TIMING' | 'TRAP_STEPPING' | 'ALCHEMICAL_BALANCE';
+  visualSkin?: CriptaMinigameVisualSkin;
+  biomeSubtitle?: string;
+  biomeTheme?: CriptaDungeonId;
   title: string;
+  subtitle?: string;
   instructions: string;
+  shortRules?: string[];
+  difficultyTier?: 'NORMAL' | 'DIFICIL' | 'MAESTRO';
+  phase?: 'INTRO' | 'MEMORIZE' | 'ACTIVE' | 'SPINNING' | 'RESULT';
   completed: boolean;
   failed: boolean;
+  succeeded?: boolean;
+  resultTier?: CriptaMinigameResultTier;
   step: number;
+  currentStep?: number;
   maxSteps: number;
   attemptsLeft: number;
+  maxAttempts?: number;
+  mistakes?: number;
+  maxMistakes?: number;
+  alchemicalMeter?: number;
   targetPattern: number[];
+  targetSequence?: number[];
   currentProgress: number[];
+  playerInputs?: number[];
   lastOutcomeText?: string;
+  rewardSummary?: string;
   rewardGold?: number;
   rewardRelicId?: CriptaRelicId;
   rewardItemId?: CriptaItemId;
   rewardWeaponId?: CriptaWeaponId;
+  rewardStatusId?: CriptaStatusEffectType;
+  rewardBlessingStatus?: CriptaStatusEffectType;
+  failureStatusId?: CriptaStatusEffectType;
+  failurePenaltyHp?: number;
+  failureStatus?: CriptaStatusEffectType;
+  startedAtMs?: number;
+  runePlayerAssignments?: Record<string, number[]>;
+  rouletteSectors?: CriptaMinigameRouletteSector[];
+  rouletteSpinCount?: number;
+  rouletteRerollCostGold?: number;
+  rouletteCanReroll?: boolean;
+  rouletteLandedSectorIndex?: number;
+  rouletteLandingAngleDeg?: number;
+  rouletteSpinStartedAt?: number;
+  sigilClueSymbols?: string[];
+  sigilActivePlates?: Record<string, number>;
+  sigilLockedPlates?: number[];
+  lockRingAngles?: number[];
+  lockTargetAngles?: number[];
+  lockRingLocked?: boolean[];
+  alchemyPressure?: number;
+  alchemyOptimalMin?: number;
+  alchemyOptimalMax?: number;
+  alchemyStepsRemaining?: number;
+  alchemyHistory?: string[];
+  chainsIntegrity?: number[];
+  chainsBroken?: boolean[];
+  chainsWeakIndices?: number[];
+  chainsTrapIndex?: number;
+  mirrorBeamPath?: number[];
+  mirrorTargetLit?: boolean;
+  gambleChestTier?: number;
+  gambleMaxTier?: number;
+  gambleAccumulatedGold?: number;
+  gambleCurseChancePct?: number;
+  gamblePlayerVotes?: Record<string, string>;
+  sweetSpotStart?: number;
+  sweetSpotEnd?: number;
+  pulseHitQualities?: string[];
+  cofferClues?: string[];
+  cofferTrueIndex?: number;
+  cofferMimicIndex?: number;
+  cofferOpenedIndices?: number[];
+  cofferPlayerMarks?: Record<string, number>;
+  /** Cooperative & specialized family state */
+  playerClues?: Record<string, string[]>;
+  assignedPlayerRoles?: Record<string, string>;
+  /** Roulette state */
+  rouletteTurnOrder?: string[];
+  rouletteCurrentPlayerId?: string | null;
+  rouletteSpinsCompleted?: Record<string, CriptaRouletteSpinRecord>;
+  rouletteActiveSpin?: CriptaRouletteSpinRecord | null;
+  /** Simultaneous / sequential Sigils state */
+  sigilsActivatedByPlayer?: Record<string, number>;
+  sigilsHoldTimestamp?: Record<string, number>;
+  /** Arcane Lock rotating rings state (angles 0..7 in 45° increments) */
+  ringCurrentSteps?: number[];
+  ringTargetSteps?: number[];
+  ringConnections?: number[][];
+  /** Pressure Plates state */
+  plateValues?: Array<{ id: number; symbol: string; label: string; weight: number }>;
+  plateTargetSum?: number;
+  selectedPlateIndices?: number[];
+  /** Alchemical Mixture state */
+  alchemyIngredients?: Array<{
+    id: string;
+    name: string;
+    heat: number;
+    stability: number;
+    toxicity: number;
+    color: string;
+  }>;
+  alchemySelectedIds?: string[];
+  alchemyTarget?: {
+    minHeat: number;
+    maxHeat: number;
+    minStability: number;
+    maxToxicity: number;
+  };
+  /** Treasure Memory state */
+  memoryCards?: Array<{
+    index: number;
+    symbolId: string;
+    symbolLabel: string;
+    matched: boolean;
+    revealed: boolean;
+  }>;
+  memoryFlippedIndices?: number[];
+  /** Curse Dodge state */
+  dodgeWave?: number;
+  dodgeMaxWaves?: number;
+  dodgeSafeZone?: { x: number; y: number; radius: number; label: string };
+  dodgePlayerHits?: Record<string, number>;
+  dodgePlayerSafeReady?: Record<string, boolean>;
+  /** Shared Beam mirror puzzle state */
+  mirrorOrientations?: number[];
+  mirrorSolution?: number[];
+  /** Chest of Greed state */
+  greedRound?: number;
+  greedPotGold?: number;
+  greedRiskPct?: number;
+  greedVotes?: Record<string, 'CONTINUE' | 'BANK'>;
+  /** Forbidden Chests observation puzzle */
+  forbiddenChests?: Array<{
+    index: number;
+    title: string;
+    visualTrait: string;
+    particleTrait: string;
+    isSafe: boolean;
+    isBest: boolean;
+    opened: boolean;
+  }>;
+  forbiddenClues?: string[];
 }
 
 export interface CriptaDungeonRoom {
@@ -885,12 +1463,22 @@ export interface CriptaDungeonRoom {
   activeEnemyActorId?: string | null;
   activeTargetedPlayerIds?: string[];
   activeTurnPlayerId?: string | null;
+  turnId?: string | null;
+  turnSequenceNumber?: number;
+  turnActionConsumed?: boolean;
+  lastActionNonce?: string | null;
   currentTurnAp?: number;
   maxTurnAp?: number;
   consumableUsedThisTurn?: boolean;
   lastPlayedCardTitle?: string | null;
   lastPlayedByPlayerName?: string | null;
   actedPlayerIdsThisRound?: string[];
+  rewardSummary?: {
+    goldGranted: number;
+    healGranted: number;
+    itemDropsCount: number;
+    relicDropsCount: number;
+  } | null;
   enemies: CriptaRoomEnemy[];
   options: CriptaRoomInteractiveOption[];
   groundDrops?: CriptaRoomGroundDrop[];
@@ -917,6 +1505,10 @@ export interface CriptaDungeonRoom {
   };
   readyToAdvancePlayerIds: string[];
   optionVotes: Record<string, string>; // playerId -> optionId for group decisions
+  decisionVoteTieWarning?: boolean;
+  canonicalType?: string;
+  actionConsumedThisTurn?: boolean;
+  turnActionLocked?: boolean;
 }
 
 export type CriptaVisualEventKind =
@@ -1081,10 +1673,13 @@ export interface CriptaPlayer {
   bonusAttack?: number;
   bonusDefense?: number;
   bonusMagic?: number;
-  /** Equipped Weapon, Upgrade Level (1..3), and Special Attack Cooldown */
+  /** Equipped Weapon, Upgrade Level (1..3), Special Attack Cooldown & Elemental Infusion Rune */
   equippedWeaponId?: CriptaWeaponId | null;
   weaponUpgradeLevel?: 1 | 2 | 3;
   weaponSpecialCooldown?: number;
+  equippedWeaponRuneId?: CriptaWeaponRuneId | null;
+  ownedWeaponRuneIds?: CriptaWeaponRuneId[];
+  ownedWeaponRunes?: CriptaWeaponRuneId[];
   abilityCooldown?: number;
   abilityCooldowns?: Record<string, number>;
   basicAttackUsedThisTurn?: boolean;
@@ -1166,8 +1761,29 @@ export interface CriptaExpeditionState {
   currentNodeId: string | null;
   generatedNodes: CriptaRoomNode[];
   /** Phase 2, 3 & 4 Authoritative Procedural Dungeon, 3-Door Run, Inventory, Relics & Final Boss State */
+  runPhase?: CriptaRunPhase;
   completedDoorCount?: number; // 0, 1, 2, or 3
+  completedDungeonCount?: number; // 0, 1, 2, or 3 (synchronized alias)
   completedDungeonIds?: CriptaDungeonId[];
+  completedBiomes?: CriptaDungeonId[];
+  currentDungeonId?: CriptaDungeonId | null;
+  currentDungeonInstanceId?: string | null;
+  currentRoomId?: string | null;
+  currentRoomPhase?: CriptaRoomLifecyclePhase;
+  completedRoomIds?: string[];
+  currentRewardState?: {
+    roomId: string;
+    hasUnclaimedDrops: boolean;
+    unclaimedDropCount: number;
+    goldEarned: number;
+    healGranted: number;
+  } | null;
+  currentTransitionState?: {
+    active: boolean;
+    kind: 'ENTERING_DUNGEON' | 'ROOM_TO_ROOM' | 'RETURNING_TO_DOORS' | 'FINAL_BOSS_ENTRANCE';
+    startedAt: number;
+  } | null;
+  majorBossUnlocked?: boolean;
   partyRelics?: CriptaAcquiredRelic[];
   discoveredEnemyAbilityIds?: string[];
   eventFlags?: CriptaRunEventFlags;
@@ -1250,6 +1866,8 @@ export type CriptaClientMessage =
       type: 'ROOM_COMBAT_ACTION';
       action: 'ATTACK' | 'ABILITY' | 'DEFEND';
       targetEnemyId?: string;
+      turnId?: string;
+      actionNonce?: string;
     }
   | {
       type: 'LOCK_ROUND_ACTION';
@@ -1258,6 +1876,9 @@ export type CriptaClientMessage =
       targetEnemyId?: string;
       targetPlayerId?: string;
       itemSlotIndex?: number;
+      turnId?: string;
+      actionNonce?: string;
+      cardId?: string;
     }
   | {
       type: 'UNLOCK_ROUND_ACTION';
@@ -1297,6 +1918,12 @@ export type CriptaClientMessage =
       type: 'ROOM_MINIGAME_ACTION';
       actionIndex: number;
       precisionScore?: number;
+      subAction?: string;
+      payloadValue?: number | string;
+    }
+  | {
+      type: 'ROOM_MINIGAME_INPUT';
+      stepValue: number;
     }
   | {
       type: 'SHOP_REROLL';
@@ -1310,6 +1937,10 @@ export type CriptaClientMessage =
     }
   | {
       type: 'UPGRADE_WEAPON';
+    }
+  | {
+      type: 'EQUIP_WEAPON_RUNE';
+      runeId: CriptaWeaponRuneId | null;
     }
   | {
       type: 'ROOM_ADVANCE';

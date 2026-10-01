@@ -6,6 +6,7 @@ import type {
   CriptaArmorId,
   CriptaCanonicalRoomType,
   CriptaCharacterId,
+  CriptaDamageType,
   CriptaDungeonId,
   CriptaDungeonRoom,
   CriptaEncounterSubjectArchetype,
@@ -15,11 +16,12 @@ import type {
   CriptaStatusEffectType,
   CriptaWeaponDefinition,
   CriptaWeaponId,
+  CriptaWeaponRuneDefinition,
+  CriptaWeaponRuneId,
 } from '../../types/laCripta';
 import { CRIPTA_CHARACTERS_CATALOG } from './criptaCatalog';
 import { playerHasStatus } from './criptaStatusEffects';
 import { playerHasRelic } from './criptaItemsAndRelics';
-import { resolveEnemyVisualBlueprint } from './criptaBiomeBestiary';
 
 export const WEAPON_UPGRADE_MAX_LEVEL = 3;
 
@@ -31,6 +33,172 @@ export const STARTER_WEAPON_BY_CLASS: Record<CriptaCharacterId, CriptaWeaponId> 
   clerigo: 'maza_consagrada',
   alquimista: 'lanzador_alquimico',
 };
+
+export const STARTER_RUNE_BY_CLASS: Record<CriptaCharacterId, CriptaWeaponRuneId> = {
+  caballero: 'runa_plomo_contundente',
+  mago: 'runa_brasa_infernal',
+  picaro: 'runa_toxina_abisal',
+  cazador: 'runa_escarcha_permafrost',
+  clerigo: 'runa_luz_consagrada',
+  alquimista: 'runa_vacio_umbrio',
+};
+
+export const ALL_WEAPON_RUNE_IDS: CriptaWeaponRuneId[] = [
+  'runa_brasa_infernal',
+  'runa_escarcha_permafrost',
+  'runa_luz_consagrada',
+  'runa_plomo_contundente',
+  'runa_toxina_abisal',
+  'runa_vacio_umbrio',
+  'runa_aguja_perforante',
+  'runa_resonancia_astral',
+];
+
+export const CRIPTA_WEAPON_RUNES_REGISTRY: Record<
+  CriptaWeaponRuneId,
+  CriptaWeaponRuneDefinition
+> = {
+  runa_brasa_infernal: {
+    id: 'runa_brasa_infernal',
+    name: 'Runa de Brasa Infernal',
+    subtitle: 'INFUSIÓN ÍGNEA DE CRISOL',
+    rarity: 'RARE',
+    infusedDamageType: 'FUEGO',
+    secondaryDamageType: 'ALQUIMICO',
+    iconKind: 'rune_fire',
+    benefitText: 'Convierte el daño del arma a FUEGO (+12% Daño Base) y aplica QUEMADURA al impactar.',
+    tradeoffText: 'Contrapartida: -10% Prob. de Crítico por el peso incandescente de la hoja.',
+    damageMultiplierDelta: 0.12,
+    critBonusDeltaPct: -10,
+    onHitStatus: 'BURN',
+    basePriceGold: 48,
+    accentColor: '#FF7A33',
+  },
+  runa_escarcha_permafrost: {
+    id: 'runa_escarcha_permafrost',
+    name: 'Runa de Escarcha Eterna',
+    subtitle: 'INFUSIÓN GLACIAL DE CONTROL',
+    rarity: 'RARE',
+    infusedDamageType: 'HIELO',
+    secondaryDamageType: 'MAGICO',
+    iconKind: 'rune_ice',
+    benefitText: 'Convierte el daño a HIELO, aplica ESCARCHA (-18% daño enemigo) y otorga +2 DEFENSA.',
+    tradeoffText: 'Contrapartida: -12% Daño directo (prioriza mitigación y control sobre daño explosivo).',
+    damageMultiplierDelta: -0.12,
+    bonusDefenseDelta: 2,
+    onHitStatus: 'FROST',
+    basePriceGold: 46,
+    accentColor: '#7BDFF2',
+  },
+  runa_luz_consagrada: {
+    id: 'runa_luz_consagrada',
+    name: 'Runa del Sol Consagrado',
+    subtitle: 'INFUSIÓN LITÚRGICA DEL ALBA',
+    rarity: 'RARE',
+    infusedDamageType: 'SAGRADO',
+    iconKind: 'rune_holy',
+    benefitText: 'Convierte el daño a SAGRADO (+10% Daño Base) y la Técnica de Arma sana +4 PV al grupo.',
+    tradeoffText: 'Contrapartida: -8% Prob. de Crítico y purifica la hoja (no aplica Sangrado ni Veneno).',
+    damageMultiplierDelta: 0.1,
+    critBonusDeltaPct: -8,
+    specialHealParty: 4,
+    executeBonusPctVsHalfHp: 20,
+    disablesBleedAndPoison: true,
+    basePriceGold: 52,
+    accentColor: '#FFD166',
+  },
+  runa_plomo_contundente: {
+    id: 'runa_plomo_contundente',
+    name: 'Runa de Plomo Quebrantahuesos',
+    subtitle: 'INFUSIÓN DE IMPACTO CONTUNDENTE',
+    rarity: 'UNCOMMON',
+    infusedDamageType: 'CONTUNDENTE',
+    iconKind: 'rune_blunt',
+    benefitText: 'Convierte el daño a CONTUNDENTE e ignora +3 de Armadura enemiga (letal contra Esqueletos y Gólems).',
+    tradeoffText: 'Contrapartida: -12% Prob. de Crítico y +1 ronda de enfriamiento en la Técnica de Arma.',
+    critBonusDeltaPct: -12,
+    armorPierceBonus: 3,
+    specialCooldownDelta: 1,
+    basePriceGold: 42,
+    accentColor: '#D9D0BC',
+  },
+  runa_toxina_abisal: {
+    id: 'runa_toxina_abisal',
+    name: 'Runa de Colmillo Micótico',
+    subtitle: 'INFUSIÓN ALQUÍMICA CORROSIVA',
+    rarity: 'UNCOMMON',
+    infusedDamageType: 'VENENO',
+    secondaryDamageType: 'ALQUIMICO',
+    iconKind: 'rune_poison',
+    benefitText: 'Convierte el daño a VENENO / ALQUÍMICO, aplica VENENO en cada golpe y CORROSIÓN en críticos.',
+    tradeoffText: 'Contrapartida: -16% Daño directo inicial (convierte el golpe en desgaste prolongado).',
+    damageMultiplierDelta: -0.16,
+    extraPoisonStacksOnHit: 1,
+    onHitStatus: 'POISON',
+    onCritStatus: 'CORROSION',
+    basePriceGold: 44,
+    accentColor: '#5EA87A',
+  },
+  runa_vacio_umbrio: {
+    id: 'runa_vacio_umbrio',
+    name: 'Runa del Vacío Umbrío',
+    subtitle: 'INFUSIÓN ABISAL PROHIBIDA',
+    rarity: 'LEGENDARY',
+    infusedDamageType: 'SOMBRA',
+    secondaryDamageType: 'MAGICO',
+    iconKind: 'rune_shadow',
+    benefitText: 'Convierte el daño a SOMBRA (+22% Daño Total) y aplica MALDICIÓN en golpes críticos.',
+    tradeoffText: 'Contrapartida: -1 DEFENSA y usar la Técnica de Arma drena -3 PV del portador.',
+    damageMultiplierDelta: 0.22,
+    bonusDefenseDelta: -1,
+    specialHpCost: 3,
+    onCritStatus: 'CURSE',
+    basePriceGold: 64,
+    accentColor: '#C77DFF',
+  },
+  runa_aguja_perforante: {
+    id: 'runa_aguja_perforante',
+    name: 'Runa de Aguja Carmesí',
+    subtitle: 'INFUSIÓN DE PRECISIÓN LETAL',
+    rarity: 'RARE',
+    infusedDamageType: 'PERFORANTE',
+    iconKind: 'rune_pierce',
+    benefitText: 'Convierte el daño a PERFORANTE, otorga +16% Prob. de Crítico y aplica SANGRADO al impactar.',
+    tradeoffText: 'Contrapartida: -20% Daño contra enemigos blindados (DEF ≥ 4) si el golpe no es Crítico.',
+    critBonusDeltaPct: 16,
+    onHitStatus: 'BLEED',
+    heavyArmorNonCritPenaltyPct: 20,
+    basePriceGold: 50,
+    accentColor: '#FF4D6D',
+  },
+  runa_resonancia_astral: {
+    id: 'runa_resonancia_astral',
+    name: 'Runa de Resonancia Astral',
+    subtitle: 'INFUSIÓN CELESTE DE PRISMA',
+    rarity: 'LEGENDARY',
+    infusedDamageType: 'ASTRAL',
+    secondaryDamageType: 'MAGICO',
+    iconKind: 'rune_astral',
+    benefitText: 'Convierte el daño a ASTRAL (+2 MAGIA) y añade +35% de tu MAGIA al daño del arma.',
+    tradeoffText: 'Contrapartida: -2 ATAQUE físico base.',
+    bonusMagicDelta: 2,
+    bonusAttackDelta: -2,
+    magicScalingBonusPct: 35,
+    basePriceGold: 62,
+    accentColor: '#69A8A5',
+  },
+};
+
+export function pickUnownedWeaponRune(
+  seed: number,
+  step: number,
+  ownedRuneIds: CriptaWeaponRuneId[] = []
+): CriptaWeaponRuneId {
+  const unowned = ALL_WEAPON_RUNE_IDS.filter((id) => !ownedRuneIds.includes(id));
+  const pool = unowned.length > 0 ? unowned : ALL_WEAPON_RUNE_IDS;
+  const idx = Math.abs((seed + step * 37) | 0) % pool.length;
+  return pool[idx];
+}
 
 export const CRIPTA_WEAPONS_REGISTRY: Record<CriptaWeaponId, CriptaWeaponDefinition> = {
   espada_oxidada: {
@@ -786,6 +954,74 @@ export const CRIPTA_ACCESSORIES_REGISTRY: Record<CriptaAccessoryId, CriptaAccess
   },
 };
 
+export function getWeaponBaseDamageType(weapon: CriptaWeaponDefinition): {
+  primary: CriptaDamageType;
+  secondary?: CriptaDamageType;
+  archetypeLabel: string;
+} {
+  if (weapon.baseDamageType) {
+    return {
+      primary: weapon.baseDamageType,
+      secondary: weapon.secondaryDamageType,
+      archetypeLabel: weapon.weaponArchetypeLabel || weapon.family,
+    };
+  }
+  switch (weapon.id) {
+    case 'espada_oxidada':
+      return { primary: 'FISICO', archetypeLabel: 'Hoja de Acero' };
+    case 'espada_del_sepulcro':
+      return { primary: 'FISICO', secondary: 'SAGRADO', archetypeLabel: 'Hoja Sepulcral' };
+    case 'espadon_del_rey_hundido':
+      return { primary: 'FISICO', secondary: 'CONTUNDENTE', archetypeLabel: 'Mandoble Real' };
+    case 'hacha_forja_infernal':
+      return { primary: 'FUEGO', secondary: 'FISICO', archetypeLabel: 'Hacha Ígnea' };
+    case 'pico_de_minero_runico':
+      return { primary: 'CONTUNDENTE', secondary: 'PERFORANTE', archetypeLabel: 'Pico Quebrantarrocas' };
+    case 'alabarda_del_juramento':
+      return { primary: 'FISICO', secondary: 'CONTUNDENTE', archetypeLabel: 'Alabarda de Bastión' };
+    case 'baston_ceniza':
+      return { primary: 'MAGICO', secondary: 'FUEGO', archetypeLabel: 'Bastón Arcano' };
+    case 'vara_de_cristal_astral':
+      return { primary: 'ASTRAL', secondary: 'MAGICO', archetypeLabel: 'Vara Prismática' };
+    case 'grimorio_prohibido_arma':
+      return { primary: 'SOMBRA', secondary: 'MAGICO', archetypeLabel: 'Tomo del Vacío' };
+    case 'cetro_del_eclipse':
+      return { primary: 'ASTRAL', secondary: 'FUEGO', archetypeLabel: 'Cetro Estelar' };
+    case 'dagas_melladas':
+      return { primary: 'PERFORANTE', secondary: 'FISICO', archetypeLabel: 'Dagas Gemelas' };
+    case 'hojas_colmillo_venenoso':
+      return { primary: 'VENENO', secondary: 'PERFORANTE', archetypeLabel: 'Colmillos Tóxicos' };
+    case 'estoque_carmesi':
+      return { primary: 'PERFORANTE', archetypeLabel: 'Estoque Imperial' };
+    case 'guadana_del_verdugo':
+      return { primary: 'SOMBRA', secondary: 'FISICO', archetypeLabel: 'Guadaña de Sombra' };
+    case 'arco_cazador':
+      return { primary: 'PERFORANTE', archetypeLabel: 'Arco Largo' };
+    case 'arco_de_espinas':
+      return { primary: 'PERFORANTE', secondary: 'VENENO', archetypeLabel: 'Arco Espinoso' };
+    case 'ballesta_de_asedio':
+      return { primary: 'PERFORANTE', secondary: 'CONTUNDENTE', archetypeLabel: 'Ballesta Pesada' };
+    case 'canon_de_azufre':
+      return { primary: 'FUEGO', secondary: 'CONTUNDENTE', archetypeLabel: 'Cañón Rúnico' };
+    case 'maza_consagrada':
+      return { primary: 'CONTUNDENTE', secondary: 'SAGRADO', archetypeLabel: 'Maza Litúrgica' };
+    case 'martillo_del_juicio':
+      return { primary: 'SAGRADO', secondary: 'CONTUNDENTE', archetypeLabel: 'Martillo Consagrado' };
+    case 'simbolo_del_alba':
+      return { primary: 'SAGRADO', archetypeLabel: 'Cetro del Alba' };
+    case 'relicario_serafin':
+      return { primary: 'SAGRADO', secondary: 'ASTRAL', archetypeLabel: 'Relicario Solar' };
+    case 'lanzador_alquimico':
+      return { primary: 'ALQUIMICO', secondary: 'VENENO', archetypeLabel: 'Lanzador Volátil' };
+    case 'catalizador_esporas':
+      return { primary: 'VENENO', secondary: 'ALQUIMICO', archetypeLabel: 'Catalizador Micótico' };
+    case 'guantelete_mutageno':
+      return { primary: 'ALQUIMICO', secondary: 'FUEGO', archetypeLabel: 'Inyector Químico' };
+    default:
+      return { primary: 'FISICO', archetypeLabel: 'Arma de Cripta' };
+  }
+}
+
 export function getEquippedWeaponForPlayer(player: CriptaPlayer): {
   weapon: CriptaWeaponDefinition;
   level: 1 | 2 | 3;
@@ -794,6 +1030,16 @@ export function getEquippedWeaponForPlayer(player: CriptaPlayer): {
   bonusAttack: number;
   bonusMagic: number;
   bonusDefense: number;
+  baseDamageType: CriptaDamageType;
+  activeDamageType: CriptaDamageType;
+  secondaryDamageType?: CriptaDamageType;
+  archetypeLabel: string;
+  activeRune: CriptaWeaponRuneDefinition | null;
+  effectiveCritDeltaPct: number;
+  effectiveArmorPierceBonus: number;
+  effectiveSpecialCooldown: number;
+  effectiveOnHitStatus?: CriptaStatusEffectType;
+  effectiveOnCritStatus?: CriptaStatusEffectType;
 } {
   const charId = player.characterId || player.selectedCharacterId || 'caballero';
   const fallbackId = STARTER_WEAPON_BY_CLASS[charId] || 'espada_oxidada';
@@ -802,15 +1048,53 @@ export function getEquippedWeaponForPlayer(player: CriptaPlayer): {
   const level: 1 | 2 | 3 =
     player.weaponUpgradeLevel === 3 ? 3 : player.weaponUpgradeLevel === 2 ? 2 : 1;
 
+  const activeRune = player.equippedWeaponRuneId
+    ? CRIPTA_WEAPON_RUNES_REGISTRY[player.equippedWeaponRuneId] || null
+    : null;
+
+  const baseTypeInfo = getWeaponBaseDamageType(weapon);
+  const activeDamageType: CriptaDamageType = activeRune
+    ? activeRune.infusedDamageType
+    : baseTypeInfo.primary;
+  const secondaryDamageType: CriptaDamageType | undefined = activeRune
+    ? activeRune.secondaryDamageType || baseTypeInfo.primary
+    : baseTypeInfo.secondary;
+
   const levelOffset = level - 1;
-  const scaledMin = weapon.baseMinDamage + levelOffset;
-  const scaledMax = weapon.baseMaxDamage + levelOffset * 2;
+  const runeMult = 1 + (activeRune?.damageMultiplierDelta || 0);
+  const scaledMin = Math.max(2, Math.round((weapon.baseMinDamage + levelOffset) * runeMult));
+  const scaledMax = Math.max(
+    scaledMin + 1,
+    Math.round((weapon.baseMaxDamage + levelOffset * 2) * runeMult)
+  );
 
   const bonusAttack =
-    (weapon.bonusAttack || 0) + (weapon.scalingStat === 'ATAQUE' && level >= 2 ? levelOffset : 0);
+    (weapon.bonusAttack || 0) +
+    (weapon.scalingStat === 'ATAQUE' && level >= 2 ? levelOffset : 0) +
+    (activeRune?.bonusAttackDelta || 0);
   const bonusMagic =
-    (weapon.bonusMagic || 0) + (weapon.scalingStat === 'MAGIA' && level >= 2 ? levelOffset : 0);
-  const bonusDefense = weapon.bonusDefense || 0;
+    (weapon.bonusMagic || 0) +
+    (weapon.scalingStat === 'MAGIA' && level >= 2 ? levelOffset : 0) +
+    (activeRune?.bonusMagicDelta || 0);
+  const bonusDefense = (weapon.bonusDefense || 0) + (activeRune?.bonusDefenseDelta || 0);
+
+  const effectiveCritDeltaPct = activeRune?.critBonusDeltaPct || 0;
+  const effectiveArmorPierceBonus = activeRune?.armorPierceBonus || 0;
+  const effectiveSpecialCooldown = Math.max(
+    1,
+    (weapon.specialAttack.cooldownRounds || 2) + (activeRune?.specialCooldownDelta || 0)
+  );
+
+  let effectiveOnHitStatus = activeRune?.onHitStatus || weapon.onHitStatus;
+  let effectiveOnCritStatus = activeRune?.onCritStatus || weapon.onCritStatus;
+  if (activeRune?.disablesBleedAndPoison) {
+    if (effectiveOnHitStatus === 'BLEED' || effectiveOnHitStatus === 'POISON') {
+      effectiveOnHitStatus = undefined;
+    }
+    if (effectiveOnCritStatus === 'BLEED' || effectiveOnCritStatus === 'POISON') {
+      effectiveOnCritStatus = undefined;
+    }
+  }
 
   return {
     weapon,
@@ -820,6 +1104,16 @@ export function getEquippedWeaponForPlayer(player: CriptaPlayer): {
     bonusAttack,
     bonusMagic,
     bonusDefense,
+    baseDamageType: baseTypeInfo.primary,
+    activeDamageType,
+    secondaryDamageType,
+    archetypeLabel: baseTypeInfo.archetypeLabel,
+    activeRune,
+    effectiveCritDeltaPct,
+    effectiveArmorPierceBonus,
+    effectiveSpecialCooldown,
+    effectiveOnHitStatus,
+    effectiveOnCritStatus,
   };
 }
 
@@ -869,8 +1163,16 @@ export function computePlayerEffectiveStats(player: CriptaPlayer): {
   const maxHpBonus = armorDef?.bonusMaxHp || 0;
 
   const baseCrit = charId === 'picaro' ? 18 : charId === 'cazador' ? 15 : 10;
-  const critChancePct =
-    baseCrit + (eqWeapon.weapon.critBonusPct || 0) + (accDef?.critBonusPct || 0);
+  const critChancePct = Math.max(
+    2,
+    Math.min(
+      85,
+      baseCrit +
+        (eqWeapon.weapon.critBonusPct || 0) +
+        (accDef?.critBonusPct || 0) +
+        eqWeapon.effectiveCritDeltaPct
+    )
+  );
 
   const potionBoostPct =
     (charId === 'alquimista' ? 15 : 0) +
@@ -895,12 +1197,136 @@ export function computePlayerEffectiveStats(player: CriptaPlayer): {
 }
 
 export interface CriptaEnemyTraitEntry {
-  id: 'SAGRADO' | 'MAGICO' | 'FISICO' | 'CONTUNDENTE' | 'PERFORANTE' | 'ALQUIMICO' | 'VENENO';
+  id: CriptaDamageType;
   label: string;
   modifierText: string;
   multiplierDelta: number; // e.g. +0.25 for +25% weakness, -0.20 for resistance
-  iconKind: 'holy' | 'arcane' | 'blunt' | 'pierce' | 'alchemy' | 'poison' | 'slash';
+  iconKind:
+    | 'holy'
+    | 'arcane'
+    | 'blunt'
+    | 'pierce'
+    | 'alchemy'
+    | 'poison'
+    | 'slash'
+    | 'fire'
+    | 'frost'
+    | 'shadow'
+    | 'astral';
 }
+
+export const CRIPTA_DAMAGE_TYPE_META: Record<
+  CriptaDamageType,
+  {
+    id: CriptaDamageType;
+    label: string;
+    shortLabel: string;
+    color: string;
+    borderColor: string;
+    bgTint: string;
+    iconKind: CriptaEnemyTraitEntry['iconKind'];
+  }
+> = {
+  FISICO: {
+    id: 'FISICO',
+    label: 'CORTE FÍSICO',
+    shortLabel: 'CORTE',
+    color: '#E2E8F0',
+    borderColor: '#94A3B8',
+    bgTint: '#161B26',
+    iconKind: 'slash',
+  },
+  CONTUNDENTE: {
+    id: 'CONTUNDENTE',
+    label: 'CONTUNDENTE',
+    shortLabel: 'CONTUNDENTE',
+    color: '#D9D0BC',
+    borderColor: '#A89F88',
+    bgTint: '#1D1A15',
+    iconKind: 'blunt',
+  },
+  PERFORANTE: {
+    id: 'PERFORANTE',
+    label: 'PERFORANTE',
+    shortLabel: 'PERFORANTE',
+    color: '#FF758F',
+    borderColor: '#C93B5B',
+    bgTint: '#24121A',
+    iconKind: 'pierce',
+  },
+  SAGRADO: {
+    id: 'SAGRADO',
+    label: 'SAGRADO',
+    shortLabel: 'SAGRADO',
+    color: '#FFD166',
+    borderColor: '#E7A54A',
+    bgTint: '#261C0E',
+    iconKind: 'holy',
+  },
+  MAGICO: {
+    id: 'MAGICO',
+    label: 'ARCANO',
+    shortLabel: 'ARCANO',
+    color: '#C8A6F5',
+    borderColor: '#9B72CF',
+    bgTint: '#1B1328',
+    iconKind: 'arcane',
+  },
+  FUEGO: {
+    id: 'FUEGO',
+    label: 'FUEGO ÍGNEO',
+    shortLabel: 'FUEGO',
+    color: '#FF7A33',
+    borderColor: '#E76F38',
+    bgTint: '#28140C',
+    iconKind: 'fire',
+  },
+  HIELO: {
+    id: 'HIELO',
+    label: 'HIELO GLACIAL',
+    shortLabel: 'HIELO',
+    color: '#7BDFF2',
+    borderColor: '#48CAE4',
+    bgTint: '#0D1F28',
+    iconKind: 'frost',
+  },
+  ALQUIMICO: {
+    id: 'ALQUIMICO',
+    label: 'ALQUÍMICO',
+    shortLabel: 'ALQUIMIA',
+    color: '#80FF72',
+    borderColor: '#5EA87A',
+    bgTint: '#102418',
+    iconKind: 'alchemy',
+  },
+  VENENO: {
+    id: 'VENENO',
+    label: 'TOXINA / VENENO',
+    shortLabel: 'VENENO',
+    color: '#8EE6AE',
+    borderColor: '#48BB78',
+    bgTint: '#102218',
+    iconKind: 'poison',
+  },
+  SOMBRA: {
+    id: 'SOMBRA',
+    label: 'SOMBRA ABISAL',
+    shortLabel: 'SOMBRA',
+    color: '#D6BCFA',
+    borderColor: '#805AD5',
+    bgTint: '#170E29',
+    iconKind: 'shadow',
+  },
+  ASTRAL: {
+    id: 'ASTRAL',
+    label: 'LUZ ASTRAL',
+    shortLabel: 'ASTRAL',
+    color: '#90E0EF',
+    borderColor: '#69A8A5',
+    bgTint: '#0E1E24',
+    iconKind: 'astral',
+  },
+};
 
 /**
  * Canonical enemy weakness & resistance profile derived from creature archetype.
@@ -910,101 +1336,45 @@ export function getEnemyWeaknessAndResistanceProfile(enemy: CriptaRoomEnemy): {
   weaknesses: CriptaEnemyTraitEntry[];
   resistances: CriptaEnemyTraitEntry[];
 } {
-  const blueprint = resolveEnemyVisualBlueprint(enemy);
-  if (blueprint && blueprint.weaknesses.length > 0) {
-    return {
-      weaknesses: blueprint.weaknesses,
-      resistances: blueprint.resistances,
-    };
-  }
   const arch = enemy.spriteArchetype;
 
-  if (arch === 'skeleton_warrior' || arch === 'bone_colossus') {
+  if (arch === 'skeleton_warrior' || arch === 'bone_colossus' || arch === 'sand_mummy') {
     return {
       weaknesses: [
         {
           id: 'CONTUNDENTE',
           label: 'CONTUNDENTE',
-          modifierText: '+25% daño',
-          multiplierDelta: 0.25,
+          modifierText: '+28% daño',
+          multiplierDelta: 0.28,
           iconKind: 'blunt',
         },
         {
           id: 'SAGRADO',
           label: 'SAGRADO',
-          modifierText: '+20% daño',
-          multiplierDelta: 0.2,
+          modifierText: '+25% daño',
+          multiplierDelta: 0.25,
           iconKind: 'holy',
         },
+        ...(arch === 'sand_mummy'
+          ? [
+              {
+                id: 'FUEGO' as const,
+                label: 'FUEGO ÍGNEO',
+                modifierText: '+30% daño',
+                multiplierDelta: 0.3,
+                iconKind: 'fire' as const,
+              },
+            ]
+          : []),
       ],
       resistances: [
         {
           id: 'PERFORANTE',
           label: 'PERFORANTE',
-          modifierText: '-20% daño',
-          multiplierDelta: -0.2,
+          modifierText: '-22% daño',
+          multiplierDelta: -0.22,
           iconKind: 'pierce',
         },
-        {
-          id: 'VENENO',
-          label: 'VENENO',
-          modifierText: 'Resistente',
-          multiplierDelta: -0.25,
-          iconKind: 'poison',
-        },
-      ],
-    };
-  }
-
-  if (arch === 'chained_wraith' || arch === 'mirror_doppelganger' || arch === 'lich_sovereign') {
-    return {
-      weaknesses: [
-        {
-          id: 'SAGRADO',
-          label: 'SAGRADO',
-          modifierText: '+25% daño',
-          multiplierDelta: 0.25,
-          iconKind: 'holy',
-        },
-        {
-          id: 'MAGICO',
-          label: 'ARCANO',
-          modifierText: '+15% daño',
-          multiplierDelta: 0.15,
-          iconKind: 'arcane',
-        },
-      ],
-      resistances: [
-        {
-          id: 'FISICO',
-          label: 'CORTE FÍSICO',
-          modifierText: '-20% daño',
-          multiplierDelta: -0.2,
-          iconKind: 'slash',
-        },
-      ],
-    };
-  }
-
-  if (arch === 'fungal_beast' || arch === 'bat_swarm') {
-    return {
-      weaknesses: [
-        {
-          id: 'ALQUIMICO',
-          label: 'FUEGO / ALQUIMIA',
-          modifierText: '+25% daño',
-          multiplierDelta: 0.25,
-          iconKind: 'alchemy',
-        },
-        {
-          id: 'FISICO',
-          label: 'TAJO AFILADO',
-          modifierText: '+15% daño',
-          multiplierDelta: 0.15,
-          iconKind: 'slash',
-        },
-      ],
-      resistances: [
         {
           id: 'VENENO',
           label: 'VENENO',
@@ -1016,19 +1386,149 @@ export function getEnemyWeaknessAndResistanceProfile(enemy: CriptaRoomEnemy): {
     };
   }
 
-  if (arch === 'Stone_gargoyle') {
+  if (arch === 'frost_wolf') {
+    return {
+      weaknesses: [
+        {
+          id: 'FUEGO',
+          label: 'FUEGO ÍGNEO',
+          modifierText: '+30% daño',
+          multiplierDelta: 0.3,
+          iconKind: 'fire',
+        },
+        {
+          id: 'FISICO',
+          label: 'CORTE FÍSICO',
+          modifierText: '+18% daño',
+          multiplierDelta: 0.18,
+          iconKind: 'slash',
+        },
+      ],
+      resistances: [
+        {
+          id: 'HIELO',
+          label: 'HIELO GLACIAL',
+          modifierText: 'Resistente (-30%)',
+          multiplierDelta: -0.3,
+          iconKind: 'frost',
+        },
+      ],
+    };
+  }
+
+  if (
+    arch === 'chained_wraith' ||
+    arch === 'mirror_doppel' ||
+    arch === 'wisp_phantom' ||
+    arch === 'void_herald' ||
+    arch === 'final_boss_phase1' ||
+    arch === 'final_boss_phase2'
+  ) {
+    return {
+      weaknesses: [
+        {
+          id: 'SAGRADO',
+          label: 'SAGRADO',
+          modifierText: '+28% daño',
+          multiplierDelta: 0.28,
+          iconKind: 'holy',
+        },
+        {
+          id: 'ASTRAL',
+          label: 'LUZ ASTRAL',
+          modifierText: '+22% daño',
+          multiplierDelta: 0.22,
+          iconKind: 'astral',
+        },
+        {
+          id: 'MAGICO',
+          label: 'ARCANO',
+          modifierText: '+18% daño',
+          multiplierDelta: 0.18,
+          iconKind: 'arcane',
+        },
+      ],
+      resistances: [
+        {
+          id: 'FISICO',
+          label: 'CORTE FÍSICO',
+          modifierText: '-20% daño',
+          multiplierDelta: -0.2,
+          iconKind: 'slash',
+        },
+        {
+          id: 'SOMBRA',
+          label: 'SOMBRA ABISAL',
+          modifierText: '-25% daño',
+          multiplierDelta: -0.25,
+          iconKind: 'shadow',
+        },
+      ],
+    };
+  }
+
+  if (
+    arch === 'plague_bloom' ||
+    arch === 'chitin_drone' ||
+    arch === 'sewer_abomination' ||
+    arch === 'deep_serpent'
+  ) {
+    return {
+      weaknesses: [
+        {
+          id: 'FUEGO',
+          label: 'FUEGO ÍGNEO',
+          modifierText: '+28% daño',
+          multiplierDelta: 0.28,
+          iconKind: 'fire',
+        },
+        {
+          id: 'ALQUIMICO',
+          label: 'ALQUÍMICO',
+          modifierText: '+24% daño',
+          multiplierDelta: 0.24,
+          iconKind: 'alchemy',
+        },
+        {
+          id: 'FISICO',
+          label: 'CORTE FÍSICO',
+          modifierText: '+16% daño',
+          multiplierDelta: 0.16,
+          iconKind: 'slash',
+        },
+      ],
+      resistances: [
+        {
+          id: 'VENENO',
+          label: 'VENENO',
+          modifierText: 'Resistente (-28%)',
+          multiplierDelta: -0.28,
+          iconKind: 'poison',
+        },
+      ],
+    };
+  }
+
+  if (arch === 'iron_golem' || arch === 'crystal_sentinel') {
     return {
       weaknesses: [
         {
           id: 'CONTUNDENTE',
-          label: 'CONTUNDENTE / PICO',
-          modifierText: '+25% daño',
-          multiplierDelta: 0.25,
+          label: 'CONTUNDENTE',
+          modifierText: '+28% daño',
+          multiplierDelta: 0.28,
           iconKind: 'blunt',
         },
         {
+          id: 'HIELO',
+          label: 'HIELO GLACIAL',
+          modifierText: '+22% daño',
+          multiplierDelta: 0.22,
+          iconKind: 'frost',
+        },
+        {
           id: 'MAGICO',
-          label: 'MAGIA',
+          label: 'ARCANO',
           modifierText: '+20% daño',
           multiplierDelta: 0.2,
           iconKind: 'arcane',
@@ -1037,37 +1537,51 @@ export function getEnemyWeaknessAndResistanceProfile(enemy: CriptaRoomEnemy): {
       resistances: [
         {
           id: 'PERFORANTE',
-          label: 'FLECHAS / DAGAS',
+          label: 'PERFORANTE',
           modifierText: '-25% daño',
           multiplierDelta: -0.25,
           iconKind: 'pierce',
+        },
+        {
+          id: 'FUEGO',
+          label: 'FUEGO ÍGNEO',
+          modifierText: '-20% daño',
+          multiplierDelta: -0.2,
+          iconKind: 'fire',
         },
       ],
     };
   }
 
-  // Default for cultist_acolyte, inquisitor_lord, crypt_warden, etc.
+  // Default for executioner, blood_acolyte, arcane_archivist, astral_weaver, goblin_raider, mine_stalker
   return {
     weaknesses: [
       {
         id: 'PERFORANTE',
         label: 'PERFORANTE',
-        modifierText: '+20% daño',
-        multiplierDelta: 0.2,
+        modifierText: '+22% daño',
+        multiplierDelta: 0.22,
         iconKind: 'pierce',
       },
       {
-        id: 'FISICO',
-        label: 'ACERO',
-        modifierText: '+15% daño',
-        multiplierDelta: 0.15,
-        iconKind: 'slash',
+        id: 'VENENO',
+        label: 'VENENO',
+        modifierText: '+20% daño',
+        multiplierDelta: 0.2,
+        iconKind: 'poison',
+      },
+      {
+        id: 'SOMBRA',
+        label: 'SOMBRA ABISAL',
+        modifierText: '+18% daño',
+        multiplierDelta: 0.18,
+        iconKind: 'shadow',
       },
     ],
     resistances: [
       {
         id: 'MAGICO',
-        label: 'SOMBRA / ARCANO',
+        label: 'ARCANO',
         modifierText: '-15% daño',
         multiplierDelta: -0.15,
         iconKind: 'arcane',
@@ -1076,52 +1590,93 @@ export function getEnemyWeaknessAndResistanceProfile(enemy: CriptaRoomEnemy): {
   };
 }
 
+export function getWeaponVsEnemyMatchupSummary(
+  player: CriptaPlayer,
+  actionType: 'ATTACK' | 'WEAPON_SPECIAL' | 'ABILITY',
+  enemy: CriptaRoomEnemy
+): {
+  multiplier: number;
+  state: 'WEAKNESS' | 'RESISTANCE' | 'NEUTRAL';
+  matchedTraitLabel?: string;
+  activeDamageType: CriptaDamageType;
+  activeDamageLabel: string;
+  deltaPct: number;
+} {
+  const eq = getEquippedWeaponForPlayer(player);
+  const charId = player.characterId || player.selectedCharacterId || 'caballero';
+  const profile = getEnemyWeaknessAndResistanceProfile(enemy);
+
+  const activeTags = new Set<CriptaDamageType>();
+  activeTags.add(eq.activeDamageType);
+  if (eq.secondaryDamageType) {
+    activeTags.add(eq.secondaryDamageType);
+  }
+
+  // If using a class ability without an overriding rune, add class innate affinity
+  if (actionType === 'ABILITY' && !eq.activeRune) {
+    if (charId === 'clerigo') activeTags.add('SAGRADO');
+    if (charId === 'mago') activeTags.add('MAGICO');
+    if (charId === 'alquimista') activeTags.add('ALQUIMICO');
+    if (charId === 'picaro' || charId === 'cazador') activeTags.add('PERFORANTE');
+  }
+
+  let bestWeakness: CriptaEnemyTraitEntry | null = null;
+  for (const w of profile.weaknesses) {
+    if (activeTags.has(w.id)) {
+      if (!bestWeakness || w.multiplierDelta > bestWeakness.multiplierDelta) {
+        bestWeakness = w;
+      }
+    }
+  }
+
+  const meta = CRIPTA_DAMAGE_TYPE_META[eq.activeDamageType] || CRIPTA_DAMAGE_TYPE_META.FISICO;
+
+  if (bestWeakness) {
+    return {
+      multiplier: 1 + bestWeakness.multiplierDelta,
+      state: 'WEAKNESS',
+      matchedTraitLabel: bestWeakness.label,
+      activeDamageType: eq.activeDamageType,
+      activeDamageLabel: meta.shortLabel,
+      deltaPct: Math.round(bestWeakness.multiplierDelta * 100),
+    };
+  }
+
+  let worstResistance: CriptaEnemyTraitEntry | null = null;
+  for (const r of profile.resistances) {
+    if (activeTags.has(r.id)) {
+      if (!worstResistance || r.multiplierDelta < worstResistance.multiplierDelta) {
+        worstResistance = r;
+      }
+    }
+  }
+
+  if (worstResistance) {
+    return {
+      multiplier: 1 + worstResistance.multiplierDelta,
+      state: 'RESISTANCE',
+      matchedTraitLabel: worstResistance.label,
+      activeDamageType: eq.activeDamageType,
+      activeDamageLabel: meta.shortLabel,
+      deltaPct: Math.round(worstResistance.multiplierDelta * 100),
+    };
+  }
+
+  return {
+    multiplier: 1,
+    state: 'NEUTRAL',
+    activeDamageType: eq.activeDamageType,
+    activeDamageLabel: meta.shortLabel,
+    deltaPct: 0,
+  };
+}
+
 export function computeWeaponVsEnemyTraitMultiplier(
   player: CriptaPlayer,
   actionType: 'ATTACK' | 'WEAPON_SPECIAL' | 'ABILITY',
   enemy: CriptaRoomEnemy
 ): number {
-  const eq = getEquippedWeaponForPlayer(player);
-  const charId = player.characterId || player.selectedCharacterId || 'caballero';
-  const fam = eq.weapon.family;
-  const profile = getEnemyWeaknessAndResistanceProfile(enemy);
-
-  const activeTags = new Set<CriptaEnemyTraitEntry['id']>();
-  if (fam === 'MACE' || charId === 'clerigo') {
-    activeTags.add('SAGRADO');
-    activeTags.add('CONTUNDENTE');
-  }
-  if (fam === 'PICKAXE' || fam === 'AXE') {
-    activeTags.add('CONTUNDENTE');
-    activeTags.add('FISICO');
-  }
-  if (fam === 'SWORD') {
-    activeTags.add('FISICO');
-  }
-  if (fam === 'DAGGER' || fam === 'BOW' || charId === 'picaro' || charId === 'cazador') {
-    activeTags.add('PERFORANTE');
-  }
-  if (fam === 'STAFF' || (actionType === 'ABILITY' && charId === 'mago')) {
-    activeTags.add('MAGICO');
-  }
-  if (fam === 'ALCHEMICAL' || charId === 'alquimista') {
-    activeTags.add('ALQUIMICO');
-  }
-
-  let delta = 0;
-  for (const w of profile.weaknesses) {
-    if (activeTags.has(w.id)) {
-      delta = Math.max(delta, w.multiplierDelta);
-    }
-  }
-  if (delta === 0) {
-    for (const r of profile.resistances) {
-      if (activeTags.has(r.id)) {
-        delta = Math.min(delta, r.multiplierDelta);
-      }
-    }
-  }
-  return 1 + delta;
+  return getWeaponVsEnemyMatchupSummary(player, actionType, enemy).multiplier;
 }
 
 export function formatDamageRange(
@@ -1191,11 +1746,16 @@ export function estimatePlayerActionDamage(
   affectedEnemyIds: string[];
   label: string;
   isMagical: boolean;
+  damageType: CriptaDamageType;
+  damageTypeLabel: string;
+  matchupState: 'WEAKNESS' | 'RESISTANCE' | 'NEUTRAL';
+  matchupDeltaPct: number;
 } {
   const eq = getEquippedWeaponForPlayer(player);
   const stats = computePlayerEffectiveStats(player);
   const charId = player.characterId || player.selectedCharacterId || 'caballero';
   const charDef = CRIPTA_CHARACTERS_CATALOG[charId];
+  const dmgMeta = CRIPTA_DAMAGE_TYPE_META[eq.activeDamageType] || CRIPTA_DAMAGE_TYPE_META.FISICO;
   const selectedAbility =
     actionType === 'ABILITY'
       ? charDef?.abilities.find((a) => a.id === abilityId) ||
@@ -1220,17 +1780,28 @@ export function estimatePlayerActionDamage(
       affectedEnemyIds: [],
       label: selectedAbility.kind === 'HEAL' ? 'CURACIÓN' : 'PROTECCIÓN',
       isMagical: true,
+      damageType: eq.activeDamageType,
+      damageTypeLabel: dmgMeta.shortLabel,
+      matchupState: 'NEUTRAL',
+      matchupDeltaPct: 0,
     };
   }
 
   const isMagical =
     eq.weapon.scalingStat === 'MAGIA' ||
+    eq.activeDamageType === 'MAGICO' ||
+    eq.activeDamageType === 'ASTRAL' ||
+    eq.activeDamageType === 'SOMBRA' ||
     (actionType === 'ABILITY' &&
       (charId === 'mago' || charId === 'clerigo' || charId === 'alquimista'));
 
   const statValue = isMagical ? stats.magic : stats.attack;
-  // Grounded stat contribution: +1 per 2 points above baseline 4
-  const statContribution = Math.max(0, Math.round((statValue - 4) * 0.55));
+  const magicHybridBonus = eq.activeRune?.magicScalingBonusPct
+    ? Math.round(stats.magic * (eq.activeRune.magicScalingBonusPct / 100))
+    : 0;
+  // Grounded stat contribution: +1 per 2 points above baseline 4 + any hybrid rune scaling
+  const statContribution =
+    Math.max(0, Math.round((statValue - 4) * 0.55)) + magicHybridBonus;
 
   let actionMultiplier = 1.0;
   let affectedEnemies: CriptaRoomEnemy[] = targetEnemy ? [targetEnemy] : [];
@@ -1263,6 +1834,7 @@ export function estimatePlayerActionDamage(
   if (playerHasStatus(player, 'FEAR')) statusMult -= 0.18;
   if (playerHasStatus(player, 'WEAKENED')) statusMult -= 0.18;
   if (playerHasStatus(player, 'BLESSED')) statusMult += 0.25;
+  if (playerHasStatus(player, 'STRENGTHENED')) statusMult += 0.2;
 
   // Class Passive Synergies
   if (charId === 'caballero' && player.isDefendingThisRound) {
@@ -1307,25 +1879,40 @@ export function estimatePlayerActionDamage(
     eq.weapon.undeadBonusPct &&
     (targetEnemy.spriteArchetype === 'skeleton_warrior' ||
       targetEnemy.spriteArchetype === 'bone_colossus' ||
-      targetEnemy.spriteArchetype === 'chained_wraith')
+      targetEnemy.spriteArchetype === 'chained_wraith' ||
+      targetEnemy.spriteArchetype === 'sand_mummy')
   ) {
     statusMult += eq.weapon.undeadBonusPct / 100;
   }
 
+  let matchupState: 'WEAKNESS' | 'RESISTANCE' | 'NEUTRAL' = 'NEUTRAL';
+  let matchupDeltaPct = 0;
+
   if (targetEnemy) {
-    const traitMult = computeWeaponVsEnemyTraitMultiplier(player, actionType, targetEnemy);
-    statusMult *= traitMult;
+    const matchup = getWeaponVsEnemyMatchupSummary(player, actionType, targetEnemy);
+    statusMult *= matchup.multiplier;
+    matchupState = matchup.state;
+    matchupDeltaPct = matchup.deltaPct;
+
+    // Tradeoff from Runa de Aguja Carmesí: -20% non-crit damage vs heavily armored targets (DEF >= 4)
+    if (
+      eq.activeRune?.heavyArmorNonCritPenaltyPct &&
+      (targetEnemy.armor || 0) >= 4
+    ) {
+      statusMult *= 1 - eq.activeRune.heavyArmorNonCritPenaltyPct / 100;
+    }
   }
 
   if (targetEnemy && (targetEnemy.vulnerableTurns || 0) > 0) {
     statusMult += 0.25;
   }
 
-  statusMult = Math.max(0.5, statusMult);
+  statusMult = Math.max(0.45, statusMult);
 
   const armorPierce =
     (actionType === 'WEAPON_SPECIAL' ? eq.weapon.specialAttack.armorPierce || 0 : 0) +
     (actionType === 'ABILITY' ? selectedAbility?.armorBreak || 0 : 0) +
+    eq.effectiveArmorPierceBonus +
     (charId === 'cazador' ? 3 : charId === 'picaro' ? 2 : 0) +
     (playerHasRelic(player, partyRelics, 'diente_del_rey') ? 2 : 0);
 
@@ -1361,6 +1948,10 @@ export function estimatePlayerActionDamage(
     affectedEnemyIds: affectedEnemies.map((e) => e.id),
     label,
     isMagical,
+    damageType: eq.activeDamageType,
+    damageTypeLabel: dmgMeta.shortLabel,
+    matchupState,
+    matchupDeltaPct,
   };
 }
 
@@ -1380,6 +1971,8 @@ export function rollAuthoritativePlayerDamage(
   damage: number;
   isCrit: boolean;
   isMagical: boolean;
+  damageType: CriptaDamageType;
+  matchupState: 'WEAKNESS' | 'RESISTANCE' | 'NEUTRAL';
   appliedOnHitStatus?: CriptaStatusEffectType;
 } {
   const est = estimatePlayerActionDamage(
@@ -1406,11 +1999,17 @@ export function rollAuthoritativePlayerDamage(
 
   const hasWeakened = Boolean(playerHasStatus(player, 'WEAKENED'));
   const hasBlessed = Boolean(playerHasStatus(player, 'BLESSED'));
-  const critThreshold = stats.critChancePct + (hasBlessed ? 10 : 0);
+  const hasCritBoost = Boolean(playerHasStatus(player, 'CRIT_BOOST'));
+  const critThreshold =
+    stats.critChancePct + (hasBlessed ? 10 : 0) + (hasCritBoost ? 20 : 0);
   const critRoll = ((currentTurn * 53 + player.seatIndex * 29 + targetEnemy.maxHp) & 0x7fffffff) % 100;
   const isCrit = !hasWeakened && !isSecondaryTarget && critRoll < critThreshold;
 
   if (isCrit) {
+    // If Runa de Aguja Carmesí is equipped, critical hits ignore the heavy-armor non-crit penalty!
+    if (eq.activeRune?.heavyArmorNonCritPenaltyPct && (targetEnemy.armor || 0) >= 4) {
+      rolled = Math.round(rolled / (1 - eq.activeRune.heavyArmorNonCritPenaltyPct / 100));
+    }
     const critMult = playerHasRelic(player, partyRelics, 'diente_del_rey') ? 1.65 : 1.45;
     rolled = Math.max(rolled + 2, Math.round(rolled * critMult));
   }
@@ -1418,16 +2017,24 @@ export function rollAuthoritativePlayerDamage(
   let appliedOnHitStatus: CriptaStatusEffectType | undefined;
   if (actionType === 'WEAPON_SPECIAL' && eq.weapon.specialAttack.appliesStatus) {
     appliedOnHitStatus = eq.weapon.specialAttack.appliesStatus;
-  } else if (isCrit && eq.weapon.onCritStatus) {
-    appliedOnHitStatus = eq.weapon.onCritStatus;
-  } else if (eq.weapon.onHitStatus) {
-    appliedOnHitStatus = eq.weapon.onHitStatus;
+    if (
+      eq.activeRune?.disablesBleedAndPoison &&
+      (appliedOnHitStatus === 'BLEED' || appliedOnHitStatus === 'POISON')
+    ) {
+      appliedOnHitStatus = eq.effectiveOnHitStatus;
+    }
+  } else if (isCrit && eq.effectiveOnCritStatus) {
+    appliedOnHitStatus = eq.effectiveOnCritStatus;
+  } else if (eq.effectiveOnHitStatus) {
+    appliedOnHitStatus = eq.effectiveOnHitStatus;
   }
 
   return {
     damage: Math.max(2, rolled),
     isCrit,
     isMagical: est.isMagical,
+    damageType: est.damageType,
+    matchupState: est.matchupState,
     appliedOnHitStatus,
   };
 }
@@ -1477,6 +2084,35 @@ export function pickWeaponDropForDungeon(
   const pool = isRareOrElite ? rarePool : uncommonPool;
   const idx = (dungeonId.length + roomIndex * 3) % pool.length;
   return pool[idx];
+}
+
+export function pickWeaponRuneDropForDungeon(
+  dungeonId: CriptaDungeonId,
+  roomIndex: number,
+  isRareOrElite: boolean
+): CriptaWeaponRuneId {
+  const biomePreferred: Partial<Record<CriptaDungeonId, CriptaWeaponRuneId[]>> = {
+    forja_infernal: ['runa_brasa_infernal', 'runa_plomo_contundente'],
+    cripta_de_cristal: ['runa_escarcha_permafrost', 'runa_resonancia_astral'],
+    cementerio_de_gigantes: ['runa_luz_consagrada', 'runa_plomo_contundente'],
+    catacumbas_del_rey: ['runa_luz_consagrada', 'runa_plomo_contundente'],
+    jardin_podrido: ['runa_toxina_abisal', 'runa_brasa_infernal'],
+    alcantarillas_imperiales: ['runa_toxina_abisal', 'runa_aguja_perforante'],
+    biblioteca_prohibida: ['runa_resonancia_astral', 'runa_vacio_umbrio'],
+    torre_del_astrologo: ['runa_resonancia_astral', 'runa_escarcha_permafrost'],
+    palacio_de_los_espejos: ['runa_resonancia_astral', 'runa_aguja_perforante'],
+    cavernas_heladas: ['runa_escarcha_permafrost', 'runa_plomo_contundente'],
+    santuario_de_sangre: ['runa_aguja_perforante', 'runa_vacio_umbrio'],
+    el_abismo: ['runa_vacio_umbrio', 'runa_resonancia_astral'],
+  };
+  const preferred = biomePreferred[dungeonId];
+  if (preferred && preferred.length > 0 && !isRareOrElite) {
+    return preferred[roomIndex % preferred.length];
+  }
+  const idx =
+    Math.abs(dungeonId.length * 11 + roomIndex * 5 + (isRareOrElite ? 3 : 0)) %
+    ALL_WEAPON_RUNE_IDS.length;
+  return ALL_WEAPON_RUNE_IDS[idx];
 }
 
 export function buildRoomEncounterSubjectAndObjects(
@@ -1638,3 +2274,88 @@ export function buildRoomEncounterSubjectAndObjects(
     interactiveObjects,
   };
 }
+
+export interface CriptaMysteriousEventBlueprint {
+  eventId: string;
+  inspectLabel: string;
+  inspectSubtitle: string;
+  respectLabel: string;
+  respectSubtitle: string;
+  cautionLabel: string;
+  cautionSubtitle: string;
+}
+
+const MYSTERIOUS_EVENT_BLUEPRINTS: CriptaMysteriousEventBlueprint[] = [
+  {
+    eventId: 'ESPECTRO_ENCADENADO',
+    inspectLabel: 'DESCIFRAR RUNAS DEL ESPECTRO',
+    inspectSubtitle: 'Interrogar su memoria con sabiduría arcana',
+    respectLabel: 'LIBERAR SUS CADENAS DE HIERRO',
+    respectSubtitle: 'Romper los grilletes y honrar su juramento',
+    cautionLabel: 'RODEAR EL PEDESTAL EN SILENCIO',
+    cautionSubtitle: 'Evitar perturbar el sello ancestral',
+  },
+  {
+    eventId: 'POZO_ABISAL',
+    inspectLabel: 'EXTRAER ESENCIA DEL POZO ABISAL',
+    inspectSubtitle: 'Destilar el agua fosforescente en un vial',
+    respectLabel: 'SUMERGIR EL ARMA EN LAS AGUAS',
+    respectSubtitle: 'Templar el acero con el poder del subsuelo',
+    cautionLabel: 'SELLAR EL BROCAL Y AVANZAR',
+    cautionSubtitle: 'Recoger las monedas del borde sin beber',
+  },
+  {
+    eventId: 'AUTOMATA_HERRERO',
+    inspectLabel: 'ESTUDIAR LOS PLANOS DEL HERRERO CIEGO',
+    inspectSubtitle: 'Aprender los grabados rúnicos del yunque',
+    respectLabel: 'AVIVAR LA FORJA Y RECLAMAR ACERO',
+    respectSubtitle: 'Ayudar al forjador a completar su obra maestra',
+    cautionLabel: 'TOMAR LAS BRASAS RESTANTES',
+    cautionSubtitle: 'Asegurar suministros y continuar la marcha',
+  },
+  {
+    eventId: 'ESPEJO_ASTRAL',
+    inspectLabel: 'CONTEMPLAR EL ESPEJO DEL UMBRAL',
+    inspectSubtitle: 'Canalizar el reflejo astral para fortalecer el espíritu',
+    respectLabel: 'QUEBRAR EL CRISTAL CON ACERO',
+    respectSubtitle: 'Reclamar el armamento atrapado tras el espejo',
+    cautionLabel: 'CUBRIR EL ESPEJO CON UN MANTO',
+    cautionSubtitle: 'Cruzar la galería sin mirar atrás',
+  },
+  {
+    eventId: 'SABUESO_HERIDO',
+    inspectLabel: 'CURAR LAS HERIDAS DEL SABUESO',
+    inspectSubtitle: 'Aplicar ungüento y ganar su lealtad en la cripta',
+    respectLabel: 'REGISTRAR EL ALIJO DEL EXPLORADOR',
+    respectSubtitle: 'Recuperar las armas y provisiones del rincón',
+    cautionLabel: 'OFRECER RACIONES Y SEGUIR ADELANTE',
+    cautionSubtitle: 'Calmar a la bestia y cruzar sin conflicto',
+  },
+  {
+    eventId: 'FUENTE_Y_JURAMENTO',
+    inspectLabel: 'BEBER DE LA FUENTE ANCESTRAL',
+    inspectSubtitle: 'Recibir las aguas consagradas del manantial',
+    respectLabel: 'FORJAR ALIANZA CON EL GUARDIÁN',
+    respectSubtitle: 'Unir aceros y jurar lealtad ante el altar',
+    cautionLabel: 'ROMPER SELLO Y AVANZAR',
+    cautionSubtitle: 'Quebrar la barrera mágica del umbral',
+  },
+  {
+    eventId: 'BRASERO_Y_ARMERIA',
+    inspectLabel: 'ENCENDER EL BRASERO RITUAL',
+    inspectSubtitle: 'Avivar la llama ancestral de la cámara',
+    respectLabel: 'REPARAR ARMADURA EN EL YUNQUE',
+    respectSubtitle: 'Martillar las placas dañadas y templar el acero',
+    cautionLabel: 'PURIFICAR ALTAR Y AVANZAR',
+    cautionSubtitle: 'Disipar la corrupción antes de cruzar',
+  },
+];
+
+export function pickMysteriousEventBlueprint(
+  dungeonId: CriptaDungeonId,
+  roomIndex: number
+): CriptaMysteriousEventBlueprint {
+  const idx = (dungeonId.length + roomIndex) % MYSTERIOUS_EVENT_BLUEPRINTS.length;
+  return MYSTERIOUS_EVENT_BLUEPRINTS[idx];
+}
+

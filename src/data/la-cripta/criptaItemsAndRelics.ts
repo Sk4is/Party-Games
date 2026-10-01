@@ -14,6 +14,7 @@ import type {
   CriptaRoomGroundDrop,
   CriptaShopSlot,
   CriptaWeaponId,
+  CriptaWeaponRuneId,
 } from '../../types/laCripta';
 import {
   buildEnemyAiProfileForArchetype,
@@ -429,15 +430,21 @@ export function rollEnemyLootDrop(
 ): CriptaRoomGroundDrop | null {
   const step = roomIndex * 97 + enemyIndex * 31 + 17;
   const roll = pseudoRandom(seed, step);
+  const generatedId = `drop_${roomIndex}_${enemyIndex}_${seed}`;
 
   if (isBoss) {
     const relicId = pickUnownedRelic(seed, step + 3, players, partyRelics);
+    const rDef = CRIPTA_RELICS_REGISTRY[relicId];
     return {
-      id: `drop_${roomIndex}_${enemyIndex}_${seed}`,
+      id: generatedId,
+      dropId: generatedId,
       kind: 'RELIC',
+      type: 'RELIC_PEDESTAL',
+      label: rDef?.name || 'Reliquia Ancestral',
       relicId,
       droppedByEnemyName: enemyName,
       xPercent: 52,
+      claimed: false,
       claimedByPlayerId: null,
     };
   }
@@ -445,12 +452,17 @@ export function rollEnemyLootDrop(
   if (isElite) {
     if (roll < 0.42) {
       const relicId = pickUnownedRelic(seed, step + 5, players, partyRelics);
+      const rDef = CRIPTA_RELICS_REGISTRY[relicId];
       return {
-        id: `drop_${roomIndex}_${enemyIndex}_${seed}`,
+        id: generatedId,
+        dropId: generatedId,
         kind: 'RELIC',
+        type: 'RELIC_PEDESTAL',
+        label: rDef?.name || 'Reliquia Ancestral',
         relicId,
         droppedByEnemyName: enemyName,
         xPercent: 48,
+        claimed: false,
         claimedByPlayerId: null,
       };
     }
@@ -463,12 +475,18 @@ export function rollEnemyLootDrop(
       'frasco_volatil',
     ];
     const itemIdx = Math.floor(pseudoRandom(seed, step + 9) * eliteItems.length);
+    const chosenItemId = eliteItems[itemIdx % eliteItems.length];
+    const iDef = CRIPTA_ITEMS_REGISTRY[chosenItemId];
     return {
-      id: `drop_${roomIndex}_${enemyIndex}_${seed}`,
+      id: generatedId,
+      dropId: generatedId,
       kind: 'ITEM',
-      itemId: eliteItems[itemIdx % eliteItems.length],
+      type: 'ITEM',
+      label: iDef?.name || 'Suministro de Élite',
+      itemId: chosenItemId,
       droppedByEnemyName: enemyName,
       xPercent: 45 + (enemyIndex % 3) * 10,
+      claimed: false,
       claimedByPlayerId: null,
     };
   }
@@ -489,12 +507,18 @@ export function rollEnemyLootDrop(
     'bomba_humo',
   ];
   const itemIdx = Math.floor(pseudoRandom(seed, step + 11) * commonPool.length);
+  const chosenCommonId = commonPool[itemIdx % commonPool.length];
+  const commonDef = CRIPTA_ITEMS_REGISTRY[chosenCommonId];
   return {
-    id: `drop_${roomIndex}_${enemyIndex}_${seed}`,
+    id: generatedId,
+    dropId: generatedId,
     kind: 'ITEM',
-    itemId: commonPool[itemIdx % commonPool.length],
+    type: 'ITEM',
+    label: commonDef?.name || 'Suministro de Cripta',
+    itemId: chosenCommonId,
     droppedByEnemyName: enemyName,
     xPercent: 38 + (enemyIndex % 3) * 14,
+    claimed: false,
     claimedByPlayerId: null,
   };
 }
@@ -524,24 +548,77 @@ export function generateShopInventoryForRoom(
     ];
   const hDef = CRIPTA_ITEMS_REGISTRY[hId];
 
-  // Slot 2: Tactical Utility / Cleanse / Elixir / Bomb Consumable (never identical to Slot 1)
-  const tacticalItemPool: CriptaItemId[] = [
-    'antidoto',
-    'tonico_claridad',
-    'unguento_igneo',
-    'elixir_fuerza',
-    'elixir_hierro',
-    'elixir_arcano',
-    'bomba_humo',
-    'frasco_volatil',
+  // Slot 2: Weapon Rune / Elemental Infusion for sale (Tactical weapon customization)
+  const shopWeaponRunePool: Array<{
+    id: CriptaWeaponRuneId;
+    name: string;
+    rarity: string;
+    description: string;
+    price: number;
+  }> = [
+    {
+      id: 'runa_brasa_infernal',
+      name: 'Runa de Brasa Infernal',
+      rarity: 'RARA',
+      description: 'Infunde FUEGO (+12% Daño Base y aplica Quemadura; −10% Crítico).',
+      price: 48,
+    },
+    {
+      id: 'runa_escarcha_permafrost',
+      name: 'Runa de Escarcha Eterna',
+      rarity: 'RARA',
+      description: 'Infunde HIELO (aplica Escarcha y +2 DEFENSA; −12% Daño directo).',
+      price: 46,
+    },
+    {
+      id: 'runa_toxina_abisal',
+      name: 'Runa de Colmillo Micótico',
+      rarity: 'POCO COMÚN',
+      description: 'Infunde VENENO / ALQUÍMICO (aplica Veneno y Corrosión en críticos; −16% Daño directo).',
+      price: 44,
+    },
+    {
+      id: 'runa_luz_consagrada',
+      name: 'Runa del Sol Consagrado',
+      rarity: 'RARA',
+      description: 'Infunde SAGRADO (+10% Daño y Técnica sana +4 PV al grupo; −8% Crítico y anula Sangrado/Veneno).',
+      price: 52,
+    },
+    {
+      id: 'runa_plomo_contundente',
+      name: 'Runa de Plomo Quebrantahuesos',
+      rarity: 'POCO COMÚN',
+      description: 'Convierte en CONTUNDENTE (+3 Perforación de Armadura; −12% Crítico y +1T CD en Técnica).',
+      price: 42,
+    },
+    {
+      id: 'runa_aguja_perforante',
+      name: 'Runa de Aguja Carmesí',
+      rarity: 'RARA',
+      description: 'Convierte en PERFORANTE (+16% Crítico y Sangrado; −20% vs blindaje pesado sin crítico).',
+      price: 50,
+    },
+    {
+      id: 'runa_resonancia_astral',
+      name: 'Runa de Resonancia Astral',
+      rarity: 'LEGENDARIA',
+      description: 'Infunde ASTRAL (+2 MAGIA y +35% escalado con MAGIA; −2 ATAQUE físico).',
+      price: 62,
+    },
+    {
+      id: 'runa_vacio_umbrio',
+      name: 'Runa del Vacío Umbrío',
+      rarity: 'LEGENDARIA',
+      description: 'Infunde SOMBRA (+22% Daño Total y Maldición en críticos; −1 DEFENSA y −3 PV al usar Técnica).',
+      price: 64,
+    },
   ];
-  const cId =
-    tacticalItemPool[
-      (Math.floor(pseudoRandom(seed, stepBase + 2) * tacticalItemPool.length) +
+  const rRunePick =
+    shopWeaponRunePool[
+      (Math.floor(pseudoRandom(seed, stepBase + 2) * shopWeaponRunePool.length) +
         rerollStep * 2) %
-        tacticalItemPool.length
+        shopWeaponRunePool.length
     ];
-  const cDef = CRIPTA_ITEMS_REGISTRY[cId];
 
   // Slot 3: Class-aware Weapon for sale (drawn from full 19 non-starter weapons)
   const shopWeaponPool: Array<{
@@ -868,13 +945,13 @@ export function generateShopInventoryForRoom(
     {
       id: slot2Id,
       slotId: slot2Id,
-      kind: 'ITEM',
-      itemId: cId,
-      name: cDef.name,
-      category: 'CONSUMIBLE · TÁCTICO',
-      rarity: RARITY_BADGE_COLORS[cDef.rarity]?.label || 'POCO COMÚN',
-      description: cDef.description,
-      priceGold: Math.max(12, Math.round(cDef.basePrice * discountMult)),
+      kind: 'WEAPON_RUNE',
+      weaponRuneId: rRunePick.id,
+      name: rRunePick.name,
+      category: 'RUNA DE ARMA · INFUSIÓN',
+      rarity: rRunePick.rarity,
+      description: rRunePick.description,
+      priceGold: Math.max(36, Math.round(rRunePick.price * discountMult)),
       soldOut: false,
       sold: false,
     },

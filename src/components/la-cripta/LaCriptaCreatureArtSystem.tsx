@@ -31,7 +31,6 @@ const PRIMARY_AUTHORED_RIG_OWNER_SLUGS = new Set<string>([
   'limo_de_cloaca',
   'escriba_sin_rostro',
   'grimorio_animado',
-  'esfera_armilar',
   'obrera_de_quitina',
   'centinela_de_geoda',
   'alma_enjaulada',
@@ -3758,53 +3757,64 @@ function renderArticulatedCreatureFamily(
     }
 
     // ========================================================================
-    // TORRE DEL ASTRÓLOGO: AUTÓMATA DE ASTROLABIO (Armillary Sphere Construct)
+    // TORRE DEL ASTRÓLOGO: ESFERA ARMILAR CHAMÁN (Shamanic Armillary Construct)
     // ========================================================================
     case 'TOWER_ARMILLARY_CONSTRUCT': {
       return (
         <g transform={`translate(${pose.torsoX}, ${pose.torsoY - pose.breathPhase})`}>
+          {/* Hanging Shamanic Talismans & Celestial Scroll Banners Beneath Rings */}
+          <rect x="20" y="48" width="4" height="9" fill="#1A1208" />
+          <rect x="21" y="49" width="2" height="7" fill="#F8F4E6" />
+          <rect x="21" y="51" width="2" height="2" fill="#34D399" />
+          <rect x="40" y="48" width="4" height="9" fill="#1A1208" />
+          <rect x="41" y="49" width="2" height="7" fill="#F8F4E6" />
+          <rect x="41" y="51" width="2" height="2" fill="#34D399" />
+          <rect x="29" y="50" width="6" height="6" fill="#B45309" />
+          <rect x="30" y="51" width="4" height="4" fill="#34D399" />
+
           {/* Outer Engraved Brass Armillary Ring */}
           <rect x="11" y="10" width="42" height="4" fill="#1A1208" />
-          <rect x="12" y="11" width="40" height="2" fill={pal.metalLight} />
+          <rect x="12" y="11" width="40" height="2" fill="#FCD34D" />
           <rect x="11" y="46" width="42" height="4" fill="#1A1208" />
-          <rect x="12" y="47" width="40" height="2" fill={pal.metalLight} />
+          <rect x="12" y="47" width="40" height="2" fill="#FCD34D" />
           <rect x="11" y="14" width="4" height="32" fill="#1A1208" />
-          <rect x="12" y="14" width="2" height="32" fill={pal.metal} />
+          <rect x="12" y="14" width="2" height="32" fill="#D97706" />
           <rect x="49" y="14" width="4" height="32" fill="#1A1208" />
-          <rect x="50" y="14" width="2" height="32" fill={pal.metal} />
+          <rect x="50" y="14" width="2" height="32" fill="#D97706" />
           {/* Tilted Inner Equatorial Ring */}
           <rect
-            x="16"
+            x="15"
             y={26 + (pose.secondaryPhase % 2)}
-            width="32"
+            width="34"
             height="5"
-            fill={pal.metalDark}
+            fill="#78350F"
           />
           <rect
-            x="17"
+            x="16"
             y={27 + (pose.secondaryPhase % 2)}
-            width="30"
+            width="32"
             height="3"
-            fill={pal.accent}
+            fill="#F59E0B"
           />
-          {/* Celestial Star-Map Singularity Core */}
-          <rect x="21" y="19" width="22" height="22" fill="#0D0B1C" />
-          <rect x="22" y="20" width="20" height="20" fill={pal.primaryDark} />
-          <rect x="24" y="22" width="16" height="16" fill={pal.secondaryDark} />
-          <rect x="26" y="24" width="12" height="12" fill={pal.secondary} />
+          {/* Shamanic Emerald-Cyan Astral Core */}
+          <rect x="21" y="19" width="22" height="22" fill="#06281E" />
+          <rect x="23" y="21" width="18" height="18" fill="#047857" />
+          <rect x="25" y="23" width="14" height="14" fill="#10B981" />
           {!pose.eyeBlink && (
             <g>
-              <rect x={28 + pose.eyeShiftX} y="26" width="8" height="8" fill={pal.eyeGlow} />
+              <rect x={27 + pose.eyeShiftX} y="25" width="10" height="10" fill="#34D399" />
+              <rect x={29 + pose.eyeShiftX} y="27" width="6" height="6" fill="#A7F3D0" />
               <rect x={30 + pose.eyeShiftX} y="28" width="4" height="4" fill="#FFFFFF" />
             </g>
           )}
-          {/* Levitating Star-Lance */}
+          {/* Orbiting Shamanic Healing Totem Satellites */}
           <g transform={`translate(${pose.weaponX}, ${pose.weaponY})`}>
-            <rect x="5" y="7" width="5" height="44" fill="#0D0B1C" />
-            <rect x="6" y="8" width="3" height="42" fill={pal.metalLight} />
-            <rect x="3" y="13" width="9" height="9" fill={pal.metalDark} />
-            <rect x="4" y="14" width="7" height="7" fill={pal.eyeGlow} />
-            <rect x="6" y="16" width="3" height="3" fill="#FFFFFF" />
+            <rect x="4" y="18" width="6" height="14" fill="#1A1208" />
+            <rect x="5" y="19" width="4" height="12" fill="#F59E0B" />
+            <rect x="5" y="22" width="4" height="6" fill="#34D399" />
+            <rect x="54" y="18" width="6" height="14" fill="#1A1208" />
+            <rect x="55" y="19" width="4" height="12" fill="#F59E0B" />
+            <rect x="55" y="22" width="4" height="6" fill="#38BDF8" />
           </g>
         </g>
       );
@@ -5398,6 +5408,378 @@ export const LaCriptaAnimatedStageNpc: React.FC<{
               <rect x="28" y="18" width="8" height="5" fill={glowColor} />
               <rect x="30" y="15" width="4" height="5" fill="#FFF8EC" />
             </g>
+          </g>
+        ) : room.encounterSubject?.archetype === 'SPECTRAL_KNIGHT' ? (
+          /* ===================================================================
+             SPECTRAL KNIGHT BOUND IN CHAINS (Caballero Espectral Encadenado)
+             =================================================================== */
+          <g>
+            {/* Hanging Wrought-Iron Dungeon Chains Binding Wrists & Pauldrons */}
+            <rect x="8" y="4" width="2" height="24" fill="#494E59" />
+            <rect x="9" y="6" width="1" height="20" fill="#A8B0C2" />
+            <rect x="54" y="4" width="2" height="24" fill="#494E59" />
+            <rect x="54" y="6" width="1" height="20" fill="#A8B0C2" />
+            <rect x="10" y="24" width="8" height="3" fill="#666D7A" />
+            <rect x="46" y="24" width="8" height="3" fill="#666D7A" />
+
+            {/* Spectral Aura & Kneeling / Hovering Plate Armor Torso */}
+            <g transform={`translate(0, ${breathY})`}>
+              <rect x="16" y="16" width="32" height="30" fill="#0B1320" />
+              <rect x="14" y="18" width="8" height="10" fill="#1E3A5F" />
+              <rect x="42" y="18" width="8" height="10" fill="#1E3A5F" />
+              <rect x="15" y="19" width="6" height="6" fill="#38BDF8" opacity="0.75" />
+              <rect x="43" y="19" width="6" height="6" fill="#38BDF8" opacity="0.75" />
+              <rect x="20" y="18" width="24" height="24" fill="#1E293B" />
+              <rect x="22" y="20" width="20" height="18" fill="#334155" />
+              {/* Spectral Rib-Plate & Soul Core */}
+              <rect x="25" y="22" width="14" height="3" fill="#7DD3FC" />
+              <rect x="26" y="27" width="12" height="3" fill="#38BDF8" />
+              <rect x="28" y="32" width="8" height="3" fill="#0284C7" />
+            </g>
+
+            {/* Visored Greathelm with Blazing Cyan Soul Eyes */}
+            <g transform={`translate(${lookX}, ${breathY})`}>
+              <rect x="23" y="5" width="18" height="14" fill="#0F172A" />
+              <rect x="24" y="6" width="16" height="12" fill="#334155" />
+              <rect x="26" y="4" width="12" height="3" fill="#7DD3FC" />
+              <rect x="25" y="11" width="14" height="4" fill="#09070F" />
+              <rect x={27 + lookX} y="12" width="3" height="2" fill="#38BDF8" />
+              <rect x={34 + lookX} y="12" width="3" height="2" fill="#38BDF8" />
+              <rect x={28 + lookX} y="12" width="1" height="1" fill="#FFFFFF" />
+              <rect x={35 + lookX} y="12" width="1" height="1" fill="#FFFFFF" />
+            </g>
+
+            {/* Planted Ancestral Greatsword in Stone Plinth */}
+            <rect x="30" y="20" width="4" height="31" fill="#94A3B8" />
+            <rect x="31" y="21" width="2" height="28" fill="#E2E8F0" />
+            <rect x="24" y="20" width="16" height="3" fill="#E7A54A" />
+            <rect x="30" y="15" width="4" height="5" fill="#FFD166" />
+          </g>
+        ) : room.encounterSubject?.archetype === 'CURSED_WELL' ? (
+          /* ===================================================================
+             ABYSSAL WELL OF WHISPERS (Pozo de las Aguas Abisales)
+             =================================================================== */
+          <g>
+            {/* Timber Roof Beams & Iron Pulley Wheel */}
+            <rect x="14" y="8" width="4" height="30" fill="#3D2415" />
+            <rect x="46" y="8" width="4" height="30" fill="#3D2415" />
+            <rect x="10" y="4" width="44" height="6" fill="#2A180E" />
+            <rect x="12" y="5" width="40" height="4" fill="#5E3A24" />
+            <rect x="29" y="10" width="6" height="6" fill="#494E59" />
+            <rect x="31" y="16" width="2" height="14" fill="#8E96A4" />
+
+            {/* Rising Bioluminescent Mist & Eldritch Tendrils from Well Mouth */}
+            <g transform={`translate(0, ${breathY})`}>
+              <rect x="20" y="22" width="24" height="14" fill={glowColor} opacity="0.35" />
+              <rect x="23" y="18" width="4" height="16" fill="#2DD4BF" />
+              <rect x="37" y="19" width="4" height="15" fill="#A855F7" />
+              <rect x="29" y="20" width="6" height="10" fill="#5EEAD4" />
+            </g>
+
+            {/* Circular Chiselled Stone Well Parapet */}
+            <rect x="12" y="34" width="40" height="16" fill="#111622" />
+            <rect x="14" y="35" width="36" height="14" fill="#1E293B" />
+            <rect x="16" y="32" width="32" height="5" fill="#475569" />
+            <rect x="18" y="33" width="28" height="2" fill="#2DD4BF" />
+            {/* Brick Courses */}
+            <rect x="16" y="39" width="10" height="4" fill="#334155" />
+            <rect x="28" y="39" width="10" height="4" fill="#334155" />
+            <rect x="40" y="39" width="8" height="4" fill="#334155" />
+            <rect x="20" y="45" width="12" height="4" fill="#334155" />
+            <rect x="34" y="45" width="12" height="4" fill="#334155" />
+          </g>
+        ) : room.encounterSubject?.archetype === 'ABYSSAL_MIRROR' ? (
+          /* ===================================================================
+             MIRROR OF FRACTURED REFLECTIONS (Espejo de los Reflejos Rotos)
+             =================================================================== */
+          <g transform={`translate(0, ${breathY})`}>
+            {/* Ornate Gilded Gothic Mirror Frame */}
+            <rect x="14" y="6" width="36" height="44" fill="#2A1C0E" />
+            <rect x="16" y="8" width="32" height="40" fill="#E7A54A" />
+            <rect x="18" y="10" width="28" height="36" fill="#090D16" />
+            <rect x="26" y="3" width="12" height="5" fill="#FFD166" />
+            <rect x="30" y="4" width="4" height="3" fill="#C084FC" />
+
+            {/* Fractured Quicksilver Glass & Glowing Doppelganger Silhouette Inside */}
+            <rect x="20" y="12" width="8" height="16" fill="#1E293B" />
+            <rect x="30" y="24" width="14" height="20" fill="#1E1B4B" />
+            <rect x="25" y="16" width="14" height="26" fill="#312E81" />
+            <rect x="28" y="18" width="8" height="8" fill="#4C1D95" />
+            <rect x={29 + lookX} y="21" width="2" height="2" fill="#F43F5E" />
+            <rect x={33 + lookX} y="21" width="2" height="2" fill="#38BDF8" />
+            {/* Diagonal Mirror Crack Lines */}
+            <rect x="20" y="14" width="6" height="1" fill="#E2E8F0" />
+            <rect x="26" y="15" width="6" height="1" fill="#E2E8F0" />
+            <rect x="32" y="16" width="8" height="1" fill="#E2E8F0" />
+            <rect x="24" y="32" width="14" height="1" fill="#A5F3FC" />
+          </g>
+        ) : room.encounterSubject?.archetype === 'BLIND_ORACLE' ? (
+          /* ===================================================================
+             BLIND ORACLE OF THE ASHES (Oráculo Ciego de las Cenizas)
+             =================================================================== */
+          <g>
+            {/* Orbiting Celestial Divination Spheres */}
+            <g transform={`translate(0, ${handY})`}>
+              <rect x="10" y="14" width="6" height="6" fill="#E7A54A" />
+              <rect x="11" y="15" width="4" height="4" fill="#FFF3C4" />
+              <rect x="48" y="14" width="6" height="6" fill="#9B72CF" />
+              <rect x="49" y="15" width="4" height="4" fill="#E0AAFF" />
+            </g>
+
+            {/* Layered Oracle Robes & Gold Astrological Stole */}
+            <g transform={`translate(0, ${breathY})`}>
+              <rect x="18" y="20" width="28" height="30" fill="#140E21" />
+              <rect x="20" y="21" width="24" height="28" fill="#2A1B42" />
+              <rect x="24" y="21" width="16" height="28" fill="#3B2559" />
+              <rect x="29" y="22" width="6" height="26" fill="#E7A54A" />
+              <rect x="30" y="24" width="4" height="22" fill="#FFD166" />
+            </g>
+
+            {/* Hooded Head, Linen Blindfold & Blazing Third Eye on Forehead */}
+            <g transform={`translate(${lookX}, ${breathY})`}>
+              <rect x="22" y="6" width="20" height="15" fill="#140E21" />
+              <rect x="24" y="7" width="16" height="13" fill="#2A1B42" />
+              {/* Linen Blindfold Across Eyes */}
+              <rect x="24" y="13" width="16" height="4" fill="#E8DFCE" />
+              <rect x="25" y="14" width="14" height="2" fill="#FFF8EC" />
+              {/* Open Blazing Third Eye */}
+              <rect x="30" y="9" width="4" height="3" fill="#FFD166" />
+              <rect x="31" y="10" width="2" height="2" fill="#F43F5E" />
+            </g>
+          </g>
+        ) : room.encounterSubject?.archetype === 'TALKING_SKULL_TOTEM' ? (
+          /* ===================================================================
+             TOTEM OF CHATTERING SKULLS (Tótem de Cráneos Parlantes)
+             =================================================================== */
+          <g>
+            {/* Impaled Ceremonial Sword at Top of Totem */}
+            <rect x="30" y="2" width="4" height="14" fill="#94A3B8" />
+            <rect x="31" y="3" width="2" height="12" fill="#F8FAFC" />
+            <rect x="25" y="8" width="14" height="2" fill="#E7A54A" />
+
+            {/* Three Stacked Bronze & Bone Skulls with Glowing Eyes */}
+            {[12, 24, 36].map((sy, idx) => (
+              <g
+                key={sy}
+                transform={`translate(${idx % 2 === 0 ? lookX : -lookX}, ${
+                  idx === 0 ? breathY : 0
+                })`}
+              >
+                <rect x="22" y={sy} width="20" height="11" fill="#1C1917" />
+                <rect x="24" y={sy + 1} width="16" height="8" fill="#E7E5E4" />
+                <rect x="26" y={sy + 3} width="4" height="3" fill="#09070F" />
+                <rect x="34" y={sy + 3} width="4" height="3" fill="#09070F" />
+                <rect
+                  x="27"
+                  y={sy + 4}
+                  width="2"
+                  height="2"
+                  fill={idx === 0 ? '#38BDF8' : idx === 1 ? '#4ADE80' : '#F43F5E'}
+                />
+                <rect
+                  x="35"
+                  y={sy + 4}
+                  width="2"
+                  height="2"
+                  fill={idx === 0 ? '#38BDF8' : idx === 1 ? '#4ADE80' : '#F43F5E'}
+                />
+                <rect x="26" y={sy + 9} width="12" height="2" fill="#A8A29E" />
+              </g>
+            ))}
+          </g>
+        ) : room.encounterSubject?.archetype === 'CRYSTAL_SARCOPHAGUS' ? (
+          /* ===================================================================
+             SEALED QUARTZ SARCOPHAGUS (Sarcófago de Cuarzo Sellado)
+             =================================================================== */
+          <g transform={`translate(0, ${breathY})`}>
+            {/* Outer Prismatic Quartz Coffin */}
+            <rect x="18" y="6" width="28" height="44" fill="#082F49" />
+            <rect x="20" y="8" width="24" height="40" fill="#0284C7" />
+            <rect x="22" y="10" width="20" height="36" fill="#38BDF8" opacity="0.65" />
+            {/* Crowned Monarch Silhouette Visible Inside the Crystal */}
+            <rect x="27" y="13" width="10" height="3" fill="#FFD166" />
+            <rect x="27" y="16" width="10" height="8" fill="#E2E8F0" />
+            <rect x="29" y="19" width="2" height="2" fill="#67E8F9" />
+            <rect x="33" y="19" width="2" height="2" fill="#67E8F9" />
+            <rect x="25" y="25" width="14" height="18" fill="#1E293B" />
+            <rect x="31" y="22" width="2" height="20" fill="#FFD166" />
+            {/* Specular Crystal Facet Highlights */}
+            <rect x="22" y="12" width="3" height="30" fill="#E0F2FE" opacity="0.55" />
+          </g>
+        ) : room.encounterSubject?.archetype === 'ALCHEMICAL_CAULDRON' ? (
+          /* ===================================================================
+             BUBBLING ALCHEMICAL CAULDRON (Caldero Alquímico Burbujeante)
+             =================================================================== */
+          <g>
+            {/* Emerald Soul-Fire Under Tripod */}
+            <rect x="20" y="44" width="24" height="6" fill="#15803D" />
+            <rect x="24" y="45" width="16" height="4" fill="#4ADE80" />
+            <rect x="28" y="46" width="8" height="2" fill="#FEF08A" />
+
+            {/* Heavy Cast-Iron Cauldron */}
+            <rect x="14" y="22" width="36" height="22" fill="#0F172A" />
+            <rect x="16" y="24" width="32" height="18" fill="#1E293B" />
+            <rect x="12" y="20" width="40" height="4" fill="#334155" />
+            {/* Bubbling Mutagenic Brew */}
+            <rect x="16" y="19" width="32" height="3" fill="#22C55E" />
+            <rect x="20" y="18" width="24" height="2" fill="#86EFAC" />
+            {/* Rising Alchemical Bubbles & Floating Vials */}
+            <g transform={`translate(0, ${breathY - (tick % 3)})`}>
+              <rect x="22" y="12" width="4" height="4" fill="#4ADE80" />
+              <rect x="31" y="8" width="5" height="5" fill="#A3E635" />
+              <rect x="39" y="13" width="3" height="3" fill="#67E8F9" />
+            </g>
+          </g>
+        ) : room.encounterSubject?.archetype === 'IMPALED_COLOSSUS_SWORD' ? (
+          /* ===================================================================
+             GREATSWORD OF THE FALLEN COLOSSUS (Espadón del Coloso Caído)
+             =================================================================== */
+          <g>
+            {/* Petrified Giant Skull Half-Buried in Plinth */}
+            <rect x="12" y="30" width="40" height="20" fill="#1E293B" />
+            <rect x="15" y="32" width="34" height="16" fill="#475569" />
+            <rect x="19" y="36" width="8" height="7" fill="#09070F" />
+            <rect x="37" y="36" width="8" height="7" fill="#09070F" />
+            <rect x="21" y="38" width="4" height="3" fill="#38BDF8" opacity="0.8" />
+            <rect x="39" y="38" width="4" height="3" fill="#38BDF8" opacity="0.8" />
+
+            {/* Monumental Runic Greatsword Impaled Vertically into the Skull */}
+            <g transform={`translate(0, ${hovered ? -1 : 0})`}>
+              <rect x="28" y="10" width="8" height="26" fill="#64748B" />
+              <rect x="30" y="11" width="4" height="24" fill="#E2E8F0" />
+              <rect x="31" y="14" width="2" height="16" fill="#FFD166" />
+              {/* Sweeping Gold Crossguard & Pommel */}
+              <rect x="18" y="8" width="28" height="4" fill="#E7A54A" />
+              <rect x="20" y="9" width="24" height="2" fill="#FFD166" />
+              <rect x="30" y="2" width="4" height="6" fill="#78350F" />
+              <rect x="29" y="0" width="6" height="3" fill="#FFD166" />
+            </g>
+          </g>
+        ) : room.encounterSubject?.archetype === 'CAGED_ABYSSAL_RAVEN' ? (
+          /* ===================================================================
+             THREE-EYED ABYSSAL RAVEN IN IRON CAGE (Cuervo Abisal de Tres Ojos)
+             =================================================================== */
+          <g transform={`translate(${lanternSwingX}, 0)`}>
+            {/* Hanging Chain & Wrought-Iron Cage */}
+            <rect x="31" y="0" width="2" height="10" fill="#94A3B8" />
+            <rect x="16" y="10" width="32" height="36" fill="#0F172A" opacity="0.55" />
+            <rect x="16" y="10" width="32" height="3" fill="#475569" />
+            <rect x="16" y="43" width="32" height="3" fill="#475569" />
+            {[16, 23, 31, 39, 46].map((bx) => (
+              <rect key={bx} x={bx} y="12" width="2" height="32" fill="#64748B" />
+            ))}
+            {/* Giant Three-Eyed Raven Inside Cage */}
+            <g transform={`translate(${lookX}, ${breathY})`}>
+              <rect x="24" y="20" width="14" height="16" fill="#09070F" />
+              <rect x="26" y="16" width="10" height="8" fill="#1E1B4B" />
+              <rect x="35" y="18" width="7" height="4" fill="#E7A54A" />
+              {/* Three Glowing Crimson/Gold Eyes */}
+              <rect x="28" y="17" width="2" height="2" fill="#F43F5E" />
+              <rect x="32" y="17" width="2" height="2" fill="#F43F5E" />
+              <rect x="30" y="15" width="2" height="2" fill="#FFD166" />
+            </g>
+          </g>
+        ) : room.encounterSubject?.archetype === 'WEEPING_BLOOD_STATUE' ? (
+          /* ===================================================================
+             EFFIGY OF THE RUBY MARTYR (Efigie de la Mártir de Rubí)
+             =================================================================== */
+          <g>
+            {/* Carved Gothic Stone Statue */}
+            <rect x="20" y="8" width="24" height="42" fill="#1E293B" />
+            <rect x="22" y="10" width="20" height="38" fill="#475569" />
+            <rect x="26" y="11" width="12" height="10" fill="#94A3B8" />
+            {/* Crimson Ruby Tears Flowing Down Into Golden Chalice */}
+            <rect x="28" y="15" width="2" height="10" fill="#E11D48" />
+            <rect x="34" y="15" width="2" height="10" fill="#E11D48" />
+            <rect x="26" y="26" width="12" height="6" fill="#FFD166" />
+            <rect x="28" y="25" width="8" height="3" fill="#E11D48" />
+            <rect x="30" y="32" width="4" height="6" fill="#E7A54A" />
+          </g>
+        ) : room.encounterSubject?.archetype === 'FUNGAL_HERMIT' ? (
+          /* ===================================================================
+             HERMIT OF THE ANCIENT MYCELIUM (Ermitaño del Micelio Ancestral)
+             =================================================================== */
+          <g transform={`translate(0, ${breathY})`}>
+            {/* Spotted Bioluminescent Mushroom Cap Hat */}
+            <rect x="12" y="6" width="40" height="10" fill="#4A2559" />
+            <rect x="16" y="3" width="32" height="5" fill="#7A3E8F" />
+            <rect x="18" y="7" width="4" height="3" fill="#BEF264" />
+            <rect x="30" y="5" width="5" height="3" fill="#4ADE80" />
+            <rect x="42" y="7" width="4" height="3" fill="#BEF264" />
+            {/* Mossy Cloak, Friendly Glowing Eyes & Amber Staff */}
+            <rect x="18" y="16" width="28" height="34" fill="#142918" />
+            <rect x="21" y="18" width="22" height="30" fill="#1E3F24" />
+            <rect x={26 + lookX} y="18" width="3" height="2" fill="#FEF08A" />
+            <rect x={35 + lookX} y="18" width="3" height="2" fill="#FEF08A" />
+            <rect x="48" y="10" width="3" height="40" fill="#78350F" />
+            <rect x="46" y="6" width="7" height="6" fill="#F59E0B" />
+          </g>
+        ) : room.encounterSubject?.archetype === 'ASTRAL_ORRERY_PEDESTAL' ? (
+          /* ===================================================================
+             CELESTIAL BRASS ORRERY (Planetario de Bronce Celeste)
+             =================================================================== */
+          <g transform={`translate(0, ${breathY})`}>
+            <rect x="22" y="36" width="20" height="14" fill="#1E293B" />
+            <rect x="25" y="38" width="14" height="12" fill="#334155" />
+            {/* Concentric Brass Rings & Orbiting Moons */}
+            <rect x="14" y="10" width="36" height="3" fill="#E7A54A" />
+            <rect x="14" y="31" width="36" height="3" fill="#E7A54A" />
+            <rect x="14" y="10" width="3" height="24" fill="#FFD166" />
+            <rect x="47" y="10" width="3" height="24" fill="#FFD166" />
+            <rect x="28" y="18" width="8" height="8" fill="#38BDF8" />
+            <rect x="30" y="20" width="4" height="4" fill="#FFFFFF" />
+          </g>
+        ) : room.encounterSubject?.archetype === 'BLACKSMITH_FORGE' ? (
+          /* ===================================================================
+             ANVIL OF THE BLIND SMITH (Yunque del Herrero Ciego)
+             =================================================================== */
+          <g>
+            {/* Blazing Coal Furnace & Heavy Iron Anvil */}
+            <rect x="10" y="28" width="18" height="22" fill="#1F120E" />
+            <rect x="12" y="32" width="14" height="10" fill="#EA580C" />
+            <rect x="14" y="34" width="10" height="6" fill="#FDE047" />
+            {/* Master Blacksmith & Raised Forging Hammer */}
+            <g transform={`translate(0, ${breathY})`}>
+              <rect x="28" y="12" width="20" height="38" fill="#1E293B" />
+              <rect x="30" y="14" width="16" height="34" fill="#7C2D12" />
+              <rect x="32" y="6" width="12" height="10" fill="#475569" />
+              <rect x="33" y="9" width="10" height="3" fill="#E2E8F0" />
+            </g>
+            <rect x="24" y="36" width="26" height="8" fill="#475569" />
+            <rect x="26" y="35" width="22" height="2" fill="#F97316" />
+          </g>
+        ) : room.encounterSubject?.archetype === 'MECHANICAL_TRAP' || rType === 'TRAP' ? (
+          /* ===================================================================
+             BLADE & GEAR AUTOMATON TRAP (Autómata de Cuchillas y Cadenas)
+             =================================================================== */
+          <g>
+            <rect x="16" y="26" width="32" height="24" fill="#1E293B" />
+            <rect x="20" y="28" width="24" height="20" fill="#334155" />
+            {/* Swinging Pendulum Scythe Blades */}
+            <g transform={`translate(${lanternSwingX * 2}, 0)`}>
+              <rect x="30" y="4" width="4" height="24" fill="#64748B" />
+              <rect x="14" y="22" width="36" height="6" fill="#CBD5E1" />
+              <rect x="12" y="26" width="40" height="2" fill="#E11D48" />
+            </g>
+          </g>
+        ) : room.encounterSubject?.archetype === 'ANCIENT_SEAL' || rType === 'PUZZLE' ? (
+          /* ===================================================================
+             TRIAD OF RUNIC OBELISKS (Tríada de Obeliscos Rúnicos)
+             =================================================================== */
+          <g transform={`translate(0, ${breathY})`}>
+            {[12, 26, 40].map((ox, idx) => (
+              <g key={ox}>
+                <rect x={ox} y={idx === 1 ? 8 : 14} width="12" height={idx === 1 ? 42 : 36} fill="#1E1B4B" />
+                <rect x={ox + 2} y={idx === 1 ? 10 : 16} width="8" height={idx === 1 ? 38 : 32} fill="#312E81" />
+                <rect
+                  x={ox + 4}
+                  y={idx === 1 ? 16 : 22}
+                  width="4"
+                  height="14"
+                  fill={idx === 0 ? '#FFD166' : idx === 1 ? '#C084FC' : '#38BDF8'}
+                />
+              </g>
+            ))}
           </g>
         ) : room.encounterSubject?.archetype === 'INJURED_HOUND' ? (
           /* ===================================================================

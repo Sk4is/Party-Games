@@ -1,21 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  CriptaAccessoryId,
+  CriptaArmorId,
   CriptaCanonicalRoomType,
   CriptaDungeonDefinition,
   CriptaDungeonRoom,
   CriptaItemId,
   CriptaRelicId,
+  CriptaWeaponId,
 } from '../../types/laCripta';
 import {
+  LaCriptaAccessoryPixelIcon,
+  LaCriptaArmorPixelIcon,
   LaCriptaItemPixelIcon,
   LaCriptaRelicPixelIcon,
+  LaCriptaWeaponPixelIcon,
 } from './LaCriptaItemRelicArt';
 import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
 import { LaCriptaAnimatedStageNpc } from './LaCriptaCreatureArtSystem';
-import {
-  CRIPTA_MINIBOSS_ARENAS_REGISTRY,
-  CriptaMinibossArenaBlueprint,
-} from '../../data/la-cripta/criptaBiomeBestiary';
 
 export type CriptaCardVisualTheme =
   | 'ATTACK'
@@ -154,18 +156,55 @@ export const LaCriptaCardIllustration: React.FC<{
   artKind: CriptaCardArtKind;
   itemId?: CriptaItemId;
   relicId?: CriptaRelicId;
-}> = ({ artKind, itemId, relicId }) => {
+  weaponId?: CriptaWeaponId;
+  armorId?: CriptaArmorId;
+  accessoryId?: CriptaAccessoryId;
+  upgradeLevel?: number;
+}> = ({
+  artKind,
+  itemId,
+  relicId,
+  weaponId,
+  armorId,
+  accessoryId,
+  upgradeLevel,
+}) => {
+  if (weaponId) {
+    return (
+      <div className="flex items-center justify-center w-full h-full">
+        <LaCriptaWeaponPixelIcon
+          weaponId={weaponId}
+          upgradeLevel={upgradeLevel}
+          size={60}
+        />
+      </div>
+    );
+  }
+  if (armorId) {
+    return (
+      <div className="flex items-center justify-center w-full h-full">
+        <LaCriptaArmorPixelIcon armorId={armorId} size={54} />
+      </div>
+    );
+  }
+  if (accessoryId) {
+    return (
+      <div className="flex items-center justify-center w-full h-full">
+        <LaCriptaAccessoryPixelIcon accessoryId={accessoryId} size={54} />
+      </div>
+    );
+  }
   if (itemId) {
     return (
       <div className="flex items-center justify-center w-full h-full">
-        <LaCriptaItemPixelIcon itemId={itemId} size={58} />
+        <LaCriptaItemPixelIcon itemId={itemId} size={56} />
       </div>
     );
   }
   if (relicId) {
     return (
       <div className="flex items-center justify-center w-full h-full">
-        <LaCriptaRelicPixelIcon relicId={relicId} size={58} />
+        <LaCriptaRelicPixelIcon relicId={relicId} size={56} />
       </div>
     );
   }
@@ -425,9 +464,14 @@ export interface LaCriptaPlayableCardProps {
   illustration?: React.ReactNode;
   itemId?: CriptaItemId;
   relicId?: CriptaRelicId;
+  weaponId?: CriptaWeaponId;
+  armorId?: CriptaArmorId;
+  accessoryId?: CriptaAccessoryId;
+  upgradeLevel?: number;
   topRightBadge?: string;
   disabled?: boolean;
   selected?: boolean;
+  turnLocked?: boolean;
   voterBadges?: Array<{ id: string; name: string; color: string }>;
   onClick: () => void;
 }
@@ -446,6 +490,7 @@ const ACCENT_TO_THEME: Record<
 
 /**
  * Large vertical playable game card for the Right Stage (Combat Actions, Events, Shop, Rest, Shrine).
+ * Compact height ensures ZERO vertical scroll on the right decision panel.
  */
 export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   title,
@@ -465,9 +510,14 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   illustration,
   itemId,
   relicId,
+  weaponId,
+  armorId,
+  accessoryId,
+  upgradeLevel,
   topRightBadge,
   disabled = false,
   selected = false,
+  turnLocked = false,
   voterBadges = [],
   onClick,
 }) => {
@@ -477,45 +527,46 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   const resolvedTopRight = topRightBadge || cooldownLabel;
   const resolvedPrimary = effectPrimary || footerBadge || categoryLabel;
   const resolvedSecondary = effectSecondary || summary;
+  const isDisabled = disabled || turnLocked;
 
   const cardElement = (
     <button
       type="button"
-      disabled={disabled}
+      disabled={isDisabled}
       onClick={onClick}
-      className={`group relative w-[168px] sm:w-[188px] xl:w-[202px] h-[272px] sm:h-[292px] border-2 flex flex-col justify-between text-left transition-all duration-150 select-none ${
-        disabled
-          ? 'opacity-40 grayscale-[35%] cursor-not-allowed'
+      className={`group relative w-[158px] sm:w-[176px] xl:w-[192px] h-[238px] sm:h-[254px] xl:h-[264px] border-2 flex flex-col justify-between text-left transition-all duration-150 select-none ${
+        isDisabled
+          ? 'opacity-45 grayscale-[30%] cursor-not-allowed'
           : selected
-          ? '-translate-y-2.5 scale-[1.03] cursor-pointer z-20'
-          : 'hover:-translate-y-2 hover:scale-[1.02] active:translate-y-0 cursor-pointer hover:z-10'
+          ? '-translate-y-2 scale-[1.03] cursor-pointer z-20'
+          : 'hover:-translate-y-1.5 hover:scale-[1.02] active:translate-y-0 cursor-pointer hover:z-10'
       }`}
       style={{
         backgroundColor: pal.bg,
         borderColor: selected ? '#FFD166' : pal.border,
         boxShadow: selected
-          ? `0 14px 32px rgba(0,0,0,0.95), 0 0 22px ${pal.glow}`
-          : disabled
-          ? '0 6px 16px rgba(0,0,0,0.7)'
-          : `0 10px 24px rgba(0,0,0,0.88), inset 0 0 18px ${pal.glow}`,
+          ? `0 12px 28px rgba(0,0,0,0.95), 0 0 20px ${pal.glow}`
+          : isDisabled
+          ? '0 4px 12px rgba(0,0,0,0.7)'
+          : `0 8px 20px rgba(0,0,0,0.88), inset 0 0 16px ${pal.glow}`,
       }}
     >
       {/* Top Cost Badge & Optional Cooldown/Risk Badge */}
       <div
-        className="w-full px-2.5 py-1.5 border-b flex items-center justify-between gap-1 shrink-0"
+        className="w-full px-2 py-1 border-b flex items-center justify-between gap-1 shrink-0"
         style={{
           backgroundColor: pal.headerBg,
           borderColor: `${pal.border}66`,
         }}
       >
         <span
-          className="px-1.5 py-0.5 font-cripta-mono text-[10px] font-extrabold tracking-wider uppercase shrink-0"
+          className="px-1.5 py-0.5 font-cripta-mono text-[9px] font-extrabold tracking-wider uppercase shrink-0"
           style={{
             backgroundColor: pal.badgeBg,
             color: pal.badgeText,
           }}
         >
-          {costLabel}
+          {turnLocked ? 'BLOQUEADA' : costLabel}
         </span>
 
         {resolvedTopRight ? (
@@ -533,21 +584,21 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
       </div>
 
       {/* Card Category + Title */}
-      <div className="px-2.5 pt-1.5 pb-1 text-center shrink-0">
+      <div className="px-2 pt-1 pb-0.5 text-center shrink-0">
         <div
           className="font-cripta-pixel text-[8px] uppercase tracking-widest truncate mb-0.5"
           style={{ color: pal.accentText }}
         >
           {categoryLabel}
         </div>
-        <div className="font-cripta-display text-xs sm:text-sm font-black text-[#F4EBD9] uppercase tracking-wide leading-tight line-clamp-2 min-h-[30px] flex items-center justify-center">
+        <div className="font-cripta-display text-xs sm:text-[13px] font-black text-[#F4EBD9] uppercase tracking-wide leading-tight line-clamp-2 min-h-[28px] flex items-center justify-center">
           {title}
         </div>
       </div>
 
       {/* Central Pixel-Art Illustration Frame */}
       <div
-        className="mx-2.5 my-0.5 flex-1 min-h-[76px] sm:min-h-[86px] border flex items-center justify-center relative overflow-hidden"
+        className="mx-2 my-0.5 flex-1 min-h-[66px] sm:min-h-[76px] border flex items-center justify-center relative overflow-hidden"
         style={{
           backgroundColor: pal.artBg,
           borderColor: `${pal.border}55`,
@@ -562,25 +613,29 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
               artKind={artKind}
               itemId={itemId}
               relicId={relicId}
+              weaponId={weaponId}
+              armorId={armorId}
+              accessoryId={accessoryId}
+              upgradeLevel={upgradeLevel}
             />
           )}
         </div>
       </div>
 
       {/* Bottom Deliberate Hierarchy: Headline Number -> Concise Copy -> Target/Status Footer */}
-      <div className="px-2.5 pt-1 pb-2 text-center flex flex-col justify-end gap-0.5 shrink-0">
+      <div className="px-2 pt-1 pb-1.5 text-center flex flex-col justify-end gap-0.5 shrink-0">
         {headlineValue && (
-          <div className="font-cripta-mono text-xs sm:text-sm font-black text-[#FFD166] tracking-wide uppercase leading-tight">
+          <div className="font-cripta-mono text-[11px] sm:text-xs font-black text-[#FFD166] tracking-wide uppercase leading-tight">
             {headlineValue}
           </div>
         )}
         {resolvedSecondary && (
-          <div className="font-cripta-pixel text-[9px] text-[#E8DFCE]/90 leading-snug line-clamp-2 min-h-[24px] flex items-center justify-center">
+          <div className="font-cripta-pixel text-[8px] sm:text-[9px] text-[#E8DFCE]/90 leading-snug line-clamp-2 min-h-[22px] flex items-center justify-center">
             {resolvedSecondary}
           </div>
         )}
         <div
-          className="mt-0.5 pt-1 border-t border-[#2A1F38]/80 font-cripta-mono text-[9px] font-extrabold tracking-wider uppercase leading-snug truncate"
+          className="mt-0.5 pt-1 border-t border-[#2A1F38]/80 font-cripta-mono text-[8px] sm:text-[9px] font-extrabold tracking-wider uppercase leading-snug truncate"
           style={{ color: pal.accentText }}
         >
           {resolvedPrimary}
@@ -639,7 +694,19 @@ export const LaCriptaCardPixelIllustration: React.FC<{
     | 'LEAVE_DOOR';
   itemId?: CriptaItemId;
   relicId?: CriptaRelicId;
-}> = ({ kind, itemId, relicId }) => {
+  weaponId?: CriptaWeaponId;
+  armorId?: CriptaArmorId;
+  accessoryId?: CriptaAccessoryId;
+  upgradeLevel?: number;
+}> = ({
+  kind,
+  itemId,
+  relicId,
+  weaponId,
+  armorId,
+  accessoryId,
+  upgradeLevel,
+}) => {
   const mapKind: Record<typeof kind, CriptaCardArtKind> = {
     ATTACK_SWORD: 'SWORD_SLASH',
     DEFEND_SHIELD: 'IRON_SHIELD',
@@ -662,6 +729,10 @@ export const LaCriptaCardPixelIllustration: React.FC<{
       artKind={mapKind[kind]}
       itemId={itemId}
       relicId={relicId}
+      weaponId={weaponId}
+      armorId={armorId}
+      accessoryId={accessoryId}
+      upgradeLevel={upgradeLevel}
     />
   );
 };
@@ -1636,9 +1707,6 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
   const id = dungeon.id;
   const p = getBiomeVisualProfile(id);
   const isBoss = roomType === 'BOSS' || roomType === 'MINIBOSS';
-  const minibossArena =
-    CRIPTA_MINIBOSS_ARENAS_REGISTRY[id] ||
-    CRIPTA_MINIBOSS_ARENAS_REGISTRY.catacumbas_del_rey;
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden select-none z-0">
@@ -1975,10 +2043,8 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
         className="absolute inset-0"
         style={{
           background: `radial-gradient(circle at 24% 48%, ${
-            isBoss ? `${minibossArena.floorSealColor}40` : p.glowColor
-          }, transparent 56%), radial-gradient(circle at 74% 44%, ${
-            isBoss ? `${minibossArena.altarAccentColor}36` : p.glowColor
-          }, transparent 60%)`,
+            isBoss ? 'rgba(244,63,94,0.28)' : p.glowColor
+          }, transparent 56%), radial-gradient(circle at 74% 44%, ${p.glowColor}, transparent 60%)`,
           animation: 'criptaTorchBreathe 5.4s ease-in-out infinite',
         }}
       />
@@ -1991,270 +2057,6 @@ export const LaCriptaFullScreenBiomeAtmosphere: React.FC<{
     </div>
   );
 };
-
-function renderMinibossSanctumCenterpieceSvg(
-  arena: CriptaMinibossArenaBlueprint,
-  p: CriptaBiomeVisualProfile,
-  flicker: number,
-  pulseY: number
-) {
-  const seal = arena.floorSealColor;
-  const accent = arena.altarAccentColor;
-
-  switch (arena.centerpieceKind) {
-    case 'OSSUARY_THRONE':
-      return (
-        <g>
-          {/* Royal Sarcophagus Archway & Crowned Ossuary Throne */}
-          <rect x="50" y="18" width="60" height="66" fill="#0B0F1A" opacity="0.88" />
-          <rect x="48" y="16" width="64" height="4" fill={accent} opacity="0.85" />
-          <rect x="52" y="22" width="4" height="62" fill="#334155" />
-          <rect x="104" y="22" width="4" height="62" fill="#334155" />
-          {/* Royal Crown Crest */}
-          <rect x="70" y="11" width="20" height="5" fill={accent} />
-          <rect x="72" y="8" width="3" height="3" fill={accent} />
-          <rect x="78" y="7" width="4" height="4" fill="#FEF08A" />
-          <rect x="85" y="8" width="3" height="3" fill={accent} />
-          {/* Twin Spectral Blue Braziers */}
-          <rect x="40" y="54" width="8" height="30" fill="#1E293B" />
-          <rect x="39" y={47 + pulseY} width="10" height="7" fill={seal} opacity={0.9 * flicker} />
-          <rect x="112" y="54" width="8" height="30" fill="#1E293B" />
-          <rect x="111" y={47 + pulseY} width="10" height="7" fill={seal} opacity={0.9 * flicker} />
-        </g>
-      );
-    case 'MYCELIAL_HEART_ALTAR':
-      return (
-        <g>
-          {/* Giant Pulsing Mycelium Brood Pod & Spore Vents */}
-          <rect x="54" y="14" width="52" height="68" fill="#091C10" opacity="0.85" />
-          <rect x="46" y="10" width="6" height="42" fill="#166534" />
-          <rect x="108" y="10" width="6" height="42" fill="#166534" />
-          <rect x="60" y="22" width="40" height="38" fill="#3B1D4E" opacity="0.82" />
-          <rect x="66" y={28 + pulseY} width="28" height="24" fill={seal} opacity={0.45 * flicker} />
-          <rect x="40" y="70" width="14" height="14" fill="#15803D" />
-          <rect x="42" y="67" width="10" height="4" fill={accent} opacity={flicker} />
-          <rect x="106" y="70" width="14" height="14" fill="#15803D" />
-          <rect x="108" y="67" width="10" height="4" fill={accent} opacity={flicker} />
-        </g>
-      );
-    case 'MOLTEN_ANVIL_CRUCIBLE':
-      return (
-        <g>
-          {/* Colossal Molten Crucible pouring lava behind the Abyssal Anvil */}
-          <rect x="62" y="10" width="36" height="22" fill="#27120B" />
-          <rect x="66" y="14" width="28" height="6" fill={accent} opacity={flicker} />
-          <rect x="75" y="32" width="10" height="52" fill={seal} opacity={0.88 * flicker} />
-          <rect x="78" y="32" width="4" height="52" fill="#FEF08A" opacity={flicker} />
-          <rect x="48" y="64" width="64" height="20" fill="#1C1917" />
-          <rect x="52" y="62" width="56" height="4" fill={seal} opacity="0.9" />
-        </g>
-      );
-    case 'SUNKEN_LEVIATHAN_SHRINE':
-      return (
-        <g>
-          {/* Abyssal Kraken Idol & Glowing Coral Monoliths */}
-          <rect x="56" y="18" width="48" height="66" fill="#062032" opacity="0.86" />
-          <rect x="66" y="24" width="28" height="26" fill="#0F3E5C" />
-          <rect x="71" y="32" width="5" height="5" fill={accent} opacity={flicker} />
-          <rect x="84" y="32" width="5" height="5" fill={accent} opacity={flicker} />
-          <rect x="40" y="38" width="8" height="46" fill="#0C4A6E" />
-          <rect x="42" y="42" width="4" height="36" fill={seal} opacity={0.8 * flicker} />
-          <rect x="112" y="38" width="8" height="46" fill="#0C4A6E" />
-          <rect x="114" y="42" width="4" height="36" fill={seal} opacity={0.8 * flicker} />
-        </g>
-      );
-    case 'RUNIC_EXCAVATION_SHAFT':
-      return (
-        <g>
-          {/* Timber-framed Black Quartz Motherlode Monolith */}
-          <rect x="44" y="12" width="8" height="72" fill="#451A03" />
-          <rect x="108" y="12" width="8" height="72" fill="#451A03" />
-          <rect x="44" y="14" width="72" height="6" fill="#78350F" />
-          <rect x="60" y="24" width="40" height="60" fill="#1C1917" />
-          <rect x="68" y="30" width="6" height="44" fill={seal} opacity={0.9 * flicker} />
-          <rect x="86" y="36" width="5" height="38" fill={accent} opacity={0.85 * flicker} />
-        </g>
-      );
-    case 'GUILLOTINE_SCAFFOLD':
-      return (
-        <g>
-          {/* Towering Guillotine Frame & Blood Banners */}
-          <rect x="56" y="10" width="6" height="74" fill="#3F1D24" />
-          <rect x="98" y="10" width="6" height="74" fill="#3F1D24" />
-          <rect x="52" y="12" width="56" height="6" fill="#4C0519" />
-          {/* Angled Guillotine Blade */}
-          <rect x="62" y={22 + pulseY} width="36" height="8" fill="#CBD5E1" />
-          <rect x="62" y={28 + pulseY} width="36" height="3" fill={seal} />
-          {/* Crimson Banners */}
-          <rect x="38" y="18" width="10" height="48" fill="#881337" />
-          <rect x="112" y="18" width="10" height="48" fill="#881337" />
-        </g>
-      );
-    case 'BLACK_ROOT_MENHIR':
-      return (
-        <g>
-          {/* Hollow Spirit-Tree Archway & Soul Lanterns */}
-          <rect x="48" y="12" width="14" height="72" fill="#0F292E" />
-          <rect x="98" y="12" width="14" height="72" fill="#0F292E" />
-          <rect x="56" y="12" width="48" height="10" fill="#134E4A" />
-          <rect x="64" y="24" width="32" height="60" fill="#041317" />
-          <rect x="42" y={34 + pulseY} width="6" height="8" fill={seal} opacity={0.9 * flicker} />
-          <rect x="112" y={34 + pulseY} width="6" height="8" fill={accent} opacity={0.9 * flicker} />
-        </g>
-      );
-    case 'PLAGUE_SLUICE_CAULDRON':
-      return (
-        <g>
-          {/* Imperial Sluice Gate & Toxic Cistern Cascade */}
-          <rect x="52" y="16" width="56" height="68" fill="#142611" />
-          <rect x="60" y="24" width="40" height="60" fill={seal} opacity={0.45 * flicker} />
-          <rect x="68" y="24" width="8" height="60" fill={accent} opacity={0.75 * flicker} />
-          <rect x="84" y="24" width="8" height="60" fill={accent} opacity={0.75 * flicker} />
-        </g>
-      );
-    case 'FORBIDDEN_CHANDELIER_PODIUM':
-      return (
-        <g>
-          {/* Floating Forbidden Grimoire Pedestal & Arcane Seal Chains */}
-          <rect x="42" y="16" width="76" height="4" fill={accent} opacity="0.6" />
-          <rect x="62" y={24 + pulseY} width="36" height="24" fill="#3B0764" />
-          <rect x="66" y={26 + pulseY} width="13" height="20" fill="#FEF3C7" />
-          <rect x="81" y={26 + pulseY} width="13" height="20" fill="#FEF3C7" />
-          <rect x="44" y="20" width="18" height="3" fill={seal} opacity={flicker} />
-          <rect x="98" y="20" width="18" height="3" fill={seal} opacity={flicker} />
-        </g>
-      );
-    case 'CELESTIAL_ORRERY_RING':
-      return (
-        <g>
-          {/* Celestial Astrolabe Rings & Eclipsed Sun */}
-          <rect x="54" y="16" width="52" height="52" fill="#0B1338" opacity="0.85" />
-          <rect x="58" y="20" width="44" height="3" fill={accent} opacity="0.85" />
-          <rect x="58" y="61" width="44" height="3" fill={accent} opacity="0.85" />
-          <rect x="70" y={30 + pulseY} width="20" height="20" fill="#020617" />
-          <rect x="68" y={28 + pulseY} width="24" height="2" fill={seal} opacity={flicker} />
-          <rect x="68" y={50 + pulseY} width="24" height="2" fill={seal} opacity={flicker} />
-        </g>
-      );
-    case 'ROYAL_BROOD_CHAMBER':
-      return (
-        <g>
-          {/* Hexagonal Amber Hive Throne & Royal Jelly Cells */}
-          <rect x="50" y="16" width="60" height="68" fill="#2E1B07" opacity="0.9" />
-          {[56, 74, 92].map((hx) => (
-            <g key={hx}>
-              <rect x={hx} y="24" width="12" height="12" fill={seal} opacity={0.8 * flicker} />
-              <rect x={hx} y="42" width="12" height="12" fill={accent} opacity={0.7 * flicker} />
-            </g>
-          ))}
-        </g>
-      );
-    case 'PRISMATIC_GEODE_SANCTUM':
-      return (
-        <g>
-          {/* Prismatic Crystal Octahedron & Refracting Quartz Pillars */}
-          <rect x="42" y="22" width="10" height="62" fill={seal} opacity="0.65" />
-          <rect x="108" y="22" width="10" height="62" fill={accent} opacity="0.65" />
-          <rect x="68" y={20 + pulseY} width="24" height="34" fill={seal} opacity={0.85 * flicker} />
-          <rect x="72" y={24 + pulseY} width="16" height="26" fill="#FFFFFF" opacity={0.75 * flicker} />
-        </g>
-      );
-    case 'HANGING_TORTURE_CAGES':
-      return (
-        <g>
-          {/* Suspended Iron Panopticon Cage & Condemnation Chains */}
-          <rect x="62" y="10" width="36" height="44" fill="#1E293B" />
-          <rect x="66" y="14" width="4" height="36" fill="#64748B" />
-          <rect x="78" y="14" width="4" height="36" fill="#64748B" />
-          <rect x="90" y="14" width="4" height="36" fill="#64748B" />
-          <rect x="70" y={28 + pulseY} width="20" height="10" fill={seal} opacity={0.85 * flicker} />
-        </g>
-      );
-    case 'OVERFLOWING_BLOOD_CHALICE':
-      return (
-        <g>
-          {/* Blood Cathedral Stained Glass & Overflowing Crimson Chalice */}
-          <rect x="52" y="14" width="56" height="70" fill="#2A0610" opacity="0.9" />
-          <rect x="58" y="20" width="16" height="42" fill={seal} opacity={0.65 * flicker} />
-          <rect x="86" y="20" width="16" height="42" fill={accent} opacity={0.65 * flicker} />
-          <rect x="70" y="54" width="20" height="10" fill={accent} />
-          <rect x="72" y="50" width="16" height="5" fill={seal} opacity={flicker} />
-        </g>
-      );
-    case 'SUNLESS_PHARAOH_DAIS':
-      return (
-        <g>
-          {/* Twin Golden Obelisks & Open Royal Sarcophagus */}
-          <rect x="42" y="18" width="10" height="66" fill={seal} opacity="0.85" />
-          <rect x="108" y="18" width="10" height="66" fill={seal} opacity="0.85" />
-          <rect x="62" y="22" width="36" height="62" fill="#451A03" />
-          <rect x="66" y="26" width="28" height="54" fill={seal} opacity="0.75" />
-          <rect x="72" y="32" width="16" height="40" fill={accent} opacity={0.7 * flicker} />
-        </g>
-      );
-    case 'GRAND_SHATTERED_MIRROR':
-      return (
-        <g>
-          {/* Hall of Fractured Quicksilver Mirrors */}
-          <rect x="44" y="18" width="20" height="64" fill="#CBD5E1" opacity="0.7" />
-          <rect x="68" y="14" width="24" height="68" fill="#E2E8F0" opacity="0.8" />
-          <rect x="96" y="18" width="20" height="64" fill="#CBD5E1" opacity="0.7" />
-          <rect x="72" y="22" width="16" height="52" fill={accent} opacity={0.55 * flicker} />
-        </g>
-      );
-    case 'GLACIAL_ICE_MONOLITH':
-      return (
-        <g>
-          {/* Permafrost Glacier Spires & Mammoth-Fang Throne */}
-          <rect x="44" y="20" width="14" height="64" fill={seal} opacity="0.75" />
-          <rect x="102" y="20" width="14" height="64" fill={seal} opacity="0.75" />
-          <rect x="58" y="32" width="8" height="52" fill="#F8FAFC" />
-          <rect x="94" y="32" width="8" height="52" fill="#F8FAFC" />
-        </g>
-      );
-    case 'GOBLIN_WAR_PALISADE':
-      return (
-        <g>
-          {/* Scrap-Iron War Throne & Powder Keg Stack */}
-          <rect x="48" y="24" width="64" height="60" fill="#291D12" />
-          <rect x="38" y="62" width="14" height="22" fill="#7C2D12" />
-          <rect x="108" y="62" width="14" height="22" fill="#7C2D12" />
-          <rect x="42" y={56 + pulseY} width="6" height="6" fill={seal} opacity={flicker} />
-          <rect x="112" y={56 + pulseY} width="6" height="6" fill={seal} opacity={flicker} />
-        </g>
-      );
-    case 'TITAN_SKULL_MAUSOLEUM':
-      return (
-        <g>
-          {/* Monumental Titan Cranium Archway & Crossed Colossal Femurs */}
-          <rect x="46" y="14" width="68" height="54" fill="#CBD5E1" opacity="0.82" />
-          <rect x="54" y="20" width="52" height="44" fill="#E2E8F0" opacity="0.88" />
-          {/* Giant Hollow Eye Sockets */}
-          <rect x="58" y="30" width="16" height="14" fill="#090D16" />
-          <rect x="86" y="30" width="16" height="14" fill="#090D16" />
-          <rect x="63" y={34 + pulseY} width="6" height="6" fill={accent} opacity={0.95 * flicker} />
-          <rect x="91" y={34 + pulseY} width="6" height="6" fill={accent} opacity={0.95 * flicker} />
-          {/* Nasal Cavity & Giant Teeth */}
-          <rect x="76" y="42" width="8" height="10" fill="#090D16" />
-          {[58, 66, 74, 82, 90, 98].map((tx) => (
-            <rect key={tx} x={tx} y="56" width="5" height="12" fill="#F8FAFC" />
-          ))}
-        </g>
-      );
-    case 'ABYSSAL_ECLIPSE_CORE':
-    default:
-      return (
-        <g>
-          {/* Abyssal Eclipse Singularity & Floating Void Monoliths */}
-          <rect x="42" y={20 + pulseY} width="10" height="52" fill="#1E0B36" />
-          <rect x="108" y={20 - pulseY} width="10" height="52" fill="#1E0B36" />
-          <rect x="62" y="18" width="36" height="36" fill={seal} opacity={0.75 * flicker} />
-          <rect x="66" y="22" width="28" height="28" fill="#05010A" />
-          <rect x="74" y="30" width="12" height="12" fill={accent} opacity={0.9 * flicker} />
-        </g>
-      );
-  }
-}
 
 export const LaCriptaBiomeStageBackdrop: React.FC<{
   dungeon: CriptaDungeonDefinition;
@@ -2272,9 +2074,6 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
 
   const biomeId = dungeon.id;
   const p = getBiomeVisualProfile(biomeId);
-  const minibossArena =
-    CRIPTA_MINIBOSS_ARENAS_REGISTRY[biomeId] ||
-    CRIPTA_MINIBOSS_ARENAS_REGISTRY.catacumbas_del_rey;
   const flicker = tick % 3 === 0 ? 1 : tick % 3 === 1 ? 0.88 : 0.94;
   const pulseY = tick % 4 === 1 || tick % 4 === 2 ? -1 : 0;
 
@@ -2480,9 +2279,6 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
         />
 
         {/* Creature Stage Stone Pedestal / Ground Plane */}
-        {isBossOrMiniboss &&
-          renderMinibossSanctumCenterpieceSvg(minibossArena, p, flicker, pulseY)}
-
         <rect x="0" y="88" width="160" height="32" fill={p.floorDark} opacity="0.92" />
         <rect x="12" y="84" width="136" height="5" fill={p.floorMid} opacity="0.9" />
         <rect x="20" y="83" width="120" height="1" fill={p.floorLight} opacity="0.65" />
@@ -2490,32 +2286,24 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
         <rect x="80" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
         <rect x="122" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
 
-        {/* Boss / Miniboss Sanctum Runic Seal on Floor */}
+        {/* Boss / Miniboss Runic Circle Glow on Floor */}
         {isBossOrMiniboss && (
           <>
             <rect
-              x="24"
-              y="84"
-              width="112"
+              x="34"
+              y="85"
+              width="92"
               height="2"
-              fill={minibossArena.floorSealColor}
-              opacity={0.9 * flicker}
-            />
-            <rect
-              x="36"
-              y="87"
-              width="88"
-              height="2"
-              fill={minibossArena.altarAccentColor}
+              fill={p.accentPrimary}
               opacity={0.85 * flicker}
             />
             <rect
-              x="48"
-              y="90"
-              width="64"
+              x="46"
+              y="88"
+              width="68"
               height="1"
-              fill="#FFFFFF"
-              opacity={0.75 * flicker}
+              fill={p.particlePrimary}
+              opacity={0.95 * flicker}
             />
           </>
         )}

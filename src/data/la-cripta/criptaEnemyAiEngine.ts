@@ -5,12 +5,14 @@ import type {
   CriptaEnemyAiPersonality,
   CriptaEnemyAiProfile,
   CriptaEnemyMemory,
+  CriptaEnemyProfession,
   CriptaPlayer,
   CriptaRoomEnemy,
   CriptaStatusEffectType,
 } from '../../types/laCripta';
 import { CRIPTA_CHARACTERS_CATALOG } from './criptaCatalog';
 import { playerHasStatus } from './criptaStatusEffects';
+import { resolveEnemyVisualBlueprint } from './criptaBiomeBestiary';
 
 /**
  * Deterministic seeded PRNG for authoritative Enemy AI decisions.
@@ -58,16 +60,23 @@ export function buildEnemyAiProfileForArchetype(
     | 'statusThreat'
     | 'statusSecondaryThreat'
     | 'abilityName'
+    | 'profession'
   >,
   roomIndex = 0
 ): {
   roleTag: NonNullable<CriptaRoomEnemy['roleTag']>;
+  profession: CriptaEnemyProfession;
   aiProfile: CriptaEnemyAiProfile;
 } {
   const slugLower = (enemy.slug || '').toLowerCase();
   const arch = enemy.spriteArchetype;
   const primaryStatus: CriptaStatusEffectType = enemy.statusThreat || 'POISON';
   const secondaryStatus: CriptaStatusEffectType = enemy.statusSecondaryThreat || 'BLEED';
+  const resolvedBp = resolveEnemyVisualBlueprint(enemy);
+  const profession: CriptaEnemyProfession =
+    enemy.isFinalBoss || enemy.isBoss
+      ? 'JEFE'
+      : enemy.profession || resolvedBp.profession || 'GUERRERO';
 
   // 1. FINAL BOSS (2-Phase Hybrid Scripted + Tactical AI)
   if (enemy.isFinalBoss) {
@@ -196,6 +205,7 @@ export function buildEnemyAiProfileForArchetype(
 
     return {
       roleTag: 'BOSS',
+      profession: 'JEFE',
       aiProfile: {
         personality: 'BOSS',
         aggression: isPhase2 ? 0.86 : 0.68,
@@ -220,6 +230,7 @@ export function buildEnemyAiProfileForArchetype(
   if (enemy.isBoss) {
     return {
       roleTag: 'BOSS',
+      profession: 'JEFE',
       aiProfile: {
         personality: 'BOSS',
         aggression: 0.72,
@@ -297,143 +308,184 @@ export function buildEnemyAiProfileForArchetype(
     };
   }
 
-  // 3. SUPPORT / HEALER ARCHETYPES (Shaman, Blood Acolyte, Astral Weaver, Wisp)
+  // 3. CHAMÁN (Section 8: Curación Oscura CD 3T when ally < 60% HP, Bendición Profana, Maldición, Descarga Mística)
   if (
+    profession === 'CHAMÁN' ||
     slugLower.includes('chaman') ||
-    slugLower.includes('acolyte') ||
-    slugLower.includes('sacerdote') ||
-    slugLower.includes('oraculo') ||
-    arch === 'blood_acolyte' ||
-    arch === 'wisp_phantom' ||
-    (arch === 'plague_bloom' && roomIndex % 2 === 1)
+    slugLower.includes('esfera_armilar') ||
+    slugLower.includes('acolito_de_hueso')
   ) {
-    const healBase = Math.max(14, Math.round(16 + roomIndex * 2));
+    const healBase = Math.max(14, Math.round(15 + roomIndex * 2));
     return {
       roleTag: 'HEALER',
+      profession: 'CHAMÁN',
       aiProfile: {
         personality: 'SUPPORT',
-        aggression: 0.38,
-        selfPreservation: 0.78,
+        aggression: 0.42,
+        selfPreservation: 0.72,
         allyProtection: 0.85,
-        statusPreference: 0.58,
-        coordination: 0.72,
-        randomness: 0.2,
+        statusPreference: 0.65,
+        coordination: 0.78,
+        randomness: 0.18,
         targetWeights: {
           lowHp: 0.35,
           lowDefense: 0.3,
           highThreat: 0.55,
           highMagic: 0.5,
-          vulnerableOrDebuffed: 0.4,
+          vulnerableOrDebuffed: 0.45,
         },
         abilities: [
           {
-            id: 'support_heal_ally',
-            name: arch === 'plague_bloom' ? 'Curación Fúngica' : 'Curación Oscura',
+            id: 'shaman_dark_heal',
+            name: 'Curación Oscura',
             actionKind: 'HEAL_ALLY',
             targetScope: 'ALLY_ENEMY',
             basePriority: 84,
-            cooldownRounds: 2,
-            maxCharges: 3,
-            healAmount: healBase,
-            minAllyMissingHpRatio: 0.28,
-          },
-          {
-            id: 'support_heal_self',
-            name: 'Reconstitución Vital',
-            actionKind: 'HEAL_SELF',
-            targetScope: 'SELF',
-            basePriority: 86,
-            cooldownRounds: 2,
+            cooldownRounds: 3,
             maxCharges: 2,
             healAmount: healBase,
-            maxSelfHpRatio: 0.45,
+            minAllyMissingHpRatio: 0.4, // Only when ally is below 60% HP!
           },
           {
-            id: 'support_status_hex',
-            name: enemy.abilityName || 'Maldición de Esporas',
+            id: 'shaman_profane_blessing',
+            name: 'Bendición Profana',
+            actionKind: 'BUFF_ALLY',
+            targetScope: 'ALLY_ENEMY',
+            basePriority: 68,
+            cooldownRounds: 3,
+            attackBonus: 2,
+            armorBonus: 2,
+          },
+          {
+            id: 'shaman_curse',
+            name: enemy.abilityName || 'Maldición Ritual',
             actionKind: 'APPLY_STATUS',
             targetScope: 'ONE_PLAYER',
-            basePriority: 58,
+            basePriority: 62,
             cooldownRounds: 2,
-            damageMultiplier: 0.78,
-            statusToApply: primaryStatus,
+            damageMultiplier: 0.8,
+            statusToApply: primaryStatus || 'CURSE',
             statusTurns: 2,
           },
           {
-            id: 'support_basic_bolt',
-            name: 'Descarga Sombría',
+            id: 'shaman_mystic_bolt',
+            name: 'Descarga Mística',
             actionKind: 'ATTACK',
             targetScope: 'ONE_PLAYER',
-            basePriority: 48,
-            damageMultiplier: 0.92,
+            basePriority: 52,
+            damageMultiplier: 0.95,
           },
         ],
       },
     };
   }
 
-  // 4. PROTECTOR / GUARDIAN ARCHETYPES (Iron Golem, Crystal Sentinel, Bone Colossus, Skeleton Warrior)
-  if (
-    slugLower.includes('guardian') ||
-    slugLower.includes('golem') ||
-    slugLower.includes('coloso') ||
-    slugLower.includes('centinela') ||
-    arch === 'iron_golem' ||
-    arch === 'crystal_sentinel' ||
-    arch === 'bone_colossus' ||
-    (arch === 'skeleton_warrior' && !enemy.isElite)
-  ) {
+  // 4. CURANDERO (Section 10: Stronger healing, cleansing/barrier, limited offense, long CDs)
+  if (profession === 'CURANDERO') {
+    const healBase = Math.max(16, Math.round(18 + roomIndex * 2));
+    return {
+      roleTag: 'HEALER',
+      profession: 'CURANDERO',
+      aiProfile: {
+        personality: 'SUPPORT',
+        aggression: 0.3,
+        selfPreservation: 0.82,
+        allyProtection: 0.9,
+        statusPreference: 0.48,
+        coordination: 0.8,
+        randomness: 0.16,
+        targetWeights: {
+          lowHp: 0.3,
+          lowDefense: 0.3,
+          highThreat: 0.6,
+        },
+        abilities: [
+          {
+            id: 'healer_restoration',
+            name: enemy.abilityName || 'Luz Restauradora',
+            actionKind: 'HEAL_ALLY',
+            targetScope: 'ALLY_ENEMY',
+            basePriority: 88,
+            cooldownRounds: 3,
+            maxCharges: 2,
+            healAmount: healBase,
+            minAllyMissingHpRatio: 0.38,
+          },
+          {
+            id: 'healer_barrier',
+            name: 'Barrera Purificadora',
+            actionKind: 'PROTECT_ALLY',
+            targetScope: 'ALLY_ENEMY',
+            basePriority: 72,
+            cooldownRounds: 3,
+            armorBonus: 3,
+          },
+          {
+            id: 'healer_light_touch',
+            name: 'Destello Sacro',
+            actionKind: 'ATTACK',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 46,
+            damageMultiplier: 0.85,
+          },
+        ],
+      },
+    };
+  }
+
+  // 5. TANQUE / GUARDIÁN (Section 7: Golpe de Escudo, Proteger Aliado, Fortificarse, Provocar)
+  if (profession === 'TANQUE' || profession === 'GUARDIÁN') {
     return {
       roleTag: 'TANK',
+      profession,
       aiProfile: {
         personality: 'PROTECTOR',
         aggression: 0.48,
-        selfPreservation: 0.68,
+        selfPreservation: 0.7,
         allyProtection: 0.92,
-        statusPreference: 0.32,
-        coordination: 0.78,
-        randomness: 0.18,
+        statusPreference: 0.35,
+        coordination: 0.8,
+        randomness: 0.16,
         targetWeights: {
           lowHp: 0.35,
           lowDefense: 0.4,
-          highThreat: 0.72,
-          highAttack: 0.6,
-          vulnerableOrDebuffed: 0.35,
+          highThreat: 0.75,
+          highAttack: 0.65,
         },
         abilities: [
           {
             id: 'tank_protect_ally',
-            name: 'Muro de Escudos',
+            name: 'Proteger Aliado',
             actionKind: 'PROTECT_ALLY',
             targetScope: 'ALLY_ENEMY',
             basePriority: 82,
             cooldownRounds: 2,
-            armorBonus: 2,
+            armorBonus: 3,
           },
           {
-            id: 'tank_defend_self',
-            name: 'Guardia de Hierro',
+            id: 'tank_fortify_self',
+            name: 'Fortificarse',
             actionKind: 'DEFEND_SELF',
             targetScope: 'SELF',
-            basePriority: 64,
+            basePriority: 66,
             cooldownRounds: 2,
             armorBonus: 3,
-            maxSelfHpRatio: 0.6,
+            maxSelfHpRatio: 0.65,
           },
           {
-            id: 'tank_crushing_blow',
-            name: enemy.abilityName || 'Maza Quebrantahuesos',
+            id: 'tank_shield_bash',
+            name: enemy.abilityName || 'Golpe de Escudo',
             actionKind: 'SPECIAL_ATTACK',
             targetScope: 'ONE_PLAYER',
-            basePriority: 58,
+            basePriority: 60,
             cooldownRounds: 2,
-            damageMultiplier: 1.15,
+            damageMultiplier: 1.12,
             statusToApply: 'WEAKENED',
             statusTurns: 2,
           },
           {
             id: 'tank_basic_strike',
-            name: 'Embate Pesado',
+            name: 'Golpe Contundente',
             actionKind: 'ATTACK',
             targetScope: 'ONE_PLAYER',
             basePriority: 52,
@@ -444,202 +496,480 @@ export function buildEnemyAiProfileForArchetype(
     };
   }
 
-  // 5. CONTROLLER / STATUS WEAVER ARCHETYPES (Spore Spider, Arcane Archivist, Astral Weaver, Chained Wraith, Sand Mummy)
-  if (
-    slugLower.includes('arana') ||
-    slugLower.includes('espora') ||
-    slugLower.includes('archivista') ||
-    slugLower.includes('espectro') ||
-    arch === 'plague_bloom' ||
-    arch === 'arcane_archivist' ||
-    arch === 'astral_weaver' ||
-    arch === 'chained_wraith' ||
-    arch === 'sand_mummy'
-  ) {
+  // 6. ALQUIMISTA (Section 16: Poison, acid, explosions, buff allies, debuff players)
+  if (profession === 'ALQUIMISTA') {
     return {
       roleTag: 'CASTER',
+      profession: 'ALQUIMISTA',
       aiProfile: {
         personality: 'CONTROLLER',
-        aggression: 0.52,
-        selfPreservation: 0.48,
-        allyProtection: 0.3,
+        aggression: 0.58,
+        selfPreservation: 0.5,
+        allyProtection: 0.55,
         statusPreference: 0.88,
-        coordination: 0.68,
+        coordination: 0.72,
         randomness: 0.2,
         targetWeights: {
-          lowHp: 0.42,
-          lowDefense: 0.45,
-          highThreat: 0.58,
-          highMagic: 0.65,
-          vulnerableOrDebuffed: 0.35,
+          lowHp: 0.45,
+          lowDefense: 0.5,
+          highThreat: 0.55,
         },
         abilities: [
           {
-            id: 'ctrl_toxic_saliva',
-            name: enemy.abilityName || 'Saliva Tóxica',
+            id: 'alch_acid_flask',
+            name: enemy.abilityName || 'Matraz Corrosivo',
             actionKind: 'APPLY_STATUS',
             targetScope: 'ONE_PLAYER',
             basePriority: 74,
             cooldownRounds: 2,
-            damageMultiplier: 0.82,
-            statusToApply: primaryStatus,
+            damageMultiplier: 0.86,
+            statusToApply: 'POISON',
             statusTurns: 2,
           },
           {
-            id: 'ctrl_spore_burst',
-            name: 'Explosión de Esporas',
+            id: 'alch_explosive_vial',
+            name: 'Mezcla Explosiva',
+            actionKind: 'DEBUFF_PLAYER',
+            targetScope: 'RANDOM_N_PLAYERS',
+            randomTargetsCount: 2,
+            basePriority: 68,
+            cooldownRounds: 3,
+            damageMultiplier: 0.78,
+            statusToApply: 'BURN',
+            statusTurns: 2,
+          },
+          {
+            id: 'alch_mutagen_buff',
+            name: 'Vapor Estimulante',
+            actionKind: 'BUFF_ALLY',
+            targetScope: 'ALLY_ENEMY',
+            basePriority: 62,
+            cooldownRounds: 3,
+            attackBonus: 2,
+            armorBonus: 2,
+          },
+          {
+            id: 'alch_throw_bottle',
+            name: 'Frasco Volátil',
+            actionKind: 'ATTACK',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 52,
+            damageMultiplier: 0.96,
+          },
+        ],
+      },
+    };
+  }
+
+  // 7. CONTROLADOR (Section 13: Apply negative status, reduce DEF/ATK, confusion, slow/frost, mark target)
+  if (profession === 'CONTROLADOR') {
+    return {
+      roleTag: 'CASTER',
+      profession: 'CONTROLADOR',
+      aiProfile: {
+        personality: 'CONTROLLER',
+        aggression: 0.5,
+        selfPreservation: 0.52,
+        allyProtection: 0.4,
+        statusPreference: 0.92,
+        coordination: 0.78,
+        randomness: 0.18,
+        targetWeights: {
+          lowHp: 0.4,
+          lowDefense: 0.45,
+          highThreat: 0.68,
+          highMagic: 0.65,
+        },
+        abilities: [
+          {
+            id: 'ctrl_mark_target',
+            name: enemy.abilityName || 'Cadenas de Sometimiento',
+            actionKind: 'APPLY_STATUS',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 76,
+            cooldownRounds: 2,
+            damageMultiplier: 0.82,
+            statusToApply: primaryStatus || 'MARKED',
+            statusTurns: 2,
+          },
+          {
+            id: 'ctrl_mind_hex',
+            name: 'Pulso Entorpecedor',
             actionKind: 'DEBUFF_PLAYER',
             targetScope: 'RANDOM_N_PLAYERS',
             randomTargetsCount: 2,
             basePriority: 68,
             cooldownRounds: 3,
             damageMultiplier: 0.72,
-            statusToApply: secondaryStatus,
+            statusToApply: secondaryStatus || 'CONFUSION',
             statusTurns: 2,
-            requiresTelegraph: enemy.isElite,
-            telegraphLabel: 'PREPARANDO: EXPLOSIÓN DE ESPORAS',
           },
           {
-            id: 'ctrl_bite',
-            name: 'Mordisco',
+            id: 'ctrl_basic_lash',
+            name: 'Azote de Control',
             actionKind: 'ATTACK',
             targetScope: 'ONE_PLAYER',
-            basePriority: 54,
-            damageMultiplier: 1.0,
-          },
-          {
-            id: 'ctrl_arcane_ward',
-            name: 'Velo Rúnico',
-            actionKind: 'DEFEND_SELF',
-            targetScope: 'SELF',
-            basePriority: 50,
-            cooldownRounds: 3,
-            armorBonus: 2,
-            maxSelfHpRatio: 0.45,
+            basePriority: 52,
+            damageMultiplier: 0.94,
           },
         ],
       },
     };
   }
 
-  // 6. CHAOTIC / SIMPLE CREATURES (Rats, Chitin Drones, Goblin Raiders)
-  if (
-    slugLower.includes('rata') ||
-    slugLower.includes('zangano') ||
-    slugLower.includes('goblin') ||
-    arch === 'chitin_drone' ||
-    arch === 'goblin_raider'
-  ) {
-    const isCowardGoblin = arch === 'goblin_raider' && !enemy.isElite;
+  // 8. INVOCADOR (Section 14: Invocar Esbirro CD 4T, max 1 active summoned creature)
+  if (profession === 'INVOCADOR') {
     return {
       roleTag: 'SWARM',
+      profession: 'INVOCADOR',
       aiProfile: {
-        personality: isCowardGoblin ? 'COWARD' : 'CHAOTIC',
-        aggression: 0.65,
-        selfPreservation: isCowardGoblin ? 0.75 : 0.25,
-        allyProtection: 0.1,
-        statusPreference: 0.35,
-        coordination: 0.2,
-        randomness: isCowardGoblin ? 0.42 : 0.78,
+        personality: 'COMMANDER',
+        aggression: 0.56,
+        selfPreservation: 0.6,
+        allyProtection: 0.5,
+        statusPreference: 0.6,
+        coordination: 0.75,
+        randomness: 0.2,
         targetWeights: {
-          lowHp: 0.25,
-          lowDefense: 0.25,
-          highThreat: 0.2,
+          lowHp: 0.45,
+          lowDefense: 0.45,
+          highThreat: 0.5,
         },
         abilities: [
           {
-            id: 'swarm_frenzy_bite',
-            name: 'Dentellada Frenética',
-            actionKind: 'ATTACK',
-            targetScope: 'ONE_PLAYER',
-            basePriority: 62,
-            damageMultiplier: 1.0,
+            id: 'summoner_call_minion',
+            name: 'Invocar Esbirro',
+            actionKind: 'SUMMON',
+            targetScope: 'SELF',
+            basePriority: 82,
+            cooldownRounds: 4,
+            maxCharges: 1,
           },
           {
-            id: 'swarm_dirty_trick',
-            name: enemy.abilityName || 'Aguijón Infeccioso',
+            id: 'summoner_hex',
+            name: enemy.abilityName || 'Maldición del Nido',
             actionKind: 'APPLY_STATUS',
             targetScope: 'ONE_PLAYER',
-            basePriority: 56,
+            basePriority: 64,
             cooldownRounds: 2,
             damageMultiplier: 0.85,
             statusToApply: primaryStatus,
             statusTurns: 2,
           },
-          ...(isCowardGoblin
-            ? [
-                {
-                  id: 'coward_cower_shield',
-                  name: 'Escudo Improvisado',
-                  actionKind: 'DEFEND_SELF' as const,
-                  targetScope: 'SELF' as const,
-                  basePriority: 72,
-                  cooldownRounds: 2,
-                  armorBonus: 2,
-                  maxSelfHpRatio: 0.45,
-                },
-              ]
-            : []),
+          {
+            id: 'summoner_strike',
+            name: 'Embiste de Progenie',
+            actionKind: 'ATTACK',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 54,
+            damageMultiplier: 0.98,
+          },
         ],
       },
     };
   }
 
-  // 7. PREDATOR / OPPORTUNIST / BERSERKER ARCHETYPES (Executioner, Mine Stalker, Frost Wolf, Deep Serpent, Void Herald, Mirror Doppel)
-  const isBerserker = arch === 'executioner' || arch === 'sewer_abomination';
-  const personality: CriptaEnemyAiPersonality = isBerserker
-    ? 'BERSERKER'
-    : arch === 'mine_stalker' || arch === 'mirror_doppel'
-    ? 'OPPORTUNIST'
-    : 'PREDATOR';
+  // 9. MAGO & SOPORTE (Section 9)
+  if (profession === 'MAGO' || profession === 'SOPORTE') {
+    const isSupport = profession === 'SOPORTE';
+    return {
+      roleTag: isSupport ? 'SUPPORT' : 'CASTER',
+      profession,
+      aiProfile: {
+        personality: isSupport ? 'SUPPORT' : 'TACTICAL',
+        aggression: isSupport ? 0.48 : 0.68,
+        selfPreservation: 0.52,
+        allyProtection: isSupport ? 0.78 : 0.35,
+        statusPreference: 0.78,
+        coordination: 0.7,
+        randomness: 0.18,
+        targetWeights: {
+          lowHp: 0.5,
+          lowDefense: 0.45,
+          highThreat: 0.6,
+          highMagic: 0.6,
+        },
+        abilities: isSupport
+          ? [
+              {
+                id: 'support_war_chant',
+                name: enemy.abilityName || 'Cántico de Batalla',
+                actionKind: 'BUFF_ALLY',
+                targetScope: 'ALLY_ENEMY',
+                basePriority: 74,
+                cooldownRounds: 3,
+                attackBonus: 2,
+                armorBonus: 2,
+              },
+              {
+                id: 'support_hex_bell',
+                name: 'Tañido Debilitador',
+                actionKind: 'APPLY_STATUS',
+                targetScope: 'ONE_PLAYER',
+                basePriority: 64,
+                cooldownRounds: 2,
+                damageMultiplier: 0.84,
+                statusToApply: primaryStatus,
+                statusTurns: 2,
+              },
+              {
+                id: 'support_strike',
+                name: 'Golpe Ritual',
+                actionKind: 'ATTACK',
+                targetScope: 'ONE_PLAYER',
+                basePriority: 52,
+                damageMultiplier: 0.95,
+              },
+            ]
+          : [
+              {
+                id: 'mage_elemental_storm',
+                name: enemy.abilityName || 'Descarga Arcana Mayor',
+                actionKind: 'DEBUFF_PLAYER',
+                targetScope: 'RANDOM_N_PLAYERS',
+                randomTargetsCount: 2,
+                basePriority: 72,
+                cooldownRounds: 3,
+                damageMultiplier: 0.86,
+                statusToApply: primaryStatus,
+                statusTurns: 2,
+              },
+              {
+                id: 'mage_status_bolt',
+                name: 'Proyectil Rúnico',
+                actionKind: 'APPLY_STATUS',
+                targetScope: 'ONE_PLAYER',
+                basePriority: 64,
+                cooldownRounds: 2,
+                damageMultiplier: 0.92,
+                statusToApply: secondaryStatus,
+                statusTurns: 2,
+              },
+              {
+                id: 'mage_arcane_ward',
+                name: 'Velo Arcano',
+                actionKind: 'DEFEND_SELF',
+                targetScope: 'SELF',
+                basePriority: 52,
+                cooldownRounds: 3,
+                armorBonus: 2,
+                maxSelfHpRatio: 0.5,
+              },
+              {
+                id: 'mage_basic_blast',
+                name: 'Saeta Mágica',
+                actionKind: 'ATTACK',
+                targetScope: 'ONE_PLAYER',
+                basePriority: 56,
+                damageMultiplier: 1.04,
+              },
+            ],
+      },
+    };
+  }
 
+  // 10. TIRADOR (Section 12: Ranged attack, multi-target projectile, status arrow, charged shot)
+  if (profession === 'TIRADOR') {
+    return {
+      roleTag: 'ASSASSIN',
+      profession: 'TIRADOR',
+      aiProfile: {
+        personality: 'TACTICAL',
+        aggression: 0.76,
+        selfPreservation: 0.45,
+        allyProtection: 0.25,
+        statusPreference: 0.62,
+        coordination: 0.65,
+        randomness: 0.2,
+        targetWeights: {
+          lowHp: 0.65,
+          lowDefense: 0.65,
+          highThreat: 0.55,
+          highMagic: 0.6,
+        },
+        abilities: [
+          {
+            id: 'ranged_status_shot',
+            name: enemy.abilityName || 'Proyectil Afilado',
+            actionKind: 'APPLY_STATUS',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 68,
+            cooldownRounds: 2,
+            damageMultiplier: 0.95,
+            statusToApply: primaryStatus || 'MARKED',
+            statusTurns: 2,
+          },
+          {
+            id: 'ranged_multi_volley',
+            name: 'Salva Cruzada',
+            actionKind: 'DEBUFF_PLAYER',
+            targetScope: 'RANDOM_N_PLAYERS',
+            randomTargetsCount: 2,
+            basePriority: 66,
+            cooldownRounds: 3,
+            damageMultiplier: 0.82,
+            statusToApply: secondaryStatus,
+            statusTurns: 2,
+          },
+          {
+            id: 'ranged_aimed_shot',
+            name: 'Disparo Certero',
+            actionKind: 'ATTACK',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 58,
+            damageMultiplier: 1.05,
+          },
+        ],
+      },
+    };
+  }
+
+  // 11. ASESINO (Section 11: Precision attack, critical strike, poison, 70/30 opportunistic targeting)
+  if (profession === 'ASESINO') {
+    return {
+      roleTag: 'ASSASSIN',
+      profession: 'ASESINO',
+      aiProfile: {
+        personality: 'OPPORTUNIST',
+        aggression: 0.84,
+        selfPreservation: 0.35,
+        allyProtection: 0.15,
+        statusPreference: 0.58,
+        coordination: 0.65,
+        randomness: 0.2,
+        targetWeights: {
+          lowHp: 0.82,
+          lowDefense: 0.68,
+          highThreat: 0.45,
+          vulnerableOrDebuffed: 0.75,
+        },
+        abilities: [
+          {
+            id: 'assassin_crit_strike',
+            name: enemy.abilityName || 'Golpe Crítico Furtivo',
+            actionKind: 'SPECIAL_ATTACK',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 70,
+            cooldownRounds: 2,
+            damageMultiplier: 1.24,
+            statusToApply: primaryStatus || 'BLEED',
+            statusTurns: 2,
+            comboAfterStatus: 'BLEED',
+            comboBonusMultiplier: 1.25,
+          },
+          {
+            id: 'assassin_poison_blade',
+            name: 'Filo Envenenado',
+            actionKind: 'APPLY_STATUS',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 64,
+            cooldownRounds: 2,
+            damageMultiplier: 0.9,
+            statusToApply: 'POISON',
+            statusTurns: 2,
+          },
+          {
+            id: 'assassin_precision_cut',
+            name: 'Ataque de Precisión',
+            actionKind: 'ATTACK',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 58,
+            damageMultiplier: 1.04,
+          },
+        ],
+      },
+    };
+  }
+
+  // 12. BERSERKER (Section 15: FURIA below 35% HP: +25% damage, -15% defense)
+  if (profession === 'BERSERKER') {
+    return {
+      roleTag: 'BRUTE',
+      profession: 'BERSERKER',
+      aiProfile: {
+        personality: 'BERSERKER',
+        aggression: 0.9,
+        selfPreservation: 0.2,
+        allyProtection: 0.15,
+        statusPreference: 0.5,
+        coordination: 0.5,
+        randomness: 0.22,
+        targetWeights: {
+          lowHp: 0.7,
+          lowDefense: 0.6,
+          highThreat: 0.6,
+        },
+        abilities: [
+          {
+            id: 'berserker_frenzy_cleave',
+            name: enemy.abilityName || 'Embate Frenético',
+            actionKind: 'SPECIAL_ATTACK',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 70,
+            cooldownRounds: 2,
+            damageMultiplier: 1.25,
+            statusToApply: 'BLEED',
+            statusTurns: 2,
+          },
+          {
+            id: 'berserker_wild_slash',
+            name: 'Tajo Desenfrenado',
+            actionKind: 'ATTACK',
+            targetScope: 'ONE_PLAYER',
+            basePriority: 62,
+            damageMultiplier: 1.05,
+          },
+        ],
+      },
+    };
+  }
+
+  // 13. GUERRERO & BRUTO (Section 6: Golpe Contundente, Embestida, Golpe Pesado CD 2T)
   return {
-    roleTag: isBerserker ? 'BRUTE' : 'ASSASSIN',
+    roleTag: profession === 'BRUTO' ? 'BRUTE' : 'ASSASSIN',
+    profession,
     aiProfile: {
-      personality,
-      aggression: 0.82,
-      selfPreservation: 0.35,
-      allyProtection: 0.2,
-      statusPreference: 0.52,
-      coordination: 0.65,
-      randomness: 0.22,
+      personality: 'AGGRESSIVE',
+      aggression: 0.78,
+      selfPreservation: 0.4,
+      allyProtection: 0.3,
+      statusPreference: 0.48,
+      coordination: 0.6,
+      randomness: 0.2,
       targetWeights: {
-        lowHp: 0.78,
-        lowDefense: 0.62,
-        highThreat: 0.45,
-        vulnerableOrDebuffed: 0.72,
+        lowHp: 0.55,
+        lowDefense: 0.55,
+        highThreat: 0.6,
+        vulnerableOrDebuffed: 0.6,
       },
       abilities: [
         {
-          id: 'predator_rend',
-          name: enemy.abilityName || 'Desgarro Letal',
+          id: 'warrior_heavy_blow',
+          name: enemy.abilityName || 'Golpe Pesado',
           actionKind: 'SPECIAL_ATTACK',
           targetScope: 'ONE_PLAYER',
           basePriority: 68,
           cooldownRounds: 2,
-          damageMultiplier: 1.2,
-          statusToApply: primaryStatus,
-          statusTurns: 2,
-          comboAfterStatus: 'BLEED',
-          comboBonusMultiplier: 1.25,
+          damageMultiplier: 1.26,
         },
         {
-          id: 'predator_lunge',
-          name: 'Zarpazo Cazador',
+          id: 'warrior_charge_bash',
+          name: 'Embestida',
+          actionKind: 'APPLY_STATUS',
+          targetScope: 'ONE_PLAYER',
+          basePriority: 60,
+          cooldownRounds: 2,
+          damageMultiplier: 0.92,
+          statusToApply: primaryStatus || 'WEAKENED',
+          statusTurns: 2,
+        },
+        {
+          id: 'warrior_blunt_strike',
+          name: 'Golpe Contundente',
           actionKind: 'ATTACK',
           targetScope: 'ONE_PLAYER',
           basePriority: 58,
           damageMultiplier: 1.0,
-        },
-        {
-          id: 'predator_brace',
-          name: 'Postura Acechante',
-          actionKind: 'DEFEND_SELF',
-          targetScope: 'SELF',
-          basePriority: 48,
-          cooldownRounds: 3,
-          armorBonus: 2,
-          maxSelfHpRatio: 0.38,
         },
       ],
     },
@@ -987,7 +1317,8 @@ export function chooseEnemyTacticalAction(
     }
 
     if (ab.actionKind === 'SUMMON') {
-      if (livingEnemies.length >= 3) return false;
+      const hasActiveSummon = livingEnemies.some((e) => e.id.startsWith('summon_'));
+      if (hasActiveSummon || livingEnemies.length >= 3) return false;
     }
 
     return true;
@@ -1235,6 +1566,30 @@ export function chooseEnemyTacticalAction(
     }
 
     // CASE H: SINGLE-PLAYER OFFENSIVE / STATUS ABILITY
+    // Section 11: ASSASSIN uses simple server-authoritative rule:
+    // 70% random living player, 30% random player below 50% HP (if any exists)
+    if (enemy.profession === 'ASESINO' || profile.personality === 'OPPORTUNIST') {
+      const belowHalfPlayers = livingPlayers.filter(
+        (p) => p.hp / Math.max(1, p.maxHp) < 0.5
+      );
+      const pickedTarget =
+        belowHalfPlayers.length > 0 && rng() < 0.3
+          ? belowHalfPlayers[Math.floor(rng() * belowHalfPlayers.length)]
+          : livingPlayers[Math.floor(rng() * livingPlayers.length)];
+
+      scoredCandidates.push({
+        item: {
+          ability: ab,
+          actionKind: ab.actionKind,
+          targetPlayers: [pickedTarget],
+          targetAllyEnemy: null,
+        },
+        score: baseScore + (rng() - 0.5) * 8,
+        label: `${ab.name} -> ${pickedTarget.name}`,
+      });
+      continue;
+    }
+
     for (const p of livingPlayers) {
       const targetScore = scorePlayerTargetForEnemy(
         enemy,
