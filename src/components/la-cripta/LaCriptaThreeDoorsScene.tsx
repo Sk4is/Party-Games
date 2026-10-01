@@ -16,6 +16,7 @@ import {
   CriptaDungeonId,
   CriptaExpeditionState,
   CriptaPlayerRoundActionType,
+  CriptaRoomEnemy,
   CriptaVisualEvent,
   CriptaWeaponRuneId,
 } from '../../types/laCripta';
@@ -49,6 +50,7 @@ import {
 } from './LaCriptaStatusEffectBadge';
 import {
   LaCriptaCombatVfxOverlay,
+  LaCriptaEnemyDeathOverlay,
   LaCriptaFloatingEventBadge,
 } from './LaCriptaVisualFeedback';
 import {
@@ -129,6 +131,12 @@ interface LaCriptaThreeDoorsSceneProps {
   currentPlayerId: string;
   activeVisualEvents?: CriptaVisualEvent[];
   enemyAnimStates?: Record<string, 'idle' | 'hit' | 'lunge' | 'death'>;
+  isPresentingSequence?: boolean;
+  presentationBannerText?: string | null;
+  hitStopActive?: boolean;
+  presentedEnemyHp?: Record<string, { hp: number; trailHp: number }>;
+  dyingEnemies?: Record<string, CriptaRoomEnemy>;
+  hideGroundDropsDuringDeath?: boolean;
   onVoteDoor: (dungeonId: CriptaDungeonId) => void;
   onVoteFinalBossDoor?: () => void;
   onRetryDungeonInit?: () => void;
@@ -165,6 +173,7 @@ interface LaCriptaThreeDoorsSceneProps {
   onShopBuyItem?: (offerId: string) => void;
   onShopBuyRelic?: () => void;
   onSelectedEnemyChange?: (enemyId: string | null) => void;
+  onHoveredDoorChange?: (dungeonId: CriptaDungeonId | null) => void;
   contextualPanelMode?: CriptaContextualPanelMode;
   inspectedPlayerId?: string | null;
   inspectedEnemyId?: string | null;
@@ -180,6 +189,12 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   currentPlayerId,
   activeVisualEvents = [],
   enemyAnimStates = {},
+  isPresentingSequence = false,
+  presentationBannerText = null,
+  hitStopActive = false,
+  presentedEnemyHp = {},
+  dyingEnemies = {},
+  hideGroundDropsDuringDeath = false,
   onVoteDoor,
   onVoteFinalBossDoor,
   onRetryDungeonInit,
@@ -198,6 +213,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   onShopBuyItem,
   onShopBuyRelic,
   onSelectedEnemyChange,
+  onHoveredDoorChange,
   contextualPanelMode = 'NONE',
   inspectedPlayerId = null,
   inspectedEnemyId = null,
@@ -223,6 +239,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   useEffect(() => {
     onSelectedEnemyChange?.(selectedEnemyId);
   }, [selectedEnemyId, onSelectedEnemyChange]);
+
+  useEffect(() => {
+    onHoveredDoorChange?.(hoveredDoorId);
+  }, [hoveredDoorId, onHoveredDoorChange]);
 
   const connectedPlayers = expeditionState.players.filter((p) => p.isConnected);
   const totalConnected = Math.max(1, connectedPlayers.length);
@@ -271,11 +291,24 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
     }
 
     const livingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
-    const visibleRoomEnemies = activeRoom.enemies.filter(
-      (e) => e.hp > 0 || enemyAnimStates[e.id] === 'death'
+    // Keep enemies visible while their presented HP > 0 or while their death animation is playing!
+    const visibleRoomEnemies = activeRoom.enemies.map((e) => {
+      if (dyingEnemies[e.id] && e.hp <= 0) {
+        return dyingEnemies[e.id];
+      }
+      return e;
+    }).filter(
+      (e) =>
+        e.hp > 0 ||
+        (presentedEnemyHp[e.id]?.hp ?? 0) > 0 ||
+        enemyAnimStates[e.id] === 'death' ||
+        Boolean(dyingEnemies[e.id])
     );
     const activeTargetEnemy =
-      livingEnemies.find((e) => e.id === selectedEnemyId) || livingEnemies[0] || null;
+      livingEnemies.find((e) => e.id === selectedEnemyId) ||
+      livingEnemies[0] ||
+      visibleRoomEnemies[0] ||
+      null;
     const inspectedEnemy =
       activeRoom.enemies.find((e) => e.id === inspectedEnemyId) ||
       activeTargetEnemy ||
@@ -314,7 +347,8 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
       activeRoom.turnId ?? activeRoom.roundNumber ?? 1
     }_${activeTurnPlayerId || 'none'}_${currentTurnAp}`;
     const isTurnActionLocked = Boolean(
-      activeRoom.actionConsumedThisTurn ||
+      isPresentingSequence ||
+        activeRoom.actionConsumedThisTurn ||
         activeRoom.turnActionLocked ||
         localLockedTurnKey === authoritativeTurnKey
     );
@@ -376,9 +410,9 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
         )
     );
 
-    const unclaimedDrops = (activeRoom.groundDrops || []).filter(
-      (d) => !d.claimedByPlayerId
-    );
+    const unclaimedDrops = hideGroundDropsDuringDeath
+      ? []
+      : (activeRoom.groundDrops || []).filter((d) => !d.claimedByPlayerId);
     const isTransitioningDoor = Boolean(
       expeditionState.roomDoorTransition?.active
     );
@@ -395,7 +429,9 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
       activeRoom.type === 'BOSS' ||
       livingEnemies.length > 0;
 
-    const hasActiveCombat = livingEnemies.length > 0 && !activeRoom.resolved;
+    const hasActiveCombat =
+      (livingEnemies.length > 0 && !activeRoom.resolved) ||
+      (isCombatRoomType && visibleRoomEnemies.length > 0 && isPresentingSequence);
 
     const canAdvance =
       !isDefeated &&
@@ -585,11 +621,30 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
             </div>
 
             {/* CENTER OF LEFT STAGE: COMMANDING LARGE CREATURE / NPC / OBJECT ART */}
-            <div className="relative z-20 flex-1 min-h-[200px] flex flex-col items-center justify-center my-2">
+            <div
+              className={`relative z-20 flex-1 min-h-[200px] flex flex-col items-center justify-center my-2 transition-transform duration-75 ${
+                hitStopActive ? 'scale-[1.02] brightness-125' : ''
+              }`}
+            >
               {visibleRoomEnemies.length > 0 ? (
                 <div className="w-full flex flex-wrap items-end justify-center gap-4 sm:gap-6">
                   {visibleRoomEnemies.map((enemy, enemyIdx) => {
-                    const isDead = enemy.hp <= 0;
+                    const presentedHpObj = presentedEnemyHp[enemy.id];
+                    const displayedHp = Math.max(
+                      0,
+                      Math.round(presentedHpObj ? presentedHpObj.hp : enemy.hp)
+                    );
+                    const displayedTrailHp = Math.max(
+                      displayedHp,
+                      Math.round(
+                        presentedHpObj ? presentedHpObj.trailHp : displayedHp
+                      )
+                    );
+                    const isDead =
+                      enemy.hp <= 0 &&
+                      displayedHp <= 0 &&
+                      (enemyAnimStates[enemy.id] === 'death' ||
+                        Boolean(dyingEnemies[enemy.id]));
                     const isTargeted = activeTargetEnemy?.id === enemy.id && !isDead;
                     const animState =
                       enemyAnimStates[enemy.id] || (isDead ? 'death' : 'idle');
@@ -633,9 +688,9 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             }
                           }
                         }}
-                        className={`group relative flex flex-col items-center transition-all duration-300 outline-none ${
+                        className={`group relative flex flex-col items-center transition-all duration-500 outline-none ${
                           isDead
-                            ? 'opacity-30 scale-90 pointer-events-none'
+                            ? 'opacity-40 scale-90 translate-y-2 pointer-events-none'
                             : isTargeted
                             ? 'scale-105 cursor-pointer z-20'
                             : 'opacity-85 hover:opacity-100 hover:scale-102 cursor-pointer z-10'
@@ -700,6 +755,20 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           {latestEnemyVfx?.vfxStyle && (
                             <LaCriptaCombatVfxOverlay
                               vfxStyle={latestEnemyVfx.vfxStyle}
+                              isCrit={
+                                latestEnemyVfx.isCrit ||
+                                latestEnemyVfx.kind === 'CRIT_ENEMY'
+                              }
+                            />
+                          )}
+                          {isDead && (
+                            <LaCriptaEnemyDeathOverlay
+                              enemyName={enemy.name}
+                              isBossOrMiniboss={
+                                enemy.isBoss ||
+                                enemy.isFinalBoss ||
+                                enemy.isMiniboss
+                              }
                             />
                           )}
                           <LaCriptaEnemyPixelSprite
@@ -723,23 +792,97 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                               {enemy.profession ||
                                 buildEnemyAiProfileForArchetype(enemy).profession}
                             </div>
-                            <div className="mt-1 h-2 w-full bg-[#161020] border border-[#2D223B] overflow-hidden">
+                            <div className="mt-1 h-2 w-full bg-[#161020] border border-[#2D223B] overflow-hidden relative">
+                              {/* Delayed trailing damage strip */}
                               <div
-                                className="h-full bg-gradient-to-r from-[#9E2A45] to-[#E63956] transition-all duration-300"
+                                className="absolute inset-y-0 left-0 bg-[#FFD166]/85 transition-all duration-500 ease-out"
                                 style={{
                                   width: `${Math.max(
                                     0,
-                                    Math.min(100, (enemy.hp / Math.max(1, enemy.maxHp)) * 100)
+                                    Math.min(
+                                      100,
+                                      (displayedTrailHp /
+                                        Math.max(1, enemy.maxHp)) *
+                                        100
+                                    )
+                                  )}%`,
+                                }}
+                              />
+                              <div
+                                className="relative z-10 h-full bg-gradient-to-r from-[#9E2A45] to-[#E63956] transition-all duration-400 ease-out"
+                                style={{
+                                  width: `${Math.max(
+                                    0,
+                                    Math.min(
+                                      100,
+                                      (displayedHp / Math.max(1, enemy.maxHp)) *
+                                        100
+                                    )
                                   )}%`,
                                 }}
                               />
                             </div>
                             <div className="mt-0.5 flex items-center justify-between text-[8px] font-cripta-pixel text-[#D8C6A0]">
                               <span>
-                                PV {enemy.hp}/{enemy.maxHp}
+                                PV {displayedHp}/{enemy.maxHp}
                               </span>
                               <span>DEF {enemy.armor || 0}</span>
                             </div>
+                            {/* Active status badges on secondary multi-enemy card */}
+                            {(Boolean(enemy.poisonStacks && enemy.poisonStacks > 0) ||
+                              Boolean(enemy.vulnerableTurns && enemy.vulnerableTurns > 0) ||
+                              Boolean(
+                                enemy.attackBuffBonus &&
+                                  enemy.attackBuffBonus < 0 &&
+                                  (enemy.attackBuffRounds || 0) > 0
+                              ) ||
+                              Boolean(
+                                (enemy.defendingRoundsRemaining || 0) > 0 ||
+                                  (enemy.armorBuffBonus || 0) > 0
+                              )) && (
+                              <div className="mt-1 pt-1 border-t border-[#261C33] flex flex-wrap items-center justify-center gap-1">
+                                {Boolean(enemy.poisonStacks && enemy.poisonStacks > 0) && (
+                                  <LaCriptaStatusEffectBadge
+                                    effectType="POISON"
+                                    turnsRemaining={enemy.poisonStacks || 1}
+                                    stacks={enemy.poisonStacks}
+                                    compact
+                                  />
+                                )}
+                                {Boolean(enemy.vulnerableTurns && enemy.vulnerableTurns > 0) && (
+                                  <LaCriptaStatusEffectBadge
+                                    effectType="VULNERABLE"
+                                    turnsRemaining={enemy.vulnerableTurns || 1}
+                                    compact
+                                  />
+                                )}
+                                {Boolean(
+                                  enemy.attackBuffBonus &&
+                                    enemy.attackBuffBonus < 0 &&
+                                    (enemy.attackBuffRounds || 0) > 0
+                                ) && (
+                                  <LaCriptaStatusEffectBadge
+                                    effectType="WEAKENED"
+                                    turnsRemaining={enemy.attackBuffRounds || 1}
+                                    compact
+                                  />
+                                )}
+                                {Boolean(
+                                  (enemy.defendingRoundsRemaining || 0) > 0 ||
+                                    (enemy.armorBuffBonus || 0) > 0
+                                ) && (
+                                  <LaCriptaStatusEffectBadge
+                                    effectType="SHIELDED"
+                                    turnsRemaining={
+                                      enemy.defendingRoundsRemaining ||
+                                      enemy.armorBuffRounds ||
+                                      1
+                                    }
+                                    compact
+                                  />
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -854,54 +997,114 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   })()}
 
                   {/* Commanding Enemy Health Bar */}
-                  <div
-                    onClick={() => {
-                      if (onInspectEnemy) {
-                        laCriptaAudio.playStoneClick();
-                        onInspectEnemy(activeTargetEnemy.id);
-                      }
-                    }}
-                    className="cursor-pointer"
-                    title="Haz clic para examinar estadísticas, debilidades y resistencias"
-                  >
-                    <div className="flex items-center justify-between text-xs font-cripta-pixel mb-1 gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[#F5EFE6] font-bold uppercase truncate">
-                          SALUD DE {activeTargetEnemy.name}
-                        </span>
-                        <span className="px-1.5 py-0.5 bg-[#241838] border border-[#7656A8] text-[8px] font-cripta-pixel font-bold text-[#FFD166] uppercase tracking-wider shrink-0">
-                          {activeTargetEnemy.profession ||
-                            buildEnemyAiProfileForArchetype(activeTargetEnemy)
-                              .profession}
-                        </span>
-                      </div>
-                      <span className="text-[#FFD166] font-bold shrink-0">
-                        {activeTargetEnemy.hp} / {activeTargetEnemy.maxHp} PV
-                      </span>
-                    </div>
-                    <div className="h-4 w-full bg-[#160F20] border-2 border-[#3E2F4B] overflow-hidden relative">
+                  {(() => {
+                    const targetHpObj = presentedEnemyHp[activeTargetEnemy.id];
+                    const targetDisplayedHp = Math.max(
+                      0,
+                      Math.round(
+                        targetHpObj ? targetHpObj.hp : activeTargetEnemy.hp
+                      )
+                    );
+                    const targetTrailHp = Math.max(
+                      targetDisplayedHp,
+                      Math.round(
+                        targetHpObj
+                          ? targetHpObj.trailHp
+                          : targetDisplayedHp
+                      )
+                    );
+                    return (
                       <div
-                        className="h-full bg-gradient-to-r from-[#8A1C33] via-[#C93B5B] to-[#FF4D6D] transition-all duration-300"
-                        style={{
-                          width: `${Math.max(
-                            0,
-                            Math.min(
-                              100,
-                              (activeTargetEnemy.hp /
-                                Math.max(1, activeTargetEnemy.maxHp)) *
-                                100
-                            )
-                          )}%`,
+                        onClick={() => {
+                          if (onInspectEnemy) {
+                            laCriptaAudio.playStoneClick();
+                            onInspectEnemy(activeTargetEnemy.id);
+                          }
                         }}
-                      />
-                    </div>
-                  </div>
+                        className="cursor-pointer"
+                        title="Haz clic para examinar estadísticas, debilidades y resistencias"
+                      >
+                        <div className="flex items-center justify-between text-xs font-cripta-pixel mb-1 gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[#F5EFE6] font-bold uppercase truncate">
+                              SALUD DE {activeTargetEnemy.name}
+                            </span>
+                            <span className="px-1.5 py-0.5 bg-[#241838] border border-[#7656A8] text-[8px] font-cripta-pixel font-bold text-[#FFD166] uppercase tracking-wider shrink-0">
+                              {activeTargetEnemy.profession ||
+                                buildEnemyAiProfileForArchetype(
+                                  activeTargetEnemy
+                                ).profession}
+                            </span>
+                          </div>
+                          <span className="text-[#FFD166] font-bold shrink-0">
+                            {targetDisplayedHp} / {activeTargetEnemy.maxHp} PV
+                          </span>
+                        </div>
+                        <div className="h-4 w-full bg-[#160F20] border-2 border-[#3E2F4B] overflow-hidden relative">
+                          {/* Delayed trailing damage strip */}
+                          <div
+                            className="absolute inset-y-0 left-0 bg-[#FFD166]/85 transition-all duration-500 ease-out"
+                            style={{
+                              width: `${Math.max(
+                                0,
+                                Math.min(
+                                  100,
+                                  (targetTrailHp /
+                                    Math.max(1, activeTargetEnemy.maxHp)) *
+                                    100
+                                )
+                              )}%`,
+                            }}
+                          />
+                          <div
+                            className="relative z-10 h-full bg-gradient-to-r from-[#8A1C33] via-[#C93B5B] to-[#FF4D6D] transition-all duration-400 ease-out"
+                            style={{
+                              width: `${Math.max(
+                                0,
+                                Math.min(
+                                  100,
+                                  (targetDisplayedHp /
+                                    Math.max(1, activeTargetEnemy.maxHp)) *
+                                    100
+                                )
+                              )}%`,
+                            }}
+                          />
+                          {/* Crisp pixel segment ticks */}
+                          <div
+                            className="pointer-events-none absolute inset-0 z-20 opacity-25"
+                            style={{
+                              backgroundImage:
+                                'repeating-linear-gradient(90deg, transparent 0px, transparent 14px, #09070D 14px, #09070D 16px)',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Active Status Effects on Target Enemy */}
                   {(Boolean(activeTargetEnemy.poisonStacks && activeTargetEnemy.poisonStacks > 0) ||
                     Boolean(activeTargetEnemy.vulnerableTurns && activeTargetEnemy.vulnerableTurns > 0) ||
-                    Boolean(activeTargetEnemy.isDefending)) && (
+                    Boolean(
+                      activeTargetEnemy.attackBuffBonus &&
+                        activeTargetEnemy.attackBuffBonus < 0 &&
+                        (activeTargetEnemy.attackBuffRounds || 0) > 0
+                    ) ||
+                    Boolean(
+                      activeTargetEnemy.attackBuffBonus &&
+                        activeTargetEnemy.attackBuffBonus > 0 &&
+                        (activeTargetEnemy.attackBuffRounds || 0) > 0
+                    ) ||
+                    Boolean(
+                      activeTargetEnemy.isDefending ||
+                        (activeTargetEnemy.defendingRoundsRemaining || 0) > 0 ||
+                        (activeTargetEnemy.armorBuffBonus || 0) > 0
+                    )) && (
                     <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#261C33]">
+                      <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-wider mr-1">
+                        ESTADOS:
+                      </span>
                       {Boolean(activeTargetEnemy.poisonStacks && activeTargetEnemy.poisonStacks > 0) && (
                         <LaCriptaStatusEffectBadge
                           effectType="POISON"
@@ -911,14 +1114,42 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       )}
                       {Boolean(activeTargetEnemy.vulnerableTurns && activeTargetEnemy.vulnerableTurns > 0) && (
                         <LaCriptaStatusEffectBadge
-                          effectType="MARKED"
+                          effectType="VULNERABLE"
                           turnsRemaining={activeTargetEnemy.vulnerableTurns || 1}
                         />
                       )}
-                      {Boolean(activeTargetEnemy.isDefending) && (
+                      {Boolean(
+                        activeTargetEnemy.attackBuffBonus &&
+                          activeTargetEnemy.attackBuffBonus < 0 &&
+                          (activeTargetEnemy.attackBuffRounds || 0) > 0
+                      ) && (
+                        <LaCriptaStatusEffectBadge
+                          effectType="WEAKENED"
+                          turnsRemaining={activeTargetEnemy.attackBuffRounds || 1}
+                        />
+                      )}
+                      {Boolean(
+                        activeTargetEnemy.attackBuffBonus &&
+                          activeTargetEnemy.attackBuffBonus > 0 &&
+                          (activeTargetEnemy.attackBuffRounds || 0) > 0
+                      ) && (
+                        <LaCriptaStatusEffectBadge
+                          effectType="BLESSED"
+                          turnsRemaining={activeTargetEnemy.attackBuffRounds || 1}
+                        />
+                      )}
+                      {Boolean(
+                        activeTargetEnemy.isDefending ||
+                          (activeTargetEnemy.defendingRoundsRemaining || 0) > 0 ||
+                          (activeTargetEnemy.armorBuffBonus || 0) > 0
+                      ) && (
                         <LaCriptaStatusEffectBadge
                           effectType="SHIELDED"
-                          turnsRemaining={activeTargetEnemy.defendingRoundsRemaining || 1}
+                          turnsRemaining={
+                            activeTargetEnemy.defendingRoundsRemaining ||
+                            activeTargetEnemy.armorBuffRounds ||
+                            1
+                          }
                         />
                       )}
                     </div>
@@ -970,10 +1201,12 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           : 'bg-[#161120] border-[#4A3B5C] text-[#D8C6A0]'
                       }`}
                     >
-                      {!isPlayerPhase
+                      {isPresentingSequence && presentationBannerText
+                        ? `✦ ${presentationBannerText} · RESOLVIENDO...`
+                        : !isPlayerPhase
                         ? '⚔ TURNO DEL ENEMIGO · RESOLVIENDO...'
                         : isTurnActionLocked
-                        ? '✦ ACCIÓN ENVIADA · RESOLVIENDO TURNO...'
+                        ? '✦ ACCIÓN ENVIADA · RESOLVIENDO...'
                         : isMyTurn
                         ? `✦ ¡TU TURNO, ${me?.name || 'HÉROE'}! · ELIGE 1 CARTA`
                         : `TURNO DE: ${activeTurnPlayer?.name || 'COMPAÑERO'}`}
@@ -2084,6 +2317,16 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
             style={{ color: openingDungeonDef.palette.highlight }}
           >
             ✦ LOS CERROJOS CEDEN · EL GRUPO CRUZA EL UMBRAL ✦
+          </p>
+        ) : hoveredDoorId && CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId] ? (
+          <p
+            className="mt-1 text-xs font-cripta-pixel tracking-wider uppercase transition-colors duration-300"
+            style={{ color: CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].palette.highlight }}
+          >
+            ✦ {CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].name} ·{' '}
+            {CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].artTheme.hoverPrompt ||
+              CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].subtitle}{' '}
+            ✦
           </p>
         ) : (
           !isSolo &&

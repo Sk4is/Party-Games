@@ -521,6 +521,8 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   voterBadges = [],
   onClick,
 }) => {
+  const [commitFlash, setCommitFlash] = useState(false);
+
   const resolvedTheme: CriptaCardVisualTheme =
     theme || (accentColor ? ACCENT_TO_THEME[accentColor] : 'EVENT');
   const pal = THEME_PALETTES[resolvedTheme];
@@ -529,31 +531,48 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   const resolvedSecondary = effectSecondary || summary;
   const isDisabled = disabled || turnLocked;
 
+  const handleCardClick = () => {
+    if (isDisabled) return;
+    setCommitFlash(true);
+    window.setTimeout(() => setCommitFlash(false), 680);
+    onClick();
+  };
+
   const cardElement = (
     <button
       type="button"
       disabled={isDisabled}
-      onClick={onClick}
-      className={`group relative w-[158px] sm:w-[176px] xl:w-[192px] h-[238px] sm:h-[254px] xl:h-[264px] border-2 flex flex-col justify-between text-left transition-all duration-150 select-none ${
+      onClick={handleCardClick}
+      className={`group relative w-[164px] sm:w-[178px] xl:w-[190px] h-[252px] sm:h-[264px] shrink-0 border-2 flex flex-col justify-between text-left transition-all duration-150 select-none ${
         isDisabled
           ? 'opacity-45 grayscale-[30%] cursor-not-allowed'
+          : commitFlash
+          ? '-translate-y-2.5 scale-[1.06] ring-2 ring-[#FFD166] cursor-pointer z-30'
           : selected
-          ? '-translate-y-2 scale-[1.03] cursor-pointer z-20'
+          ? '-translate-y-2 scale-[1.03] ring-1 ring-[#FFD166] cursor-pointer z-20'
           : 'hover:-translate-y-1.5 hover:scale-[1.02] active:translate-y-0 cursor-pointer hover:z-10'
       }`}
       style={{
         backgroundColor: pal.bg,
-        borderColor: selected ? '#FFD166' : pal.border,
-        boxShadow: selected
-          ? `0 12px 28px rgba(0,0,0,0.95), 0 0 20px ${pal.glow}`
-          : isDisabled
-          ? '0 4px 12px rgba(0,0,0,0.7)'
-          : `0 8px 20px rgba(0,0,0,0.88), inset 0 0 16px ${pal.glow}`,
+        borderColor: commitFlash || selected ? '#FFD166' : pal.border,
+        boxShadow:
+          commitFlash || selected
+            ? `0 14px 32px rgba(0,0,0,0.95), 0 0 24px #FFD16688, inset 0 0 18px ${pal.glow}`
+            : isDisabled
+            ? '0 4px 12px rgba(0,0,0,0.7)'
+            : `0 8px 20px rgba(0,0,0,0.88), inset 0 0 16px ${pal.glow}`,
       }}
     >
-      {/* Top Cost Badge & Optional Cooldown/Risk Badge */}
+      {/* Physical Commitment / Vote Lock Seal Stamp */}
+      {(commitFlash || selected) && (
+        <div className="pointer-events-none absolute -top-2.5 left-1/2 -translate-x-1/2 z-30 px-2 py-0.5 bg-[#2A1C0E] border-2 border-[#FFD166] text-[8px] font-cripta-pixel font-black text-[#FFD166] uppercase tracking-widest shadow-[0_0_12px_rgba(255,209,102,0.75)] whitespace-nowrap">
+          ✦ {commitFlash ? 'ACCIÓN SELLADA' : 'SELECCIONADA'} ✦
+        </div>
+      )}
+
+      {/* 1. Fixed Top Cost Badge & Cooldown/Risk Bar (26px) */}
       <div
-        className="w-full px-2 py-1 border-b flex items-center justify-between gap-1 shrink-0"
+        className="w-full h-[26px] px-2 border-b flex items-center justify-between gap-1 shrink-0"
         style={{
           backgroundColor: pal.headerBg,
           borderColor: `${pal.border}66`,
@@ -566,7 +585,7 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
             color: pal.badgeText,
           }}
         >
-          {turnLocked ? 'BLOQUEADA' : costLabel}
+          {turnLocked ? 'RESOLVIENDO...' : costLabel}
         </span>
 
         {resolvedTopRight ? (
@@ -583,29 +602,29 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
         )}
       </div>
 
-      {/* Card Category + Title */}
-      <div className="px-2 pt-1 pb-0.5 text-center shrink-0">
+      {/* 2. Fixed Category + Title Block (42px) */}
+      <div className="h-[42px] px-2 pt-1 pb-0.5 text-center shrink-0 flex flex-col justify-center overflow-hidden">
         <div
-          className="font-cripta-pixel text-[8px] uppercase tracking-widest truncate mb-0.5"
+          className="font-cripta-pixel text-[8px] uppercase tracking-widest truncate leading-none mb-0.5"
           style={{ color: pal.accentText }}
         >
           {categoryLabel}
         </div>
-        <div className="font-cripta-display text-xs sm:text-[13px] font-black text-[#F4EBD9] uppercase tracking-wide leading-tight line-clamp-2 min-h-[28px] flex items-center justify-center">
+        <div className="font-cripta-display text-xs sm:text-[13px] font-black text-[#F4EBD9] uppercase tracking-wide leading-tight line-clamp-2 flex items-center justify-center">
           {title}
         </div>
       </div>
 
-      {/* Central Pixel-Art Illustration Frame */}
+      {/* 3. STRICT NORMALIZED PIXEL-ART ILLUSTRATION FRAME (90px / 96px — Never compresses or stretches!) */}
       <div
-        className="mx-2 my-0.5 flex-1 min-h-[66px] sm:min-h-[76px] border flex items-center justify-center relative overflow-hidden"
+        className="mx-2 h-[88px] sm:h-[94px] shrink-0 border flex items-center justify-center relative overflow-hidden"
         style={{
           backgroundColor: pal.artBg,
           borderColor: `${pal.border}55`,
           backgroundImage: `radial-gradient(circle at 50% 50%, ${pal.glow} 0%, transparent 75%)`,
         }}
       >
-        <div className="transition-transform duration-150 group-hover:scale-110 flex items-center justify-center w-full h-full">
+        <div className="transition-transform duration-150 group-hover:scale-105 flex items-center justify-center w-full h-full p-1 overflow-hidden">
           {illustration ? (
             illustration
           ) : (
@@ -620,32 +639,14 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
             />
           )}
         </div>
-      </div>
 
-      {/* Bottom Deliberate Hierarchy: Headline Number -> Concise Copy -> Target/Status Footer */}
-      <div className="px-2 pt-1 pb-1.5 text-center flex flex-col justify-end gap-0.5 shrink-0">
-        {headlineValue && (
-          <div className="font-cripta-mono text-[11px] sm:text-xs font-black text-[#FFD166] tracking-wide uppercase leading-tight">
-            {headlineValue}
-          </div>
-        )}
-        {resolvedSecondary && (
-          <div className="font-cripta-pixel text-[8px] sm:text-[9px] text-[#E8DFCE]/90 leading-snug line-clamp-2 min-h-[22px] flex items-center justify-center">
-            {resolvedSecondary}
-          </div>
-        )}
-        <div
-          className="mt-0.5 pt-1 border-t border-[#2A1F38]/80 font-cripta-mono text-[8px] sm:text-[9px] font-extrabold tracking-wider uppercase leading-snug truncate"
-          style={{ color: pal.accentText }}
-        >
-          {resolvedPrimary}
-        </div>
+        {/* Multiplayer Voter Badges Overlay anchored inside bottom of art box so card layout never shifts */}
         {voterBadges.length > 0 && (
-          <div className="mt-0.5 flex flex-wrap items-center justify-center gap-1">
+          <div className="pointer-events-none absolute inset-x-1 bottom-1 z-20 flex flex-wrap items-center justify-center gap-1">
             {voterBadges.map((v) => (
               <span
                 key={v.id}
-                className="px-1 py-0.2 bg-[#09070D] border text-[8px] font-cripta-pixel text-[#D9D0BC]"
+                className="px-1.5 py-0.2 bg-[#09070D]/95 border text-[7px] font-cripta-pixel text-[#FFD166] shadow-md"
                 style={{ borderColor: v.color }}
               >
                 {v.name}
@@ -653,6 +654,28 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
             ))}
           </div>
         )}
+      </div>
+
+      {/* 4. Fixed Bottom Hierarchy: Headline Number -> Concise Copy -> Target/Status Footer */}
+      <div className="px-2 pt-1 pb-1.5 text-center flex-1 min-h-0 flex flex-col justify-between shrink-0 overflow-hidden">
+        <div className="flex flex-col items-center justify-center my-auto gap-0.5 overflow-hidden">
+          {headlineValue && (
+            <div className="font-cripta-mono text-[11px] sm:text-xs font-black text-[#FFD166] tracking-wide uppercase leading-none truncate max-w-full">
+              {headlineValue}
+            </div>
+          )}
+          {resolvedSecondary && (
+            <div className="font-cripta-pixel text-[8px] sm:text-[9px] text-[#E8DFCE]/90 leading-snug line-clamp-2 flex items-center justify-center">
+              {resolvedSecondary}
+            </div>
+          )}
+        </div>
+        <div
+          className="pt-1 border-t border-[#2A1F38]/80 font-cripta-mono text-[8px] sm:text-[9px] font-extrabold tracking-wider uppercase leading-none truncate shrink-0"
+          style={{ color: pal.accentText }}
+        >
+          {resolvedPrimary}
+        </div>
       </div>
     </button>
   );

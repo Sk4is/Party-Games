@@ -612,6 +612,173 @@ class LaCriptaAudioEngine {
   public playDebuffGained() {
     this.playRuneWrong();
   }
+
+  /**
+   * Subtle anticipation charge / weapon draw before an attack crosses the screen
+   */
+  public playAttackAnticipation(
+    style: 'melee' | 'ranged' | 'magic' | 'alchemy' | 'enemy' = 'melee'
+  ) {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    if (style === 'magic') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(460, now + 0.22);
+    } else if (style === 'ranged') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.linearRampToValueAtTime(280, now + 0.18);
+    } else if (style === 'alchemy') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(340, now + 0.19);
+    } else if (style === 'enemy') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(95, now);
+      osc.frequency.linearRampToValueAtTime(145, now + 0.22);
+    } else {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(125, now);
+      osc.frequency.exponentialRampToValueAtTime(210, now + 0.16);
+    }
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.09, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.23);
+  }
+
+  /**
+   * Directional projectile / slash wave travel sound
+   */
+  public playAttackTravel(vfxStyle?: string) {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    if (vfxStyle === 'arrow' || vfxStyle === 'pierce') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(680, now);
+      osc.frequency.exponentialRampToValueAtTime(220, now + 0.14);
+    } else if (vfxStyle === 'arcane' || vfxStyle === 'holy') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(480, now);
+      osc.frequency.exponentialRampToValueAtTime(640, now + 0.16);
+    } else {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(320, now);
+      osc.frequency.exponentialRampToValueAtTime(110, now + 0.15);
+    }
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.11, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.17);
+  }
+
+  /**
+   * Damage-type distinct contact impact (Tajante, Contundente, Perforante, Arcano, Sagrado, Alquímico)
+   */
+  public playImpactByDamageType(damageType?: string, isCrit = false) {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const dt = (damageType || '').toUpperCase();
+
+    if (dt.includes('CONTUNDENTE') || dt === 'BLUNT') {
+      // Heavy compression thud
+      const thud = ctx.createOscillator();
+      const gain = ctx.createGain();
+      thud.type = 'triangle';
+      thud.frequency.setValueAtTime(isCrit ? 160 : 115, now);
+      thud.frequency.exponentialRampToValueAtTime(28, now + 0.24);
+      gain.gain.setValueAtTime(isCrit ? 0.32 : 0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      thud.connect(gain);
+      gain.connect(ctx.destination);
+      thud.start(now);
+      thud.stop(now + 0.26);
+      if (isCrit) this.playSwordSlash(true);
+      return;
+    }
+
+    if (dt.includes('PERFORANTE') || dt === 'PIERCE' || dt === 'ARROW') {
+      // High-velocity focused puncture snap
+      const snap = ctx.createOscillator();
+      const gain = ctx.createGain();
+      snap.type = 'sawtooth';
+      snap.frequency.setValueAtTime(isCrit ? 860 : 640, now);
+      snap.frequency.exponentialRampToValueAtTime(85, now + 0.13);
+      gain.gain.setValueAtTime(isCrit ? 0.24 : 0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      snap.connect(gain);
+      gain.connect(ctx.destination);
+      snap.start(now);
+      snap.stop(now + 0.15);
+      return;
+    }
+
+    if (
+      dt.includes('MAGICO') ||
+      dt.includes('MÁGICO') ||
+      dt.includes('ASTRAL') ||
+      dt.includes('SOMBRA') ||
+      dt === 'ARCANE'
+    ) {
+      this.playMagicCast();
+      if (isCrit) this.playSwordSlash(true);
+      return;
+    }
+
+    this.playSwordSlash(isCrit);
+  }
+
+  /**
+   * Vampiric / Lifesteal energy siphon traveling from enemy to player HUD
+   */
+  public playLifestealTravel() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    [246.94, 329.63, 493.88].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      const t = now + idx * 0.055;
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.25, t + 0.22);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.11, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.25);
+    });
+  }
+
+  /**
+   * Physical commitment stamp when locking a decision card
+   */
+  public playDecisionCommit() {
+    this.playDoorVote();
+  }
 }
 
 export const laCriptaAudio = new LaCriptaAudioEngine();

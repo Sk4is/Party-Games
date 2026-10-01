@@ -33,6 +33,11 @@ import {
   LaCriptaExitExpeditionModal,
   LaCriptaStatusCodexModal,
 } from './LaCriptaStatusEffectBadge';
+import {
+  LaCriptaDirectionalTravelOverlay,
+  LaCriptaGoldCollectionOverlay,
+  useLaCriptaPresentationQueue,
+} from './LaCriptaVisualFeedback';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 
 interface LaCriptaGameProps {
@@ -150,8 +155,7 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
   });
 
   const [selectedTargetEnemyId, setSelectedTargetEnemyId] = useState<string | null>(null);
-  const [activeRelicRevealId, setActiveRelicRevealId] = useState<CriptaRelicId | null>(null);
-  const [showBossPhaseTransition, setShowBossPhaseTransition] = useState<boolean>(false);
+  const [hoveredPreviewDungeonId, setHoveredPreviewDungeonId] = useState<string | null>(null);
 
   const handleChangePlayerName = useCallback((nextName: string) => {
     setPlayerName(nextName);
@@ -240,15 +244,24 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     onBackToMenu();
   }, [leaveRoom, onBackToMenu]);
 
-  // Phase 3 & 4: Visual Gameplay Feedback, Floating Popups, Player Portrait States & Enemy Hit/Death States
-  const lastProcessedBatchIdRef = useRef<number>(0);
-  const [activeVisualEvents, setActiveVisualEvents] = useState<CriptaVisualEvent[]>([]);
-  const [playerAnimationStates, setPlayerAnimationStates] = useState<
-    Record<string, CriptaSpriteAnimationState>
-  >({});
-  const [enemyAnimStates, setEnemyAnimStates] = useState<
-    Record<string, 'idle' | 'hit' | 'lunge' | 'death'>
-  >({});
+  // Action Presentation Queue Engine (Chronological Combat & Decision Sequencing)
+  const {
+    isPresentingSequence,
+    presentationBannerText,
+    hitStopActive,
+    activeVisualEvents,
+    activeTravel,
+    activeGoldBurst,
+    playerAnimationStates,
+    enemyAnimStates,
+    presentedEnemyHp,
+    presentedPlayerHp,
+    dyingEnemies,
+    hideGroundDropsDuringDeath,
+    playerCardImpacts,
+    activeRelicRevealId,
+    showBossPhaseTransition,
+  } = useLaCriptaPresentationQueue(expeditionState);
 
   // Unified Contextual Side Panel State (only ONE panel open at a time)
   const [contextualPanelMode, setContextualPanelMode] =
@@ -289,165 +302,6 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     setContextualPanelMode('ENEMY_INSPECTION');
   }, []);
 
-  useEffect(() => {
-    const batch = expeditionState?.lastEventBatch;
-    if (!batch || !batch.batchId || batch.batchId === lastProcessedBatchIdRef.current) {
-      return;
-    }
-    lastProcessedBatchIdRef.current = batch.batchId;
-
-    const events = batch.events || [];
-    if (events.length === 0) return;
-
-    setActiveVisualEvents(events);
-
-    const nextPlayerAnims: Record<string, CriptaSpriteAnimationState> = {};
-    const nextEnemyAnims: Record<string, 'idle' | 'hit' | 'lunge' | 'death'> = {};
-
-    if (batch.actorPlayerId && batch.actorAction) {
-      if (batch.actorAction === 'ATTACK' || batch.actorAction === 'WEAPON_SPECIAL') {
-        nextPlayerAnims[batch.actorPlayerId] = 'attack';
-      } else if (batch.actorAction === 'ABILITY' || batch.actorAction === 'USE_ITEM') {
-        nextPlayerAnims[batch.actorPlayerId] = 'cast';
-      } else if (batch.actorAction === 'DEFEND' || batch.actorAction === 'PASS') {
-        nextPlayerAnims[batch.actorPlayerId] = 'defend';
-      }
-    }
-
-    let playedPrimarySfx = false;
-    let relicRevealTimer: number | null = null;
-    let bossPhaseTimer: number | null = null;
-
-    for (const ev of events) {
-      if ((ev.kind === 'RELIC_ACQUIRED' || ev.kind === 'RELIC_OBTAINED') && ev.relicId) {
-        setActiveRelicRevealId(ev.relicId);
-        relicRevealTimer = window.setTimeout(() => {
-          setActiveRelicRevealId(null);
-        }, 2800);
-      }
-
-      if (ev.kind === 'BOSS_PHASE_TRANSITION') {
-        setShowBossPhaseTransition(true);
-        bossPhaseTimer = window.setTimeout(() => {
-          setShowBossPhaseTransition(false);
-        }, 2400);
-      }
-
-      if (ev.targetType === 'ENEMY' && ev.targetId) {
-        if (ev.kind === 'ENEMY_DEATH') {
-          nextEnemyAnims[ev.targetId] = 'death';
-        } else if (ev.kind === 'ENEMY_ATTACK') {
-          if (nextEnemyAnims[ev.targetId] !== 'death') {
-            nextEnemyAnims[ev.targetId] = 'lunge';
-          }
-        } else if (
-          (ev.kind === 'DAMAGE_ENEMY' || ev.kind === 'CRIT_ENEMY' || ev.kind === 'STATUS_APPLIED') &&
-          nextEnemyAnims[ev.targetId] !== 'death'
-        ) {
-          nextEnemyAnims[ev.targetId] = 'hit';
-        }
-      }
-
-      if (ev.targetType === 'PLAYER' && ev.targetId) {
-        if (ev.kind === 'REVIVE_PLAYER') {
-          nextPlayerAnims[ev.targetId] = 'revive';
-        } else if (ev.kind === 'HEAL_PLAYER') {
-          if (!nextPlayerAnims[ev.targetId]) {
-            nextPlayerAnims[ev.targetId] = 'heal';
-          }
-        } else if (ev.kind === 'DAMAGE_PLAYER') {
-          nextPlayerAnims[ev.targetId] = 'hit';
-        } else if (
-          ev.kind === 'SHIELD_PLAYER' ||
-          ev.kind === 'GAIN_ATTACK' ||
-          ev.kind === 'GAIN_DEFENSE' ||
-          ev.kind === 'GAIN_MAGIC' ||
-          ev.kind === 'ITEM_ACQUIRED'
-        ) {
-          if (!nextPlayerAnims[ev.targetId]) {
-            nextPlayerAnims[ev.targetId] = 'buff';
-          }
-        } else if (ev.kind === 'STATUS_APPLIED') {
-          if (!nextPlayerAnims[ev.targetId]) {
-            nextPlayerAnims[ev.targetId] = 'debuff';
-          }
-        }
-      }
-
-      // Trigger crisp synthesized audio feedback for the batch
-      if (!playedPrimarySfx) {
-        if (ev.kind === 'MINIBOSS_ENRAGE') {
-          laCriptaAudio.playMinibossEnrage();
-          playedPrimarySfx = true;
-        } else if (
-          ev.kind === 'REVIVE_PLAYER' ||
-          ev.kind === 'RELIC_ACQUIRED' ||
-          ev.kind === 'RELIC_OBTAINED' ||
-          ev.kind === 'DOOR_COMPLETED' ||
-          ev.kind === 'MINIBOSS_DEFEATED'
-        ) {
-          laCriptaAudio.playReviveFanfare();
-          playedPrimarySfx = true;
-        } else if (ev.kind === 'CRIT_ENEMY' || ev.kind === 'BOSS_PHASE_TRANSITION') {
-          laCriptaAudio.playSwordSlash(true);
-          playedPrimarySfx = true;
-        } else if (ev.kind === 'ENEMY_DEATH') {
-          laCriptaAudio.playEnemyDeath();
-          playedPrimarySfx = true;
-        } else if (ev.kind === 'DAMAGE_ENEMY') {
-          if (ev.vfxStyle === 'arcane' || ev.vfxStyle === 'holy' || ev.vfxStyle === 'alchemy') {
-            laCriptaAudio.playMagicCast();
-          } else {
-            laCriptaAudio.playSwordSlash(false);
-          }
-          playedPrimarySfx = true;
-        } else if (
-          ev.kind === 'GAIN_GOLD' ||
-          ev.kind === 'LOOT_ITEM' ||
-          ev.kind === 'ROOM_REWARD' ||
-          ev.kind === 'ITEM_ACQUIRED'
-        ) {
-          laCriptaAudio.playGoldChange(true);
-          playedPrimarySfx = true;
-        } else if (ev.kind === 'LOSE_GOLD') {
-          laCriptaAudio.playGoldChange(false);
-          playedPrimarySfx = true;
-        } else if (ev.kind === 'HEAL_PLAYER' || ev.kind === 'ITEM_CONSUMED') {
-          laCriptaAudio.playHealChime();
-          playedPrimarySfx = true;
-        } else if (ev.kind === 'SHIELD_PLAYER' || ev.kind === 'GAIN_DEFENSE') {
-          laCriptaAudio.playShieldGuard();
-          playedPrimarySfx = true;
-        } else if (ev.kind === 'DAMAGE_PLAYER' || ev.kind === 'ENEMY_ATTACK') {
-          laCriptaAudio.playSwordSlash(false);
-          playedPrimarySfx = true;
-        } else if (ev.kind === 'STATUS_APPLIED') {
-          laCriptaAudio.playMagicCast();
-          playedPrimarySfx = true;
-        }
-      }
-    }
-
-    setPlayerAnimationStates(nextPlayerAnims);
-    setEnemyAnimStates(nextEnemyAnims);
-
-    const animTimer = window.setTimeout(() => {
-      setPlayerAnimationStates({});
-      setEnemyAnimStates({});
-    }, 680);
-
-    const eventsTimer = window.setTimeout(() => {
-      setActiveVisualEvents([]);
-    }, 1180);
-
-    return () => {
-      window.clearTimeout(animTimer);
-      window.clearTimeout(eventsTimer);
-      if (relicRevealTimer) window.clearTimeout(relicRevealTimer);
-      if (bossPhaseTimer) window.clearTimeout(bossPhaseTimer);
-    };
-  }, [expeditionState?.lastEventBatch]);
-
   const localPlayer = useMemo(
     () => expeditionState?.players.find((p) => p.id === playerId) || null,
     [expeditionState?.players, playerId]
@@ -471,6 +325,16 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
       );
     }
     if (
+      (expeditionState.phase === 'THREE_DOORS' ||
+        expeditionState.phase === 'RETURNING_TO_DOORS') &&
+      hoveredPreviewDungeonId &&
+      CRIPTA_DUNGEONS_REGISTRY[hoveredPreviewDungeonId as keyof typeof CRIPTA_DUNGEONS_REGISTRY]
+    ) {
+      return CRIPTA_DUNGEONS_REGISTRY[
+        hoveredPreviewDungeonId as keyof typeof CRIPTA_DUNGEONS_REGISTRY
+      ];
+    }
+    if (
       expeditionState.selectedDungeonId &&
       CRIPTA_DUNGEONS_REGISTRY[expeditionState.selectedDungeonId]
     ) {
@@ -485,6 +349,7 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     expeditionState?.phase,
     expeditionState?.selectedDungeonId,
     expeditionState?.offeredDungeons,
+    hoveredPreviewDungeonId,
   ]);
 
   const activeAtmosphereRoomType = useMemo(() => {
@@ -526,6 +391,12 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
       {isFullViewportGame && activeAtmosphereDungeon && (
         <LaCriptaForegroundBiomeParticles dungeon={activeAtmosphereDungeon} />
       )}
+
+      {/* Directional Attack & Lifesteal Travel Overlay (Player <-> Enemy Stage) */}
+      <LaCriptaDirectionalTravelOverlay travel={activeTravel} />
+
+      {/* 60 FPS Gold Collection Coin Arc & Banner Overlay */}
+      <LaCriptaGoldCollectionOverlay burst={activeGoldBurst} />
 
       {/* Subtle Fantasy Arcade CRT Scanline Overlay (pointer-events: none) */}
       <LaCriptaCrtOverlay />
@@ -628,6 +499,12 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
             currentPlayerId={playerId}
             activeVisualEvents={activeVisualEvents}
             enemyAnimStates={enemyAnimStates}
+            isPresentingSequence={isPresentingSequence}
+            presentationBannerText={presentationBannerText}
+            hitStopActive={hitStopActive}
+            presentedEnemyHp={presentedEnemyHp}
+            dyingEnemies={dyingEnemies}
+            hideGroundDropsDuringDeath={hideGroundDropsDuringDeath}
             onVoteDoor={voteDoor}
             onVoteFinalBossDoor={voteFinalBossDoor}
             onRetryDungeonInit={retryDungeonInit}
@@ -648,6 +525,7 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
             onShopBuyItem={sendShopBuyItem}
             onShopBuyRelic={sendShopBuyRelic}
             onSelectedEnemyChange={setSelectedTargetEnemyId}
+            onHoveredDoorChange={setHoveredPreviewDungeonId}
             contextualPanelMode={contextualPanelMode}
             inspectedPlayerId={inspectedPlayerId}
             inspectedEnemyId={inspectedEnemyId}
@@ -668,6 +546,8 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
           onReturnToLobby={returnToLobby}
           playerAnimationStates={playerAnimationStates}
           activeVisualEvents={activeVisualEvents}
+          presentedPlayerHp={presentedPlayerHp}
+          playerCardImpacts={playerCardImpacts}
           onUseConsumable={sendUseInventoryItem}
           selectedTargetEnemyId={selectedTargetEnemyId}
           onOpenInventory={handleToggleInventory}

@@ -675,71 +675,130 @@ export const LaCriptaContextualSidePanel: React.FC<
 
                   {/* Body: Structured Dark-Fantasy Character Sheet */}
                   <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
-                    {/* 1. FOUR CANONICAL PRIMARY STATS + DERIVED */}
+                    {/* 1. FOUR CANONICAL PRIMARY STATS + STRUCTURED COMBAT METRICS */}
                     <div>
                       <div className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest mb-1.5">
-                        ✦ ATRIBUTOS Y COMBATE
+                        ✦ ATRIBUTOS PRINCIPALES Y COMBATE
                       </div>
-                      <div className="grid grid-cols-4 gap-1.5 font-cripta-pixel text-center">
-                        <div className="p-1.5 bg-[#140E1E] border border-[#2E223D]">
-                          <div className="text-[8px] text-[#D8C6A0]/70">VIDA MÁX</div>
-                          <div className="text-xs font-bold text-[#8EE6AE] mt-0.5">
-                            {inspectedPlayer.maxHp}
+
+                      {/* Clean 2x2 Primary RPG Attribute Grid */}
+                      <div className="grid grid-cols-2 gap-2 font-cripta-pixel">
+                        {/* VIDA MÁXIMA */}
+                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[8px] text-[#D8C6A0]/70 uppercase tracking-wider">
+                              VIDA MÁXIMA
+                            </div>
+                            <div className="text-[8px] text-[#8EE6AE]/80 mt-0.5 truncate">
+                              Actual: {Math.max(0, inspectedPlayer.hp)} / {inspectedPlayer.maxHp} PV
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-cripta-mono text-sm sm:text-base font-black text-[#8EE6AE] leading-none">
+                              {inspectedPlayer.maxHp}
+                            </div>
+                            <div className="text-[7px] text-[#D8C6A0]/60 uppercase mt-0.5">
+                              SALUD
+                            </div>
                           </div>
                         </div>
-                        <div className="p-1.5 bg-[#140E1E] border border-[#2E223D]">
-                          <div className="text-[8px] text-[#D8C6A0]/70">ATAQUE</div>
-                          <div className="text-xs font-bold text-[#FF8FA3] mt-0.5">
-                            {effStats.attack}
-                            {bonusAtk > 0 && (
-                              <span className="text-[9px] text-[#FFD166] ml-0.5">
-                                (+{bonusAtk})
-                              </span>
-                            )}
+
+                        {/* ATAQUE */}
+                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[8px] text-[#D8C6A0]/70 uppercase tracking-wider">
+                              ATAQUE FÍSICO
+                            </div>
+                            <div className="text-[8px] text-[#D8C6A0]/65 mt-0.5 truncate">
+                              Base {baseAtk}
+                              {bonusAtk !== 0
+                                ? ` · Equipo ${bonusAtk > 0 ? `+${bonusAtk}` : bonusAtk}`
+                                : ' · Sin bono'}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-cripta-mono text-sm sm:text-base font-black text-[#FF8FA3] leading-none">
+                              {effStats.attack}
+                            </div>
+                            <div className="text-[7px] text-[#FFD166] uppercase mt-0.5">
+                              {bonusAtk > 0 ? `+${bonusAtk} BONO` : 'TOTAL'}
+                            </div>
                           </div>
                         </div>
-                        <div className="p-1.5 bg-[#140E1E] border border-[#2E223D]">
-                          <div className="text-[8px] text-[#D8C6A0]/70">DEFENSA</div>
-                          <div className="text-xs font-bold text-[#7BDFF2] mt-0.5">
-                            {effStats.defense}
-                            {bonusDef > 0 && (
-                              <span className="text-[9px] text-[#FFD166] ml-0.5">
-                                (+{bonusDef})
-                              </span>
-                            )}
+
+                        {/* DEFENSA */}
+                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[8px] text-[#D8C6A0]/70 uppercase tracking-wider">
+                              DEFENSA BASE
+                            </div>
+                            <div className="text-[8px] text-[#D8C6A0]/65 mt-0.5 truncate">
+                              Base {baseDef}
+                              {bonusDef !== 0
+                                ? ` · Equipo ${bonusDef > 0 ? `+${bonusDef}` : bonusDef}`
+                                : ' · Mitigación'}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-cripta-mono text-sm sm:text-base font-black text-[#7BDFF2] leading-none">
+                              {effStats.defense}
+                            </div>
+                            <div className="text-[7px] text-[#7BDFF2]/80 uppercase mt-0.5">
+                              {bonusDef > 0 ? `+${bonusDef} BONO` : 'ARMADURA'}
+                            </div>
                           </div>
                         </div>
-                        <div className="p-1.5 bg-[#140E1E] border border-[#2E223D]">
-                          <div className="text-[8px] text-[#D8C6A0]/70">MAGIA</div>
-                          <div className="text-xs font-bold text-[#C8A6F5] mt-0.5">
-                            {effStats.magic}
-                            {bonusMag > 0 && (
-                              <span className="text-[9px] text-[#FFD166] ml-0.5">
-                                (+{bonusMag})
-                              </span>
-                            )}
+
+                        {/* MAGIA */}
+                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[8px] text-[#D8C6A0]/70 uppercase tracking-wider">
+                              PODER MÁGICO
+                            </div>
+                            <div className="text-[8px] text-[#D8C6A0]/65 mt-0.5 truncate">
+                              Base {baseMag}
+                              {bonusMag !== 0
+                                ? ` · Equipo ${bonusMag > 0 ? `+${bonusMag}` : bonusMag}`
+                                : ' · Arcano/Fe'}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-cripta-mono text-sm sm:text-base font-black text-[#C8A6F5] leading-none">
+                              {effStats.magic}
+                            </div>
+                            <div className="text-[7px] text-[#C8A6F5]/80 uppercase mt-0.5">
+                              {bonusMag > 0 ? `+${bonusMag} BONO` : 'TOTAL'}
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Derived Metrics Strip */}
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[9px] font-cripta-pixel text-[#D8C6A0]/85">
-                        <span className="px-2 py-0.5 bg-[#120C1A] border border-[#2A1F38]">
-                          CRÍTICO: <strong className="text-[#FFD166]">{effStats.critChancePct}%</strong>
-                        </span>
-                        <span className="px-2 py-0.5 bg-[#120C1A] border border-[#2A1F38]">
-                          ESCUDO ACTIVO: <strong className="text-[#7BDFF2]">{inspectedPlayer.armor || 0}</strong>
-                        </span>
-                        {effStats.potionBoostPct > 0 && (
-                          <span className="px-2 py-0.5 bg-[#120C1A] border border-[#2A1F38]">
-                            ALQUIMIA: <strong className="text-[#8EE6AE]">+{effStats.potionBoostPct}%</strong>
-                          </span>
-                        )}
-                        {effStats.healBoostPct > 0 && (
-                          <span className="px-2 py-0.5 bg-[#120C1A] border border-[#2A1F38]">
-                            CURACIÓN: <strong className="text-[#FFD166]">+{effStats.healBoostPct}%</strong>
-                          </span>
-                        )}
+                      {/* Structured 4-Column Derived Combat Metrics Strip */}
+                      <div className="mt-2 grid grid-cols-4 gap-1.5 font-cripta-pixel text-center">
+                        <div className="px-1.5 py-1.5 bg-[#110B19] border border-[#2A1F38]">
+                          <div className="text-[7px] text-[#D8C6A0]/65 uppercase">DAÑO ARMA</div>
+                          <div className="font-cripta-mono text-[10px] font-bold text-[#FF8FA3] mt-0.5">
+                            {formatDamageRange(weaponDmgEst.min, weaponDmgEst.max)}
+                          </div>
+                        </div>
+                        <div className="px-1.5 py-1.5 bg-[#110B19] border border-[#2A1F38]">
+                          <div className="text-[7px] text-[#D8C6A0]/65 uppercase">CRÍTICO</div>
+                          <div className="font-cripta-mono text-[10px] font-bold text-[#FFD166] mt-0.5">
+                            {effStats.critChancePct}%
+                          </div>
+                        </div>
+                        <div className="px-1.5 py-1.5 bg-[#110B19] border border-[#2A1F38]">
+                          <div className="text-[7px] text-[#D8C6A0]/65 uppercase">ESCUDO</div>
+                          <div className="font-cripta-mono text-[10px] font-bold text-[#7BDFF2] mt-0.5">
+                            +{inspectedPlayer.armor || 0}
+                          </div>
+                        </div>
+                        <div className="px-1.5 py-1.5 bg-[#110B19] border border-[#2A1F38]">
+                          <div className="text-[7px] text-[#D8C6A0]/65 uppercase">ALQUIMIA/CURA</div>
+                          <div className="font-cripta-mono text-[10px] font-bold text-[#8EE6AE] mt-0.5">
+                            +{Math.max(effStats.potionBoostPct || 0, effStats.healBoostPct || 0)}%
+                          </div>
+                        </div>
                       </div>
                     </div>
 

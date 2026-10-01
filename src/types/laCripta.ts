@@ -977,6 +977,7 @@ export interface CriptaRoomGroundDrop {
   ownershipScope?: 'SHARED_PARTY' | 'FIRST_CLAIM' | 'PERSONAL_CHOICE';
   droppedByEnemyName: string;
   xPercent: number;
+  claimed?: boolean;
   claimedByPlayerId?: string | null;
   claimedByPlayerName?: string;
 }
@@ -1567,6 +1568,8 @@ export interface CriptaVisualEvent {
   vfxStyle?:
     | 'slash'
     | 'cleave'
+    | 'blunt'
+    | 'pierce'
     | 'arcane'
     | 'holy'
     | 'alchemy'
@@ -1576,8 +1579,59 @@ export interface CriptaVisualEvent {
     | 'explosion'
     | 'gold'
     | 'revive'
-    | 'heal';
+    | 'heal'
+    | 'lifesteal';
   isCrit?: boolean;
+  damageType?: CriptaDamageType;
+}
+
+export type CombatPresentationEventType =
+  | 'ACTION_START'
+  | 'ANTICIPATION'
+  | 'ATTACK_ANIMATION'
+  | 'PROJECTILE'
+  | 'IMPACT'
+  | 'DAMAGE'
+  | 'HEAL'
+  | 'BLOCK'
+  | 'SHIELD_GAIN'
+  | 'ARMOR_GAIN'
+  | 'BUFF'
+  | 'DEBUFF'
+  | 'STATUS_APPLY'
+  | 'STATUS_REMOVE'
+  | 'CRITICAL'
+  | 'MISS'
+  | 'DODGE'
+  | 'COUNTER'
+  | 'LIFESTEAL'
+  | 'ENEMY_DEATH'
+  | 'PLAYER_DOWN'
+  | 'LOOT_REVEAL'
+  | 'DECISION_LOCK'
+  | 'ACTION_END';
+
+export interface CombatPresentationEvent {
+  id: string;
+  actionId: string;
+  type: CombatPresentationEventType;
+  actorId?: string;
+  targetIds: string[];
+  payload?: {
+    value?: number;
+    label?: string;
+    sublabel?: string;
+    color?: string;
+    statusType?: CriptaStatusEffectType;
+    damageType?: CriptaDamageType | string;
+    vfxStyle?: CriptaVisualEvent['vfxStyle'];
+    isCrit?: boolean;
+    isEnemyActor?: boolean;
+    visualEvent?: CriptaVisualEvent;
+  };
+  priority: number;
+  duration: number;
+  blocking: boolean;
 }
 
 export interface CriptaVisualEventBatch {

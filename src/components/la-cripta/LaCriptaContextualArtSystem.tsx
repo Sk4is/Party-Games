@@ -1038,13 +1038,13 @@ export const LaCriptaContextualDecisionIllustration: React.FC<{
   equippedWeaponLevel = 1,
 }) => {
   const def = resolveDecisionVisualDefinition({
-    biomeId,
-    roomType,
+    biomeId: biomeId as CriptaDungeonId,
+    roomType: roomType as CriptaCanonicalRoomType,
     option,
     cardTitle,
     equippedWeaponId,
   });
-  const pal = getBiomeDecisionPalette(biomeId);
+  const pal = getBiomeDecisionPalette(biomeId as CriptaDungeonId);
   const activeWeaponId = (option?.grantsWeaponId || equippedWeaponId || 'espada_oxidada') as CriptaWeaponId;
 
   return (

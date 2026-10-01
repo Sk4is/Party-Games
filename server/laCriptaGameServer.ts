@@ -64,6 +64,7 @@ import {
   estimatePlayerActionDamage,
   getEquippedWeaponForPlayer,
   getWeaponUpgradeCost,
+  pickWeaponDropForDungeon,
   pickWeaponRuneDropForDungeon,
   rollAuthoritativePlayerDamage,
   STARTER_WEAPON_BY_CLASS,
@@ -1760,18 +1761,42 @@ export class LaCriptaServer {
           targetEnemy.poisonStacks = (targetEnemy.poisonStacks || 0) + 2;
           targetEnemy.vulnerableTurns = (targetEnemy.vulnerableTurns || 0) + 2;
           room.runStats.damageDealt += dmg;
-          visualEvents.push({
-            id: `ev_${ts}_fire_${targetEnemy.id}`,
-            kind: 'DAMAGE_ENEMY',
-            targetType: 'ENEMY',
-            targetId: targetEnemy.id,
-            sourcePlayerId: player.id,
-            value: -dmg,
-            label: `-${dmg} PV`,
-            sublabel: 'FRASCO VOLÁTIL · ENVENENADO',
-            color: '#FF7A33',
-            vfxStyle: 'explosion',
-          });
+          visualEvents.push(
+            {
+              id: `ev_${ts}_fire_${targetEnemy.id}`,
+              kind: 'DAMAGE_ENEMY',
+              targetType: 'ENEMY',
+              targetId: targetEnemy.id,
+              sourcePlayerId: player.id,
+              value: -dmg,
+              label: `-${dmg} PV`,
+              sublabel: 'FRASCO VOLÁTIL',
+              color: '#FF7A33',
+              vfxStyle: 'explosion',
+            },
+            {
+              id: `ev_${ts}_fire_st1_${targetEnemy.id}`,
+              kind: 'STATUS_APPLIED',
+              targetType: 'ENEMY',
+              targetId: targetEnemy.id,
+              sourcePlayerId: player.id,
+              label: '+VENENO (2)',
+              sublabel: 'FRASCO VOLÁTIL',
+              color: '#5EA87A',
+              statusType: 'POISON',
+            },
+            {
+              id: `ev_${ts}_fire_st2_${targetEnemy.id}`,
+              kind: 'STATUS_APPLIED',
+              targetType: 'ENEMY',
+              targetId: targetEnemy.id,
+              sourcePlayerId: player.id,
+              label: '+VULNERABLE (2T)',
+              sublabel: '+20% DAÑO RECIBIDO',
+              color: '#E7A54A',
+              statusType: 'VULNERABLE',
+            }
+          );
           if (prevHp > 0 && targetEnemy.hp <= 0) {
             this.handleEnemyKilledSideEffects(room, activeRoom, targetEnemy, visualEvents, ts);
           }
@@ -3377,11 +3402,11 @@ export class LaCriptaServer {
         }
 
         const currentLivingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
+        // All surviving enemies have acted -> END_OF_ROUND resolution (wait for last enemy attack animation to complete)
         if (enemyIdx >= currentLivingEnemies.length) {
-          // All surviving enemies have acted -> END_OF_ROUND resolution
           scheduleStep(() => {
             this.resolveEndOfCombatRound(room, activeRoom);
-          }, 420);
+          }, 1350);
           return;
         }
 
@@ -3414,16 +3439,16 @@ export class LaCriptaServer {
 
         scheduleStep(() => {
           stepEnemyAction(enemyIdx + 1);
-        }, 620);
+        }, 1650);
       };
 
       stepEnemyAction(0);
     };
 
-    // Start stepping through enemy phase resolution after a brief pause so the final player card animation is seen
+    // Wait 1750ms so the player's attack/ability/status/heal sequence fully resolves on screen BEFORE enemy phase starts
     scheduleStep(() => {
       startEnemyPhaseResolution();
-    }, 480);
+    }, 1750);
   }
 
   private executeSinglePlayerRoundAction(
@@ -3752,34 +3777,107 @@ export class LaCriptaServer {
               : '';
           hitLogNames.push(`${en.name} (-${dmg} PV ${dmgTypeMeta.shortLabel}${matchupNote})`);
 
+          const appliedStatusEvents: CriptaVisualEvent[] = [];
           if (en.hp > 0) {
             if (spec.armorBreak && spec.armorBreak > 0) {
               en.armor = Math.max(0, en.armor - spec.armorBreak);
+              appliedStatusEvents.push({
+                id: `ev_${ts}_wspec_abrk_${en.id}_${i}`,
+                kind: 'STATUS_APPLIED',
+                targetType: 'ENEMY',
+                targetId: en.id,
+                sourcePlayerId: player.id,
+                label: `-${spec.armorBreak} ARMADURA`,
+                sublabel: spec.name.toUpperCase(),
+                color: '#E7A54A',
+                statusType: 'VULNERABLE',
+              });
             }
             if (spec.vulnerableTurns && spec.vulnerableTurns > 0) {
               en.vulnerableTurns = (en.vulnerableTurns || 0) + spec.vulnerableTurns;
+              appliedStatusEvents.push({
+                id: `ev_${ts}_wspec_vuln_${en.id}_${i}`,
+                kind: 'STATUS_APPLIED',
+                targetType: 'ENEMY',
+                targetId: en.id,
+                sourcePlayerId: player.id,
+                label: `+VULNERABLE (${spec.vulnerableTurns}T)`,
+                sublabel: '+20% DAÑO RECIBIDO',
+                color: '#E7A54A',
+                statusType: 'VULNERABLE',
+              });
             }
             if (spec.poisonStacks && spec.poisonStacks > 0) {
               const extraPoison =
                 (playerHasRelic(player, room.partyRelics || [], 'guantes_del_boticario') ? 1 : 0) +
                 (eqWeapon.activeRune?.extraPoisonStacksOnHit || 0);
-              en.poisonStacks = (en.poisonStacks || 0) + spec.poisonStacks + extraPoison;
+              const totalPoisonAdded = spec.poisonStacks + extraPoison;
+              en.poisonStacks = (en.poisonStacks || 0) + totalPoisonAdded;
+              appliedStatusEvents.push({
+                id: `ev_${ts}_wspec_pois_${en.id}_${i}`,
+                kind: 'STATUS_APPLIED',
+                targetType: 'ENEMY',
+                targetId: en.id,
+                sourcePlayerId: player.id,
+                label: `+VENENO (${totalPoisonAdded})`,
+                sublabel: `${en.poisonStacks * 4} DAÑO/RONDA`,
+                color: '#5EA87A',
+                statusType: 'POISON',
+              });
             } else if (eqWeapon.activeRune?.extraPoisonStacksOnHit) {
-              en.poisonStacks =
-                (en.poisonStacks || 0) + eqWeapon.activeRune.extraPoisonStacksOnHit;
+              const runePoison = eqWeapon.activeRune.extraPoisonStacksOnHit;
+              en.poisonStacks = (en.poisonStacks || 0) + runePoison;
+              appliedStatusEvents.push({
+                id: `ev_${ts}_wspec_rpois_${en.id}_${i}`,
+                kind: 'STATUS_APPLIED',
+                targetType: 'ENEMY',
+                targetId: en.id,
+                sourcePlayerId: player.id,
+                label: `+VENENO (${runePoison})`,
+                sublabel: eqWeapon.activeRune.name.toUpperCase(),
+                color: '#5EA87A',
+                statusType: 'POISON',
+              });
             }
             if (rolled.appliedOnHitStatus) {
+              const stDef = CRIPTA_STATUS_EFFECTS_REGISTRY[rolled.appliedOnHitStatus];
               if (
                 rolled.appliedOnHitStatus === 'POISON' ||
                 rolled.appliedOnHitStatus === 'BLEED' ||
                 rolled.appliedOnHitStatus === 'BURN'
               ) {
                 en.poisonStacks = (en.poisonStacks || 0) + 1;
+                if (!spec.poisonStacks) {
+                  appliedStatusEvents.push({
+                    id: `ev_${ts}_wspec_ohs_${en.id}_${i}`,
+                    kind: 'STATUS_APPLIED',
+                    targetType: 'ENEMY',
+                    targetId: en.id,
+                    sourcePlayerId: player.id,
+                    label: `+${stDef?.name || 'VENENO'} (1)`,
+                    sublabel: eqWeapon.weapon.name.toUpperCase(),
+                    color: stDef?.visualTreatment.color || '#5EA87A',
+                    statusType: rolled.appliedOnHitStatus,
+                  });
+                }
               } else if (
                 rolled.appliedOnHitStatus === 'CURSE' ||
                 rolled.appliedOnHitStatus === 'MARKED'
               ) {
                 en.vulnerableTurns = (en.vulnerableTurns || 0) + 2;
+                if (!spec.vulnerableTurns) {
+                  appliedStatusEvents.push({
+                    id: `ev_${ts}_wspec_ohv_${en.id}_${i}`,
+                    kind: 'STATUS_APPLIED',
+                    targetType: 'ENEMY',
+                    targetId: en.id,
+                    sourcePlayerId: player.id,
+                    label: `+${stDef?.name || 'MARCADO'} (2T)`,
+                    sublabel: '+20% DAÑO RECIBIDO',
+                    color: stDef?.visualTreatment.color || '#E7A54A',
+                    statusType: rolled.appliedOnHitStatus,
+                  });
+                }
               } else if (
                 rolled.appliedOnHitStatus === 'FROST' ||
                 rolled.appliedOnHitStatus === 'BLINDED' ||
@@ -3787,6 +3885,17 @@ export class LaCriptaServer {
               ) {
                 en.attackBuffBonus = -2;
                 en.attackBuffRounds = 2;
+                appliedStatusEvents.push({
+                  id: `ev_${ts}_wspec_ohw_${en.id}_${i}`,
+                  kind: 'STATUS_APPLIED',
+                  targetType: 'ENEMY',
+                  targetId: en.id,
+                  sourcePlayerId: player.id,
+                  label: `+${stDef?.name || 'DEBILITADO'} (-2 ATQ)`,
+                  sublabel: '2 RONDAS',
+                  color: stDef?.visualTreatment.color || '#69A8A5',
+                  statusType: rolled.appliedOnHitStatus,
+                });
               }
             }
           }
@@ -3812,6 +3921,7 @@ export class LaCriptaServer {
                 : classVfx,
             isCrit: rolled.isCrit,
           });
+          visualEvents.push(...appliedStatusEvents);
 
           if (prevHp > 0 && en.hp <= 0) {
             this.handleEnemyKilledSideEffects(room, activeRoom, en, visualEvents, ts);
@@ -4069,9 +4179,21 @@ export class LaCriptaServer {
           recordPlayerDamageAndThreat(en, dmg);
           hitSummaries.push(`${en.name} (-${dmg} PV)`);
 
+          const appliedAbStatusEvents: CriptaVisualEvent[] = [];
           if (en.hp > 0) {
             if (ability.armorBreak && ability.armorBreak > 0) {
               en.armor = Math.max(0, en.armor - ability.armorBreak);
+              appliedAbStatusEvents.push({
+                id: `ev_${ts}_ab_abrk_${en.id}_${i}`,
+                kind: 'STATUS_APPLIED',
+                targetType: 'ENEMY',
+                targetId: en.id,
+                sourcePlayerId: player.id,
+                label: `-${ability.armorBreak} ARMADURA`,
+                sublabel: abilityName.toUpperCase(),
+                color: '#E7A54A',
+                statusType: 'VULNERABLE',
+              });
             }
             // Embate de Escudo interrupts enemy telegraphed heavy attack!
             if (ability.id === 'embate_de_escudo' && en.memory?.preparedAbilityId) {
@@ -4080,8 +4202,20 @@ export class LaCriptaServer {
               en.intent = 'ATAQUE';
               en.intentCategory = 'ATTACK';
               logParts.push(`¡${player.name} INTERRUMPE el ataque cargado de ${en.name}!`);
+              appliedAbStatusEvents.push({
+                id: `ev_${ts}_ab_int_${en.id}_${i}`,
+                kind: 'STATUS_APPLIED',
+                targetType: 'ENEMY',
+                targetId: en.id,
+                sourcePlayerId: player.id,
+                label: '¡ATAQUE INTERRUMPIDO!',
+                sublabel: abilityName.toUpperCase(),
+                color: '#FFD166',
+                statusType: 'WEAKENED',
+              });
             }
             if (ability.statusToApply) {
+              const stDef = CRIPTA_STATUS_EFFECTS_REGISTRY[ability.statusToApply];
               if (
                 ability.statusToApply === 'POISON' ||
                 ability.statusToApply === 'BLEED' ||
@@ -4096,15 +4230,56 @@ export class LaCriptaServer {
                 )
                   ? 1
                   : 0;
-                en.poisonStacks = (en.poisonStacks || 0) + baseStacks + extraStacks;
+                const addedStacks = baseStacks + extraStacks;
+                en.poisonStacks = (en.poisonStacks || 0) + addedStacks;
+                appliedAbStatusEvents.push({
+                  id: `ev_${ts}_ab_st_${en.id}_${i}`,
+                  kind: 'STATUS_APPLIED',
+                  targetType: 'ENEMY',
+                  targetId: en.id,
+                  sourcePlayerId: player.id,
+                  label: `+${stDef?.name || 'VENENO'} (${addedStacks})`,
+                  sublabel: `${en.poisonStacks * 4} DAÑO/RONDA`,
+                  color: stDef?.visualTreatment.color || '#5EA87A',
+                  statusType: ability.statusToApply,
+                });
               } else if (
                 ability.statusToApply === 'MARKED' ||
-                ability.statusToApply === 'CURSE'
+                ability.statusToApply === 'CURSE' ||
+                ability.statusToApply === 'VULNERABLE'
               ) {
-                en.vulnerableTurns = (en.vulnerableTurns || 0) + (ability.statusTurns || 2);
-              } else if (ability.statusToApply === 'WEAKENED') {
+                const turnsAdded = ability.statusTurns || 2;
+                en.vulnerableTurns = (en.vulnerableTurns || 0) + turnsAdded;
+                appliedAbStatusEvents.push({
+                  id: `ev_${ts}_ab_st_${en.id}_${i}`,
+                  kind: 'STATUS_APPLIED',
+                  targetType: 'ENEMY',
+                  targetId: en.id,
+                  sourcePlayerId: player.id,
+                  label: `+${stDef?.name || 'MARCADO'} (${turnsAdded}T)`,
+                  sublabel: '+20% DAÑO RECIBIDO',
+                  color: stDef?.visualTreatment.color || '#E7A54A',
+                  statusType: ability.statusToApply,
+                });
+              } else if (
+                ability.statusToApply === 'WEAKENED' ||
+                ability.statusToApply === 'FROST' ||
+                ability.statusToApply === 'BLINDED'
+              ) {
+                const turnsAdded = ability.statusTurns || 2;
                 en.attackBuffBonus = -2;
-                en.attackBuffRounds = ability.statusTurns || 2;
+                en.attackBuffRounds = turnsAdded;
+                appliedAbStatusEvents.push({
+                  id: `ev_${ts}_ab_st_${en.id}_${i}`,
+                  kind: 'STATUS_APPLIED',
+                  targetType: 'ENEMY',
+                  targetId: en.id,
+                  sourcePlayerId: player.id,
+                  label: `+${stDef?.name || 'DEBILITADO'} (-2 ATQ)`,
+                  sublabel: `${turnsAdded} RONDAS`,
+                  color: stDef?.visualTreatment.color || '#69A8A5',
+                  statusType: ability.statusToApply,
+                });
               }
             }
           }
@@ -4122,6 +4297,7 @@ export class LaCriptaServer {
             vfxStyle: classVfx,
             isCrit: abIsCrit,
           });
+          visualEvents.push(...appliedAbStatusEvents);
 
           if (prevTargetHp > 0 && en.hp <= 0) {
             this.handleEnemyKilledSideEffects(room, activeRoom, en, visualEvents, ts);
@@ -4190,23 +4366,58 @@ export class LaCriptaServer {
           ? ` · RESISTE ${dmgTypeMeta.shortLabel}`
           : '';
 
+      const appliedAtkStatusEvents: CriptaVisualEvent[] = [];
       if (target.hp > 0) {
         if (eqWeapon.activeRune?.extraPoisonStacksOnHit) {
-          target.poisonStacks =
-            (target.poisonStacks || 0) + eqWeapon.activeRune.extraPoisonStacksOnHit;
+          const runeStacks = eqWeapon.activeRune.extraPoisonStacksOnHit;
+          target.poisonStacks = (target.poisonStacks || 0) + runeStacks;
+          appliedAtkStatusEvents.push({
+            id: `ev_${ts}_atk_rpois_${target.id}`,
+            kind: 'STATUS_APPLIED',
+            targetType: 'ENEMY',
+            targetId: target.id,
+            sourcePlayerId: player.id,
+            label: `+VENENO (${runeStacks})`,
+            sublabel: eqWeapon.activeRune.name.toUpperCase(),
+            color: '#5EA87A',
+            statusType: 'POISON',
+          });
         }
         if (rolledAtk.appliedOnHitStatus) {
+          const stDef = CRIPTA_STATUS_EFFECTS_REGISTRY[rolledAtk.appliedOnHitStatus];
           if (
             rolledAtk.appliedOnHitStatus === 'POISON' ||
             rolledAtk.appliedOnHitStatus === 'BLEED' ||
             rolledAtk.appliedOnHitStatus === 'BURN'
           ) {
             target.poisonStacks = (target.poisonStacks || 0) + 1;
+            appliedAtkStatusEvents.push({
+              id: `ev_${ts}_atk_ohs_${target.id}`,
+              kind: 'STATUS_APPLIED',
+              targetType: 'ENEMY',
+              targetId: target.id,
+              sourcePlayerId: player.id,
+              label: `+${stDef?.name || 'VENENO'} (1)`,
+              sublabel: `${target.poisonStacks * 4} DAÑO/RONDA`,
+              color: stDef?.visualTreatment.color || '#5EA87A',
+              statusType: rolledAtk.appliedOnHitStatus,
+            });
           } else if (
             rolledAtk.appliedOnHitStatus === 'CURSE' ||
             rolledAtk.appliedOnHitStatus === 'MARKED'
           ) {
             target.vulnerableTurns = (target.vulnerableTurns || 0) + 2;
+            appliedAtkStatusEvents.push({
+              id: `ev_${ts}_atk_ohv_${target.id}`,
+              kind: 'STATUS_APPLIED',
+              targetType: 'ENEMY',
+              targetId: target.id,
+              sourcePlayerId: player.id,
+              label: `+${stDef?.name || 'MARCADO'} (2T)`,
+              sublabel: '+20% DAÑO RECIBIDO',
+              color: stDef?.visualTreatment.color || '#E7A54A',
+              statusType: rolledAtk.appliedOnHitStatus,
+            });
           } else if (
             rolledAtk.appliedOnHitStatus === 'FROST' ||
             rolledAtk.appliedOnHitStatus === 'BLINDED' ||
@@ -4214,6 +4425,17 @@ export class LaCriptaServer {
           ) {
             target.attackBuffBonus = -2;
             target.attackBuffRounds = 2;
+            appliedAtkStatusEvents.push({
+              id: `ev_${ts}_atk_ohw_${target.id}`,
+              kind: 'STATUS_APPLIED',
+              targetType: 'ENEMY',
+              targetId: target.id,
+              sourcePlayerId: player.id,
+              label: `+${stDef?.name || 'DEBILITADO'} (-2 ATQ)`,
+              sublabel: '2 RONDAS',
+              color: stDef?.visualTreatment.color || '#69A8A5',
+              statusType: rolledAtk.appliedOnHitStatus,
+            });
           }
         }
       }
@@ -4257,6 +4479,7 @@ export class LaCriptaServer {
         vfxStyle: classVfx,
         isCrit: atkIsCrit,
       });
+      visualEvents.push(...appliedAtkStatusEvents);
 
       if (prevTargetHp > 0 && target.hp <= 0) {
         this.handleEnemyKilledSideEffects(room, activeRoom, target, visualEvents, ts);

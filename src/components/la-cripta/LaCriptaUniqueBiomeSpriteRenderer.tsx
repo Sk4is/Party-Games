@@ -1078,6 +1078,403 @@ export const LaCriptaUniqueBiomeSpriteSvg: React.FC<UniqueBiomeSpriteSvgProps> =
     );
   }
 
+  // 6A. DUELISTA DE PLATA / DUELISTA DEL REFLEJO (Elegant Masked Fencer + Fractured Mirror Reflection)
+  if (
+    s === 'SILVER_RAPIER_DUELIST' ||
+    s === 'SHATTERED_DOPPELGANGER' ||
+    s === 'JESTER_TWIN_MASK'
+  ) {
+    return (
+      <g>
+        <rect x="10" y="57" width="44" height="4" fill="#040307" opacity="0.86" />
+        {/* Fractured Out-of-Sync Mirror Reflection Behind Body */}
+        <g
+          transform={`translate(${6 - wingSpread}, ${torsoY - 2})`}
+          opacity={pulse ? 0.52 : 0.36}
+        >
+          <PixelArtMatrix
+            offsetX={18}
+            offsetY={6}
+            palette={palMap}
+            rows={[
+              '....######3333######....',
+              '..##3366665555666633##..',
+              '.#36611111566511111663#.',
+              '.#611..###5555###..116#.',
+              '..#61..#33666633#..16#..',
+              '...##..#36111163#..##...',
+              '.......#31155113#.......',
+              '......#3611551163#......',
+              '.....#36111##11163#.....',
+              '.....#311#....#113#.....',
+            ]}
+          />
+          {/* Diagonal Mirror Crack Glints */}
+          <rect x="16" y="12" width="12" height="1" fill="#FFFFFF" />
+          <rect x="28" y="22" width="14" height="1" fill={eyeGlow} />
+        </g>
+
+        {/* Mirrored Aristocratic Duelist Cape & Asymmetric Silver Pauldrons + Fencer Stance */}
+        <g transform={`translate(0, ${torsoY})`}>
+          {/* Flowing Quicksilver Half-Cape (Left Shoulder) */}
+          <PixelArtMatrix
+            offsetX={11}
+            offsetY={17}
+            palette={palMap}
+            rows={[
+              '..##############........',
+              '.#33442222222244#.......',
+              '#3422111133111122#......',
+              '#4211133663311112#......',
+              '#421136655663112#.......',
+              '#421133666633112#.......',
+              '.#4211133331112#........',
+              '.#4221111111122#........',
+              '..#42211##1122#.........',
+              '...###..##..###.........',
+            ]}
+          />
+          {/* Aristocratic Fencer Doublet, Reflective Shoulder Armor & Duelist Boots */}
+          <PixelArtMatrix
+            offsetX={15}
+            offsetY={18}
+            palette={palMap}
+            rows={[
+              '....######3333####3333######....',
+              '..##4433664411####1144663344##..',
+              '.#4366644411223553221144466634#.',
+              '.#4444##2211235665321122##4444#.',
+              '..####..#21123566532112#..####..',
+              '........#21122355322112#........',
+              '........#44334466443344#........',
+              '.......#2211122##2211122#.......',
+              '......#221122#....#221122#......',
+              '......#443344#....#443344#......',
+              '.....#436634#......#436634#.....',
+              '.....#41114#........#41114#.....',
+              '....#4436634#......#4366344#....',
+              '....#########......#########....',
+            ]}
+          />
+        </g>
+
+        {/* Sculpted Silver Mirror Fencer Mask, Plumed Hat/Crest & Gleaming Slit Eyes */}
+        <g transform={`translate(0, ${headY})`}>
+          <PixelArtMatrix
+            offsetX={18}
+            offsetY={2}
+            palette={palMap}
+            rows={[
+              '..........33666633..........',
+              '........336655556633........',
+              '......####44333344####......',
+              '....##4466664444666644##....',
+              '...#46664444333344446664#...',
+              '...#4644############4464#...',
+              '...#464#5566####6655#464#...',
+              '...#4644####3663####4464#...',
+              '....#466444436634444664#....',
+              '.....##44666333366644##.....',
+              '.......##############.......',
+            ]}
+          />
+        </g>
+
+        {/* Needle-Sharp Silver Rapier with Swept Cup-Hilt & Mirror Glint */}
+        <g transform={`translate(0, ${torsoY + armR})`}>
+          <PixelArtMatrix
+            offsetX={41}
+            offsetY={2}
+            palette={palMap}
+            rows={[
+              '..........63..........',
+              '..........63..........',
+              '.........663..........',
+              '.........643..........',
+              '........6643..........',
+              '........643...........',
+              '.......6643...........',
+              '.......643............',
+              '......6643............',
+              '....33655633..........',
+              '..334456654433........',
+              '..344335533443........',
+              '.....##44##...........',
+              '.....#3663#...........',
+            ]}
+          />
+        </g>
+
+        {/* Off-Hand Parrying Mirror-Dagger (Main-Gauche) */}
+        <g transform={`translate(0, ${torsoY + armL})`}>
+          <PixelArtMatrix
+            offsetX={6}
+            offsetY={22}
+            palette={palMap}
+            rows={[
+              '..63......',
+              '..643.....',
+              '...643....',
+              '..335533..',
+              '...#44#...',
+            ]}
+          />
+        </g>
+      </g>
+    );
+  }
+
+  // 6B. ILUSIONISTA DE CRISTAL / DAMA DE AZOGUE / GRAN ILUSIONISTA
+  // (Floating Robed Illusionist + Translucent Duplicate Silhouette + Orbiting Crystal Shards + Prism Staff)
+  if (
+    s === 'QUICKSILVER_GOWN_LADY' ||
+    s === 'KALEIDOSCOPE_GRAND_ILLUSIONIST' ||
+    s === 'PRISM_REFRACT_WRAITH' ||
+    s === 'CHIME_CRYSTAL_CHANTER'
+  ) {
+    return (
+      <g>
+        <rect x="12" y="57" width="40" height="4" fill="#040307" opacity="0.82" />
+        <rect x="18" y="56" width="28" height="2" fill={eyeGlow} opacity={pulse ? 0.85 : 0.45} />
+
+        {/* Translucent Refracted Duplicate Illusion Silhouette (Shifted Left/Back) */}
+        <g
+          transform={`translate(${-6 + wingSpread}, ${torsoY - 2})`}
+          opacity={pulse ? 0.48 : 0.32}
+        >
+          <PixelArtMatrix
+            offsetX={16}
+            offsetY={8}
+            palette={palMap}
+            rows={[
+              '......####5555####......',
+              '....##556633336655##....',
+              '...#5633########3365#...',
+              '...#53##66####66##35#...',
+              '....#533########335#....',
+              '..###55333666633355###..',
+              '.#55331111555511113355#.',
+              '.#53112222566522221135#.',
+              '..#531122255552221135#..',
+              '...#5311223333221135#...',
+              '....#53112#..#21135#....',
+            ]}
+          />
+        </g>
+
+        {/* Orbiting Faceted Crystal Shards Around Body */}
+        <g transform={`translate(0, ${torsoY - wingSpread})`}>
+          <PixelArtMatrix
+            offsetX={4}
+            offsetY={10}
+            palette={palMap}
+            rows={[
+              '..66..',
+              '.6556.',
+              '656656',
+              '653356',
+              '.6336.',
+              '..66..',
+            ]}
+          />
+          <PixelArtMatrix
+            offsetX={53}
+            offsetY={12}
+            palette={palMap}
+            rows={[
+              '..66..',
+              '.6556.',
+              '656656',
+              '653356',
+              '.6336.',
+              '..66..',
+            ]}
+          />
+          <PixelArtMatrix
+            offsetX={6}
+            offsetY={34}
+            palette={palMap}
+            rows={[
+              '.55.',
+              '5665',
+              '5335',
+              '.55.',
+            ]}
+          />
+        </g>
+
+        {/* Floating Layered Prismatic Illusionist Robes & Astral Stole */}
+        <g transform={`translate(0, ${torsoY})`}>
+          <PixelArtMatrix
+            offsetX={14}
+            offsetY={19}
+            palette={palMap}
+            rows={[
+              '....######3333####3333######....',
+              '..##334411335566665533114433##..',
+              '.#3441122211356776531122211443#.',
+              '#341122###211356653112###221143#',
+              '#4112#....#2113553112#....#2114#',
+              '.####.....#2213663122#.....####.',
+              '.........#321135531123#.........',
+              '........#32112366321123#........',
+              '.......#3211223553221123#.......',
+              '......#341122236632221143#......',
+              '.....#341122#235532#221143#.....',
+              '.....#31122#.#3663#.#22113#.....',
+              '......#355#...#55#...#553#......',
+            ]}
+          />
+        </g>
+
+        {/* Hooded Porcelain-Crystal Mask & Refracted Crown */}
+        <g transform={`translate(0, ${headY})`}>
+          <PixelArtMatrix
+            offsetX={18}
+            offsetY={2}
+            palette={palMap}
+            rows={[
+              '..........55..66..55..........',
+              '........55336655663355........',
+              '......####3311111133####......',
+              '....##331111222222111133##....',
+              '...#31122####6666####22113#...',
+              '...#312##666644446666##213#...',
+              '...#312#66#56####65#66#213#...',
+              '...#312#66#55####55#66#213#...',
+              '....#312#666635536666#213#....',
+              '.....##3122##3663##2213##.....',
+              '.......################.......',
+            ]}
+          />
+        </g>
+
+        {/* Staff / Orb of Refracted Prismatic Light */}
+        <g transform={`translate(0, ${torsoY + armR})`}>
+          <PixelArtMatrix
+            offsetX={44}
+            offsetY={2}
+            palette={palMap}
+            rows={[
+              '....665566....',
+              '..6655665566..',
+              '.655667766556.',
+              '.656676676656.',
+              '.655667766556.',
+              '..6655665566..',
+              '....334433....',
+              '.....#44#.....',
+              '.....#34#.....',
+              '.....#34#.....',
+              '.....#34#.....',
+              '.....#34#.....',
+              '.....#34#.....',
+              '.....#55#.....',
+            ]}
+          />
+        </g>
+      </g>
+    );
+  }
+
+  // 6C. FRAGMENTO VIVIENTE / MÁSCARA DE PORCELANA / MONARCA DEL ESPEJO / CENTINELA DE GEODA
+  if (
+    s === 'FLOATING_MIRROR_BLADE' ||
+    s === 'FLOATING_PORCELAIN_MASK' ||
+    s === 'THRONE_MIRROR_MONARCH' ||
+    s === 'GEODE_OBELISK_SENTINEL' ||
+    s === 'PRISMATIC_MONOLITH_COLOSSUS'
+  ) {
+    return (
+      <g>
+        <rect x="8" y="57" width="48" height="4" fill="#040307" opacity="0.86" />
+        <rect x="14" y="55" width="36" height="2" fill={eyeGlow} opacity={pulse ? 0.9 : 0.55} />
+
+        {/* Faceted Crystal / Mirror Shards Crowned Back Architecture */}
+        <g transform={`translate(0, ${torsoY})`}>
+          <PixelArtMatrix
+            offsetX={8}
+            offsetY={4 - wingSpread}
+            palette={palMap}
+            rows={[
+              '....66....55....................55....66....',
+              '..66556..5335..................5335..65566..',
+              '.653356.536635................536635.653356.',
+              '.#3113#.#3113#................#3113#.#3113#.',
+            ]}
+          />
+
+          {/* Armored Crystalline / Mirror-Plate Knight-Colossus Torso & Greaves */}
+          <PixelArtMatrix
+            offsetX={11}
+            offsetY={16}
+            palette={palMap}
+            rows={[
+              '..########3366############6633########..',
+              '.#3366443311112222####2222111133446633#.',
+              '#36644114411336611444411663311441144663#',
+              '#44112222111155554566545555111122221144#',
+              '#4122###221125665467764566521122###2214#',
+              '#442#...#2211255545665455521122#...#244#',
+              '.###.....#22111122444422111122#.....###.',
+              '.........#44336644555544663344#.........',
+              '........#22111122######22111122#........',
+              '.......#22112222#......#22221122#.......',
+              '.......#44336644#......#44663344#.......',
+              '.......#41122114#......#41122114#.......',
+              '......#4433663344#....#4433663344#......',
+              '......############....############......',
+            ]}
+          />
+        </g>
+
+        {/* Crowned Porcelain / Crystal Visage */}
+        <g transform={`translate(0, ${headY})`}>
+          <PixelArtMatrix
+            offsetX={18}
+            offsetY={1}
+            palette={palMap}
+            rows={[
+              '....66....335533....66....',
+              '....656..33566533..656....',
+              '....#4333345665433334#....',
+              '...##4466664444666644##...',
+              '..#44661111222211116644#..',
+              '..#4611####3663####1164#..',
+              '..#461#5566####6655#164#..',
+              '..#4611####3663####1164#..',
+              '...#466111144441111664#...',
+              '....##################....',
+            ]}
+          />
+        </g>
+
+        {/* Prismatic Mirror Greatsword & Floating Aegis Shield */}
+        <g transform={`translate(0, ${torsoY + armR})`}>
+          <PixelArtMatrix
+            offsetX={45}
+            offsetY={2}
+            palette={palMap}
+            rows={[
+              '....65....',
+              '...6566...',
+              '...6546...',
+              '...6546...',
+              '...6646...',
+              '...6546...',
+              '...6546...',
+              '...6546...',
+              '3364554633',
+              '.##.44.##.',
+              '....44....',
+              '....66....',
+            ]}
+          />
+        </g>
+      </g>
+    );
+  }
+
   // =========================================================================
   // ANATOMICAL LAYERED RIG FOR ALL BIOME CREATURES, ELITES & MINIBOSSES
   // =========================================================================

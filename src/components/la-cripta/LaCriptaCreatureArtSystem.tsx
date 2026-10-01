@@ -1248,6 +1248,30 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
   const isLowHp =
     enemy.hp > 0 && enemy.maxHp > 0 && enemy.hp / enemy.maxHp <= 0.32;
   const isDead = enemy.hp <= 0 || animState === 'death';
+  const [deathProgress, setDeathProgress] = useState<number>(isDead ? 0.01 : 0);
+
+  // Smooth 60 FPS requestAnimationFrame death animation progression
+  useEffect(() => {
+    if (!isDead) {
+      setDeathProgress(0);
+      return;
+    }
+    let rafId = 0;
+    const startTs = performance.now();
+    const durationMs = 1550;
+    const step = (now: number) => {
+      const elapsed = Math.max(0, now - startTs);
+      const prog = Math.min(1, elapsed / durationMs);
+      setDeathProgress(prog);
+      if (prog < 1) {
+        rafId = window.requestAnimationFrame(step);
+      }
+    };
+    rafId = window.requestAnimationFrame(step);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, [isDead]);
 
   // Entry animation when creature first spawns in the encounter stage
   useEffect(() => {
@@ -1679,20 +1703,199 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
         {/* ===================================================================
             LAYER 2: AUTHORED 64x64 ARTICULATED CREATURE RIG BY UNIQUE SLUG
             =================================================================== */}
-        {useUniqueBiomeRig ? (
-          <g transform={`translate(${pose.torsoX}, 0)`}>
-            <LaCriptaUniqueBiomeSpriteSvg
-              blueprint={uniqueBlueprint}
-              torsoY={pose.torsoY}
-              headY={pose.headY}
-              armL={pose.propY}
-              armR={pose.weaponY}
-              wingSpread={pose.breathPhase}
-              pulse={pose.secondaryPhase % 2 === 0}
-            />
+        <g
+          style={
+            pose.isDeadCollapsed
+              ? {
+                  transformOrigin: '32px 54px',
+                  transform: `translateY(${Math.round(
+                    Math.min(1, deathProgress * 1.35) * 10
+                  )}px) rotate(${
+                    def.family.includes('MIRROR') ||
+                    def.family.includes('CRYSTAL') ||
+                    def.family.includes('ABYSS')
+                      ? Math.round(Math.sin(deathProgress * Math.PI * 6) * (1 - deathProgress) * 6)
+                      : Math.round(Math.min(1, deathProgress * 1.4) * 14)
+                  }deg) scale(${
+                    1 - Math.max(0, (deathProgress - 0.35) * 0.45)
+                  }, ${1 - Math.min(0.42, deathProgress * 0.45)})`,
+                  opacity: Math.max(0.06, 1 - Math.max(0, (deathProgress - 0.25) / 0.75)),
+                  filter:
+                    deathProgress < 0.22
+                      ? 'brightness(2.1) contrast(1.4)'
+                      : deathProgress < 0.55
+                      ? 'brightness(1.3) saturate(0.6)'
+                      : 'grayscale(0.85) brightness(0.7)',
+                }
+              : undefined
+          }
+        >
+          {useUniqueBiomeRig ? (
+            <g transform={`translate(${pose.torsoX}, 0)`}>
+              <LaCriptaUniqueBiomeSpriteSvg
+                blueprint={uniqueBlueprint}
+                torsoY={pose.torsoY}
+                headY={pose.headY}
+                armL={pose.propY}
+                armR={pose.weaponY}
+                wingSpread={pose.breathPhase}
+                pulse={pose.secondaryPhase % 2 === 0}
+              />
+            </g>
+          ) : (
+            renderArticulatedCreatureFamily(def, enemy, pose)
+          )}
+        </g>
+
+        {/* ===================================================================
+            LAYER 2B: 60 FPS FAMILY-SPECIFIC DEATH SHATTER / COLLAPSE / SPORES
+            =================================================================== */}
+        {pose.isDeadCollapsed && deathProgress > 0 && deathProgress < 0.98 && (
+          <g opacity={Math.max(0, 1 - Math.max(0, (deathProgress - 0.55) / 0.45))}>
+            {def.family.includes('CATACOMBS') ||
+            def.family.includes('GIANT') ||
+            def.family.includes('MUMMY') ? (
+              /* SKELETON / BONE: Collapsing skull & rib bones + rising crypt dust */
+              <g>
+                <rect
+                  x={Math.round(24 - deathProgress * 14)}
+                  y={Math.round(26 + deathProgress * 24)}
+                  width="5"
+                  height="2"
+                  fill="#E5DEC9"
+                />
+                <rect
+                  x={Math.round(34 + deathProgress * 15)}
+                  y={Math.round(28 + deathProgress * 22)}
+                  width="6"
+                  height="2"
+                  fill="#D8C6A0"
+                />
+                <rect
+                  x={Math.round(28 + deathProgress * 6)}
+                  y={Math.round(18 + deathProgress * 32)}
+                  width="6"
+                  height="5"
+                  fill="#F4EBD9"
+                />
+                <rect
+                  x={Math.round(18 - deathProgress * 8)}
+                  y={Math.round(48 - deathProgress * 12)}
+                  width="8"
+                  height="4"
+                  fill="#9E9580"
+                  opacity="0.65"
+                />
+                <rect
+                  x={Math.round(38 + deathProgress * 8)}
+                  y={Math.round(48 - deathProgress * 12)}
+                  width="8"
+                  height="4"
+                  fill="#9E9580"
+                  opacity="0.65"
+                />
+              </g>
+            ) : def.family.includes('MIRROR') ||
+              def.family.includes('CRYSTAL') ||
+              def.family.includes('TOWER') ||
+              def.family.includes('PRISON') ||
+              def.family.includes('LIBRARY') ||
+              def.family.includes('ABYSS') ? (
+              /* SPIRIT / ARCANE / MIRROR: Shattering prismatic shards & dissolving motes */
+              <g>
+                {[
+                  { sx: 26, sy: 20, dx: -18, dy: -10, c: '#FFFFFF' },
+                  { sx: 36, sy: 20, dx: 18, dy: -12, c: pal.eyeGlow },
+                  { sx: 22, sy: 30, dx: -20, dy: 8, c: pal.metalLight },
+                  { sx: 40, sy: 30, dx: 20, dy: 10, c: pal.accent },
+                  { sx: 30, sy: 24, dx: -6, dy: -18, c: '#7BDFF2' },
+                  { sx: 34, sy: 34, dx: 8, dy: 16, c: '#E0AAFF' },
+                ].map((sh, i) => (
+                  <rect
+                    key={i}
+                    x={Math.round(sh.sx + sh.dx * deathProgress)}
+                    y={Math.round(sh.sy + sh.dy * deathProgress)}
+                    width="4"
+                    height="4"
+                    fill={sh.c}
+                  />
+                ))}
+              </g>
+            ) : def.family.includes('GARDEN') || def.family.includes('WOODS') ? (
+              /* PLANT / FUNGUS: Bursting bioluminescent spore cloud & withering petals */
+              <g>
+                {[
+                  { sx: 28, sy: 28, dx: -16, dy: -16, c: '#D4FF80' },
+                  { sx: 34, sy: 26, dx: 16, dy: -18, c: '#8EE6AE' },
+                  { sx: 24, sy: 34, dx: -18, dy: -6, c: '#9159AD' },
+                  { sx: 38, sy: 34, dx: 18, dy: -8, c: '#7BDFF2' },
+                  { sx: 31, sy: 24, dx: 0, dy: -22, c: '#FFF3C4' },
+                ].map((sp, i) => (
+                  <rect
+                    key={i}
+                    x={Math.round(sp.sx + sp.dx * deathProgress)}
+                    y={Math.round(sp.sy + sp.dy * deathProgress)}
+                    width="4"
+                    height="4"
+                    fill={sp.c}
+                  />
+                ))}
+              </g>
+            ) : def.family.includes('FORGE') || def.family.includes('TEMPLE') ? (
+              /* CONSTRUCT / FORGE / STONE: Core crack glow & breaking slag fragments */
+              <g>
+                <rect
+                  x="26"
+                  y={Math.round(22 + deathProgress * 12)}
+                  width="12"
+                  height="3"
+                  fill="#FFD166"
+                />
+                <rect
+                  x={Math.round(22 - deathProgress * 16)}
+                  y={Math.round(28 + deathProgress * 22)}
+                  width="6"
+                  height="5"
+                  fill={pal.metal}
+                />
+                <rect
+                  x={Math.round(36 + deathProgress * 16)}
+                  y={Math.round(28 + deathProgress * 22)}
+                  width="6"
+                  height="5"
+                  fill={pal.secondary}
+                />
+              </g>
+            ) : (
+              /* BEAST / FLESH / INSECT: Stagger collapse & rising dark crimson/shadow mist */
+              <g>
+                <rect
+                  x={Math.round(22 - deathProgress * 10)}
+                  y={Math.round(36 - deathProgress * 18)}
+                  width="7"
+                  height="5"
+                  fill={pal.secondary}
+                  opacity="0.75"
+                />
+                <rect
+                  x={Math.round(35 + deathProgress * 10)}
+                  y={Math.round(34 - deathProgress * 20)}
+                  width="7"
+                  height="5"
+                  fill={pal.primaryDark}
+                  opacity="0.8"
+                />
+                <rect
+                  x="28"
+                  y={Math.round(30 - deathProgress * 22)}
+                  width="8"
+                  height="4"
+                  fill={pal.eyeGlow}
+                  opacity="0.7"
+                />
+              </g>
+            )}
           </g>
-        ) : (
-          renderArticulatedCreatureFamily(def, enemy, pose)
         )}
 
         {/* ===================================================================
@@ -4520,56 +4723,176 @@ function renderArticulatedCreatureFamily(
     }
 
     // ========================================================================
-    // PALACIO DE LOS ESPEJOS: DUELISTA DE AZOGUE (Silver Mirror Fencer)
+    // PALACIO DE LOS ESPEJOS: DUELISTA DE PLATA & ILUSIONISTA DE CRISTAL
     // ========================================================================
     case 'MIRROR_SILVER_DUELIST': {
+      const isIllusionist = def.subVariant === 'SHAMAN_CASTER';
+      if (isIllusionist) {
+        return (
+          <g>
+            {/* Translucent Refracted Duplicate Illusion Silhouette Behind Caster */}
+            <g
+              transform={`translate(${pose.torsoX - 7 + (pose.secondaryPhase % 2)}, ${
+                pose.torsoY - 3
+              })`}
+              opacity="0.42"
+            >
+              <rect x="21" y="8" width="16" height="11" fill={pal.eyeGlow} />
+              <rect x="18" y="20" width="22" height="28" fill={pal.secondary} />
+              <rect x="22" y="22" width="14" height="24" fill={pal.metalLight} />
+            </g>
+            {/* Orbiting Prismatic Crystal Shards */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY - pose.breathPhase})`}>
+              <rect x="6" y="12" width="4" height="7" fill="#0D101C" />
+              <rect x="7" y="13" width="2" height="5" fill={pal.eyeGlow} />
+              <rect x="7" y="14" width="1" height="2" fill="#FFFFFF" />
+              <rect x="53" y="14" width="4" height="7" fill="#0D101C" />
+              <rect x="54" y="15" width="2" height="5" fill={pal.accent} />
+              <rect x="54" y="16" width="1" height="2" fill="#FFFFFF" />
+              <rect x="9" y="32" width="3" height="5" fill={pal.metalLight} />
+            </g>
+            {/* Floating Layered Illusionist Robes & Silver-Mirror Stole */}
+            <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
+              <rect x="16" y="19" width="30" height="33" fill="#0D101C" />
+              <rect x="17" y="20" width="28" height="31" fill={pal.primaryDark} />
+              <rect x="19" y="21" width="24" height="28" fill={pal.primary} />
+              <rect x="22" y="22" width="18" height="25" fill={pal.secondaryDark} />
+              <rect x="27" y="21" width="8" height="28" fill={pal.secondary} />
+              <rect x="29" y="21" width="4" height="27" fill={pal.metalLight} />
+              <rect x="30" y="23" width="2" height="23" fill="#FFFFFF" />
+              {/* Reflective Crystal Pauldrons */}
+              <rect x="13" y="17" width="9" height="6" fill="#0D101C" />
+              <rect x="14" y="18" width="7" height="4" fill={pal.metalLight} />
+              <rect x="40" y="17" width="9" height="6" fill="#0D101C" />
+              <rect x="41" y="18" width="7" height="4" fill={pal.metalLight} />
+            </g>
+            {/* Hooded Porcelain-Crystal Mask & Refracted Crown */}
+            <g
+              transform={`translate(${pose.torsoX + pose.headX}, ${
+                pose.torsoY + pose.headY
+              })`}
+            >
+              <rect x="26" y="1" width="10" height="4" fill={pal.accent} />
+              <rect x="29" y="0" width="4" height="4" fill="#FFFFFF" />
+              <rect x="20" y="5" width="22" height="15" fill="#0D101C" />
+              <rect x="21" y="6" width="20" height="13" fill={pal.primary} />
+              <rect x="24" y="8" width="14" height="10" fill={pal.metalLight} />
+              <rect x="25" y="9" width="6" height="8" fill="#FFFFFF" />
+              <rect x={25 + pose.eyeShiftX} y="11" width="4" height="2" fill="#0D101C" />
+              <rect x={26 + pose.eyeShiftX} y="11" width="2" height="2" fill={pal.eyeGlow} />
+              <rect x={33 + pose.eyeShiftX} y="11" width="4" height="2" fill="#0D101C" />
+              <rect x={34 + pose.eyeShiftX} y="11" width="2" height="2" fill={pal.accent} />
+            </g>
+            {/* Staff of Refracted Light & Prismatic Orb */}
+            <g
+              transform={`translate(${pose.torsoX + pose.weaponX}, ${
+                pose.torsoY + pose.weaponY
+              })`}
+            >
+              <rect x="10" y="10" width="3" height="42" fill="#0D101C" />
+              <rect x="11" y="11" width="1" height="40" fill={pal.metalLight} />
+              <rect x="6" y="2" width="11" height="10" fill="#0D101C" />
+              <rect x="7" y="3" width="9" height="8" fill={pal.eyeGlow} />
+              <rect x="9" y="5" width="5" height="4" fill="#FFFFFF" />
+            </g>
+          </g>
+        );
+      }
+
       return (
         <g>
-          {/* Out-of-Sync Silver Mirror Phantom Behind Duelist */}
+          {/* Fractured Out-of-Sync Mirror Reflection Behind Duelist */}
           <g
-            transform={`translate(${pose.torsoX + 6 - pose.secondaryPhase}, ${
+            transform={`translate(${pose.torsoX + 7 - pose.secondaryPhase}, ${
               pose.torsoY - 2
             })`}
-            opacity="0.38"
+            opacity="0.45"
           >
-            <rect x="20" y="10" width="20" height="42" fill={pal.metalLight} />
+            <rect x="23" y="6" width="14" height="12" fill={pal.metalLight} />
+            <rect x="19" y="19" width="22" height="24" fill={pal.secondary} />
+            <rect x="21" y="20" width="16" height="20" fill={pal.metalLight} />
+            <rect x="17" y="14" width="12" height="1" fill="#FFFFFF" />
+            <rect x="25" y="26" width="14" height="1" fill={pal.eyeGlow} />
           </g>
-          {/* Aristocratic Fencer Coat & Boots */}
+          {/* Mirrored Half-Cape & Aristocratic Duelist Boots */}
+          <g transform={`translate(0, ${pose.isDeadCollapsed ? 7 : 0})`}>
+            <rect x="20" y="42" width="7" height="14" fill="#0D101C" />
+            <rect x="21" y="43" width="5" height="12" fill={pal.primaryDark} />
+            <rect x="22" y="43" width="2" height="5" fill={pal.metalLight} />
+            <rect x="18" y="53" width="9" height="3" fill={pal.metal} />
+            <rect x="34" y="42" width="7" height="14" fill="#0D101C" />
+            <rect x="35" y="43" width="5" height="12" fill={pal.primaryDark} />
+            <rect x="36" y="43" width="2" height="5" fill={pal.metalLight} />
+            <rect x="34" y="53" width="9" height="3" fill={pal.metal} />
+          </g>
+          {/* Aristocratic Fencer Coat, Mirrored Cape & Reflective Shoulder Armor */}
           <g transform={`translate(${pose.torsoX}, ${pose.torsoY})`}>
-            <rect x="19" y="19" width="24" height="37" fill="#0D101C" />
-            <rect x="20" y="20" width="22" height="35" fill={pal.primary} />
-            <rect x="23" y="22" width="16" height="22" fill={pal.metal} />
-            <rect x="28" y="22" width="6" height="22" fill={pal.secondary} />
-            <rect x="29" y="22" width="2" height="22" fill={pal.metalLight} />
+            {/* Flowing Mirrored Half-Cape on Right/Back */}
+            <rect x="33" y="19" width="14" height="27" fill="#0D101C" />
+            <rect x="34" y="20" width="12" height="25" fill={pal.secondaryDark} />
+            <rect x="35" y="21" width="9" height="22" fill={pal.secondary} />
+            <rect x="37" y="22" width="5" height="18" fill={pal.metalLight} opacity="0.7" />
+            {/* Tailored Fencer Doublet & Silver Filigree */}
+            <rect x="18" y="19" width="24" height="25" fill="#0D101C" />
+            <rect x="19" y="20" width="22" height="23" fill={pal.primary} />
+            <rect x="22" y="21" width="16" height="20" fill={pal.metal} />
+            <rect x="24" y="22" width="12" height="17" fill={pal.primaryLight} />
+            <rect x="28" y="21" width="4" height="20" fill={pal.metalLight} />
+            <rect x="29" y="22" width="2" height="18" fill="#FFFFFF" />
+            {/* Reflective Silver Shoulder Pauldrons */}
+            <rect x="14" y="17" width="9" height="7" fill="#0D101C" />
+            <rect x="15" y="18" width="7" height="5" fill={pal.metalLight} />
+            <rect x="16" y="19" width="4" height="2" fill="#FFFFFF" />
+            <rect x="37" y="17" width="9" height="7" fill="#0D101C" />
+            <rect x="38" y="18" width="7" height="5" fill={pal.metalLight} />
+            <rect x="39" y="19" width="4" height="2" fill="#FFFFFF" />
+            {/* Duelist Sash & Buckle */}
+            <rect x="19" y="37" width="22" height="3" fill={pal.secondary} />
+            <rect x="28" y="36" width="5" height="5" fill={pal.metalLight} />
           </g>
-          {/* Smooth Silver Mirror Mask */}
+          {/* Sculpted Silver Mirror Fencer Mask & Plumed Crest */}
           <g
             transform={`translate(${pose.torsoX + pose.headX}, ${
               pose.torsoY + pose.headY
             })`}
           >
-            <rect x="23" y="6" width="16" height="15" fill="#0D101C" />
-            <rect x="24" y="7" width="14" height="13" fill={pal.metalLight} />
-            <rect x="25" y="8" width="5" height="10" fill="#FFFFFF" />
-            <rect x="29" y="8" width="2" height="11" fill={pal.secondary} />
+            <rect x="28" y="1" width="9" height="5" fill={pal.accent} />
+            <rect x="30" y="2" width="5" height="3" fill="#FFFFFF" />
+            <rect x="22" y="5" width="17" height="15" fill="#0D101C" />
+            <rect x="23" y="6" width="15" height="13" fill={pal.metal} />
+            <rect x="24" y="7" width="13" height="11" fill={pal.metalLight} />
+            <rect x="25" y="8" width="5" height="9" fill="#FFFFFF" />
+            <rect x="30" y="7" width="2" height="11" fill={pal.secondary} />
+            <rect x="25" y="11" width="11" height="3" fill="#0D101C" />
             <rect
               x={26 + pose.eyeShiftX}
               y="12"
-              width="10"
+              width="3"
+              height="2"
+              fill={pal.eyeGlow}
+            />
+            <rect
+              x={32 + pose.eyeShiftX}
+              y="12"
+              width="3"
               height="2"
               fill={pal.eyeGlow}
             />
           </g>
-          {/* Needle-Thin Silver Mercury Rapier */}
+          {/* Needle-Sharp Silver Mercury Rapier with Swept Cup-Hilt */}
           <g
             transform={`translate(${pose.torsoX + pose.weaponX}, ${
               pose.torsoY + pose.weaponY
             })`}
           >
-            <rect x="9" y="3" width="2" height="31" fill={pal.metalLight} />
+            <rect x="8" y="2" width="3" height="31" fill="#0D101C" />
+            <rect x="9" y="3" width="2" height="29" fill={pal.metalLight} />
             <rect x="9" y="4" width="1" height="26" fill="#FFFFFF" />
-            <rect x="5" y="32" width="10" height="4" fill={pal.accent} />
-            <rect x="9" y="36" width="2" height="6" fill={pal.primaryDark} />
+            <rect x="4" y="31" width="11" height="5" fill="#0D101C" />
+            <rect x="5" y="32" width="9" height="3" fill={pal.accent} />
+            <rect x="7" y="32" width="5" height="2" fill="#FFFFFF" />
+            <rect x="8" y="36" width="3" height="6" fill={pal.primaryDark} />
+            <rect x="8" y="41" width="3" height="2" fill={pal.metalLight} />
           </g>
         </g>
       );

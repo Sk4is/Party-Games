@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Copy, Check, Volume2, VolumeX, LogOut, Crown, Sparkles, Swords } from 'lucide-react';
 import {
   CriptaAcquiredRelic,
@@ -77,6 +77,11 @@ interface LaCriptaPartyHudProps {
   onReturnToLobby?: () => void;
   playerAnimationStates?: Record<string, CriptaSpriteAnimationState>;
   activeVisualEvents?: CriptaVisualEvent[];
+  presentedPlayerHp?: Record<string, { hp: number; trailHp: number }>;
+  playerCardImpacts?: Record<
+    string,
+    'DAMAGE' | 'HEAL' | 'SHIELD' | 'BUFF' | 'DEBUFF' | 'ANTICIPATION'
+  >;
   onUseConsumable?: (
     slotIndex: number,
     targetEnemyId?: string,
@@ -106,6 +111,70 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
   const [copied, setCopied] = useState(false);
   const [muted, setMuted] = useState(() => laCriptaAudio.isMuted());
   const [inspectedRelic, setInspectedRelic] = useState<CriptaAcquiredRelic | null>(null);
+
+  // 60 FPS Animated Gold Counter & Treasury Pulse (Priority 12)
+  const authoritativeGold = expeditionState.partyGold ?? 0;
+  const [displayedGold, setDisplayedGold] = useState<number>(authoritativeGold);
+  const [goldDeltaBadge, setGoldDeltaBadge] = useState<{
+    delta: number;
+    key: number;
+  } | null>(null);
+  const [impactPulseActive, setImpactPulseActive] = useState(false);
+  const prevGoldRef = useRef<number>(authoritativeGold);
+  const goldCounterRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onCoinImpact = () => {
+      setImpactPulseActive(true);
+      const timer = window.setTimeout(() => setImpactPulseActive(false), 520);
+      return () => window.clearTimeout(timer);
+    };
+    window.addEventListener('cripta-gold-counter-impact', onCoinImpact);
+    return () => window.removeEventListener('cripta-gold-counter-impact', onCoinImpact);
+  }, []);
+
+  useEffect(() => {
+    const prev = prevGoldRef.current;
+    if (authoritativeGold === prev) return;
+    const delta = authoritativeGold - prev;
+    prevGoldRef.current = authoritativeGold;
+
+    setGoldDeltaBadge({ delta, key: Date.now() });
+    const badgeTimer = window.setTimeout(() => {
+      setGoldDeltaBadge(null);
+    }, 1800);
+
+    let rafId = 0;
+    let delayTimer = 0;
+    const startVal = displayedGold;
+    const endVal = authoritativeGold;
+    // When gaining gold, wait briefly (~420ms) as the flying coins travel toward the GOLD counter before rolling the digits up
+    const startDelayMs = delta > 0 ? 420 : 0;
+    const duration = 560;
+
+    delayTimer = window.setTimeout(() => {
+      if (delta > 0) {
+        setImpactPulseActive(true);
+        window.setTimeout(() => setImpactPulseActive(false), 480);
+      }
+      const startTime = performance.now();
+      const step = (now: number) => {
+        const t = Math.min(1, (now - startTime) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        setDisplayedGold(Math.round(startVal + (endVal - startVal) * eased));
+        if (t < 1) {
+          rafId = window.requestAnimationFrame(step);
+        }
+      };
+      rafId = window.requestAnimationFrame(step);
+    }, startDelayMs);
+
+    return () => {
+      window.clearTimeout(badgeTimer);
+      window.clearTimeout(delayTimer);
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [authoritativeGold]);
 
   const handleCopyCode = () => {
     laCriptaAudio.playStoneClick();
@@ -280,12 +349,51 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
               title="Oro de Expedición"
               category="TESORO COMPARTIDO"
               description="Oro acumulado por el grupo. Se emplea en el Mercader, en la Forja de armas y en rituales de resurrección."
-              footerLabel={`DISPONIBLE: ${expeditionState.partyGold ?? 0} ORO`}
+              footerLabel={`DISPONIBLE: ${authoritativeGold} ORO`}
               borderColor="#E7A54A"
             >
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#1D140C] border border-[#E7A54A] font-cripta-mono text-xs font-extrabold text-[#FFD166] cursor-help">
-                <span>◆</span>
-                <span>{expeditionState.partyGold ?? 0} ORO</span>
+              <div
+                ref={goldCounterRef}
+                id="cripta-gold-counter-hud"
+                data-cripta-gold-counter="true"
+                className={`relative inline-flex items-center gap-1.5 px-2.5 py-1 border font-cripta-mono text-xs font-extrabold cursor-help transition-all duration-300 ${
+                  impactPulseActive
+                    ? 'bg-[#463012] border-[#FFF3C4] text-[#FFFFFF] scale-112 ring-2 ring-[#FFD166] shadow-[0_0_26px_rgba(255,209,102,0.95)]'
+                    : goldDeltaBadge
+                    ? goldDeltaBadge.delta > 0
+                      ? 'bg-[#35240E] border-[#FFD166] text-[#FFF3C4] scale-105 ring-1 ring-[#FFD166] shadow-[0_0_18px_rgba(255,209,102,0.75)]'
+                      : 'bg-[#2E111B] border-[#C93B5B] text-[#FF8FA3] scale-105'
+                    : 'bg-[#1D140C] border-[#E7A54A] text-[#FFD166]'
+                }`}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 12 12"
+                  shapeRendering="crispEdges"
+                  className="shrink-0"
+                >
+                  <rect x="3" y="1" width="6" height="10" fill="#B66E19" />
+                  <rect x="2" y="2" width="8" height="8" fill="#E7A54A" />
+                  <rect x="3" y="2" width="6" height="8" fill="#FFD166" />
+                  <rect x="5" y="3" width="2" height="6" fill="#FFF3C4" />
+                </svg>
+                <span>{displayedGold} ORO</span>
+
+                {goldDeltaBadge && (
+                  <span
+                    key={goldDeltaBadge.key}
+                    className={`pointer-events-none absolute -bottom-6 right-0 px-2 py-0.5 border text-[10px] font-cripta-pixel font-black whitespace-nowrap shadow-lg animate-cripta-float-up z-50 ${
+                      goldDeltaBadge.delta > 0
+                        ? 'bg-[#1B1308] border-[#FFD166] text-[#FFD166]'
+                        : 'bg-[#260D16] border-[#C93B5B] text-[#FF8FA3]'
+                    }`}
+                  >
+                    {goldDeltaBadge.delta > 0
+                      ? `+${goldDeltaBadge.delta} ORO`
+                      : `${goldDeltaBadge.delta} ORO`}
+                  </span>
+                )}
               </div>
             </LaCriptaPixelTooltip>
           )}
@@ -370,6 +478,8 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
   currentPlayerId,
   playerAnimationStates = {},
   activeVisualEvents = [],
+  presentedPlayerHp = {},
+  playerCardImpacts = {},
   onOpenInventory,
   isInventoryOpen = false,
   onInspectPlayer,
@@ -426,8 +536,14 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
           const isMe = player.id === currentPlayerId;
           const votedDoorId = expeditionState.doorVotes[player.id];
           const animState = playerAnimationStates[player.id] || 'idle';
+          const cardImpact = playerCardImpacts[player.id];
+          const presentedHpObj = presentedPlayerHp[player.id];
+          const displayedHp = presentedHpObj ? presentedHpObj.hp : player.hp;
+          const displayedTrailHp = presentedHpObj ? presentedHpObj.trailHp : player.hp;
+
           const isDead = Boolean(
-            player.isDead || (charDef && player.maxHp > 0 && player.hp <= 0)
+            (player.isDead || (charDef && player.maxHp > 0 && player.hp <= 0)) &&
+              displayedHp <= 0
           );
           const isActiveTurnPlayer =
             !isDead &&
@@ -457,7 +573,17 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   0,
                   Math.min(
                     hpSegmentsTotal,
-                    Math.round((player.hp / Math.max(1, player.maxHp)) * hpSegmentsTotal)
+                    Math.round((displayedHp / Math.max(1, player.maxHp)) * hpSegmentsTotal)
+                  )
+                )
+              : 0;
+          const hpTrailSegments =
+            charDef && player.maxHp > 0 && !isDead
+              ? Math.max(
+                  hpFilledSegments,
+                  Math.min(
+                    hpSegmentsTotal,
+                    Math.round((displayedTrailHp / Math.max(1, player.maxHp)) * hpSegmentsTotal)
                   )
                 )
               : 0;
@@ -484,7 +610,17 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
               className={`relative flex items-center gap-2.5 px-2.5 sm:px-3 py-1.5 border-2 transition-all duration-150 ${
                 onInspectPlayer ? 'cursor-pointer' : ''
               } ${
-                isInspected
+                cardImpact === 'DAMAGE'
+                  ? 'bg-[#3B0C18] translate-y-1 ring-2 ring-[#FF4D6D]'
+                  : cardImpact === 'SHIELD'
+                  ? 'bg-[#0F2A30] -translate-y-1 ring-2 ring-[#7BDFF2]'
+                  : cardImpact === 'HEAL'
+                  ? 'bg-[#0E291C] -translate-y-1 ring-2 ring-[#5EA87A]'
+                  : cardImpact === 'BUFF' || cardImpact === 'ANTICIPATION'
+                  ? 'bg-[#281C10] -translate-y-1.5 ring-2 ring-[#FFD166]'
+                  : cardImpact === 'DEBUFF'
+                  ? 'bg-[#26102A] translate-y-0.5 ring-2 ring-[#9B72CF]'
+                  : isInspected
                   ? 'bg-[#261B38] -translate-y-1.5 ring-2 ring-[#FFD166]'
                   : isDead
                   ? 'bg-[#0F090E]'
@@ -497,29 +633,45 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   : 'bg-[#130E19] hover:bg-[#191222]'
               }`}
               style={{
-                borderColor: isInspected
-                  ? '#FFD166'
-                  : isDead
-                  ? '#8F263D'
-                  : isTargetedByEnemy
-                  ? '#E03E52'
-                  : isActiveTurnPlayer || isCurrentlyActing
-                  ? '#FFD166'
-                  : hasLivingEnemies && hasActedThisRound && combatRoundPhase === 'PLAYER_PHASE'
-                  ? '#5EA87A'
-                  : charDef
-                  ? isMe
-                    ? '#E7A54A'
-                    : charDef.accentColor
-                  : '#282039',
-                boxShadow: isActiveTurnPlayer
-                  ? 'inset 0 0 22px rgba(255,209,102,0.22), 0 0 18px rgba(231,165,74,0.45)'
-                  : '0 4px 14px rgba(0,0,0,0.85)',
+                borderColor:
+                  cardImpact === 'DAMAGE'
+                    ? '#FF4D6D'
+                    : cardImpact === 'SHIELD'
+                    ? '#7BDFF2'
+                    : cardImpact === 'HEAL'
+                    ? '#5EA87A'
+                    : cardImpact === 'BUFF' || cardImpact === 'ANTICIPATION'
+                    ? '#FFD166'
+                    : isInspected
+                    ? '#FFD166'
+                    : isDead
+                    ? '#8F263D'
+                    : isTargetedByEnemy
+                    ? '#E03E52'
+                    : isActiveTurnPlayer || isCurrentlyActing
+                    ? '#FFD166'
+                    : hasLivingEnemies && hasActedThisRound && combatRoundPhase === 'PLAYER_PHASE'
+                    ? '#5EA87A'
+                    : charDef
+                    ? isMe
+                      ? '#E7A54A'
+                      : charDef.accentColor
+                    : '#282039',
+                boxShadow:
+                  cardImpact === 'DAMAGE'
+                    ? 'inset 0 0 26px rgba(255,77,109,0.55), 0 0 22px rgba(201,59,91,0.65)'
+                    : cardImpact === 'SHIELD'
+                    ? 'inset 0 0 24px rgba(123,223,242,0.4), 0 0 18px rgba(105,168,165,0.55)'
+                    : cardImpact === 'HEAL'
+                    ? 'inset 0 0 24px rgba(94,168,122,0.45), 0 0 18px rgba(94,168,122,0.55)'
+                    : isActiveTurnPlayer
+                    ? 'inset 0 0 22px rgba(255,209,102,0.22), 0 0 18px rgba(231,165,74,0.45)'
+                    : '0 4px 14px rgba(0,0,0,0.85)',
               }}
             >
-              {/* Floating Visual Gameplay Feedback Popups above Player Card */}
+              {/* Spatial Floating Gameplay Feedback Popups Directly Around THIS Player's HUD Card */}
               {playerEvents.length > 0 && (
-                <div className="pointer-events-none absolute -top-9 inset-x-0 z-40 flex flex-col items-center gap-1">
+                <div className="pointer-events-none absolute -top-10 inset-x-0 z-40 flex flex-col items-center gap-1">
                   {playerEvents.slice(-3).map((ev, idx) => (
                     <LaCriptaFloatingEventBadge key={ev.id} event={ev} indexOffset={idx} />
                   ))}
@@ -575,15 +727,28 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                 borderColor={charDef?.accentColor || '#E7A54A'}
               >
                 <div
-                  className="relative w-12 h-12 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-[#09070D] border-2 overflow-visible"
+                  className={`relative w-12 h-12 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-[#09070D] border-2 overflow-visible transition-transform duration-150 ${
+                    cardImpact === 'DAMAGE'
+                      ? 'translate-x-1 translate-y-0.5'
+                      : cardImpact === 'ANTICIPATION'
+                      ? '-translate-y-1 scale-105'
+                      : ''
+                  }`}
                   style={{
-                    borderColor: isDead
-                      ? '#8F263D'
-                      : isTargetedByEnemy
-                      ? '#E03E52'
-                      : isActiveTurnPlayer
-                      ? '#FFD166'
-                      : player.color,
+                    borderColor:
+                      cardImpact === 'DAMAGE'
+                        ? '#FF4D6D'
+                        : cardImpact === 'SHIELD'
+                        ? '#7BDFF2'
+                        : cardImpact === 'HEAL'
+                        ? '#5EA87A'
+                        : isDead
+                        ? '#8F263D'
+                        : isTargetedByEnemy
+                        ? '#E03E52'
+                        : isActiveTurnPlayer
+                        ? '#FFD166'
+                        : player.color,
                   }}
                 >
                   {charId && charDef ? (
@@ -642,27 +807,85 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                     )}
                   </div>
 
-                  {charDef && (
-                    <div className="flex items-center gap-1.5 shrink-0 font-cripta-mono text-[10px]">
+                  {charDef && effStats && (
+                    <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 font-cripta-mono text-[10px]">
                       <LaCriptaPixelTooltip
-                        title="Armadura y Defensa"
-                        category="PROTECCIÓN"
-                        description="Mitiga el daño físico recibido de los ataques enemigos."
-                        footerLabel={`ARMADURA: ${player.armor}`}
-                        borderColor="#69A8A5"
+                        title="Ataque Físico"
+                        category="ATRIBUTO DE COMBATE"
+                        description={`Potencia el daño de armas físicas y técnicas marciales (Base ${charDef.stats.attack}${
+                          effStats.attack > charDef.stats.attack
+                            ? ` +${effStats.attack - charDef.stats.attack} bono`
+                            : ''
+                        }).`}
+                        footerLabel={`ATAQUE EFECTIVO: ${effStats.attack}`}
+                        borderColor="#E7A54A"
                       >
-                        <span className="text-[#69A8A5] cursor-help">
-                          DEF {player.armor}
+                        <span className="inline-flex items-center gap-0.5 px-1 py-0.2 bg-[#1D130E] border border-[#E7A54A]/45 text-[#FFD166] cursor-help">
+                          <svg width="8" height="8" viewBox="0 0 8 8" shapeRendering="crispEdges">
+                            <rect x="5" y="1" width="2" height="2" fill="#FFD166" />
+                            <rect x="3" y="3" width="2" height="2" fill="#E7A54A" />
+                            <rect x="1" y="5" width="2" height="2" fill="#D9D0BC" />
+                          </svg>
+                          <span>{effStats.attack}</span>
                         </span>
                       </LaCriptaPixelTooltip>
-                      <span className={isDead ? 'text-[#C93B5B] font-bold' : 'text-[#FFD166] font-bold'}>
-                        {isDead ? `0/${player.maxHp}` : `${player.hp}/${player.maxHp}`} PV
+
+                      <LaCriptaPixelTooltip
+                        title="Armadura y Defensa"
+                        category="ATRIBUTO DE COMBATE"
+                        description={`Mitiga el daño físico directo recibido (Armadura actual: ${player.armor} · Defensa efectiva: ${effStats.defense}).`}
+                        footerLabel={`DEFENSA EFECTIVA: ${effStats.defense}`}
+                        borderColor="#69A8A5"
+                      >
+                        <span className="inline-flex items-center gap-0.5 px-1 py-0.2 bg-[#0F1E22] border border-[#69A8A5]/45 text-[#7BDFF2] cursor-help">
+                          <svg width="8" height="8" viewBox="0 0 8 8" shapeRendering="crispEdges">
+                            <rect x="1" y="1" width="6" height="4" fill="#69A8A5" />
+                            <rect x="2" y="5" width="4" height="2" fill="#7BDFF2" />
+                            <rect x="3" y="7" width="2" height="1" fill="#D9F2F0" />
+                          </svg>
+                          <span>{effStats.defense}</span>
+                        </span>
+                      </LaCriptaPixelTooltip>
+
+                      <LaCriptaPixelTooltip
+                        title="Poder Mágico y Alquímico"
+                        category="ATRIBUTO DE COMBATE"
+                        description={`Potencia hechizos arcanos, plegarias sagradas, curaciones y fórmulas alquímicas (Base ${charDef.stats.magic}${
+                          effStats.magic > charDef.stats.magic
+                            ? ` +${effStats.magic - charDef.stats.magic} bono`
+                            : ''
+                        }).`}
+                        footerLabel={`MAGIA EFECTIVA: ${effStats.magic}`}
+                        borderColor="#9B72CF"
+                      >
+                        <span className="inline-flex items-center gap-0.5 px-1 py-0.2 bg-[#1A1126] border border-[#9B72CF]/45 text-[#D8B4F8] cursor-help">
+                          <svg width="8" height="8" viewBox="0 0 8 8" shapeRendering="crispEdges">
+                            <rect x="3" y="0" width="2" height="8" fill="#9B72CF" />
+                            <rect x="0" y="3" width="8" height="2" fill="#9B72CF" />
+                            <rect x="3" y="3" width="2" height="2" fill="#FFF3C4" />
+                          </svg>
+                          <span>{effStats.magic}</span>
+                        </span>
+                      </LaCriptaPixelTooltip>
+
+                      <span
+                        className={`ml-0.5 ${
+                          isDead
+                            ? 'text-[#C93B5B] font-bold'
+                            : cardImpact === 'DAMAGE'
+                            ? 'text-[#FF4D6D] font-black'
+                            : cardImpact === 'HEAL'
+                            ? 'text-[#6EE7B7] font-black'
+                            : 'text-[#FFD166] font-bold'
+                        }`}
+                      >
+                        {isDead ? `0/${player.maxHp}` : `${displayedHp}/${player.maxHp}`} PV
                       </span>
                     </div>
                   )}
                 </div>
 
-                {/* Segmented Pixel HP Bar */}
+                {/* Segmented Pixel HP Bar with Trailing Damage Strip */}
                 <div className="mt-1 flex items-center gap-1">
                   <span
                     className={`text-[10px] font-cripta-pixel leading-none shrink-0 ${
@@ -674,13 +897,22 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   <div className="flex items-center gap-0.5 flex-1">
                     {Array.from({ length: hpSegmentsTotal }).map((_, segIdx) => {
                       const lit = charDef && !isDead ? segIdx < hpFilledSegments : false;
+                      const isTrailSegment =
+                        charDef && !isDead && !lit && segIdx < hpTrailSegments;
                       return (
                         <span
                           key={segIdx}
-                          className="h-2 flex-1 border transition-colors duration-200"
+                          className="h-2 flex-1 border transition-colors duration-300"
                           style={{
-                            backgroundColor: lit ? '#C93B5B' : '#09070D',
-                            borderColor: lit ? '#E7A54A' : '#282039',
+                            backgroundColor: lit
+                              ? cardImpact === 'HEAL'
+                                ? '#5EA87A'
+                                : '#C93B5B'
+                              : isTrailSegment
+                              ? '#FFD166'
+                              : '#09070D',
+                            borderColor:
+                              lit || isTrailSegment ? '#E7A54A' : '#282039',
                           }}
                         />
                       );
