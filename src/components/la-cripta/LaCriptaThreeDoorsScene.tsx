@@ -775,14 +775,14 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
               )}
             </div>
 
-            {/* CENTER OF LEFT STAGE: COMMANDING LARGE CREATURE / NPC / OBJECT ART */}
+            {/* CENTER OF LEFT STAGE: COMMANDING LARGE CREATURE / NPC / OBJECT ART (Elevated to 56-62% Visual Center) */}
             <div
-              className={`relative z-20 flex-1 min-h-[260px] sm:min-h-[290px] flex flex-col items-center justify-end my-1 transition-transform duration-75 ${
+              className={`relative z-20 flex-1 min-h-[300px] sm:min-h-[360px] flex flex-col items-center justify-center pt-2 pb-6 sm:pb-10 my-auto transition-transform duration-75 ${
                 hitStopActive ? 'scale-[1.02] brightness-125' : ''
               }`}
             >
               {visibleRoomEnemies.length > 0 ? (
-                <div className="w-full flex flex-nowrap items-end justify-center gap-3 sm:gap-5 px-1">
+                <div className="w-full flex flex-nowrap items-end justify-center gap-4 sm:gap-6 px-1">
                   {visibleRoomEnemies.map((enemy, enemyIdx) => {
                     const presentedHpObj = presentedEnemyHp[enemy.id];
                     const displayedHp = Math.max(

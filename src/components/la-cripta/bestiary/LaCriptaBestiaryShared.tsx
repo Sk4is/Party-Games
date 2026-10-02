@@ -825,10 +825,14 @@ export const AuthoredEnemySpriteSvg: React.FC<{
 
   switch (visualDef.idleType) {
     case 'COLOSSUS_BREATH': {
-      // Very slow, heavy mass breathing for Esqueleto Colosal & colossal titans (never bounces!)
-      const slowCycle = Math.sin(particlePhase * 1.35);
-      topHalfSquashY = slowCycle > 0.45 ? 1 : 0;
-      rightWeaponShiftY = slowCycle > 0.25 ? 1 : 0;
+      // Geological, monumental mass cadence for Esqueleto Colosal (60 FPS restrained ancient settle)
+      const slowMassCycle = Math.sin(particlePhase * 0.75); // ~0.75 rad/s: very slow deep cycle
+      // Skull micro-tilt (1px) over long subtle phases
+      hatTipShiftX = slowMassCycle > 0.65 ? 1 : slowMassCycle < -0.65 ? -1 : 0;
+      // Rib cage subtle 1px shift during deep expansion
+      topHalfSquashY = slowMassCycle > 0.5 ? 1 : 0;
+      // Massive ancient burial weapon slowly settling under its immense weight
+      rightWeaponShiftY = slowMassCycle > 0.2 ? 1 : 0;
       break;
     }
     case 'CONSTRUCT_PISTON': {
@@ -1047,7 +1051,9 @@ const EnemySmoothEffectsLayer: React.FC<{
   const cy = canvasH / 2;
 
   if (effectType === 'COLOSSUS_DUST') {
-    // Slow falling bone/stone dust when colossal skeleton shifts its massive weight (Requirement 19)
+    // Slow falling bone/stone dust + periodic floor dust puff when massive frame settles (Requirement 10)
+    const floorPuffPhase = (phase * 0.25) % 1; // triggers every ~4s
+    const showFloorPuff = floorPuffPhase < 0.28;
     return (
       <g>
         {[0, 1, 2, 3, 4].map((i) => {
@@ -1066,6 +1072,14 @@ const EnemySmoothEffectsLayer: React.FC<{
             />
           );
         })}
+        {showFloorPuff && (
+          <g opacity={(1 - floorPuffPhase / 0.28) * 0.65}>
+            <rect x={cx - 14} y={groundY - 1} width="3" height="0.8" fill="#D8C6A0" />
+            <rect x={cx - 16} y={groundY - 1.8} width="2" height="0.8" fill="#94A3B8" />
+            <rect x={cx + 12} y={groundY - 1} width="3" height="0.8" fill="#D8C6A0" />
+            <rect x={cx + 14} y={groundY - 1.8} width="2" height="0.8" fill="#94A3B8" />
+          </g>
+        )}
       </g>
     );
   }

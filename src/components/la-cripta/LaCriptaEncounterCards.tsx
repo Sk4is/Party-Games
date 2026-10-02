@@ -3279,29 +3279,29 @@ export const LaCriptaBiomeStageBackdrop: React.FC<{
           opacity={0.92 * flicker}
         />
 
-        {/* Creature Stage Stone Pedestal / Ground Plane */}
-        <rect x="0" y="88" width="160" height="32" fill={p.floorDark} opacity="0.92" />
-        <rect x="12" y="84" width="136" height="5" fill={p.floorMid} opacity="0.9" />
-        <rect x="20" y="83" width="120" height="1" fill={p.floorLight} opacity="0.65" />
-        <rect x="38" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
-        <rect x="80" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
-        <rect x="122" y="84" width="1" height="5" fill="#08060D" opacity="0.65" />
+        {/* Creature Stage Stone Pedestal / Ground Plane (Elevated to 58% of stage height) */}
+        <rect x="0" y="74" width="160" height="46" fill={p.floorDark} opacity="0.92" />
+        <rect x="10" y="70" width="140" height="5" fill={p.floorMid} opacity="0.9" />
+        <rect x="18" y="69" width="124" height="1" fill={p.floorLight} opacity="0.65" />
+        <rect x="36" y="70" width="1" height="5" fill="#08060D" opacity="0.65" />
+        <rect x="80" y="70" width="1" height="5" fill="#08060D" opacity="0.65" />
+        <rect x="124" y="70" width="1" height="5" fill="#08060D" opacity="0.65" />
 
         {/* Boss / Miniboss Runic Circle Glow on Floor */}
         {isBossOrMiniboss && (
           <>
             <rect
-              x="34"
-              y="85"
-              width="92"
+              x="30"
+              y="71"
+              width="100"
               height="2"
               fill={p.accentPrimary}
               opacity={0.85 * flicker}
             />
             <rect
-              x="46"
-              y="88"
-              width="68"
+              x="42"
+              y="74"
+              width="76"
               height="1"
               fill={p.particlePrimary}
               opacity={0.95 * flicker}
