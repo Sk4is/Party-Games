@@ -131,6 +131,10 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     sendUseInventoryItem,
     sendClaimGroundDrop,
     sendBuyShopSlot,
+    sendPassShopChoice,
+    sendTradeItem,
+    sendTradeGold,
+    sendUpgradeAttribute,
     sendReplaceInventoryItem,
     sendDiscardOverflowItem,
     sendShopBuyItem,
@@ -579,6 +583,10 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
             onAdvanceRoom={sendRoomAdvance}
             onClaimGroundDrop={sendClaimGroundDrop}
             onBuyShopSlot={sendBuyShopSlot}
+            onPassShopChoice={sendPassShopChoice}
+            onTradeItem={sendTradeItem}
+            onTradeGold={sendTradeGold}
+            onUpgradeAttribute={sendUpgradeAttribute}
             onShopBuyItem={sendShopBuyItem}
             onShopBuyRelic={sendShopBuyRelic}
             onSelectedEnemyChange={setSelectedTargetEnemyId}

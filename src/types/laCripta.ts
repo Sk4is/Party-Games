@@ -1552,12 +1552,20 @@ export interface CriptaRoomMinigameState {
   } | null;
 }
 
+export type CriptaChoicePolicy =
+  | 'REQUIRED_PER_PLAYER'
+  | 'OPTIONAL_PER_PLAYER'
+  | 'REQUIRED_GROUP'
+  | 'OPTIONAL_GROUP'
+  | 'FREE_LOOT';
+
 export interface CriptaDungeonRoom {
   id: string;
   index: number; // 0-indexed position in sequence
   roomNumber: number; // 1-indexed display number
   dungeonId: CriptaDungeonId;
   type: CriptaCanonicalRoomType;
+  choicePolicy?: CriptaChoicePolicy;
   state: CriptaRoomState;
   revealed: boolean;
   visited: boolean;
@@ -1617,6 +1625,8 @@ export interface CriptaDungeonRoom {
     priceGold: number;
     timestamp: number;
   }>;
+  playerShopChoices?: Record<string, { choice: string; timestamp: number }>;
+  playerOpportunityChoices?: Record<string, string>;
   lifecyclePhase?: CriptaRoomLifecyclePhase;
   resolvedAtTimestamp?: number | null;
   isMinibossRoom?: boolean;
@@ -2135,6 +2145,23 @@ export type CriptaClientMessage =
   | {
       type: 'EQUIP_WEAPON_RUNE';
       runeId: CriptaWeaponRuneId | null;
+    }
+  | {
+      type: 'PASS_SHOP_CHOICE';
+    }
+  | {
+      type: 'TRADE_ITEM';
+      targetPlayerId: string;
+      slotIndex: number;
+    }
+  | {
+      type: 'TRADE_GOLD';
+      targetPlayerId: string;
+      amount: number;
+    }
+  | {
+      type: 'UPGRADE_ATTRIBUTE';
+      attribute: 'attack' | 'defense' | 'magic' | 'agility' | 'precision' | 'willpower' | 'health';
     }
   | {
       type: 'ROOM_ADVANCE';

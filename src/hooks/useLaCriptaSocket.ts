@@ -744,6 +744,31 @@ export function useLaCriptaSocket({
     [sendMessage]
   );
 
+  const sendPassShopChoice = useCallback(() => {
+    sendMessage({ type: 'PASS_SHOP_CHOICE' });
+  }, [sendMessage]);
+
+  const sendTradeItem = useCallback(
+    (targetPlayerId: string, slotIndex: number) => {
+      sendMessage({ type: 'TRADE_ITEM', targetPlayerId, slotIndex });
+    },
+    [sendMessage]
+  );
+
+  const sendTradeGold = useCallback(
+    (targetPlayerId: string, amount: number) => {
+      sendMessage({ type: 'TRADE_GOLD', targetPlayerId, amount });
+    },
+    [sendMessage]
+  );
+
+  const sendUpgradeAttribute = useCallback(
+    (attribute: 'attack' | 'defense' | 'magic' | 'agility' | 'precision' | 'willpower' | 'health') => {
+      sendMessage({ type: 'UPGRADE_ATTRIBUTE', attribute });
+    },
+    [sendMessage]
+  );
+
   const sendRoomAdvance = useCallback(() => {
     sendMessage({ type: 'ROOM_ADVANCE' });
   }, [sendMessage]);
@@ -774,6 +799,10 @@ export function useLaCriptaSocket({
     sendUseInventoryItem,
     sendClaimGroundDrop,
     sendBuyShopSlot,
+    sendPassShopChoice,
+    sendTradeItem,
+    sendTradeGold,
+    sendUpgradeAttribute,
     sendResolveInventoryFull,
     sendReplaceInventoryItem,
     sendDiscardOverflowItem,

@@ -192,6 +192,10 @@ interface LaCriptaThreeDoorsSceneProps {
   onClaimGroundDrop?: (dropId: string) => void;
   onShopBuyItem?: (offerId: string) => void;
   onShopBuyRelic?: () => void;
+  onPassShopChoice?: () => void;
+  onTradeItem?: (targetPlayerId: string, slotIndex: number) => void;
+  onTradeGold?: (targetPlayerId: string, amount: number) => void;
+  onUpgradeAttribute?: (attribute: 'attack' | 'defense' | 'magic' | 'agility' | 'precision' | 'willpower' | 'health') => void;
   onSelectedEnemyChange?: (enemyId: string | null) => void;
   onHoveredDoorChange?: (dungeonId: CriptaDungeonId | null) => void;
   contextualPanelMode?: CriptaContextualPanelMode;

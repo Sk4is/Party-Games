@@ -1,6 +1,7 @@
 import type {
   CriptaCanonicalRoomType,
   CriptaCharacterId,
+  CriptaChoicePolicy,
   CriptaDungeonId,
   CriptaDungeonLengthTier,
   CriptaDungeonRoom,
@@ -1265,12 +1266,27 @@ export function generateProceduralDungeon(
       CRIPTA_MINIBOSS_ARENAS_REGISTRY.catacumbas_del_rey;
     const minibossEnemyName = enemies[0]?.name || minibossDef.name;
 
+    const choicePolicy: CriptaChoicePolicy =
+      rType === 'SHOP'
+        ? 'REQUIRED_PER_PLAYER'
+        : rType === 'DECISION' ||
+          rType === 'REST' ||
+          rType === 'SHRINE' ||
+          rType === 'SECRET' ||
+          rType === 'EVENT' ||
+          rType === 'TRAP'
+        ? 'OPTIONAL_PER_PLAYER'
+        : rType === 'PUZZLE'
+        ? 'REQUIRED_GROUP'
+        : 'FREE_LOOT';
+
     return {
       id: `room_${dungeonId}_${idx + 1}`,
       index: idx,
       roomNumber: idx + 1,
       dungeonId,
       type: rType,
+      choicePolicy,
       state: isFirst ? 'IN_PROGRESS' : 'LOCKED',
       lifecyclePhase: isFirst ? 'ACTIVE' : 'ENTERING',
       resolvedAtTimestamp: null,
@@ -1348,6 +1364,7 @@ export function generateProceduralDungeon(
     roomNumber: secretHostIndex + 1,
     dungeonId,
     type: 'SECRET',
+    choicePolicy: 'OPTIONAL_PER_PLAYER',
     state: 'AVAILABLE',
     revealed: true,
     visited: false,

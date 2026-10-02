@@ -1059,6 +1059,26 @@ export class LaCriptaServer {
         break;
       }
 
+      case 'PASS_SHOP_CHOICE': {
+        this.handlePassShopChoice(ws, room, player);
+        break;
+      }
+
+      case 'TRADE_ITEM': {
+        this.handleTradeItem(ws, room, player, msg.targetPlayerId, msg.slotIndex);
+        break;
+      }
+
+      case 'TRADE_GOLD': {
+        this.handleTradeGold(ws, room, player, msg.targetPlayerId, msg.amount);
+        break;
+      }
+
+      case 'UPGRADE_ATTRIBUTE': {
+        this.handleUpgradeAttribute(ws, room, player, msg.attribute);
+        break;
+      }
+
       case 'RESOLVE_INVENTORY_FULL': {
         this.handleResolveInventoryFull(ws, room, player, msg.replaceSlotIndex);
         break;
@@ -2458,7 +2478,256 @@ export class LaCriptaServer {
       vfxStyle: 'gold',
     });
 
+    if (!activeRoom.playerShopChoices) {
+      activeRoom.playerShopChoices = {};
+    }
+    activeRoom.playerShopChoices[player.id] = {
+      choice: slot.id,
+      timestamp: Date.now(),
+    };
+    if (!activeRoom.readyToAdvancePlayerIds.includes(player.id)) {
+      activeRoom.readyToAdvancePlayerIds.push(player.id);
+    }
+
     this.emitVisualEventBatch(room, visualEvents, player.id, 'BUY_SHOP');
+    this.broadcastRoomState(room);
+  }
+
+  private handlePassShopChoice(
+    ws: WebSocket,
+    room: ServerCriptaRoom,
+    player: CriptaPlayer
+  ) {
+    if (!this.isInsideExploreOrBossPhase(room)) return;
+    if (room.expeditionDefeated) return;
+    const activeRoom = this.getActiveDungeonRoom(room);
+    if (!activeRoom || activeRoom.type !== 'SHOP') return;
+
+    if (!activeRoom.playerShopChoices) {
+      activeRoom.playerShopChoices = {};
+    }
+    activeRoom.playerShopChoices[player.id] = {
+      choice: 'PASS',
+      timestamp: Date.now(),
+    };
+    if (!activeRoom.readyToAdvancePlayerIds.includes(player.id)) {
+      activeRoom.readyToAdvancePlayerIds.push(player.id);
+    }
+
+    activeRoom.outcomeLog = `${player.name} decide no comprar nada y se prepara para continuar.`;
+    this.broadcastRoomState(room);
+  }
+
+  private handleTradeItem(
+    ws: WebSocket,
+    room: ServerCriptaRoom,
+    player: CriptaPlayer,
+    targetPlayerId: string,
+    slotIndex: number
+  ) {
+    if (player.isDead || player.hp <= 0) {
+      this.sendError(ws, 'Un aventurero caído no puede comerciar.');
+      return;
+    }
+    const target = room.players.find(
+      (p) => p.id === targetPlayerId && p.isConnected && !p.isDead
+    );
+    if (!target) {
+      this.sendError(ws, 'El aliado no está disponible para comerciar.');
+      return;
+    }
+    const inv = player.normalInventory || [];
+    if (slotIndex < 0 || slotIndex >= inv.length) {
+      this.sendError(ws, 'Objeto no válido en la mochila.');
+      return;
+    }
+    const targetInv = target.normalInventory || [];
+    if (targetInv.length >= NORMAL_INVENTORY_MAX_SLOTS) {
+      this.sendError(ws, `La mochila de ${target.name} está llena (máx. ${NORMAL_INVENTORY_MAX_SLOTS}).`);
+      return;
+    }
+    const itemToTrade = inv[slotIndex];
+    inv.splice(slotIndex, 1);
+    targetInv.push(itemToTrade);
+    player.normalInventory = inv;
+    target.normalInventory = targetInv;
+    const itemDef = CRIPTA_ITEMS_REGISTRY[itemToTrade];
+    const itemName = itemDef?.name || itemToTrade;
+    this.emitVisualEventBatch(
+      room,
+      [
+        {
+          id: `ev_trade_${Date.now()}`,
+          kind: 'LOOT_ITEM',
+          targetType: 'PLAYER',
+          targetId: target.id,
+          sourcePlayerId: player.id,
+          label: `✦ ${itemName.toUpperCase()}`,
+          sublabel: `ENTREGADO POR ${player.name.toUpperCase()}`,
+          color: '#5EA87A',
+          vfxStyle: 'holy',
+        },
+      ],
+      player.id,
+      'TRADE'
+    );
+    this.broadcastRoomState(room);
+  }
+
+  private handleTradeGold(
+    ws: WebSocket,
+    room: ServerCriptaRoom,
+    player: CriptaPlayer,
+    targetPlayerId: string,
+    amount: number
+  ) {
+    if (player.isDead || player.hp <= 0) {
+      this.sendError(ws, 'Un aventurero caído no puede compartir recursos.');
+      return;
+    }
+    const target = room.players.find(
+      (p) => p.id === targetPlayerId && p.isConnected && !p.isDead
+    );
+    if (!target) {
+      this.sendError(ws, 'El aliado no está disponible.');
+      return;
+    }
+    const shareAmt = Math.max(5, Math.min(50, amount || 10));
+    const currentGold = room.partyGold ?? 0;
+    if (currentGold < shareAmt) {
+      this.sendError(ws, `No hay suficiente oro común en la expedición (${shareAmt} ORO).`);
+      return;
+    }
+    this.emitVisualEventBatch(
+      room,
+      [
+        {
+          id: `ev_gold_share_${Date.now()}`,
+          kind: 'GAIN_GOLD',
+          targetType: 'PLAYER',
+          targetId: target.id,
+          sourcePlayerId: player.id,
+          value: shareAmt,
+          label: `✦ ${player.name.toUpperCase()} CEDE ${shareAmt} ORO`,
+          sublabel: `PARA COMPRAS DE ${target.name.toUpperCase()}`,
+          color: '#FFD166',
+          vfxStyle: 'gold',
+        },
+      ],
+      player.id,
+      'TRADE_GOLD'
+    );
+    this.broadcastRoomState(room);
+  }
+
+  private handleUpgradeAttribute(
+    ws: WebSocket,
+    room: ServerCriptaRoom,
+    player: CriptaPlayer,
+    attribute: 'attack' | 'defense' | 'magic' | 'agility' | 'precision' | 'willpower' | 'health'
+  ) {
+    if (player.isDead || player.hp <= 0) {
+      this.sendError(ws, 'Un aventurero caído no puede entrenar atributos.');
+      return;
+    }
+    const activeRoom = this.getActiveDungeonRoom(room);
+    if (
+      activeRoom &&
+      (activeRoom.type === 'COMBAT' ||
+        activeRoom.type === 'MINIBOSS' ||
+        activeRoom.type === 'BOSS') &&
+      !activeRoom.resolved
+    ) {
+      this.sendError(ws, 'No puedes entrenar atributos durante el combate activo.');
+      return;
+    }
+
+    let currentBonus = 0;
+    if (attribute === 'attack') currentBonus = player.bonusAttack || 0;
+    else if (attribute === 'defense') currentBonus = player.bonusDefense || 0;
+    else if (attribute === 'magic') currentBonus = player.bonusMagic || 0;
+    else if (attribute === 'agility') currentBonus = player.bonusAgility || 0;
+    else if (attribute === 'precision') currentBonus = player.bonusPrecision || 0;
+    else if (attribute === 'willpower') currentBonus = player.bonusWillpower || 0;
+    else if (attribute === 'health') {
+      currentBonus = Math.floor(Math.max(0, (player.maxHp - 100)) / 12);
+    }
+
+    const cost = 25 + currentBonus * 5;
+    const currentGold = room.partyGold ?? 0;
+    if (currentGold < cost) {
+      this.sendError(
+        ws,
+        `Oro insuficiente. Necesitas ${cost} ORO para mejorar este atributo.`
+      );
+      return;
+    }
+
+    room.partyGold = currentGold - cost;
+    if (!room.runStats) room.runStats = buildDefaultRunStats();
+    room.runStats.goldSpent += cost;
+
+    let statLabel = '';
+    let statColor = '#FFD166';
+    if (attribute === 'attack') {
+      player.bonusAttack = (player.bonusAttack || 0) + 1;
+      statLabel = '+1 ATAQUE';
+      statColor = '#FF7A33';
+    } else if (attribute === 'defense') {
+      player.bonusDefense = (player.bonusDefense || 0) + 1;
+      player.armor = Math.min(24, (player.armor || 0) + 1);
+      statLabel = '+1 DEFENSA';
+      statColor = '#38BDF8';
+    } else if (attribute === 'magic') {
+      player.bonusMagic = (player.bonusMagic || 0) + 1;
+      statLabel = '+1 MAGIA';
+      statColor = '#C084FC';
+    } else if (attribute === 'agility') {
+      player.bonusAgility = (player.bonusAgility || 0) + 1;
+      statLabel = '+1 AGILIDAD';
+      statColor = '#34D399';
+    } else if (attribute === 'precision') {
+      player.bonusPrecision = (player.bonusPrecision || 0) + 1;
+      statLabel = '+1 PRECISIÓN';
+      statColor = '#FBBF24';
+    } else if (attribute === 'willpower') {
+      player.bonusWillpower = (player.bonusWillpower || 0) + 1;
+      statLabel = '+1 VOLUNTAD';
+      statColor = '#EC4899';
+    } else if (attribute === 'health') {
+      player.maxHp = (player.maxHp || 100) + 12;
+      player.hp = Math.min(player.maxHp, player.hp + 12);
+      statLabel = '+12 VIDA MÁXIMA';
+      statColor = '#5EA87A';
+    }
+
+    this.emitVisualEventBatch(
+      room,
+      [
+        {
+          id: `ev_stat_cost_${Date.now()}`,
+          kind: 'LOSE_GOLD',
+          targetType: 'PARTY',
+          value: -cost,
+          label: `-${cost} ORO`,
+          color: '#E7A54A',
+          vfxStyle: 'gold',
+        },
+        {
+          id: `ev_stat_up_${Date.now()}`,
+          kind: 'GAIN_DEFENSE',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          value: 1,
+          label: `✦ ${statLabel}`,
+          sublabel: `ENTRENAMIENTO DE ATRIBUTO (${player.name.toUpperCase()})`,
+          color: statColor,
+          vfxStyle: 'holy',
+        },
+      ],
+      player.id,
+      'UPGRADE_STAT'
+    );
     this.broadcastRoomState(room);
   }
 
@@ -7696,12 +7965,56 @@ export class LaCriptaServer {
       return;
     }
 
-    // Allow SHOP, REST, and LOOT rooms to be exited once players choose to leave
+    // Enforce choicePolicy authoritatively
+    const activeAliveConnected = room.players.filter(
+      (p) => p.isConnected && !p.isDead && p.hp > 0
+    );
+
+    // 1. SHOP (REQUIRED_PER_PLAYER): EVERY ACTIVE PLAYER must choose exactly one option before continuing!
+    if (
+      activeRoom.choicePolicy === 'REQUIRED_PER_PLAYER' ||
+      activeRoom.type === 'SHOP'
+    ) {
+      const choices = activeRoom.playerShopChoices || {};
+      const allActiveChose = activeAliveConnected.every((p) =>
+        Boolean(choices[p.id])
+      );
+      if (!allActiveChose) {
+        this.logRejectedTransition(
+          room,
+          'ROOM_ADVANCE',
+          `Not all players made a shop choice (${Object.keys(choices).length}/${activeAliveConnected.length})`
+        );
+        return;
+      }
+    }
+
+    // 2. PUZZLE: Active puzzle mechanism must be completed or resolved before advancing
+    if (
+      activeRoom.type === 'PUZZLE' &&
+      activeRoom.minigame &&
+      !activeRoom.minigame.completed &&
+      !activeRoom.resolved
+    ) {
+      this.logRejectedTransition(
+        room,
+        'ROOM_ADVANCE',
+        'El mecanismo de la cámara de acertijo aún no ha sido resuelto.'
+      );
+      return;
+    }
+
+    // Allow rooms to be exited once resolved or if optional/free loot
     const canLeaveRoom =
       activeRoom.resolved ||
+      activeRoom.choicePolicy === 'OPTIONAL_PER_PLAYER' ||
+      activeRoom.choicePolicy === 'FREE_LOOT' ||
       activeRoom.type === 'SHOP' ||
       activeRoom.type === 'REST' ||
-      activeRoom.type === 'LOOT';
+      activeRoom.type === 'LOOT' ||
+      activeRoom.type === 'DECISION' ||
+      activeRoom.type === 'SHRINE' ||
+      activeRoom.type === 'SECRET';
 
     if (!canLeaveRoom) {
       this.logRejectedTransition(
