@@ -8,6 +8,7 @@ import {
 } from '../../types/laCripta';
 import { resolveEnemyVisualBlueprint } from '../../data/la-cripta/criptaBiomeBestiary';
 import { LaCriptaUniqueBiomeSpriteSvg } from './LaCriptaUniqueBiomeSpriteRenderer';
+import { ENEMY_VISUAL_REGISTRY } from './bestiary/LaCriptaBestiaryRegistry';
 
 const PRIMARY_AUTHORED_RIG_OWNER_SLUGS = new Set<string>([
   'guardian_de_la_cripta',
@@ -1217,9 +1218,7 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
     () => resolveEnemyVisualBlueprint(enemy, dungeonId),
     [enemy, dungeonId]
   );
-  const useUniqueBiomeRig = !PRIMARY_AUTHORED_RIG_OWNER_SLUGS.has(
-    uniqueBlueprint.slug
-  );
+  const useUniqueBiomeRig = true;
 
   const seed = useMemo(() => hashStringSeed(enemy.id || enemy.slug || 'e'), [
     enemy.id,
@@ -1599,20 +1598,21 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
     statusAppliedFlash,
   ]);
 
-  // Compute responsive display size with multi-enemy depth & relative creature scale
-  const baseStagePx = enemy.isFinalBoss
-    ? 276
+  // Compute responsive display size with multi-enemy depth & relative creature scale (Requirement 4)
+  const registryEntry = ENEMY_VISUAL_REGISTRY[uniqueBlueprint.id];
+  const authoredScale =
+    registryEntry?.scaleMultiplier ?? uniqueBlueprint.scaleFactor ?? 1.24;
+  const baseUnitPx = enemy.isFinalBoss
+    ? 176
     : enemy.isMiniboss || enemy.isBoss
-    ? 252
-    : enemy.isElite
-    ? 226
-    : 208;
+    ? 172
+    : 182;
   const crowdFactor =
-    totalVisibleEnemies >= 3 ? 0.72 : totalVisibleEnemies === 2 ? 0.86 : 1.0;
+    totalVisibleEnemies >= 3 ? 0.78 : totalVisibleEnemies === 2 ? 0.9 : 1.0;
   const depthScale =
-    totalVisibleEnemies > 1 && enemyIndex % 2 === 1 ? 0.93 : 1.0;
+    totalVisibleEnemies > 1 && enemyIndex % 2 === 1 ? 0.94 : 1.0;
   const computedSizePx = Math.round(
-    (customSizePx || baseStagePx * crowdFactor) * def.baseScale * depthScale
+    (customSizePx || baseUnitPx * authoredScale * crowdFactor) * depthScale
   );
 
   const pal = def.palette;
@@ -1655,22 +1655,26 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
             LAYER 1: GROUND ANCHOR SHADOW, BIOME RIM UNDERLIGHT & TARGET RING
             =================================================================== */}
         <g>
-          <rect
-            x={32 - Math.round(def.shadowWidth / 2)}
-            y="57"
-            width={def.shadowWidth}
-            height="3"
-            fill="#040307"
-            opacity="0.9"
-          />
-          <rect
-            x={32 - Math.round(def.shadowWidth / 2) + 3}
-            y="56"
-            width={def.shadowWidth - 6}
-            height="5"
-            fill="#07050C"
-            opacity="0.7"
-          />
+          {!useUniqueBiomeRig && (
+            <>
+              <rect
+                x={32 - Math.round(def.shadowWidth / 2)}
+                y="57"
+                width={def.shadowWidth}
+                height="3"
+                fill="#040307"
+                opacity="0.9"
+              />
+              <rect
+                x={32 - Math.round(def.shadowWidth / 2) + 3}
+                y="56"
+                width={def.shadowWidth - 6}
+                height="5"
+                fill="#07050C"
+                opacity="0.7"
+              />
+            </>
+          )}
           {/* Subtle Biome Rim Underlight */}
           <rect
             x={32 - Math.round(def.shadowWidth / 2) + 4}
@@ -1901,7 +1905,7 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
         {/* ===================================================================
             LAYER 3: ELITE / MINIBOSS / BOSS INSIGNIA & MANTLE ACCENTS
             =================================================================== */}
-        {!pose.isDeadCollapsed && (enemy.isMiniboss || enemy.isBoss) && (
+        {!useUniqueBiomeRig && !pose.isDeadCollapsed && (enemy.isMiniboss || enemy.isBoss) && (
           <g transform={`translate(${pose.headX}, ${pose.headY})`}>
             {/* High-detail Miniboss / Boss Iron-Gold Crest above helm */}
             <rect x="25" y="3" width="14" height="2" fill="#8F263D" />

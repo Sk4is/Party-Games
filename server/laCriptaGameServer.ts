@@ -2866,16 +2866,18 @@ export class LaCriptaServer {
           room.players.filter((p) => p.isConnected).length,
           room.seed + 777
         );
+        const phase2Boss = activeRoom.enemies.find((e) => e.isFinalBoss);
+        const phase2BossName = phase2Boss?.name || 'El Corazón Desatado';
         activeRoom.outcomeLog = `${logParts.join(
           ' '
-        )} ¡LAS CADENAS ANCESTRALES SE QUIEBRAN! Malkorath desata su FASE II e invoca una Esquirla del Corazón.`;
+        )} ¡LAS CADENAS ANCESTRALES SE QUIEBRAN! ${phase2BossName} desata su FASE II e invoca un guardián abisal.`;
 
         visualEvents.push({
           id: `ev_${ts}_boss_p2`,
           kind: 'BOSS_PHASE_TRANSITION',
           targetType: 'ROOM',
-          label: '¡FASE II: EL CORAZÓN DESATADO!',
-          sublabel: 'MALKORATH SE TRANSFORMA',
+          label: `¡FASE II: ${phase2BossName.toUpperCase()}!`,
+          sublabel: 'TRANSFORMACIÓN ABISAL COMPLETA',
           color: '#FFD166',
           vfxStyle: 'explosion',
         });

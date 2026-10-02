@@ -189,7 +189,11 @@ export type CriptaUniqueCreatureModelId =
   | 'ABISMO_PRIMER_CAIDO'
   | 'ABISMO_CORAZON_CRIPTAS'
   | 'FINAL_BOSS_SOBERANO_P1'
-  | 'FINAL_BOSS_SOBERANO_P2';
+  | 'FINAL_BOSS_SOBERANO_P2'
+  | 'FINAL_BOSS_OSSUARY_KING_P1'
+  | 'FINAL_BOSS_OSSUARY_KING_P2'
+  | 'FINAL_BOSS_ASTRAL_LEVIATHAN_P1'
+  | 'FINAL_BOSS_ASTRAL_LEVIATHAN_P2';
 
 export interface CriptaCreatureVisualBlueprint {
   id: CriptaUniqueCreatureModelId;
@@ -367,7 +371,11 @@ export interface CriptaCreatureVisualBlueprint {
     | 'BROKEN_WINGS_FIRST_FALLEN'
     | 'CHAINED_ABYSSAL_HEART'
     | 'SOVEREIGN_PHASE_1'
-    | 'SOVEREIGN_PHASE_2';
+    | 'SOVEREIGN_PHASE_2'
+    | 'OSSUARY_KING_PHASE_1'
+    | 'OSSUARY_KING_PHASE_2'
+    | 'ASTRAL_LEVIATHAN_PHASE_1'
+    | 'ASTRAL_LEVIATHAN_PHASE_2';
   palette: {
     primary: string;
     secondary: string;
@@ -1053,8 +1061,21 @@ function deriveProfessionAndVisualProfile(
       traitGroup,
     ] = spec;
     const traits = getTraitsByGroup(traitGroup);
+    const isLargeNormal =
+      tier === 'NORMAL' &&
+      (roleTag === 'TANK' ||
+        roleTag === 'BRUTE' ||
+        slug.includes('esqueleto_colosal') ||
+        slug.includes('guardian_de_coral') ||
+        slug.includes('automata_de_escoria'));
     const scaleFactor =
-      tier === 'MINIBOSS' ? 1.24 : tier === 'ELITE' ? 1.12 : 1.0;
+      tier === 'MINIBOSS'
+        ? 1.68
+        : tier === 'ELITE'
+        ? 1.42
+        : isLargeNormal
+        ? 1.34
+        : 1.22;
     const { profession, visualProfile } = deriveProfessionAndVisualProfile(
       slug,
       name,
@@ -1098,15 +1119,16 @@ function deriveProfessionAndVisualProfile(
   });
 });
 
-// Add Final Boss Phase 1 & Phase 2 blueprints
+// Add 3 Distinct Final Bosses (each with Phase 1 & Phase 2 blueprints)
 CRIPTA_BIOME_BESTIARY_BY_SLUG['soberano_del_umbral'] = {
   id: 'FINAL_BOSS_SOBERANO_P1',
   slug: 'soberano_del_umbral',
-  name: 'Malakor, Soberano del Umbral',
+  name: 'Malkorath, Soberano Encadenado',
   title: 'Monarca de los Tres Sellos · Fase I',
   dungeonId: 'el_abismo',
   tier: 'FINAL_BOSS',
   roleTag: 'BOSS',
+  profession: 'JEFE',
   silhouetteType: 'SOVEREIGN_PHASE_1',
   palette: {
     primary: '#9333EA',
@@ -1116,7 +1138,7 @@ CRIPTA_BIOME_BESTIARY_BY_SLUG['soberano_del_umbral'] = {
     metal: '#E2E8F0',
     dark: '#06040B',
   },
-  scaleFactor: 1.32,
+  scaleFactor: 1.98,
   idleCadence: 'RITUAL_PULSE',
   signatureMoveName: 'Juicio de las Tres Puertas',
   statusThreat: 'CURSE',
@@ -1128,10 +1150,11 @@ CRIPTA_BIOME_BESTIARY_BY_SLUG['soberano_del_umbral_p2'] = {
   id: 'FINAL_BOSS_SOBERANO_P2',
   slug: 'soberano_del_umbral_p2',
   name: 'El Corazón Desatado de la Cripta',
-  title: 'Forma Abisal Ascendida · Fase II',
+  title: 'Avatar del Eclipse Eterno · Fase II',
   dungeonId: 'el_abismo',
   tier: 'FINAL_BOSS',
   roleTag: 'BOSS',
+  profession: 'JEFE',
   silhouetteType: 'SOVEREIGN_PHASE_2',
   palette: {
     primary: '#E11D48',
@@ -1141,12 +1164,116 @@ CRIPTA_BIOME_BESTIARY_BY_SLUG['soberano_del_umbral_p2'] = {
     metal: '#F8FAFC',
     dark: '#05020A',
   },
-  scaleFactor: 1.38,
+  scaleFactor: 2.12,
   idleCadence: 'RITUAL_PULSE',
   signatureMoveName: 'Cataclismo del Eclipse Eterno',
   statusThreat: 'FEAR',
   weaknesses: W_HOLY_ARCANE,
   resistances: R_SLASH,
+};
+
+CRIPTA_BIOME_BESTIARY_BY_SLUG['rey_osario_primordial'] = {
+  id: 'FINAL_BOSS_OSSUARY_KING_P1',
+  slug: 'rey_osario_primordial',
+  name: 'Vexaris, Patriarca del Osario Eterno',
+  title: 'Soberano de las Mil Calaveras · Fase I',
+  dungeonId: 'cementerio_de_gigantes',
+  tier: 'FINAL_BOSS',
+  roleTag: 'BOSS',
+  profession: 'JEFE',
+  silhouetteType: 'OSSUARY_KING_PHASE_1',
+  palette: {
+    primary: '#E2E8F0',
+    secondary: '#14532D',
+    highlight: '#FBBF24',
+    eyeGlow: '#4ADE80',
+    metal: '#94A3B8',
+    dark: '#050806',
+  },
+  scaleFactor: 2.02,
+  idleCadence: 'HEAVY_BREATH',
+  signatureMoveName: 'Decreto de la Catedral de Hueso',
+  statusThreat: 'CURSE',
+  weaknesses: W_BLUNT_HOLY,
+  resistances: R_PIERCE_POISON,
+};
+
+CRIPTA_BIOME_BESTIARY_BY_SLUG['rey_osario_primordial_p2'] = {
+  id: 'FINAL_BOSS_OSSUARY_KING_P2',
+  slug: 'rey_osario_primordial_p2',
+  name: 'Behemoth de la Necrópolis Despierta',
+  title: 'Dragón-Coloso de Hueso y Ánima · Fase II',
+  dungeonId: 'cementerio_de_gigantes',
+  tier: 'FINAL_BOSS',
+  roleTag: 'BOSS',
+  profession: 'JEFE',
+  silhouetteType: 'OSSUARY_KING_PHASE_2',
+  palette: {
+    primary: '#F8FAFC',
+    secondary: '#064E3B',
+    highlight: '#A3E635',
+    eyeGlow: '#BEF264',
+    metal: '#CBD5E1',
+    dark: '#040906',
+  },
+  scaleFactor: 2.18,
+  idleCadence: 'HEAVY_BREATH',
+  signatureMoveName: 'Exhalación de las Cien Fosas',
+  statusThreat: 'POISON',
+  weaknesses: W_BLUNT_HOLY,
+  resistances: R_PIERCE_POISON,
+};
+
+CRIPTA_BIOME_BESTIARY_BY_SLUG['emperatriz_del_eclipse_carmesi'] = {
+  id: 'FINAL_BOSS_ASTRAL_LEVIATHAN_P1',
+  slug: 'emperatriz_del_eclipse_carmesi',
+  name: 'Nyxara, Arquitecta del Eclipse Carmesí',
+  title: 'Oráculo del Sol Devorado · Fase I',
+  dungeonId: 'torre_del_astrologo',
+  tier: 'FINAL_BOSS',
+  roleTag: 'BOSS',
+  profession: 'JEFE',
+  silhouetteType: 'ASTRAL_LEVIATHAN_PHASE_1',
+  palette: {
+    primary: '#BE123C',
+    secondary: '#1E1B4B',
+    highlight: '#FDE047',
+    eyeGlow: '#38BDF8',
+    metal: '#F59E0B',
+    dark: '#07040E',
+  },
+  scaleFactor: 1.98,
+  idleCadence: 'FLOAT_SWAY',
+  signatureMoveName: 'Alineación del Grial Sangriento',
+  statusThreat: 'BLEED',
+  weaknesses: W_PIERCE_SLASH,
+  resistances: R_ARCANE,
+};
+
+CRIPTA_BIOME_BESTIARY_BY_SLUG['emperatriz_del_eclipse_carmesi_p2'] = {
+  id: 'FINAL_BOSS_ASTRAL_LEVIATHAN_P2',
+  slug: 'emperatriz_del_eclipse_carmesi_p2',
+  name: 'Leviatán de la Corona Sangrienta',
+  title: 'Deidad del Horizonte Roto · Fase II',
+  dungeonId: 'santuario_de_sangre',
+  tier: 'FINAL_BOSS',
+  roleTag: 'BOSS',
+  profession: 'JEFE',
+  silhouetteType: 'ASTRAL_LEVIATHAN_PHASE_2',
+  palette: {
+    primary: '#F43F5E',
+    secondary: '#31102F',
+    highlight: '#FEF08A',
+    eyeGlow: '#67E8F9',
+    metal: '#FBBF24',
+    dark: '#08020A',
+  },
+  scaleFactor: 2.16,
+  idleCadence: 'FLOAT_SWAY',
+  signatureMoveName: 'Singularidad de Marea Roja',
+  statusThreat: 'CONFUSION',
+  weaknesses: W_PIERCE_SLASH,
+  resistances: R_ARCANE,
 };
 
 // Map legacy slugs from server DUNGEON_FLAVOR so any existing room state resolves to a unique creature
@@ -1317,7 +1444,7 @@ const LEGACY_SLUG_ALIAS_MAP: Record<string, string> = {
   portador_del_femur: 'titan_decapitado',
   titan_del_cementerio_antiguo: 'rey_del_osario',
   el_ultimo_titan_hueco: 'rey_del_osario',
-  // Abismo
+  // Abismo & Miniboss aliases
   heraldo_del_vacio_legacy: 'heraldo_del_vacio',
   heraldo_sin_forma: 'heraldo_del_vacio',
   sombra_abisal: 'sombra_devoradora',
@@ -1325,6 +1452,26 @@ const LEGACY_SLUG_ALIAS_MAP: Record<string, string> = {
   caballero_del_vacio: 'testigo_ciego',
   arquitecto_de_la_grieta: 'caballero_del_eclipse',
   senor_del_umbral_abisal: 'el_primer_caido',
+  el_que_duerme_abajo: 'corazon_de_la_cripta',
+  comandante_del_sepulcro: 'senor_del_osario',
+  reina_fungica_menor: 'matriarca_fungica',
+  forjador_maldito: 'titan_del_crisol',
+  capataz_de_la_veta: 'perforador_profundo',
+  gran_inquisidor_del_cadalso: 'el_gran_verdugo',
+  ciervo_de_las_almas: 'venado_de_la_corona_negra',
+  rey_de_la_cloaca: 'rey_de_las_ratas',
+  archivista_encadenado: 'censor_del_silencio',
+  pretor_de_quitina: 'reina_de_la_progenie',
+  arconte_prismatico: 'coloso_prismatico',
+  alcaide_de_las_cadenas: 'carcelero_eterno',
+  cardenal_carmesi: 'cardenal_desollado',
+  faraon_de_ceniza: 'faraon_sin_sol',
+  regente_del_reflejo: 'monarca_de_los_reflejos',
+  alfa_de_la_escarcha: 'behemoth_de_permafrost',
+  caudillo_rompehuesos: 'caudillo_corona_de_hierro',
+  titan_de_osario: 'coloso_de_femures',
+  heraldo_del_velo: 'el_primer_caido',
+  esquirla_del_vacio_chaman: 'fragmento_resonante',
 };
 
 function normalizeText(raw: string): string {
@@ -1371,13 +1518,31 @@ export function resolveEnemyVisualBlueprint(
   >,
   dungeonId?: CriptaDungeonId | null
 ): CriptaCreatureVisualBlueprint {
-  if (enemy.isFinalBoss || enemy.slug === 'soberano_del_umbral') {
+  const rawSlug = normalizeText(enemy.slug || '');
+  if (enemy.isFinalBoss) {
+    if (
+      rawSlug.includes('rey_osario') ||
+      rawSlug.includes('vexaris') ||
+      rawSlug.includes('necropolis')
+    ) {
+      return enemy.bossPhase === 2
+        ? CRIPTA_BIOME_BESTIARY_BY_SLUG['rey_osario_primordial_p2']
+        : CRIPTA_BIOME_BESTIARY_BY_SLUG['rey_osario_primordial'];
+    }
+    if (
+      rawSlug.includes('emperatriz') ||
+      rawSlug.includes('nyxara') ||
+      rawSlug.includes('corona_sangrienta')
+    ) {
+      return enemy.bossPhase === 2
+        ? CRIPTA_BIOME_BESTIARY_BY_SLUG['emperatriz_del_eclipse_carmesi_p2']
+        : CRIPTA_BIOME_BESTIARY_BY_SLUG['emperatriz_del_eclipse_carmesi'];
+    }
     return enemy.bossPhase === 2
       ? CRIPTA_BIOME_BESTIARY_BY_SLUG['soberano_del_umbral_p2']
       : CRIPTA_BIOME_BESTIARY_BY_SLUG['soberano_del_umbral'];
   }
 
-  const rawSlug = normalizeText(enemy.slug || '');
   if (CRIPTA_BIOME_BESTIARY_BY_SLUG[rawSlug]) {
     return CRIPTA_BIOME_BESTIARY_BY_SLUG[rawSlug];
   }

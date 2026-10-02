@@ -33,6 +33,7 @@ import {
   LaCriptaExitExpeditionModal,
   LaCriptaStatusCodexModal,
 } from './LaCriptaStatusEffectBadge';
+import { LaCriptaEnemyVisualQADebugModal } from './bestiary/LaCriptaEnemyVisualQADebugModal';
 import {
   LaCriptaDirectionalTravelOverlay,
   LaCriptaGoldCollectionOverlay,
@@ -156,6 +157,19 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
 
   const [selectedTargetEnemyId, setSelectedTargetEnemyId] = useState<string | null>(null);
   const [hoveredPreviewDungeonId, setHoveredPreviewDungeonId] = useState<string | null>(null);
+  const [showBestiaryQA, setShowBestiaryQA] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.altKey || (e.ctrlKey && e.shiftKey)) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setShowBestiaryQA((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const handleChangePlayerName = useCallback((nextName: string) => {
     setPlayerName(nextName);
@@ -467,6 +481,24 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
         onReturnToLobby={handleConfirmReturnToLobby}
         onReturnToMenu={handleConfirmReturnToMenu}
       />
+
+      {/* Development-Only Enemy Visual QA Debug Modal & Trigger */}
+      {import.meta.env.DEV && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowBestiaryQA(true)}
+            title="Abrir QA Visual del Bestiario (Alt+B)"
+            className="fixed bottom-2 left-2 z-[95] px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-[#120F1D]/90 hover:bg-[#1E1930] text-[#FFD166] border border-[#FFD166]/40 rounded shadow-lg"
+          >
+            Bestiario QA (166)
+          </button>
+          <LaCriptaEnemyVisualQADebugModal
+            isOpen={showBestiaryQA}
+            onClose={() => setShowBestiaryQA(false)}
+          />
+        </>
+      )}
 
       {/* Main Interactive Stage */}
       {(!expeditionState || expeditionState.phase === 'LOBBY') && (

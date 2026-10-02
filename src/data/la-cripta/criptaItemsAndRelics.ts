@@ -13,6 +13,7 @@ import type {
   CriptaRoomEnemy,
   CriptaRoomGroundDrop,
   CriptaShopSlot,
+  CriptaStatusEffectType,
   CriptaWeaponId,
   CriptaWeaponRuneId,
 } from '../../types/laCripta';
@@ -1038,6 +1039,158 @@ export function generateShopInventoryForRoom(
   return slots;
 }
 
+interface FinalBossCampaignSpec {
+  p1Slug: string;
+  p1Name: string;
+  p1Title: string;
+  p1Ability: string;
+  p1Status: CriptaStatusEffectType;
+  p1SecondaryStatus: CriptaStatusEffectType;
+  p1Accent: string;
+  roomTitle: string;
+  p1Subtitle: string;
+  p1Narrative: string;
+  p2Slug: string;
+  p2Name: string;
+  p2Title: string;
+  p2Ability: string;
+  p2Status: CriptaStatusEffectType;
+  p2SecondaryStatus: CriptaStatusEffectType;
+  p2Accent: string;
+  p2Subtitle: string;
+  p2Narrative: string;
+  p2Banner: string;
+  thrallSlug: string;
+  thrallName: string;
+  thrallTitle: string;
+  thrallAbility: string;
+  thrallStatus: CriptaStatusEffectType;
+  thrallAccent: string;
+}
+
+const FINAL_BOSS_CAMPAIGN_TRIO: FinalBossCampaignSpec[] = [
+  {
+    p1Slug: 'soberano_del_umbral',
+    p1Name: 'Malkorath, Soberano Encadenado',
+    p1Title: 'FASE I · GUARDIÁN DE LOS TRES SELLOS',
+    p1Ability: 'Cadenas de los Tres Sellos',
+    p1Status: 'CURSE',
+    p1SecondaryStatus: 'POISON',
+    p1Accent: '#E7A54A',
+    roomTitle: 'EL CORAZÓN DE LA CRIPTA',
+    p1Subtitle: 'SANTUARIO ABISAL FINAL · FASE I',
+    p1Narrative:
+      'Los tres sellos ancestrales convergen en el altar abisal. Malkorath despierta envuelto en cadenas rúnicas.',
+    p2Slug: 'soberano_del_umbral_p2',
+    p2Name: 'El Corazón Desatado de la Cripta',
+    p2Title: 'FASE II · AVATAR DEL ECLIPSE ETERNO',
+    p2Ability: 'Cataclismo del Eclipse (Ataque Grupal)',
+    p2Status: 'BURN',
+    p2SecondaryStatus: 'CONFUSION',
+    p2Accent: '#C93B5B',
+    p2Subtitle: 'EL CORAZÓN DESATADO · FASE II',
+    p2Narrative:
+      '¡LAS CADENAS SE ROMPEN! El Corazón de la Cripta abre sus seis alas abisales, invoca una Esquirla del Vacío y desata ataques grupales.',
+    p2Banner: 'FASE II: EL CORAZÓN DESATADO',
+    thrallSlug: 'fragmento_resonante',
+    thrallName: 'Esquirla del Corazón',
+    thrallTitle: 'CONDUCTO DE ENERGÍA ABISAL',
+    thrallAbility: 'Pulso de Miasma',
+    thrallStatus: 'POISON',
+    thrallAccent: '#9B72CF',
+  },
+  {
+    p1Slug: 'rey_osario_primordial',
+    p1Name: 'Vexaris, Patriarca del Osario Eterno',
+    p1Title: 'FASE I · SOBERANO DE LAS MIL CALAVERAS',
+    p1Ability: 'Decreto de la Catedral de Hueso',
+    p1Status: 'CURSE',
+    p1SecondaryStatus: 'BLEED',
+    p1Accent: '#4ADE80',
+    roomTitle: 'CATEDRAL DEL OSARIO PRIMORDIAL',
+    p1Subtitle: 'TRONO DE LAS MIL CALAVERAS · FASE I',
+    p1Narrative:
+      'Una catedral viviente de cráneos titánicos se alza del foso. Vexaris blande la Gran Guadaña de la Primera Dinastía entre fuegos de ánima.',
+    p2Slug: 'rey_osario_primordial_p2',
+    p2Name: 'Behemoth de la Necrópolis Despierta',
+    p2Title: 'FASE II · DRAGÓN-COLOSO DE HUESO Y ÁNIMA',
+    p2Ability: 'Exhalación de las Cien Fosas (Ataque Grupal)',
+    p2Status: 'POISON',
+    p2SecondaryStatus: 'WEAKENED',
+    p2Accent: '#A3E635',
+    p2Subtitle: 'LA NECRÓPOLIS DESPIERTA · FASE II',
+    p2Narrative:
+      '¡EL TRONO DE CRÁNEOS SE TRANSFORMA! Vexaris despliega alas de costillas colosales, despierta tres fauces dracónicas y convoca un Relicario de Médula.',
+    p2Banner: 'FASE II: BEHEMOTH DE LA NECRÓPOLIS',
+    thrallSlug: 'acolito_de_hueso',
+    thrallName: 'Relicario de Médula Real',
+    thrallTitle: 'TOTEM DE ÁNIMA NECRÓTICA',
+    thrallAbility: 'Plegaria de Médula',
+    thrallStatus: 'CURSE',
+    thrallAccent: '#4ADE80',
+  },
+  {
+    p1Slug: 'emperatriz_del_eclipse_carmesi',
+    p1Name: 'Nyxara, Arquitecta del Eclipse Carmesí',
+    p1Title: 'FASE I · ORÁCULO DEL SOL DEVORADO',
+    p1Ability: 'Alineación del Grial Sangriento',
+    p1Status: 'BLEED',
+    p1SecondaryStatus: 'CURSE',
+    p1Accent: '#F43F5E',
+    roomTitle: 'PLANETARIO DEL ECLIPSE CARMESÍ',
+    p1Subtitle: 'ALTAR DEL SOL DEVORADO · FASE I',
+    p1Narrative:
+      'Anillos de bronce celeste giran sobre un mar de sangre. Nyxara levita en el centro del astrolabio sosteniendo el Cáliz del Eclipse.',
+    p2Slug: 'emperatriz_del_eclipse_carmesi_p2',
+    p2Name: 'Leviatán de la Corona Sangrienta',
+    p2Title: 'FASE II · DEIDAD DEL HORIZONTE ROTO',
+    p2Ability: 'Singularidad de Marea Roja (Ataque Grupal)',
+    p2Status: 'CONFUSION',
+    p2SecondaryStatus: 'BLEED',
+    p2Accent: '#FB7185',
+    p2Subtitle: 'HORIZONTE DEL SOL DEVORADO · FASE II',
+    p2Narrative:
+      '¡EL ASTROLABIO SE FRACTURA EN MIL CUCHILLAS! Nyxara revela su forma de Leviatán Astral de múltiples ojos e invoca un Astrolabio de Sangre Viva.',
+    p2Banner: 'FASE II: LEVIATÁN DE LA CORONA SANGRIENTA',
+    thrallSlug: 'esfera_armilar',
+    thrallName: 'Astrolabio de Sangre Viva',
+    thrallTitle: 'SATÉLITE DE GRAVEDAD CARMESÍ',
+    thrallAbility: 'Curación Oscura Astral',
+    thrallStatus: 'CURSE',
+    thrallAccent: '#F59E0B',
+  },
+];
+
+function selectFinalBossSpec(
+  seed: number,
+  completedDungeonIds: CriptaDungeonId[] = []
+): FinalBossCampaignSpec {
+  const lastBiome = completedDungeonIds?.[completedDungeonIds.length - 1];
+  if (
+    lastBiome === 'catacumbas_del_rey' ||
+    lastBiome === 'cementerio_de_gigantes' ||
+    lastBiome === 'jardin_podrido' ||
+    lastBiome === 'alcantarillas_imperiales' ||
+    lastBiome === 'minas_abandonadas' ||
+    lastBiome === 'fortaleza_goblin'
+  ) {
+    return FINAL_BOSS_CAMPAIGN_TRIO[1];
+  }
+  if (
+    lastBiome === 'torre_del_astrologo' ||
+    lastBiome === 'santuario_de_sangre' ||
+    lastBiome === 'palacio_de_los_espejos' ||
+    lastBiome === 'cripta_de_cristal' ||
+    lastBiome === 'biblioteca_prohibida' ||
+    lastBiome === 'templo_sumergido' ||
+    lastBiome === 'ciudad_sepultada'
+  ) {
+    return FINAL_BOSS_CAMPAIGN_TRIO[2];
+  }
+  const idx = Math.abs(seed || 0) % FINAL_BOSS_CAMPAIGN_TRIO.length;
+  return FINAL_BOSS_CAMPAIGN_TRIO[idx];
+}
+
 /**
  * Builds the Climactic 2-Phase Final Boss Chamber after 3 doors are completed (Requirements 31–38).
  */
@@ -1050,12 +1203,13 @@ export function buildFinalBossChamber(
   const phase1Hp = Math.round(135 * partyScale);
 
   const primaryDungeonId = completedDungeonIds?.[2] || 'el_abismo';
+  const spec = selectFinalBossSpec(seed, completedDungeonIds);
 
   const bossPhase1Base: CriptaRoomEnemy = {
     id: `final_boss_core_${seed}`,
-    slug: 'soberano_del_umbral',
-    name: 'Malkorath, Soberano Encadenado',
-    title: 'FASE I · GUARDIÁN DE LOS TRES SELLOS',
+    slug: spec.p1Slug,
+    name: spec.p1Name,
+    title: spec.p1Title,
     isElite: true,
     isBoss: true,
     isFinalBoss: true,
@@ -1067,10 +1221,10 @@ export function buildFinalBossChamber(
     intent: 'MALDICIÓN',
     intentCategory: 'MAGIC',
     intentValue: 16,
-    accentColor: '#E7A54A',
-    statusThreat: 'CURSE',
-    statusSecondaryThreat: 'POISON',
-    abilityName: 'Cadenas de los Tres Sellos',
+    accentColor: spec.p1Accent,
+    statusThreat: spec.p1Status,
+    statusSecondaryThreat: spec.p1SecondaryStatus,
+    abilityName: spec.p1Ability,
     poisonStacks: 0,
     vulnerableTurns: 0,
     spriteArchetype: 'final_boss_phase1',
@@ -1096,10 +1250,9 @@ export function buildFinalBossChamber(
     visited: true,
     resolved: false,
     isFinalBossRoom: true,
-    title: 'EL CORAZÓN DE LA CRIPTA',
-    subtitle: 'SANTUARIO ABISAL FINAL · FASE I',
-    narrative:
-      'Los tres sellos ancestrales convergen en el altar abisal. Malkorath despierta envuelto en cadenas rúnicas.',
+    title: spec.roomTitle,
+    subtitle: spec.p1Subtitle,
+    narrative: spec.p1Narrative,
     outcomeLog: null,
     biomeVariant: 0,
     combatTurn: 1,
@@ -1130,15 +1283,20 @@ export function transformFinalBossToPhase2(
   const phase2Hp = Math.round(165 * partyScale);
   const shardHp = Math.round(42 * partyScale);
 
-  room.subtitle = 'EL CORAZÓN DESATADO · FASE II';
-  room.narrative =
-    '¡LAS CADENAS SE ROMPEN! El Corazón de la Cripta abre sus alas abisales, invoca una Esquirla del Vacío y desata ataques grupales.';
+  const currentBossSlug = room.enemies?.[0]?.slug || '';
+  const spec =
+    FINAL_BOSS_CAMPAIGN_TRIO.find(
+      (s) => s.p1Slug === currentBossSlug || s.p2Slug === currentBossSlug
+    ) || selectFinalBossSpec(seed, [room.dungeonId]);
+
+  room.subtitle = spec.p2Subtitle;
+  room.narrative = spec.p2Narrative;
 
   const bossPhase2Base: CriptaRoomEnemy = {
     id: `final_boss_core_${seed}`,
-    slug: 'corazon_de_la_cripta',
-    name: 'El Corazón Desatado de la Cripta',
-    title: 'FASE II · AVATAR DEL ECLIPSE ETERNO',
+    slug: spec.p2Slug,
+    name: spec.p2Name,
+    title: spec.p2Title,
     isElite: true,
     isBoss: true,
     isFinalBoss: true,
@@ -1150,10 +1308,10 @@ export function transformFinalBossToPhase2(
     intent: 'CATACLISMO',
     intentCategory: 'TELEGRAPH',
     intentValue: 19,
-    accentColor: '#C93B5B',
-    statusThreat: 'BURN',
-    statusSecondaryThreat: 'CONFUSION',
-    abilityName: 'Cataclismo del Eclipse (Ataque Grupal)',
+    accentColor: spec.p2Accent,
+    statusThreat: spec.p2Status,
+    statusSecondaryThreat: spec.p2SecondaryStatus,
+    abilityName: spec.p2Ability,
     poisonStacks: 0,
     vulnerableTurns: 1,
     spriteArchetype: 'final_boss_phase2',
@@ -1170,9 +1328,9 @@ export function transformFinalBossToPhase2(
 
   const voidShardBase: CriptaRoomEnemy = {
     id: `final_boss_shard_${seed}`,
-    slug: 'esquirla_del_vacio_chaman',
-    name: 'Esquirla del Corazón',
-    title: 'CONDUCTO DE ENERGÍA ABISAL',
+    slug: spec.thrallSlug,
+    name: spec.thrallName,
+    title: spec.thrallTitle,
     isElite: false,
     isBoss: false,
     hp: shardHp,
@@ -1182,9 +1340,9 @@ export function transformFinalBossToPhase2(
     intent: 'AFLICCIÓN',
     intentCategory: 'HEAL',
     intentValue: 11,
-    accentColor: '#9B72CF',
-    statusThreat: 'POISON',
-    abilityName: 'Pulso de Miasma',
+    accentColor: spec.thrallAccent,
+    statusThreat: spec.thrallStatus,
+    abilityName: spec.thrallAbility,
     poisonStacks: 0,
     vulnerableTurns: 0,
     spriteArchetype: 'crystal_sentinel',
@@ -1204,5 +1362,5 @@ export function transformFinalBossToPhase2(
   room.queuedPlayerActions = {};
   room.activeCombatActorId = null;
   room.activeTargetedPlayerIds = [];
-  room.combatBannerText = `RONDA ${room.combatTurn || 1} — FASE II: EL CORAZÓN DESATADO`;
+  room.combatBannerText = `RONDA ${room.combatTurn || 1} — ${spec.p2Banner}`;
 }

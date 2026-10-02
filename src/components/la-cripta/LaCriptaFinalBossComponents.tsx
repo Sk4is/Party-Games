@@ -374,7 +374,10 @@ export const LaCriptaDungeonCompletionBanner: React.FC<{
 /**
  * Dramatic Boss Phase 1 -> Phase 2 Transformation Banner (Requirements 32 & 33).
  */
-export const LaCriptaBossPhaseTransitionBanner: React.FC = () => {
+export const LaCriptaBossPhaseTransitionBanner: React.FC<{
+  bossName?: string;
+  bossTitle?: string;
+}> = ({ bossName, bossTitle }) => {
   return (
     <div className="pointer-events-none absolute inset-0 z-40 bg-[#0B0409]/90 flex flex-col items-center justify-center p-4 text-center animate-cripta-crit-pop">
       <svg width="72" height="72" viewBox="0 0 24 24" shapeRendering="crispEdges">
@@ -389,10 +392,12 @@ export const LaCriptaBossPhaseTransitionBanner: React.FC = () => {
         ✦ LAS CADENAS ANCESTRALES SE QUIEBRAN ✦
       </div>
       <div className="font-cripta-display text-2xl sm:text-4xl font-black tracking-widest text-[#FFD166] uppercase mt-1">
-        FASE II · EL CORAZÓN DESATADO
+        {bossName ? `FASE II · ${bossName.toUpperCase()}` : 'FASE II · EL CORAZÓN DESATADO'}
       </div>
       <p className="mt-1 text-xs font-cripta-pixel text-[#D9D0BC] max-w-md">
-        Malkorath libera su forma abisal, invoca una Esquirla del Corazón y prepara ataques contra todo el grupo.
+        {bossTitle
+          ? `${bossTitle} desata su forma definitiva, invoca refuerzos del abismo y prepara ataques contra todo el grupo.`
+          : 'El Soberano Final libera su forma abisal, invoca refuerzos del Corazón y prepara ataques contra todo el grupo.'}
       </p>
     </div>
   );
