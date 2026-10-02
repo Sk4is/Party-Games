@@ -257,6 +257,198 @@ for (const charId of ALL_CRIPTA_CHARACTER_IDS) {
   );
 }
 
+// 6. Direct WebSocket SELECT_CHARACTER Handler Tests
+console.log('\n--- Testing Direct WebSocket SELECT_CHARACTER Handler ---');
+
+class MockWebSocket {
+  public readyState = 1; // WebSocket.OPEN
+  public sentMessages: any[] = [];
+
+  send(data: string) {
+    try {
+      this.sentMessages.push(JSON.parse(data));
+    } catch {
+      this.sentMessages.push(data);
+    }
+  }
+}
+
+// Test selecting each of the 9 characters through handleClientMessage
+for (const charId of ALL_CRIPTA_CHARACTER_IDS) {
+  const testServer = new LaCriptaServer();
+  const testRoom = testServer.createRoomDirect({
+    id: `player_ws_${charId}`,
+    name: `Player_${charId}`,
+    avatar: '🕯️',
+    color: '#E7A54A',
+  });
+
+  const mockWs = new MockWebSocket() as any;
+  (testServer as any).clients.set(mockWs, {
+    ws: mockWs,
+    playerId: `player_ws_${charId}`,
+    roomCode: testRoom.roomCode,
+    isAlive: true,
+  });
+
+  testServer.handleClientMessage(mockWs, {
+    type: 'SELECT_CHARACTER',
+    characterId: charId,
+  });
+
+  const liveRoom = (testServer as any).rooms.get(testRoom.roomCode);
+  const updatedPlayer = liveRoom?.players.find((p: any) => p.id === `player_ws_${charId}`);
+  assert(
+    updatedPlayer?.characterId === charId,
+    `WebSocket SELECT_CHARACTER for '${charId}' sets player.characterId to '${charId}'`
+  );
+  assert(
+    liveRoom?.selectedCharacters[`player_ws_${charId}`] === charId,
+    `WebSocket SELECT_CHARACTER for '${charId}' updates room.selectedCharacters`
+  );
+  assert(
+    updatedPlayer?.hp === CRIPTA_CHARACTERS_CATALOG[charId].maxHp,
+    `WebSocket SELECT_CHARACTER for '${charId}' initializes HP (${updatedPlayer?.hp}/${CRIPTA_CHARACTERS_CATALOG[charId].maxHp})`
+  );
+
+  // Check that broadcast happened and no error was sent
+  const lastError = mockWs.sentMessages.find((m: any) => m.type === 'ERROR');
+  assert(!lastError, `No error returned when selecting '${charId}'`);
+}
+
+// Test unknown character rejection
+{
+  const testServer = new LaCriptaServer();
+  const testRoom = testServer.createRoomDirect({
+    id: 'player_ws_invalid',
+    name: 'Player_Invalid',
+    avatar: '🕯️',
+    color: '#E7A54A',
+  });
+
+  const mockWs = new MockWebSocket() as any;
+  (testServer as any).clients.set(mockWs, {
+    ws: mockWs,
+    playerId: 'player_ws_invalid',
+    roomCode: testRoom.roomCode,
+    isAlive: true,
+  });
+
+  testServer.handleClientMessage(mockWs, {
+    type: 'SELECT_CHARACTER',
+    characterId: 'unknown_character' as any,
+  });
+
+  const errorMsg = mockWs.sentMessages.find((m: any) => m.type === 'ERROR');
+  assert(Boolean(errorMsg), `Rejection error sent for 'unknown_character'`);
+  assert(
+    errorMsg?.code === 'INVALID_CHARACTER',
+    `Error code is 'INVALID_CHARACTER' (got: ${errorMsg?.code})`
+  );
+  assert(
+    errorMsg?.message === 'Ese aventurero no existe en La Cripta.',
+    `Error message matches 'Ese aventurero no existe en La Cripta.'`
+  );
+}
+
+// Test duplicate character selection rejection
+{
+  const testServer = new LaCriptaServer();
+  const testRoom = testServer.createRoomDirect({
+    id: 'player_1',
+    name: 'Player_1',
+    avatar: '🕯️',
+    color: '#E7A54A',
+  });
+
+  const liveRoom = (testServer as any).rooms.get(testRoom.roomCode);
+
+  // Add second player to room
+  liveRoom.players.push({
+    id: 'player_2',
+    name: 'Player_2',
+    avatar: '⚔️',
+    color: '#38BDF8',
+    seatIndex: 1,
+    isHost: false,
+    isConnected: true,
+    isDead: false,
+    hp: 0,
+    maxHp: 0,
+    armor: 0,
+    characterId: null,
+    selectedCharacterId: null,
+    agility: 0,
+    precision: 0,
+    willpower: 0,
+    bonusAttack: 0,
+    bonusDefense: 0,
+    bonusMagic: 0,
+    bonusAgility: 0,
+    bonusPrecision: 0,
+    bonusWillpower: 0,
+    classResource: 0,
+    maxClassResource: 0,
+    classResourceKind: null,
+    equippedWeaponId: null,
+    weaponUpgradeLevel: 1,
+    equippedWeaponRuneId: null,
+    ownedWeaponRunes: [],
+    weaponSpecialCooldown: 0,
+    abilityCooldowns: {},
+    basicAttackUsedThisTurn: false,
+    learnedTechniqueIds: [],
+    equippedArmorId: null,
+    equippedAccessoryId: null,
+    normalInventory: [],
+    personalRelics: [],
+    pendingInventoryReplacement: null,
+    inventoryItems: [],
+    statuses: [],
+    deathsCount: 0,
+  });
+
+  const wsPlayer1 = new MockWebSocket() as any;
+  const wsPlayer2 = new MockWebSocket() as any;
+  (testServer as any).clients.set(wsPlayer1, {
+    ws: wsPlayer1,
+    playerId: 'player_1',
+    roomCode: testRoom.roomCode,
+    isAlive: true,
+  });
+  (testServer as any).clients.set(wsPlayer2, {
+    ws: wsPlayer2,
+    playerId: 'player_2',
+    roomCode: testRoom.roomCode,
+    isAlive: true,
+  });
+
+  // Player 1 selects barbaro
+  testServer.handleClientMessage(wsPlayer1, {
+    type: 'SELECT_CHARACTER',
+    characterId: 'barbaro',
+  });
+  assert(
+    liveRoom.players[0].characterId === 'barbaro',
+    'Player 1 successfully selected barbaro'
+  );
+
+  // Player 2 attempts to select barbaro
+  testServer.handleClientMessage(wsPlayer2, {
+    type: 'SELECT_CHARACTER',
+    characterId: 'barbaro',
+  });
+  const dupError = wsPlayer2.sentMessages.find((m: any) => m.type === 'ERROR');
+  assert(
+    dupError?.code === 'CHARACTER_ALREADY_OCCUPIED',
+    `Duplicate selection returns 'CHARACTER_ALREADY_OCCUPIED' (got: ${dupError?.code})`
+  );
+  assert(
+    liveRoom.players[1].characterId === null,
+    'Player 2 characterId remains null after duplicate rejection'
+  );
+}
+
 console.log('\n============================================================');
 console.log(`[RESULTS] Total: ${totalTests} | Passed: ${passedTests} | Failed: ${failedTests}`);
 console.log('============================================================\n');

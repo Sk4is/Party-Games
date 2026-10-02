@@ -643,13 +643,24 @@ export class LaCriptaServer {
     }
   }
 
-  private sendError(ws: WebSocket, message: string) {
+  public sendError(
+    ws: WebSocket,
+    message: string,
+    code?: string,
+    extra?: Record<string, unknown>
+  ) {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'ERROR', message } satisfies CriptaServerMessage));
+      const payload: CriptaServerMessage = {
+        type: 'ERROR',
+        message,
+        ...(code ? { code } : {}),
+        ...(extra || {}),
+      };
+      ws.send(JSON.stringify(payload));
     }
   }
 
-  private handleClientMessage(ws: WebSocket, msg: CriptaClientMessage) {
+  public handleClientMessage(ws: WebSocket, msg: CriptaClientMessage) {
     if (!msg || typeof msg.type !== 'string') return;
 
     if (msg.type === 'PING') {
@@ -783,19 +794,30 @@ export class LaCriptaServer {
           return;
         }
 
-        const charId = normalizeCriptaCharacterId(msg.characterId);
-        if (!charId || !ALL_CRIPTA_CHARACTER_IDS.includes(charId)) {
+        const rawCharacterId = msg.characterId;
+        const normalizedCharacterId = normalizeCriptaCharacterId(rawCharacterId);
+        const isValid = Boolean(
+          normalizedCharacterId && ALL_CRIPTA_CHARACTER_IDS.includes(normalizedCharacterId)
+        );
+
+        if (!isValid || !normalizedCharacterId) {
           console.warn(
-            `[LaCripta] Invalid characterId requested: ${JSON.stringify(msg.characterId)} | Available: ${ALL_CRIPTA_CHARACTER_IDS.join(', ')}`
+            `[LaCripta][SELECT_CHARACTER_REJECTED]\nrawCharacterId=${rawCharacterId}\nnormalizedCharacterId=${normalizedCharacterId}\nvalidIds=[${ALL_CRIPTA_CHARACTER_IDS.join(',')}]`
           );
-          this.sendError(ws, 'Ese aventurero no existe en La Cripta.');
+          this.sendError(
+            ws,
+            'Ese aventurero no existe en La Cripta.',
+            'INVALID_CHARACTER',
+            { characterId: String(rawCharacterId || '') }
+          );
           return;
         }
 
         console.log(
-          `[LaCripta] Character selected: ${charId.toUpperCase()} by player ${player.name} (${player.id})`
+          `[LaCripta][SELECT_CHARACTER]\nroomCode=${room.roomCode}\nplayerId=${player.id}\nrawCharacterId=${rawCharacterId}\nnormalizedCharacterId=${normalizedCharacterId}\nregistryExists=true`
         );
 
+        const charId = normalizedCharacterId;
 
         // Authoritative exclusivity check: no two players can occupy the same character
         const occupiedByOther = room.players.find(
@@ -805,7 +827,9 @@ export class LaCriptaServer {
           const charDef = CRIPTA_CHARACTERS_CATALOG[charId];
           this.sendError(
             ws,
-            `${charDef.className} ya está ocupado por ${occupiedByOther.name}.`
+            `${charDef.className} ya está ocupado por ${occupiedByOther.name}.`,
+            'CHARACTER_ALREADY_OCCUPIED',
+            { characterId: charId, occupiedBy: occupiedByOther.name }
           );
           // Send authoritative state so client stays in sync
           if (ws.readyState === WebSocket.OPEN) {

@@ -2212,6 +2212,9 @@ export type CriptaServerMessage =
   | {
       type: 'ERROR';
       message: string;
+      code?: string;
+      characterId?: string;
+      [key: string]: unknown;
     }
   | {
       type: 'PONG';
