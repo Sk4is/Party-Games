@@ -32,6 +32,9 @@ export const STARTER_WEAPON_BY_CLASS: Record<CriptaCharacterId, CriptaWeaponId> 
   cazador: 'arco_cazador',
   clerigo: 'maza_consagrada',
   alquimista: 'lanzador_alquimico',
+  barbaro: 'gran_hacha_barbara',
+  bardo: 'laud_resonancia_arcana',
+  nigromante: 'guadana_de_hueso',
 };
 
 export const STARTER_RUNE_BY_CLASS: Record<CriptaCharacterId, CriptaWeaponRuneId> = {
@@ -41,6 +44,9 @@ export const STARTER_RUNE_BY_CLASS: Record<CriptaCharacterId, CriptaWeaponRuneId
   cazador: 'runa_escarcha_permafrost',
   clerigo: 'runa_luz_consagrada',
   alquimista: 'runa_vacio_umbrio',
+  barbaro: 'runa_aguja_perforante',
+  bardo: 'runa_resonancia_astral',
+  nigromante: 'runa_vacio_umbrio',
 };
 
 export const ALL_WEAPON_RUNE_IDS: CriptaWeaponRuneId[] = [
@@ -826,6 +832,280 @@ export const CRIPTA_WEAPONS_REGISTRY: Record<CriptaWeaponId, CriptaWeaponDefinit
     basePriceGold: 94,
     accentColor: '#80FF72',
   },
+  gran_hacha_barbara: {
+    id: 'gran_hacha_barbara',
+    name: 'Gran Hacha de Guerra Bárbara',
+    family: 'AXE',
+    rarity: 'COMMON',
+    preferredClasses: ['barbaro'],
+    scalingStat: 'ATAQUE',
+    baseDamageType: 'FISICO',
+    secondaryDamageType: 'CONTUNDENTE',
+    weaponArchetypeLabel: 'Gran Hacha de Dos Manos',
+    baseMinDamage: 7,
+    baseMaxDamage: 10,
+    bonusAttack: 2,
+    bonusWillpower: 1,
+    critBonusPct: 6,
+    onHitStatus: 'BLEED',
+    specialEffectText: '+2 ATAQUE, +1 VOLUNTAD. Genera +20 Furia y fractura armaduras al impactar.',
+    specialAttack: {
+      id: 'tajo_desgarrador_furia',
+      name: 'Tajo Desgarrador',
+      description: 'Barrido salvaje a 2 enemigos que perfora 3 de DEF, aplica Sangrado y genera +20 Furia.',
+      category: 'ATTACK',
+      dealsDamage: true,
+      targetRule: 'CLEAVE_2',
+      cooldownRounds: 2,
+      damageMultiplier: 1.15,
+      armorPierce: 3,
+      armorBreak: 2,
+      appliesStatus: 'BLEED',
+    },
+    basePriceGold: 46,
+    accentColor: '#D94E34',
+  },
+  mazo_colosal_rompecraneos: {
+    id: 'mazo_colosal_rompecraneos',
+    name: 'Mazo Colosal Rompecráneos',
+    family: 'MACE',
+    rarity: 'RARE',
+    preferredClasses: ['barbaro', 'caballero'],
+    scalingStat: 'ATAQUE',
+    baseDamageType: 'CONTUNDENTE',
+    secondaryDamageType: 'FISICO',
+    weaponArchetypeLabel: 'Martillo de Guerra Colosal',
+    baseMinDamage: 9,
+    baseMaxDamage: 13,
+    bonusAttack: 3,
+    bonusDefense: 1,
+    bonusWillpower: 1,
+    armorPierceBonus: 3,
+    onHitStatus: 'VULNERABLE',
+    specialEffectText: '+3 ATAQUE, +1 DEFENSA, +3 Penetración de Armadura. Demuele corazas pesadas.',
+    specialAttack: {
+      id: 'impacto_rompecraneos',
+      name: 'Impacto Rompecráneos',
+      description: 'Golpe sísmico que ignora 5 de DEF, destruye 4 de Armadura y aplica Vulnerable.',
+      category: 'ATTACK',
+      dealsDamage: true,
+      targetRule: 'SINGLE',
+      cooldownRounds: 2,
+      damageMultiplier: 1.35,
+      armorPierce: 5,
+      armorBreak: 4,
+      appliesStatus: 'VULNERABLE',
+    },
+    basePriceGold: 86,
+    accentColor: '#E76F38',
+  },
+  laud_resonancia_arcana: {
+    id: 'laud_resonancia_arcana',
+    name: 'Laúd Resonador de Bronce',
+    family: 'INSTRUMENT',
+    rarity: 'COMMON',
+    preferredClasses: ['bardo'],
+    scalingStat: 'MAGIA',
+    secondaryScalingStat: 'VOLUNTAD',
+    baseDamageType: 'ASTRAL',
+    secondaryDamageType: 'MAGICO',
+    weaponArchetypeLabel: 'Instrumento Arcano',
+    baseMinDamage: 5,
+    baseMaxDamage: 8,
+    bonusMagic: 2,
+    bonusAgility: 2,
+    bonusWillpower: 1,
+    healBoostPct: 15,
+    onHitStatus: 'WEAKENED',
+    specialEffectText: '+2 MAGIA, +2 AGILIDAD, +1 VOLUNTAD. Sus acordes debilitan enemigos e inspiran al grupo.',
+    specialAttack: {
+      id: 'acorde_de_cadencia',
+      name: 'Acorde de Cadencia',
+      description: 'Onda armónica a todos los enemigos que aplica Debilitado y otorga +4 Escudo al grupo.',
+      category: 'BUFF',
+      dealsDamage: true,
+      targetRule: 'ALL_ENEMIES',
+      cooldownRounds: 2,
+      damageMultiplier: 0.92,
+      appliesStatus: 'WEAKENED',
+      partyShieldBase: 4,
+      partyHealBase: 5,
+    },
+    basePriceGold: 46,
+    accentColor: '#38B2AC',
+  },
+  viola_del_eclipse: {
+    id: 'viola_del_eclipse',
+    name: 'Viola del Eclipse Astral',
+    family: 'INSTRUMENT',
+    rarity: 'LEGENDARY',
+    preferredClasses: ['bardo', 'mago'],
+    scalingStat: 'MAGIA',
+    secondaryScalingStat: 'PRECISION',
+    baseDamageType: 'ASTRAL',
+    secondaryDamageType: 'SOMBRA',
+    weaponArchetypeLabel: 'Reliquia Sinfónica',
+    baseMinDamage: 7,
+    baseMaxDamage: 11,
+    bonusMagic: 3,
+    bonusAgility: 2,
+    bonusPrecision: 2,
+    bonusWillpower: 2,
+    critBonusPct: 12,
+    healBoostPct: 20,
+    onHitStatus: 'VULNERABLE',
+    specialEffectText: '+3 MAGIA, +2 AGILIDAD, +2 PRECISIÓN, +2 VOLUNTAD. Cada acorde resuena con crítica astral.',
+    specialAttack: {
+      id: 'sinfonia_del_eclipse',
+      name: 'Sinfonía del Eclipse',
+      description: 'Desata un crescendo astral sobre todos los enemigos (+Vulnerable) y cura +9 PV al grupo.',
+      category: 'ATTACK',
+      dealsDamage: true,
+      targetRule: 'ALL_ENEMIES',
+      cooldownRounds: 3,
+      damageMultiplier: 1.08,
+      appliesStatus: 'VULNERABLE',
+      partyHealBase: 9,
+      partyShieldBase: 5,
+    },
+    basePriceGold: 94,
+    accentColor: '#81E6D9',
+  },
+  guadana_de_hueso: {
+    id: 'guadana_de_hueso',
+    name: 'Guadaña de Hueso Sepulcral',
+    family: 'SCYTHE',
+    rarity: 'COMMON',
+    preferredClasses: ['nigromante'],
+    scalingStat: 'MAGIA',
+    secondaryScalingStat: 'VOLUNTAD',
+    baseDamageType: 'SOMBRA',
+    secondaryDamageType: 'FISICO',
+    weaponArchetypeLabel: 'Guadaña de Osario',
+    baseMinDamage: 6,
+    baseMaxDamage: 9,
+    bonusMagic: 2,
+    bonusWillpower: 2,
+    onHitStatus: 'CURSE',
+    specialEffectText: '+2 MAGIA, +2 VOLUNTAD. Aplica Maldición al golpear y drena vitalidad para su portador.',
+    specialAttack: {
+      id: 'siega_de_almas',
+      name: 'Siega de Almas',
+      description: 'Tajo sombrío sobre 2 enemigos que aplica Maldición, drena 35% de vida y cosecha Esencia.',
+      category: 'ATTACK',
+      dealsDamage: true,
+      targetRule: 'CLEAVE_2',
+      cooldownRounds: 2,
+      damageMultiplier: 1.08,
+      appliesStatus: 'CURSE',
+      lifestealFraction: 0.35,
+      bonusVsDebuffedPct: 25,
+    },
+    basePriceGold: 46,
+    accentColor: '#68D391',
+  },
+  grimorio_sepulcral: {
+    id: 'grimorio_sepulcral',
+    name: 'Códice de Ceniza y Almas',
+    family: 'RELIC_TOME',
+    rarity: 'LEGENDARY',
+    preferredClasses: ['nigromante', 'mago', 'clerigo'],
+    scalingStat: 'MAGIA',
+    secondaryScalingStat: 'VOLUNTAD',
+    baseDamageType: 'SOMBRA',
+    secondaryDamageType: 'ASTRAL',
+    weaponArchetypeLabel: 'Grimorio Necrótico',
+    baseMinDamage: 8,
+    baseMaxDamage: 12,
+    bonusMagic: 3,
+    bonusWillpower: 3,
+    bonusPrecision: 1,
+    healBoostPct: 20,
+    onHitStatus: 'CORROSION',
+    specialEffectText: '+3 MAGIA, +3 VOLUNTAD. Sus salmos oscuros corroen defensas y convierten el dolor en escudo.',
+    specialAttack: {
+      id: 'requiem_del_osario',
+      name: 'Réquiem del Osario',
+      description: 'Maldice y corroe a todos los enemigos, drenando salud para restaurar +8 PV al grupo.',
+      category: 'DEBUFF',
+      dealsDamage: true,
+      targetRule: 'ALL_ENEMIES',
+      cooldownRounds: 3,
+      damageMultiplier: 1.05,
+      appliesStatus: 'CURSE',
+      armorBreak: 3,
+      partyHealBase: 8,
+    },
+    basePriceGold: 95,
+    accentColor: '#9B72CF',
+  },
+  espada_bastarda_real: {
+    id: 'espada_bastarda_real',
+    name: 'Espada Bastarda del Juramento',
+    family: 'SWORD',
+    rarity: 'RARE',
+    preferredClasses: ['caballero', 'barbaro'],
+    scalingStat: 'ATAQUE',
+    baseDamageType: 'FISICO',
+    secondaryDamageType: 'SAGRADO',
+    weaponArchetypeLabel: 'Espada Bastarda Templada',
+    baseMinDamage: 8,
+    baseMaxDamage: 11,
+    bonusAttack: 2,
+    bonusDefense: 2,
+    bonusWillpower: 2,
+    specialEffectText: '+2 ATAQUE, +2 DEFENSA, +2 VOLUNTAD. Otorga Escudo al grupo al ejecutar su técnica.',
+    specialAttack: {
+      id: 'sentencia_del_juramento',
+      name: 'Sentencia del Juramento',
+      description: 'Tajo consagrado que quiebra 3 de DEF enemiga y otorga +5 Escudo a todo el grupo.',
+      category: 'ATTACK',
+      dealsDamage: true,
+      targetRule: 'CLEAVE_2',
+      cooldownRounds: 2,
+      damageMultiplier: 1.12,
+      armorBreak: 3,
+      partyShieldBase: 5,
+    },
+    basePriceGold: 80,
+    accentColor: '#FFD166',
+  },
+  dagas_sombra_nocturna: {
+    id: 'dagas_sombra_nocturna',
+    name: 'Colmillos de Sombra Nocturna',
+    family: 'DAGGER',
+    rarity: 'RARE',
+    preferredClasses: ['picaro', 'cazador', 'bardo'],
+    scalingStat: 'ATAQUE',
+    secondaryScalingStat: 'AGILIDAD',
+    baseDamageType: 'PERFORANTE',
+    secondaryDamageType: 'SOMBRA',
+    weaponArchetypeLabel: 'Dagas de Asesino',
+    baseMinDamage: 7,
+    baseMaxDamage: 10,
+    bonusAttack: 2,
+    bonusAgility: 3,
+    bonusPrecision: 3,
+    critBonusPct: 16,
+    onHitStatus: 'BLEED',
+    onCritStatus: 'VULNERABLE',
+    specialEffectText: '+2 ATAQUE, +3 AGILIDAD, +3 PRECISIÓN, +16% Crítico. +30% daño contra enemigos con estados.',
+    specialAttack: {
+      id: 'danza_de_penumbra',
+      name: 'Danza de Penumbra',
+      description: 'Asalto relámpago que ignora 4 de DEF, aplica Sangrado y Vulnerable (+30% vs debilitados).',
+      category: 'ATTACK',
+      dealsDamage: true,
+      targetRule: 'SINGLE',
+      cooldownRounds: 2,
+      damageMultiplier: 1.28,
+      armorPierce: 4,
+      appliesStatus: 'BLEED',
+      bonusVsDebuffedPct: 30,
+    },
+    basePriceGold: 84,
+    accentColor: '#C93B5B',
+  },
 };
 
 export const CRIPTA_ARMORS_REGISTRY: Record<CriptaArmorId, CriptaArmorDefinition> = {
@@ -835,7 +1115,8 @@ export const CRIPTA_ARMORS_REGISTRY: Record<CriptaArmorId, CriptaArmorDefinition
     rarity: 'COMMON',
     bonusDefense: 1,
     bonusMaxHp: 4,
-    specialEffectText: '+1 DEFENSA y +4 VIDA MÁX.',
+    bonusAgility: 1,
+    specialEffectText: '+1 DEFENSA, +1 AGILIDAD y +4 VIDA MÁX.',
     basePriceGold: 32,
   },
   cota_de_malla_cripta: {
@@ -844,7 +1125,8 @@ export const CRIPTA_ARMORS_REGISTRY: Record<CriptaArmorId, CriptaArmorDefinition
     rarity: 'UNCOMMON',
     bonusDefense: 2,
     bonusMaxHp: 6,
-    specialEffectText: '+2 DEFENSA y +6 VIDA MÁX.',
+    bonusWillpower: 1,
+    specialEffectText: '+2 DEFENSA, +1 VOLUNTAD y +6 VIDA MÁX.',
     basePriceGold: 54,
   },
   coraza_del_sepulturero: {
@@ -853,8 +1135,9 @@ export const CRIPTA_ARMORS_REGISTRY: Record<CriptaArmorId, CriptaArmorDefinition
     rarity: 'RARE',
     bonusDefense: 2,
     bonusMaxHp: 8,
+    bonusWillpower: 2,
     statusResistance: 'CURSE',
-    specialEffectText: '+2 DEFENSA, +8 VIDA MÁX. Reduce MALDICIÓN en 1 turno.',
+    specialEffectText: '+2 DEFENSA, +2 VOLUNTAD, +8 VIDA MÁX. Reduce MALDICIÓN en 1 turno.',
     basePriceGold: 74,
   },
   tunica_del_astrologo: {
@@ -864,7 +1147,8 @@ export const CRIPTA_ARMORS_REGISTRY: Record<CriptaArmorId, CriptaArmorDefinition
     bonusDefense: 1,
     bonusMaxHp: 5,
     bonusMagic: 2,
-    specialEffectText: '+2 MAGIA, +1 DEFENSA, +5 VIDA MÁX.',
+    bonusWillpower: 2,
+    specialEffectText: '+2 MAGIA, +2 VOLUNTAD, +1 DEFENSA, +5 VIDA MÁX.',
     basePriceGold: 72,
   },
   armadura_escamas_fungicas: {
@@ -873,8 +1157,9 @@ export const CRIPTA_ARMORS_REGISTRY: Record<CriptaArmorId, CriptaArmorDefinition
     rarity: 'UNCOMMON',
     bonusDefense: 2,
     bonusMaxHp: 6,
+    bonusPrecision: 1,
     statusResistance: 'POISON',
-    specialEffectText: '+2 DEFENSA, +6 VIDA MÁX. Resistencia contra VENENO.',
+    specialEffectText: '+2 DEFENSA, +1 PRECISIÓN, +6 VIDA MÁX. Resistencia contra VENENO.',
     basePriceGold: 58,
   },
   manto_de_sombra_real: {
@@ -883,8 +1168,10 @@ export const CRIPTA_ARMORS_REGISTRY: Record<CriptaArmorId, CriptaArmorDefinition
     rarity: 'RARE',
     bonusDefense: 2,
     bonusMaxHp: 7,
+    bonusAgility: 2,
+    bonusPrecision: 1,
     statusResistance: 'BLEED',
-    specialEffectText: '+2 DEFENSA, +7 VIDA MÁX. Inmunidad parcial a SANGRADO.',
+    specialEffectText: '+2 DEFENSA, +2 AGILIDAD, +1 PRECISIÓN, +7 VIDA MÁX. Resiste SANGRADO.',
     basePriceGold: 76,
   },
   placas_del_juramento: {
@@ -893,7 +1180,8 @@ export const CRIPTA_ARMORS_REGISTRY: Record<CriptaArmorId, CriptaArmorDefinition
     rarity: 'RARE',
     bonusDefense: 3,
     bonusMaxHp: 10,
-    specialEffectText: '+3 DEFENSA y +10 VIDA MÁX. Forjada para la vanguardia.',
+    bonusWillpower: 2,
+    specialEffectText: '+3 DEFENSA, +2 VOLUNTAD y +10 VIDA MÁX. Forjada para la vanguardia.',
     basePriceGold: 82,
   },
 };
@@ -904,8 +1192,9 @@ export const CRIPTA_ACCESSORIES_REGISTRY: Record<CriptaAccessoryId, CriptaAccess
     name: 'Anillo del Boticario',
     rarity: 'UNCOMMON',
     bonusMagic: 1,
+    bonusPrecision: 1,
     potionBoostPct: 20,
-    specialEffectText: '+1 MAGIA · Pociones y elixires +20% efectividad.',
+    specialEffectText: '+1 MAGIA, +1 PRECISIÓN · Pociones y elixires +20% efectividad.',
     basePriceGold: 48,
   },
   colgante_de_cristal: {
@@ -913,7 +1202,8 @@ export const CRIPTA_ACCESSORIES_REGISTRY: Record<CriptaAccessoryId, CriptaAccess
     name: 'Colgante de Cristal',
     rarity: 'RARE',
     bonusMagic: 2,
-    specialEffectText: '+2 MAGIA · Potencia hechizos y curaciones.',
+    bonusWillpower: 2,
+    specialEffectText: '+2 MAGIA, +2 VOLUNTAD · Potencia hechizos, maldiciones y curaciones.',
     basePriceGold: 64,
   },
   sello_del_cazador: {
@@ -921,8 +1211,10 @@ export const CRIPTA_ACCESSORIES_REGISTRY: Record<CriptaAccessoryId, CriptaAccess
     name: 'Anillo del Acechador',
     rarity: 'RARE',
     bonusAttack: 2,
+    bonusPrecision: 2,
+    bonusAgility: 1,
     critBonusPct: 10,
-    specialEffectText: '+2 ATAQUE y +10% probabilidad de golpe Crítico.',
+    specialEffectText: '+2 ATAQUE, +2 PRECISIÓN, +1 AGILIDAD y +10% golpe Crítico.',
     basePriceGold: 64,
   },
   espejo_roto_accesorio: {
@@ -931,7 +1223,8 @@ export const CRIPTA_ACCESSORIES_REGISTRY: Record<CriptaAccessoryId, CriptaAccess
     rarity: 'UNCOMMON',
     bonusMagic: 1,
     bonusDefense: 1,
-    specialEffectText: '+1 MAGIA, +1 DEFENSA · Revela secretos en espejos y altares.',
+    bonusWillpower: 2,
+    specialEffectText: '+1 MAGIA, +1 DEFENSA, +2 VOLUNTAD · Revela secretos en espejos y altares.',
     basePriceGold: 52,
   },
   amuleto_rompeescudos: {
@@ -940,7 +1233,8 @@ export const CRIPTA_ACCESSORIES_REGISTRY: Record<CriptaAccessoryId, CriptaAccess
     rarity: 'RARE',
     bonusAttack: 2,
     bonusDefense: 1,
-    specialEffectText: '+2 ATAQUE y +1 DEFENSA · Tus golpes fracturan corazas.',
+    bonusPrecision: 2,
+    specialEffectText: '+2 ATAQUE, +1 DEFENSA, +2 PRECISIÓN · Tus golpes fracturan corazas.',
     basePriceGold: 68,
   },
   reloj_de_arena_astral: {
@@ -948,8 +1242,9 @@ export const CRIPTA_ACCESSORIES_REGISTRY: Record<CriptaAccessoryId, CriptaAccess
     name: 'Reloj de Arena Astral',
     rarity: 'RARE',
     bonusMagic: 2,
+    bonusAgility: 2,
     critBonusPct: 8,
-    specialEffectText: '+2 MAGIA y +8% Crítico · Sincroniza técnicas arcanas.',
+    specialEffectText: '+2 MAGIA, +2 AGILIDAD y +8% Crítico · Sincroniza el tempo arcano.',
     basePriceGold: 70,
   },
 };
@@ -1127,8 +1422,17 @@ export function computePlayerEffectiveStats(player: CriptaPlayer): {
   attack: number;
   defense: number;
   magic: number;
+  agility: number;
+  precision: number;
+  willpower: number;
   maxHpBonus: number;
   critChancePct: number;
+  critDamageMult: number;
+  dodgeChancePct: number;
+  evasionPct: number;
+  statusResistPct: number;
+  armorPierceBonus: number;
+  initiativeScore: number;
   potionBoostPct: number;
   healBoostPct: number;
 } {
@@ -1140,18 +1444,30 @@ export function computePlayerEffectiveStats(player: CriptaPlayer): {
     ? CRIPTA_ACCESSORIES_REGISTRY[player.equippedAccessoryId]
     : null;
 
+  const classRes = player.classResource || 0;
+
   const attack =
     (charDef?.stats.attack || 5) +
     (player.bonusAttack || 0) +
     eqWeapon.bonusAttack +
+    (armorDef?.bonusAttack || 0) +
     (accDef?.bonusAttack || 0);
 
-  const defense =
+  // Bárbaro at 75+ Fury sacrifices 2 defensive stability for massive offensive pressure;
+  // Nigromante gains +1 spiritual defense per 2 stored Esencia.
+  const barbaroFuryDefPenalty = charId === 'barbaro' && classRes >= 75 ? -2 : 0;
+  const nigromanteEssenceDefBonus = charId === 'nigromante' ? Math.floor(classRes / 2) : 0;
+
+  const defense = Math.max(
+    1,
     (charDef?.stats.defense || 5) +
-    (player.bonusDefense || 0) +
-    eqWeapon.bonusDefense +
-    (armorDef?.bonusDefense || 0) +
-    (accDef?.bonusDefense || 0);
+      (player.bonusDefense || 0) +
+      eqWeapon.bonusDefense +
+      (armorDef?.bonusDefense || 0) +
+      (accDef?.bonusDefense || 0) +
+      barbaroFuryDefPenalty +
+      nigromanteEssenceDefBonus
+  );
 
   const magic =
     (charDef?.stats.magic || 5) +
@@ -1160,37 +1476,125 @@ export function computePlayerEffectiveStats(player: CriptaPlayer): {
     (armorDef?.bonusMagic || 0) +
     (accDef?.bonusMagic || 0);
 
+  const agility = Math.max(
+    1,
+    (charDef?.stats.agility ?? player.agility ?? 5) +
+      (player.bonusAgility || 0) +
+      (eqWeapon.weapon.bonusAgility || 0) +
+      (armorDef?.bonusAgility || 0) +
+      (accDef?.bonusAgility || 0) +
+      (playerHasStatus(player, 'HASTE') ? 3 : 0) -
+      (playerHasStatus(player, 'SLOW') ? 2 : 0)
+  );
+
+  const precision = Math.max(
+    1,
+    (charDef?.stats.precision ?? player.precision ?? 5) +
+      (player.bonusPrecision || 0) +
+      (eqWeapon.weapon.bonusPrecision || 0) +
+      (armorDef?.bonusPrecision || 0) +
+      (accDef?.bonusPrecision || 0) +
+      (playerHasStatus(player, 'PRECISION') || playerHasStatus(player, 'INSPIRATION') ? 2 : 0) -
+      (playerHasStatus(player, 'BLINDED') ? 3 : 0)
+  );
+
+  const willpower = Math.max(
+    1,
+    (charDef?.stats.willpower ?? player.willpower ?? 5) +
+      (player.bonusWillpower || 0) +
+      (eqWeapon.weapon.bonusWillpower || 0) +
+      (armorDef?.bonusWillpower || 0) +
+      (accDef?.bonusWillpower || 0) +
+      (playerHasStatus(player, 'BLESSED') ? 2 : 0) -
+      (playerHasStatus(player, 'FEAR') || playerHasStatus(player, 'CURSE') ? 2 : 0)
+  );
+
   const maxHpBonus = armorDef?.bonusMaxHp || 0;
 
-  const baseCrit = charId === 'picaro' ? 18 : charId === 'cazador' ? 15 : 10;
+  // PRECISIÓN directly governs Critical Hit Chance, Critical Damage Multiplier, and Armor Penetration!
+  const classCritBonus = charId === 'picaro' ? 6 : charId === 'cazador' ? 5 : 0;
+  const furyCritBonus = charId === 'barbaro' && classRes >= 75 ? 12 : charId === 'barbaro' && classRes >= 50 ? 5 : 0;
   const critChancePct = Math.max(
-    2,
+    3,
     Math.min(
       85,
-      baseCrit +
-        (eqWeapon.weapon.critBonusPct || 0) +
-        (accDef?.critBonusPct || 0) +
-        eqWeapon.effectiveCritDeltaPct
+      Math.round(
+        4 +
+          precision * 2.2 +
+          classCritBonus +
+          furyCritBonus +
+          (eqWeapon.weapon.critBonusPct || 0) +
+          (accDef?.critBonusPct || 0) +
+          eqWeapon.effectiveCritDeltaPct
+      )
     )
   );
 
+  const critDamageMult = Number((1.4 + Math.max(0, precision - 4) * 0.04).toFixed(2));
+
+  // AGILIDAD directly governs Dodge/Evasion chance and Turn Initiative!
+  const dodgeChancePct = Math.max(
+    2,
+    Math.min(
+      48,
+      Math.round(
+        agility * 2.4 +
+          (charId === 'picaro' ? 6 : charId === 'bardo' ? 4 : 0) +
+          (playerHasStatus(player, 'STEALTH') ? 15 : 0)
+      )
+    )
+  );
+
+  // VOLUNTAD directly governs Status Resistance, Healing/Shielding output, and Curse potency!
+  const statusResistPct = Math.max(
+    4,
+    Math.min(
+      65,
+      Math.round(
+        willpower * 4.2 +
+          (charId === 'clerigo' || charId === 'nigromante' ? 8 : 0) +
+          (playerHasStatus(player, 'RESISTANCE') ? 20 : 0)
+      )
+    )
+  );
+
+  const armorPierceBonus =
+    Math.floor(precision / 3) +
+    (eqWeapon.weapon.armorPierceBonus || 0) +
+    eqWeapon.effectiveArmorPierceBonus;
+
+  const initiativeScore = agility * 10 + precision;
+
   const potionBoostPct =
-    (charId === 'alquimista' ? 15 : 0) +
+    (charId === 'alquimista' ? 20 : 0) +
+    Math.max(0, (willpower - 5) * 3) +
     (eqWeapon.weapon.potionBoostPct || 0) +
     (accDef?.potionBoostPct || 0) +
     (eqWeapon.level >= 2 && eqWeapon.weapon.family === 'ALCHEMICAL' ? 10 : 0);
 
   const healBoostPct =
-    (charId === 'clerigo' ? 15 : 0) +
+    (charId === 'clerigo' ? 18 : charId === 'bardo' ? 12 : 0) +
+    Math.max(0, (willpower - 4) * 4) +
     (eqWeapon.weapon.healBoostPct || 0) +
-    (eqWeapon.level >= 2 && eqWeapon.weapon.family === 'MACE' ? 10 : 0);
+    (eqWeapon.level >= 2 && (eqWeapon.weapon.family === 'MACE' || eqWeapon.weapon.family === 'INSTRUMENT')
+      ? 10
+      : 0);
 
   return {
     attack,
     defense,
     magic,
+    agility,
+    precision,
+    willpower,
     maxHpBonus,
     critChancePct,
+    critDamageMult,
+    dodgeChancePct,
+    evasionPct: dodgeChancePct,
+    statusResistPct,
+    armorPierceBonus,
+    initiativeScore,
     potionBoostPct,
     healBoostPct,
   };
@@ -1618,6 +2022,9 @@ export function getWeaponVsEnemyMatchupSummary(
     if (charId === 'mago') activeTags.add('MAGICO');
     if (charId === 'alquimista') activeTags.add('ALQUIMICO');
     if (charId === 'picaro' || charId === 'cazador') activeTags.add('PERFORANTE');
+    if (charId === 'barbaro') activeTags.add('CONTUNDENTE');
+    if (charId === 'bardo') activeTags.add('ASTRAL');
+    if (charId === 'nigromante') activeTags.add('SOMBRA');
   }
 
   let bestWeakness: CriptaEnemyTraitEntry | null = null;
@@ -1778,7 +2185,7 @@ export function estimatePlayerActionDamage(
       maxDamage: 0,
       targetCount: 0,
       affectedEnemyIds: [],
-      label: selectedAbility.kind === 'HEAL' ? 'CURACIÓN' : 'PROTECCIÓN',
+      label: selectedAbility.kind === 'HEAL' ? 'CURACIÓN' : 'APOYO TÁCTICO',
       isMagical: true,
       damageType: eq.activeDamageType,
       damageTypeLabel: dmgMeta.shortLabel,
@@ -1793,15 +2200,33 @@ export function estimatePlayerActionDamage(
     eq.activeDamageType === 'ASTRAL' ||
     eq.activeDamageType === 'SOMBRA' ||
     (actionType === 'ABILITY' &&
-      (charId === 'mago' || charId === 'clerigo' || charId === 'alquimista'));
+      (charId === 'mago' ||
+        charId === 'clerigo' ||
+        charId === 'alquimista' ||
+        charId === 'bardo' ||
+        charId === 'nigromante'));
 
   const statValue = isMagical ? stats.magic : stats.attack;
   const magicHybridBonus = eq.activeRune?.magicScalingBonusPct
     ? Math.round(stats.magic * (eq.activeRune.magicScalingBonusPct / 100))
     : 0;
-  // Grounded stat contribution: +1 per 2 points above baseline 4 + any hybrid rune scaling
+
+  // Secondary stat contribution from weapon (AGILIDAD, PRECISIÓN, VOLUNTAD, etc.)
+  let secondaryStatBonus = 0;
+  const secStat = eq.weapon.secondaryScalingStat;
+  if (secStat === 'AGILIDAD') {
+    secondaryStatBonus = Math.max(0, Math.round((stats.agility - 4) * 0.35));
+  } else if (secStat === 'PRECISION') {
+    secondaryStatBonus = Math.max(0, Math.round((stats.precision - 4) * 0.35));
+  } else if (secStat === 'VOLUNTAD') {
+    secondaryStatBonus = Math.max(0, Math.round((stats.willpower - 4) * 0.35));
+  } else if (eq.weapon.family === 'DAGGER') {
+    secondaryStatBonus = Math.max(0, Math.round((stats.agility - 5) * 0.3));
+  }
+
+  // Grounded stat contribution: +1 per 2 points above baseline 4 + any hybrid/secondary scaling
   const statContribution =
-    Math.max(0, Math.round((statValue - 4) * 0.55)) + magicHybridBonus;
+    Math.max(0, Math.round((statValue - 4) * 0.55)) + magicHybridBonus + secondaryStatBonus;
 
   let actionMultiplier = 1.0;
   let affectedEnemies: CriptaRoomEnemy[] = targetEnemy ? [targetEnemy] : [];
@@ -1835,24 +2260,118 @@ export function estimatePlayerActionDamage(
   if (playerHasStatus(player, 'WEAKENED')) statusMult -= 0.18;
   if (playerHasStatus(player, 'BLESSED')) statusMult += 0.25;
   if (playerHasStatus(player, 'STRENGTHENED')) statusMult += 0.2;
+  if (playerHasStatus(player, 'INSPIRATION')) statusMult += 0.16;
 
-  // Class Passive Synergies
-  if (charId === 'caballero' && player.isDefendingThisRound) {
-    statusMult += 0.3;
+  const classRes = player.classResource || 0;
+
+  // Class Passive & Core Mechanic Resource Synergies (All 9 Classes)
+  if (charId === 'caballero') {
+    if (player.isDefendingThisRound) {
+      statusMult += 0.25;
+    }
+    statusMult += classRes * 0.06;
+    if (actionType === 'ABILITY' && selectedAbility?.consumesAllResource && classRes > 0) {
+      statusMult += classRes * 0.25;
+    }
   }
-  if (
-    charId === 'picaro' &&
-    targetEnemy &&
-    ((targetEnemy.poisonStacks || 0) > 0 || (targetEnemy.vulnerableTurns || 0) > 0)
-  ) {
-    statusMult += 0.3;
+  if (charId === 'mago') {
+    statusMult += classRes * 0.12;
+    if (classRes >= 5) {
+      statusMult += 0.25; // SOBRECARGA ARCANA
+    }
   }
-  if (
-    charId === 'cazador' &&
-    targetEnemy &&
-    ((targetEnemy.vulnerableTurns || 0) > 0 || targetEnemy.hp <= targetEnemy.maxHp * 0.5)
-  ) {
-    statusMult += 0.25;
+  if (charId === 'picaro') {
+    statusMult += classRes * 0.08;
+    if (actionType === 'ABILITY' && selectedAbility?.consumesAllResource && classRes > 0) {
+      statusMult += classRes * 0.28;
+    }
+    if (
+      targetEnemy &&
+      ((targetEnemy.poisonStacks || 0) > 0 ||
+        (targetEnemy.bleedStacks || 0) > 0 ||
+        (targetEnemy.vulnerableTurns || 0) > 0 ||
+        (targetEnemy.markedTurns || 0) > 0)
+    ) {
+      statusMult += 0.3;
+    }
+  }
+  if (charId === 'cazador') {
+    statusMult += classRes * 0.12;
+    if (actionType === 'ABILITY' && selectedAbility?.consumesAllResource && classRes > 0) {
+      statusMult += classRes * 0.25;
+    }
+    if (
+      targetEnemy &&
+      ((targetEnemy.vulnerableTurns || 0) > 0 ||
+        (targetEnemy.markedTurns || 0) > 0 ||
+        targetEnemy.hp <= targetEnemy.maxHp * 0.5 ||
+        (targetEnemy.curseTurns || 0) > 0)
+    ) {
+      statusMult += 0.25;
+    }
+  }
+  if (charId === 'clerigo') {
+    statusMult += classRes * 0.08;
+    if (actionType === 'ABILITY' && selectedAbility?.consumesAllResource && classRes > 0) {
+      statusMult += classRes * 0.22;
+    }
+  }
+  if (charId === 'alquimista') {
+    statusMult += classRes * 0.1;
+    if (actionType === 'ABILITY' && selectedAbility?.consumesAllResource && classRes > 0) {
+      statusMult += classRes * 0.25;
+    }
+  }
+
+  // BÁRBARO: FURIA thresholds & missing HP scaling (Frenesí de Ceniza)
+  if (charId === 'barbaro') {
+    const missingHpRatio = Math.max(
+      0,
+      Math.min(0.8, (player.maxHp - player.hp) / Math.max(1, player.maxHp))
+    );
+    statusMult += missingHpRatio * 0.35;
+    if (classRes >= 75) {
+      statusMult += 0.32;
+    } else if (classRes >= 50) {
+      statusMult += 0.2;
+    } else if (classRes >= 25) {
+      statusMult += 0.1;
+    }
+    if (
+      actionType === 'ABILITY' &&
+      selectedAbility?.id === 'quebrantahuesos' &&
+      targetEnemy &&
+      ((targetEnemy.armor || 0) > 0 ||
+        (targetEnemy.stunTurns || 0) > 0 ||
+        (targetEnemy.vulnerableTurns || 0) > 0)
+    ) {
+      statusMult += 0.35;
+    }
+  }
+
+  // BARDO: COMPÁS (Tempo 4 = Finale Resonante +35% potencia)
+  if (charId === 'bardo') {
+    if (classRes >= 4) {
+      statusMult += 0.35;
+    } else if (classRes === 3) {
+      statusMult += 0.15;
+    }
+  }
+
+  // NIGROMANTE: ESENCIA scaling & Curses/Alchemical synergy
+  if (charId === 'nigromante') {
+    statusMult += classRes * 0.06;
+    if (actionType === 'ABILITY' && selectedAbility?.consumesAllResource && classRes > 0) {
+      statusMult += classRes * 0.24;
+    }
+    if (
+      targetEnemy &&
+      ((targetEnemy.curseTurns || 0) > 0 ||
+        (targetEnemy.poisonStacks || 0) > 0 ||
+        (targetEnemy.burnStacks || 0) > 0)
+    ) {
+      statusMult += 0.22;
+    }
   }
 
   // Relic Synergies
@@ -1912,8 +2431,8 @@ export function estimatePlayerActionDamage(
   const armorPierce =
     (actionType === 'WEAPON_SPECIAL' ? eq.weapon.specialAttack.armorPierce || 0 : 0) +
     (actionType === 'ABILITY' ? selectedAbility?.armorBreak || 0 : 0) +
-    eq.effectiveArmorPierceBonus +
-    (charId === 'cazador' ? 3 : charId === 'picaro' ? 2 : 0) +
+    stats.armorPierceBonus +
+    (charId === 'cazador' ? 2 : charId === 'picaro' ? 1 : charId === 'barbaro' && classRes >= 50 ? 2 : 0) +
     (playerHasRelic(player, partyRelics, 'diente_del_rey') ? 2 : 0);
 
   let enemyMitigation = 1;
@@ -1986,10 +2505,11 @@ export function rollAuthoritativePlayerDamage(
   const eq = getEquippedWeaponForPlayer(player);
   const stats = computePlayerEffectiveStats(player);
 
-  // Deterministic roll between est.min and est.max
+  // Deterministic roll between est.min and est.max (PRECISIÓN tightens variance toward upper bound)
   const hash =
     ((currentTurn * 37 + player.seatIndex * 19 + targetEnemy.hp * 13) & 0x7fffffff) % 100;
-  const t = (hash % 100) / 100;
+  const precisionFloor = Math.min(0.3, Math.max(0, (stats.precision - 5) * 0.04));
+  const t = Math.min(1, precisionFloor + ((hash % 100) / 100) * (1 - precisionFloor));
   let rolled = Math.round(est.min + t * (est.max - est.min));
 
   if (isSecondaryTarget) {
@@ -2000,8 +2520,12 @@ export function rollAuthoritativePlayerDamage(
   const hasWeakened = Boolean(playerHasStatus(player, 'WEAKENED'));
   const hasBlessed = Boolean(playerHasStatus(player, 'BLESSED'));
   const hasCritBoost = Boolean(playerHasStatus(player, 'CRIT_BOOST'));
+  const hasInspiration = Boolean(playerHasStatus(player, 'INSPIRATION'));
   const critThreshold =
-    stats.critChancePct + (hasBlessed ? 10 : 0) + (hasCritBoost ? 20 : 0);
+    stats.critChancePct +
+    (hasBlessed ? 10 : 0) +
+    (hasCritBoost ? 20 : 0) +
+    (hasInspiration ? 10 : 0);
   const critRoll = ((currentTurn * 53 + player.seatIndex * 29 + targetEnemy.maxHp) & 0x7fffffff) % 100;
   const isCrit = !hasWeakened && !isSecondaryTarget && critRoll < critThreshold;
 
@@ -2010,7 +2534,10 @@ export function rollAuthoritativePlayerDamage(
     if (eq.activeRune?.heavyArmorNonCritPenaltyPct && (targetEnemy.armor || 0) >= 4) {
       rolled = Math.round(rolled / (1 - eq.activeRune.heavyArmorNonCritPenaltyPct / 100));
     }
-    const critMult = playerHasRelic(player, partyRelics, 'diente_del_rey') ? 1.65 : 1.45;
+    const baseCritMult = stats.critDamageMult || 1.45;
+    const critMult = playerHasRelic(player, partyRelics, 'diente_del_rey')
+      ? baseCritMult + 0.2
+      : baseCritMult;
     rolled = Math.max(rolled + 2, Math.round(rolled * critMult));
   }
 
@@ -2052,6 +2579,9 @@ export function pickWeaponDropForDungeon(
     'arco_de_espinas',
     'pico_de_minero_runico',
     'martillo_del_juicio',
+    'gran_hacha_barbara',
+    'laud_resonancia_arcana',
+    'guadana_de_hueso',
   ];
   const rarePool: CriptaWeaponId[] = [
     'espadon_del_rey_hundido',
@@ -2067,6 +2597,9 @@ export function pickWeaponDropForDungeon(
     'relicario_serafin',
     'canon_de_azufre',
     'guantelete_mutageno',
+    'mazo_colosal_rompecraneos',
+    'viola_del_eclipse',
+    'grimorio_sepulcral',
   ];
   const basePool = isRareOrElite || roomIndex >= 3 ? rarePool : uncommonPool;
   if (preferredClassIds && preferredClassIds.length > 0) {

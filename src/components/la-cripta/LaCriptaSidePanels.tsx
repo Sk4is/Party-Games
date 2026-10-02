@@ -36,6 +36,11 @@ import {
 import { buildEnemyAiProfileForArchetype } from '../../data/la-cripta/criptaEnemyAiEngine';
 import { CRIPTA_STATUS_EFFECTS_REGISTRY } from '../../data/la-cripta/criptaStatusEffects';
 import {
+  getClassMechanicForCharacter,
+  getEnemyActiveStatuses,
+  getPlayerClassMechanicHudState,
+} from '../../data/la-cripta/criptaClassMechanics';
+import {
   LaCriptaAccessoryPixelIcon,
   LaCriptaArmorPixelIcon,
   LaCriptaDamageTypeBadge,
@@ -50,6 +55,8 @@ import {
 } from './LaCriptaStatusEffectBadge';
 import { LaCriptaPixelTooltip } from './LaCriptaPixelTooltip';
 import { LaCriptaPixelPortrait } from './LaCriptaPartyHud';
+import { LaCriptaPixelSprite } from './LaCriptaPixelSprite';
+import { LaCriptaStatSegments } from './LaCriptaStatBar';
 import { LaCriptaEnemyPixelSprite } from './LaCriptaRoomEnvironment';
 import { LaCriptaBiomeStageBackdrop } from './LaCriptaEncounterCards';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
@@ -251,6 +258,7 @@ export const LaCriptaContextualSidePanel: React.FC<
   onEquipWeaponRune,
 }) => {
   const [pendingSlotIndex, setPendingSlotIndex] = useState<number | null>(null);
+  const [showMechanicDetails, setShowMechanicDetails] = useState(false);
   const [recentUsedItemBanner, setRecentUsedItemBanner] = useState<{
     itemId: CriptaItemId;
     name: string;
@@ -301,7 +309,7 @@ export const LaCriptaContextualSidePanel: React.FC<
         } max-h-[88dvh] lg:max-h-none lg:h-full bg-[#0E0A16]/98 border-t-2 sm:border-t-0 sm:border-l-2 border-[#E7A54A] shadow-[-16px_0_48px_rgba(0,0,0,0.94)] flex flex-col justify-between overflow-hidden animate-[slideInRight_220ms_cubic-bezier(0.16,1,0.3,1)]`}
       >
         {/* ===================================================================
-            MODE 1: MOCHILA (DEDICATED INVENTORY DRAWER)
+            MODE 1: MOCHILA (CLEAN VISUAL GRID INVENTORY DRAWER)
             =================================================================== */}
         {mode === 'INVENTORY' && localPlayer && (
           <>
@@ -312,8 +320,11 @@ export const LaCriptaContextualSidePanel: React.FC<
                   <LaCriptaBackpackPixelIcon size={20} />
                 </div>
                 <div>
-                  <div className="font-cripta-display text-base font-black text-[#FFD166] uppercase tracking-wider leading-none">
-                    MOCHILA
+                  <div className="font-cripta-display text-base font-black text-[#FFD166] uppercase tracking-wider leading-none flex items-center gap-2">
+                    <span>MOCHILA</span>
+                    <span className="px-1.5 py-0.5 bg-[#0C0814] border border-[#E7A54A]/70 font-cripta-mono text-xs text-[#FFF3C4]">
+                      {(localPlayer.normalInventory || []).length} / {NORMAL_INVENTORY_MAX_SLOTS}
+                    </span>
                   </div>
                   <div className="mt-0.5 text-[10px] font-cripta-pixel text-[#D8C6A0]">
                     {localPlayer.name} ·{' '}
@@ -335,15 +346,15 @@ export const LaCriptaContextualSidePanel: React.FC<
             </div>
 
             {/* Free Action Rule Subbanner */}
-            <div className="px-4 py-2 bg-[#120D1B] border-b border-[#261C34] flex items-center justify-between gap-2 text-[9px] font-cripta-pixel">
+            <div className="px-4 py-1.5 bg-[#120D1B] border-b border-[#261C34] flex items-center justify-between gap-2 text-[9px] font-cripta-pixel">
               {hasActiveCombat ? (
                 activeRoom.consumableUsedThisTurn ? (
                   <span className="text-[#E7A54A] font-bold uppercase">
-                    ✦ CONSUMIBLE USADO ESTE TURNO
+                    ✦ 1 OBJETO USADO ESTE TURNO
                   </span>
                 ) : isMyTurnInCombat ? (
                   <span className="text-[#8EE6AE] font-bold uppercase">
-                    ✦ ACCIÓN LIBRE: NO CONSUME AP NI TU TURNO (MÁX. 1)
+                    ✦ ACCIÓN LIBRE (0 AP · MÁX. 1 POR TURNO)
                   </span>
                 ) : (
                   <span className="text-[#D8C6A0]/75 uppercase">
@@ -352,21 +363,21 @@ export const LaCriptaContextualSidePanel: React.FC<
                 )
               ) : (
                 <span className="text-[#8EE6AE] uppercase">
-                  ✦ PUEDES USAR OBJETOS DE CURACIÓN Y UTILIDAD AQUÍ
+                  ✦ CLIC EN UN OBJETO PARA USARLO
                 </span>
               )}
             </div>
 
             {/* Satisfying Item Use Visual Feedback Toast inside Drawer */}
             {recentUsedItemBanner && (
-              <div className="mx-4 mt-2.5 p-2.5 bg-[#13241B] border-2 border-[#5EA87A] flex items-center gap-2.5 animate-pulse">
+              <div className="mx-4 mt-2.5 p-2 bg-[#13241B] border-2 border-[#5EA87A] flex items-center gap-2.5 animate-pulse">
                 <LaCriptaItemPixelIcon
                   itemId={recentUsedItemBanner.itemId}
-                  size={28}
+                  size={26}
                 />
                 <div className="min-w-0">
                   <div className="text-[10px] font-cripta-pixel font-bold text-[#8EE6AE] uppercase">
-                    ✦ {recentUsedItemBanner.name} UTILIZADO
+                    ✦ {recentUsedItemBanner.name} USADO
                   </div>
                   <div className="text-[9px] font-cripta-pixel text-[#D9D0BC] truncate">
                     {recentUsedItemBanner.effectText}
@@ -375,158 +386,173 @@ export const LaCriptaContextualSidePanel: React.FC<
               </div>
             )}
 
-            {/* Item List Body */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+            {/* Compact 3-Column Visual Slot Grid */}
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
               {(() => {
                 const grouped = groupPlayerInventoryItems(
                   localPlayer.normalInventory || []
                 );
-                if (grouped.length === 0) {
-                  return (
-                    <div className="h-48 border border-dashed border-[#342744] bg-[#120D1A]/60 flex flex-col items-center justify-center p-6 text-center">
-                      <LaCriptaBackpackPixelIcon size={32} />
-                      <div className="mt-2 font-cripta-display text-sm font-bold text-[#D8C6A0] uppercase">
-                        MOCHILA VACÍA
-                      </div>
-                      <p className="mt-1 text-[10px] font-cripta-pixel text-[#D8C6A0]/65 leading-relaxed">
-                        Recoge botín de los enemigos derrotados, cofres o el
-                        mercader para almacenar consumibles aquí.
-                      </p>
-                    </div>
-                  );
-                }
-
                 const iAmDown = Boolean(
                   localPlayer.isDead || localPlayer.hp <= 0
                 );
+                const emptySlotsCount = Math.max(
+                  0,
+                  NORMAL_INVENTORY_MAX_SLOTS - grouped.length
+                );
 
-                return grouped.map((entry) => {
-                  const def = CRIPTA_ITEMS_REGISTRY[entry.itemId];
-                  if (!def) return null;
-                  const catInfo =
-                    ITEM_CATEGORY_DISPLAY[def.category] ||
-                    ITEM_CATEGORY_DISPLAY.UTILITY;
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {grouped.map((entry) => {
+                        const def = CRIPTA_ITEMS_REGISTRY[entry.itemId];
+                        if (!def) return null;
+                        const catInfo =
+                          ITEM_CATEGORY_DISPLAY[def.category] ||
+                          ITEM_CATEGORY_DISPLAY.UTILITY;
 
-                  const canUseContext = hasActiveCombat
-                    ? def.combatUsable &&
-                      isMyTurnInCombat &&
-                      !activeRoom.consumableUsedThisTurn
-                    : def.roomUsable;
+                        const canUseContext = hasActiveCombat
+                          ? def.combatUsable &&
+                            isMyTurnInCombat &&
+                            !activeRoom.consumableUsedThisTurn
+                          : def.roomUsable;
 
-                  const isUsableNow =
-                    !iAmDown &&
-                    canUseContext &&
-                    pendingSlotIndex === null;
+                        const isUsableNow =
+                          !iAmDown &&
+                          canUseContext &&
+                          pendingSlotIndex === null;
 
-                  const unavailableReason = iAmDown
-                    ? 'CAÍDO'
-                    : hasActiveCombat && !isMyTurnInCombat
-                    ? 'DISPONIBLE EN TU TURNO'
-                    : hasActiveCombat && activeRoom.consumableUsedThisTurn
-                    ? 'USADO ESTE TURNO'
-                    : !canUseContext
-                    ? 'NO DISPONIBLE AQUÍ'
-                    : 'USAR';
+                        const unavailableReason = iAmDown
+                          ? 'CAÍDO'
+                          : hasActiveCombat && !isMyTurnInCombat
+                          ? 'ESPERA TURNO'
+                          : hasActiveCombat && activeRoom.consumableUsedThisTurn
+                          ? 'YA USADO'
+                          : !canUseContext
+                          ? 'SOLO COMBATE'
+                          : 'USAR';
 
-                  return (
-                    <LaCriptaPixelTooltip
-                      key={entry.itemId}
-                      title={def.name}
-                      category={catInfo.label}
-                      description={def.description}
-                      footerLabel={`CANTIDAD: x${entry.count} · ${
-                        isUsableNow ? 'DISPONIBLE AHORA' : unavailableReason
-                      }`}
-                      borderColor={catInfo.color}
-                      accentColor={catInfo.color}
-                      icon={<LaCriptaItemPixelIcon itemId={entry.itemId} size={18} />}
-                      className="block w-full"
-                    >
-                      <div className="w-full p-2.5 bg-[#150F20] hover:bg-[#1C142B] border border-[#382A4B] hover:border-[#E7A54A] flex items-center justify-between gap-3 transition-colors">
-                        {/* Left Pixel Icon + Item Details */}
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className="w-11 h-11 bg-[#0B0811] border flex items-center justify-center shrink-0 relative"
-                            style={{ borderColor: catInfo.borderColor }}
+                        return (
+                          <LaCriptaPixelTooltip
+                            key={entry.itemId}
+                            title={def.name}
+                            category={catInfo.label}
+                            description={def.description}
+                            footerLabel={`CANTIDAD: x${entry.count} · ${
+                              isUsableNow ? 'CLIC PARA USAR' : unavailableReason
+                            }`}
+                            borderColor={catInfo.color}
+                            accentColor={catInfo.color}
+                            icon={
+                              <LaCriptaItemPixelIcon
+                                itemId={entry.itemId}
+                                size={18}
+                              />
+                            }
+                            className="block w-full"
                           >
-                            <LaCriptaItemPixelIcon
-                              itemId={entry.itemId}
-                              size={32}
-                            />
-                            <span className="absolute -bottom-1 -right-1 px-1 bg-[#09070D] border border-[#E7A54A] text-[9px] font-cripta-mono font-bold text-[#FFD166]">
-                              x{entry.count}
-                            </span>
-                          </div>
+                            <button
+                              type="button"
+                              disabled={!isUsableNow}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isUsableNow || !onUseConsumable) return;
+                                laCriptaAudio.playDoorVote();
+                                setPendingSlotIndex(entry.firstSlotIndex);
+                                setRecentUsedItemBanner({
+                                  itemId: entry.itemId,
+                                  name: def.name,
+                                  effectText: def.description,
+                                });
+                                window.setTimeout(() => {
+                                  setRecentUsedItemBanner(null);
+                                }, 1800);
+                                onUseConsumable(
+                                  entry.firstSlotIndex,
+                                  selectedTargetEnemyId || undefined,
+                                  localPlayer.id
+                                );
+                              }}
+                              className={`group relative w-full aspect-square p-2 border-2 flex flex-col items-center justify-between transition-all select-none ${
+                                isUsableNow
+                                  ? 'bg-[#161022] hover:bg-[#221835] border-[#4A3B5C] hover:border-[#FFD166] cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.65)] hover:-translate-y-0.5'
+                                  : 'bg-[#110C1A]/80 border-[#2A1F38] opacity-60 cursor-not-allowed'
+                              }`}
+                            >
+                              {/* Top Category Dot + Stack Count */}
+                              <div className="w-full flex items-center justify-between">
+                                <span
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: catInfo.color }}
+                                />
+                                <span className="px-1.5 py-0.2 bg-[#09070D] border border-[#E7A54A] font-cripta-mono text-[10px] font-black text-[#FFD166]">
+                                  x{entry.count}
+                                </span>
+                              </div>
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-cripta-display text-xs sm:text-sm font-black text-[#F5EFE6] uppercase truncate">
-                                {def.name}
-                              </span>
-                              <span
-                                className="px-1 py-0.2 border text-[8px] font-cripta-pixel uppercase shrink-0"
-                                style={{
-                                  color: catInfo.color,
-                                  borderColor: catInfo.borderColor,
-                                }}
-                              >
-                                {catInfo.label}
-                              </span>
-                            </div>
-                            <div className="mt-0.5 text-[10px] font-cripta-pixel text-[#D8C6A0] leading-snug">
-                              {def.description}
-                            </div>
-                          </div>
-                        </div>
+                              {/* Center Large Pixel Icon */}
+                              <div className="my-auto flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <LaCriptaItemPixelIcon
+                                  itemId={entry.itemId}
+                                  size={40}
+                                />
+                              </div>
 
-                        {/* Right Action Button */}
-                        <button
-                          type="button"
-                          disabled={!isUsableNow}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isUsableNow || !onUseConsumable) return;
-                            laCriptaAudio.playDoorVote();
-                            setPendingSlotIndex(entry.firstSlotIndex);
-                            setRecentUsedItemBanner({
-                              itemId: entry.itemId,
-                              name: def.name,
-                              effectText: def.description,
-                            });
-                            window.setTimeout(() => {
-                              setRecentUsedItemBanner(null);
-                            }, 1800);
-                            onUseConsumable(
-                              entry.firstSlotIndex,
-                              selectedTargetEnemyId || undefined,
-                              localPlayer.id
-                            );
-                          }}
-                          className={`px-2.5 py-1.5 border font-cripta-pixel text-[9px] font-bold uppercase tracking-wider shrink-0 transition-all ${
-                            isUsableNow
-                              ? 'bg-[#1C2F23] hover:bg-[#274432] border-[#5EA87A] text-[#8EE6AE] cursor-pointer shadow-[0_0_12px_rgba(94,168,122,0.25)]'
-                              : 'bg-[#140F1D] border-[#2E223D] text-[#D8C6A0]/45 cursor-not-allowed'
-                          }`}
+                              {/* Bottom Concise Name + Action Pill */}
+                              <div className="w-full text-center">
+                                <div className="font-cripta-display text-[10px] font-black text-[#F5EFE6] uppercase truncate">
+                                  {def.name}
+                                </div>
+                                <div
+                                  className={`mt-0.5 py-0.5 text-[8px] font-cripta-pixel font-bold uppercase tracking-wider ${
+                                    isUsableNow
+                                      ? 'bg-[#1C2F23] text-[#8EE6AE] border border-[#5EA87A]/70 group-hover:bg-[#274432]'
+                                      : 'text-[#D8C6A0]/45'
+                                  }`}
+                                >
+                                  {isUsableNow ? 'USAR' : unavailableReason}
+                                </div>
+                              </div>
+                            </button>
+                          </LaCriptaPixelTooltip>
+                        );
+                      })}
+
+                      {/* Empty Visual Backpack Slots up to 6 */}
+                      {Array.from({ length: emptySlotsCount }).map((_, idx) => (
+                        <div
+                          key={`empty_${idx}`}
+                          className="w-full aspect-square border border-dashed border-[#2E223D] bg-[#0B0812]/50 flex flex-col items-center justify-center p-2 text-center select-none"
                         >
-                          {isUsableNow ? 'USAR' : unavailableReason}
-                        </button>
+                          <div className="w-6 h-6 border border-[#261C34] bg-[#120D1B]/60 flex items-center justify-center text-[9px] font-cripta-mono text-[#D8C6A0]/25">
+                            ·
+                          </div>
+                          <span className="mt-1.5 text-[8px] font-cripta-pixel text-[#D8C6A0]/30 uppercase">
+                            VACÍO
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {grouped.length === 0 && (
+                      <div className="p-3 bg-[#120D1A]/70 border border-[#2A1F38] text-center text-[10px] font-cripta-pixel text-[#D8C6A0]/70">
+                        Mochila vacía. Recoge botín de enemigos, cofres o el mercader.
                       </div>
-                    </LaCriptaPixelTooltip>
-                  );
-                });
+                    )}
+                  </>
+                );
               })()}
             </div>
 
             {/* Footer Capacity */}
             <div className="px-4 py-2.5 bg-[#140E1F] border-t border-[#2E223D] flex items-center justify-between text-[10px] font-cripta-pixel text-[#D8C6A0]">
               <span>
-                CAPACIDAD:{' '}
+                MOCHILA:{' '}
                 <strong className="text-[#FFD166]">
                   {(localPlayer.normalInventory || []).length} /{' '}
                   {NORMAL_INVENTORY_MAX_SLOTS}
                 </strong>
               </span>
-              <span className="text-[#D8C6A0]/65">ESC PARA CERRAR</span>
+              <span className="text-[#D8C6A0]/65">PASA EL CURSOR PARA DETALLES</span>
             </div>
           </>
         )}
@@ -563,6 +589,13 @@ export const LaCriptaContextualSidePanel: React.FC<
               const bonusDef = effStats.defense - baseDef;
               const baseMag = charDef?.stats.magic || 5;
               const bonusMag = effStats.magic - baseMag;
+              const baseAgi = charDef?.stats.agility || 5;
+              const bonusAgi = effStats.agility - baseAgi;
+              const basePre = charDef?.stats.precision || 5;
+              const bonusPre = effStats.precision - basePre;
+              const baseVol = charDef?.stats.willpower || 5;
+              const bonusVol = effStats.willpower - baseVol;
+              const classResVal = inspectedPlayer.classResource ?? charDef?.classResource?.initialValue ?? 0;
 
               const weaponDmgEst = estimatePlayerActionDamage(
                 inspectedPlayer,
@@ -598,51 +631,76 @@ export const LaCriptaContextualSidePanel: React.FC<
                 )
               );
 
+              const dmgTypeLabel =
+                CRIPTA_DAMAGE_TYPE_META[eqWeapon.activeDamageType]?.label ||
+                eqWeapon.activeDamageType;
+
               return (
                 <>
-                  {/* Header: Hero Stage Portrait + Name + Class + Live Vital Bar */}
-                  <div className="px-4 py-3 bg-[#171123] border-b-2 border-[#2E223D] flex items-center justify-between gap-3 shrink-0">
-                    <div className="flex items-center gap-3 min-w-0">
+                  {/* Top Bar with Title & Close Button */}
+                  <div className="px-4 py-2.5 bg-[#171123] border-b border-[#2E223D] flex items-center justify-between gap-2 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-cripta-pixel font-bold text-[#E7A54A] uppercase tracking-widest">
+                        ✦ IDENTIDAD DEL AVENTURERO
+                      </span>
+                      {isSelf && (
+                        <span className="px-1.5 py-0.2 bg-[#231934] border border-[#E7A54A] text-[8px] font-cripta-pixel font-bold text-[#FFD166] uppercase">
+                          TÚ
+                        </span>
+                      )}
+                      {isDowned && (
+                        <span className="px-1.5 py-0.5 bg-[#2A0E17] border border-[#C93B5B] text-[8px] font-cripta-pixel font-bold text-[#FF8FA3] uppercase">
+                          ☠ CAÍDO
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      aria-label="Cerrar inspección de jugador"
+                      className="p-1.5 bg-[#221832] hover:bg-[#312247] border border-[#4A3B5C] hover:border-[#FFD166] text-[#D8C6A0] hover:text-[#FFD166] cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Body: Visual, Scannable Dark-Fantasy Character Panel */}
+                  <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
+                    {/* 1. IDENTIDAD: Large Animated Sprite + Name + Class + Actual Combat HP Bar */}
+                    <div className="p-3 bg-[#130D1D] border border-[#342648] flex items-center gap-3.5 relative overflow-hidden">
                       <div
-                        className="w-14 h-14 bg-[#0B0811] border-2 flex items-center justify-center shrink-0 relative shadow-[inset_0_0_16px_rgba(0,0,0,0.85)]"
+                        className="w-20 h-20 bg-[#09060F] border-2 flex items-center justify-center shrink-0 relative shadow-[inset_0_0_20px_rgba(0,0,0,0.9)]"
                         style={{
                           borderColor: isDowned
                             ? '#C93B5B'
                             : inspectedPlayer.color || '#E7A54A',
                         }}
                       >
-                        <LaCriptaPixelPortrait
+                        <LaCriptaPixelSprite
                           characterId={charId}
-                          size={44}
+                          animationState={isDowned ? 'idle' : 'ready'}
+                          size="md"
+                          classResource={classResVal}
                         />
                         {(inspectedPlayer.armor || 0) > 0 && (
-                          <span className="absolute -bottom-1 -right-1 px-1 py-0.2 bg-[#0E1E26] border border-[#7BDFF2] font-cripta-mono text-[8px] font-bold text-[#7BDFF2]">
-                            +{inspectedPlayer.armor} ESC
+                          <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-[#0E1E26] border border-[#7BDFF2] font-cripta-mono text-[8px] font-bold text-[#7BDFF2]">
+                            🛡 +{inspectedPlayer.armor}
                           </span>
                         )}
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-cripta-display text-base sm:text-lg font-black text-[#F5EFE6] uppercase truncate">
-                            {inspectedPlayer.name}
-                          </span>
-                          {isSelf && (
-                            <span className="px-1.5 py-0.2 bg-[#231934] border border-[#E7A54A] text-[8px] font-cripta-pixel font-bold text-[#FFD166] uppercase">
-                              TÚ
-                            </span>
-                          )}
-                          {isDowned && (
-                            <span className="px-1.5 py-0.5 bg-[#2A0E17] border border-[#C93B5B] text-[8px] font-cripta-pixel font-bold text-[#FF8FA3] uppercase">
-                              CAÍDO
-                            </span>
-                          )}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="font-cripta-display text-lg sm:text-xl font-black text-[#F5EFE6] uppercase truncate leading-tight">
+                          {inspectedPlayer.name}
                         </div>
-                        <div className="text-[10px] font-cripta-pixel text-[#E7A54A] uppercase tracking-wider">
+                        <div className="text-[10px] font-cripta-pixel text-[#E7A54A] uppercase tracking-wider truncate mt-0.5">
                           {charDef?.className || 'AVENTURERO'} · {charDef?.name}
                         </div>
-                        {/* Compact Vital Bar in Header */}
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <div className="w-28 sm:w-36 h-2.5 bg-[#09060E] border border-[#38294A] overflow-hidden">
+
+                        {/* Dedicated Combat HP Bar (Kept strictly separate from VIDA aptitude) */}
+                        <div className="mt-2.5 space-y-1">
+                          <div className="w-full h-3 bg-[#08050D] border border-[#3E2D52] overflow-hidden relative">
                             <div
                               className="h-full transition-all duration-300"
                               style={{
@@ -656,313 +714,313 @@ export const LaCriptaContextualSidePanel: React.FC<
                               }}
                             />
                           </div>
-                          <span className="font-cripta-mono text-[10px] font-bold text-[#8EE6AE]">
-                            {Math.max(0, inspectedPlayer.hp)}/{inspectedPlayer.maxHp} PV
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      aria-label="Cerrar inspección de jugador"
-                      className="p-1.5 bg-[#221832] hover:bg-[#312247] border border-[#4A3B5C] hover:border-[#FFD166] text-[#D8C6A0] hover:text-[#FFD166] cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Body: Structured Dark-Fantasy Character Sheet */}
-                  <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
-                    {/* 1. FOUR CANONICAL PRIMARY STATS + STRUCTURED COMBAT METRICS */}
-                    <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest mb-1.5">
-                        ✦ ATRIBUTOS PRINCIPALES Y COMBATE
-                      </div>
-
-                      {/* Clean 2x2 Primary RPG Attribute Grid */}
-                      <div className="grid grid-cols-2 gap-2 font-cripta-pixel">
-                        {/* VIDA MÁXIMA */}
-                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-[8px] text-[#D8C6A0]/70 uppercase tracking-wider">
-                              VIDA MÁXIMA
-                            </div>
-                            <div className="text-[8px] text-[#8EE6AE]/80 mt-0.5 truncate">
-                              Actual: {Math.max(0, inspectedPlayer.hp)} / {inspectedPlayer.maxHp} PV
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-cripta-mono text-sm sm:text-base font-black text-[#8EE6AE] leading-none">
-                              {inspectedPlayer.maxHp}
-                            </div>
-                            <div className="text-[7px] text-[#D8C6A0]/60 uppercase mt-0.5">
-                              SALUD
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* ATAQUE */}
-                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-[8px] text-[#D8C6A0]/70 uppercase tracking-wider">
-                              ATAQUE FÍSICO
-                            </div>
-                            <div className="text-[8px] text-[#D8C6A0]/65 mt-0.5 truncate">
-                              Base {baseAtk}
-                              {bonusAtk !== 0
-                                ? ` · Equipo ${bonusAtk > 0 ? `+${bonusAtk}` : bonusAtk}`
-                                : ' · Sin bono'}
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-cripta-mono text-sm sm:text-base font-black text-[#FF8FA3] leading-none">
-                              {effStats.attack}
-                            </div>
-                            <div className="text-[7px] text-[#FFD166] uppercase mt-0.5">
-                              {bonusAtk > 0 ? `+${bonusAtk} BONO` : 'TOTAL'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* DEFENSA */}
-                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-[8px] text-[#D8C6A0]/70 uppercase tracking-wider">
-                              DEFENSA BASE
-                            </div>
-                            <div className="text-[8px] text-[#D8C6A0]/65 mt-0.5 truncate">
-                              Base {baseDef}
-                              {bonusDef !== 0
-                                ? ` · Equipo ${bonusDef > 0 ? `+${bonusDef}` : bonusDef}`
-                                : ' · Mitigación'}
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-cripta-mono text-sm sm:text-base font-black text-[#7BDFF2] leading-none">
-                              {effStats.defense}
-                            </div>
-                            <div className="text-[7px] text-[#7BDFF2]/80 uppercase mt-0.5">
-                              {bonusDef > 0 ? `+${bonusDef} BONO` : 'ARMADURA'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* MAGIA */}
-                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-[8px] text-[#D8C6A0]/70 uppercase tracking-wider">
-                              PODER MÁGICO
-                            </div>
-                            <div className="text-[8px] text-[#D8C6A0]/65 mt-0.5 truncate">
-                              Base {baseMag}
-                              {bonusMag !== 0
-                                ? ` · Equipo ${bonusMag > 0 ? `+${bonusMag}` : bonusMag}`
-                                : ' · Arcano/Fe'}
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-cripta-mono text-sm sm:text-base font-black text-[#C8A6F5] leading-none">
-                              {effStats.magic}
-                            </div>
-                            <div className="text-[7px] text-[#C8A6F5]/80 uppercase mt-0.5">
-                              {bonusMag > 0 ? `+${bonusMag} BONO` : 'TOTAL'}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Structured 4-Column Derived Combat Metrics Strip */}
-                      <div className="mt-2 grid grid-cols-4 gap-1.5 font-cripta-pixel text-center">
-                        <div className="px-1.5 py-1.5 bg-[#110B19] border border-[#2A1F38]">
-                          <div className="text-[7px] text-[#D8C6A0]/65 uppercase">DAÑO ARMA</div>
-                          <div className="font-cripta-mono text-[10px] font-bold text-[#FF8FA3] mt-0.5">
-                            {formatDamageRange(weaponDmgEst.min, weaponDmgEst.max)}
-                          </div>
-                        </div>
-                        <div className="px-1.5 py-1.5 bg-[#110B19] border border-[#2A1F38]">
-                          <div className="text-[7px] text-[#D8C6A0]/65 uppercase">CRÍTICO</div>
-                          <div className="font-cripta-mono text-[10px] font-bold text-[#FFD166] mt-0.5">
-                            {effStats.critChancePct}%
-                          </div>
-                        </div>
-                        <div className="px-1.5 py-1.5 bg-[#110B19] border border-[#2A1F38]">
-                          <div className="text-[7px] text-[#D8C6A0]/65 uppercase">ESCUDO</div>
-                          <div className="font-cripta-mono text-[10px] font-bold text-[#7BDFF2] mt-0.5">
-                            +{inspectedPlayer.armor || 0}
-                          </div>
-                        </div>
-                        <div className="px-1.5 py-1.5 bg-[#110B19] border border-[#2A1F38]">
-                          <div className="text-[7px] text-[#D8C6A0]/65 uppercase">ALQUIMIA/CURA</div>
-                          <div className="font-cripta-mono text-[10px] font-bold text-[#8EE6AE] mt-0.5">
-                            +{Math.max(effStats.potionBoostPct || 0, effStats.healBoostPct || 0)}%
+                          <div className="flex items-center justify-between text-[10px] font-cripta-mono font-bold">
+                            <span className="text-[#8EE6AE]">
+                              {Math.max(0, inspectedPlayer.hp)} / {inspectedPlayer.maxHp} PV
+                            </span>
+                            <span
+                              className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 uppercase cursor-help"
+                              title={`Crítico: ${effStats.critChancePct}% (×${effStats.critDamageMult}) · Evasión: ${effStats.dodgeChancePct}% · Res. Estados: ${effStats.statusResistPct}% · Iniciativa: ${effStats.initiativeScore}`}
+                            >
+                              CRIT {effStats.critChancePct}% · EVA {effStats.dodgeChancePct}%
+                            </span>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* 2. EQUIPPED WEAPON, ARMOR & ACCESSORY WITH HIGH-DETAIL PIXEL ART */}
-                    <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest mb-1.5">
-                        ✦ EQUIPAMIENTO ACTIVO
+                    {/* 2. ATRIBUTOS: Shared 10-Segment Pixel-Square Bars (Same Visual Language as Lobby) */}
+                    <div className="p-3 bg-[#120C1B] border border-[#2E223D]">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest">
+                          ATRIBUTOS
+                        </span>
+                        <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/55 uppercase">
+                          PASA EL CURSOR PARA DETALLES
+                        </span>
                       </div>
+
                       <div className="space-y-1.5">
-                        {/* Primary Weapon Slot + Damage Identity + Active Weapon Rune */}
-                        <LaCriptaPixelTooltip
-                          title={`${eqWeapon.weapon.name} (Nv.${eqWeapon.level})`}
-                          category={`ARMA · ${eqWeapon.weapon.rarity}${
-                            eqWeapon.weapon.weaponArchetypeLabel
-                              ? ` · ${eqWeapon.weapon.weaponArchetypeLabel}`
-                              : ''
-                          }`}
-                          description={`${eqWeapon.weapon.specialEffectText}${
-                            eqWeapon.activeRune
-                              ? ` | INFUSIÓN ACTIVA (${eqWeapon.activeRune.name}): ${eqWeapon.activeRune.benefitText} · ${eqWeapon.activeRune.tradeoffText}`
-                              : ''
-                          }`}
-                          footerLabel={`DAÑO BASE: ~${eqWeapon.scaledMin}–${eqWeapon.scaledMax} · ESCALA CON ${eqWeapon.weapon.scalingStat}`}
-                          borderColor={eqWeapon.activeRune?.accentColor || '#E7A54A'}
-                          className="block w-full"
+                        <LaCriptaStatSegments
+                          stat="health"
+                          value={charDef?.stats.health ?? 5}
+                          max={10}
+                          triggerKey={`${inspectedPlayer.id}_health`}
+                          tooltip={`VIDA (${charDef?.stats.health ?? 5}/10): Aptitud vital de clase · Salud máxima actual: ${inspectedPlayer.maxHp} PV`}
+                        />
+                        <LaCriptaStatSegments
+                          stat="attack"
+                          value={effStats.attack}
+                          max={10}
+                          triggerKey={`${inspectedPlayer.id}_attack`}
+                          tooltip={`ATAQUE (${effStats.attack}): Base ${baseAtk}${
+                            bonusAtk !== 0 ? ` (${bonusAtk > 0 ? `+${bonusAtk}` : bonusAtk} por equipo/bonos)` : ''
+                          } · Daño estimado: ${formatDamageRange(weaponDmgEst.min, weaponDmgEst.max)}`}
+                        />
+                        <LaCriptaStatSegments
+                          stat="defense"
+                          value={effStats.defense}
+                          max={10}
+                          triggerKey={`${inspectedPlayer.id}_defense`}
+                          tooltip={`DEFENSA (${effStats.defense}): Base ${baseDef}${
+                            bonusDef !== 0 ? ` (${bonusDef > 0 ? `+${bonusDef}` : bonusDef} por equipo/bonos)` : ''
+                          } · Escudo activo: +${inspectedPlayer.armor || 0}`}
+                        />
+                        <LaCriptaStatSegments
+                          stat="magic"
+                          value={effStats.magic}
+                          max={10}
+                          triggerKey={`${inspectedPlayer.id}_magic`}
+                          tooltip={`MAGIA (${effStats.magic}): Base ${baseMag}${
+                            bonusMag !== 0 ? ` (${bonusMag > 0 ? `+${bonusMag}` : bonusMag} por equipo/bonos)` : ''
+                          } · Potencia conjuros, alquimia y drenaje`}
+                        />
+                        <LaCriptaStatSegments
+                          stat="agility"
+                          value={effStats.agility}
+                          max={10}
+                          triggerKey={`${inspectedPlayer.id}_agility`}
+                          tooltip={`AGILIDAD (${effStats.agility}): Base ${baseAgi}${
+                            bonusAgi !== 0 ? ` (${bonusAgi > 0 ? `+${bonusAgi}` : bonusAgi} por equipo/bonos)` : ''
+                          } · Evasión: ${effStats.dodgeChancePct}% · Iniciativa: ${effStats.initiativeScore}`}
+                        />
+                        <LaCriptaStatSegments
+                          stat="precision"
+                          value={effStats.precision}
+                          max={10}
+                          triggerKey={`${inspectedPlayer.id}_precision`}
+                          tooltip={`PRECISIÓN (${effStats.precision}): Base ${basePre}${
+                            bonusPre !== 0 ? ` (${bonusPre > 0 ? `+${bonusPre}` : bonusPre} por equipo/bonos)` : ''
+                          } · Crítico: ${effStats.critChancePct}% (×${effStats.critDamageMult}) · Perforación: +${effStats.armorPierceBonus} ARM`}
+                        />
+                        <LaCriptaStatSegments
+                          stat="willpower"
+                          value={effStats.willpower}
+                          max={10}
+                          triggerKey={`${inspectedPlayer.id}_willpower`}
+                          tooltip={`VOLUNTAD (${effStats.willpower}): Base ${baseVol}${
+                            bonusVol !== 0 ? ` (${bonusVol > 0 ? `+${bonusVol}` : bonusVol} por equipo/bonos)` : ''
+                          } · Res. Estados: ${effStats.statusResistPct}% · Bono Curación: +${Math.max(effStats.potionBoostPct || 0, effStats.healBoostPct || 0)}%`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 3. MECÁNICA DE CLASE (Compact Visual Bar/Pips + Hover/Tap for Details) */}
+                    {(() => {
+                      const mechHud = getPlayerClassMechanicHudState(inspectedPlayer);
+                      const mechDef = getClassMechanicForCharacter(charId);
+                      if (!mechHud || !mechDef) return null;
+                      return (
+                        <div
+                          className="p-3 bg-[#120C1C] border flex flex-col gap-2"
+                          style={{ borderColor: `${mechHud.colorHex}88` }}
                         >
-                          <div className="p-2 bg-[#150F20] border border-[#E7A54A]/70 flex flex-col gap-1.5">
-                            <div className="flex items-center justify-between gap-2.5">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-11 h-11 bg-[#0B0811] border border-[#E7A54A] flex items-center justify-center shrink-0 relative">
-                                  <LaCriptaWeaponPixelIcon
-                                    weaponId={eqWeapon.weapon.id}
-                                    upgradeLevel={eqWeapon.level}
-                                    size={34}
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className="text-[10px] font-cripta-pixel font-bold uppercase tracking-wider flex items-center gap-1.5"
+                              style={{ color: mechHud.colorHex }}
+                            >
+                              <span>{mechHud.iconSymbol}</span>
+                              <span>{mechHud.label}</span>
+                            </span>
+                            <span
+                              className="font-cripta-mono text-xs font-black"
+                              style={{ color: mechHud.colorHex }}
+                            >
+                              {mechHud.current} / {mechHud.max}
+                            </span>
+                          </div>
+
+                          {/* Visual Bar for FURIA (0-100) or Compact Segment Pips for 1-5 Mechanics */}
+                          {mechHud.kind === 'FURIA' ? (
+                            <div className="w-full h-2.5 bg-[#08060C] border border-[#3B1D26] overflow-hidden relative">
+                              <div
+                                className="h-full transition-all duration-300"
+                                style={{
+                                  width: `${Math.min(100, classResVal)}%`,
+                                  backgroundColor:
+                                    classResVal >= 75 ? '#EF4444' : '#F97316',
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              {Array.from({ length: mechHud.max }).map((_, idx) => {
+                                const lit = classResVal > idx;
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="flex-1 h-2.5 border transition-colors"
+                                    style={{
+                                      borderColor: lit ? mechHud.colorHex : '#282039',
+                                      backgroundColor: lit
+                                        ? mechHud.colorHex
+                                        : '#08060C',
+                                    }}
                                   />
-                                  <span className="absolute -bottom-1 -right-1 px-1 bg-[#09070D] border border-[#FFD166] font-cripta-mono text-[8px] font-bold text-[#FFD166]">
-                                    NV.{eqWeapon.level}
-                                  </span>
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="font-cripta-display text-xs font-black text-[#FFD166] uppercase truncate">
-                                      {eqWeapon.weapon.name}
-                                    </span>
-                                    <LaCriptaDamageTypeBadge
-                                      damageType={eqWeapon.activeDamageType}
-                                      secondaryType={eqWeapon.secondaryDamageType}
-                                      compact
-                                    />
-                                  </div>
-                                  {eqWeapon.weapon.weaponArchetypeLabel && (
-                                    <div className="text-[8px] font-cripta-pixel uppercase tracking-wider text-[#E7A54A]/90 mt-0.5">
-                                      {eqWeapon.weapon.weaponArchetypeLabel}
-                                    </div>
-                                  )}
-                                  <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/85 line-clamp-2 mt-0.5">
-                                    {eqWeapon.weapon.specialEffectText}
-                                  </div>
-                                </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Compact Active State & Bonus Line + [? VER DETALLES] */}
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
+                            <div className="min-w-0">
+                              <div
+                                className="text-[9px] font-cripta-pixel font-bold uppercase truncate"
+                                style={{ color: '#FFD166' }}
+                              >
+                                ★ {mechHud.stateBadge}
                               </div>
-                              <span className="px-2 py-1 bg-[#241623] border border-[#C93B5B] font-cripta-mono text-[10px] font-bold text-[#FF8FA3] shrink-0">
-                                {formatDamageRange(weaponDmgEst.min, weaponDmgEst.max)} DAÑO
+                              <div className="text-[9px] font-cripta-pixel text-[#8EE6AE] truncate">
+                                {mechHud.bonusSummary}
+                              </div>
+                            </div>
+
+                            <LaCriptaPixelTooltip
+                              title={`${mechHud.iconSymbol} ${mechDef.name} (${mechHud.current}/${mechHud.max})`}
+                              category={`MECÁNICA DE CLASE · ${charDef?.className || ''}`}
+                              description={`${mechDef.shortDescription} | CÓMO GANAR: ${mechDef.howToGain} | CÓMO USAR: ${mechDef.howToSpendOrTrigger}`}
+                              footerLabel={`${mechHud.stateBadge} · ${mechHud.bonusSummary}`}
+                              borderColor={mechHud.colorHex}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setShowMechanicDetails((v) => !v)}
+                                className="px-2 py-1 bg-[#1D142C] hover:bg-[#291C3D] border border-[#4A3B5C] hover:border-[#FFD166] text-[8px] font-cripta-pixel font-bold text-[#D8C6A0] hover:text-[#FFD166] uppercase tracking-wider cursor-pointer shrink-0"
+                              >
+                                ? {showMechanicDetails ? 'OCULTAR' : 'VER DETALLES'}
+                              </button>
+                            </LaCriptaPixelTooltip>
+                          </div>
+
+                          {showMechanicDetails && (
+                            <div className="pt-2 border-t border-[#2E223D] space-y-1 text-[8.5px] font-cripta-pixel text-[#D8C6A0]/90 leading-relaxed">
+                              <div className="text-[#F5EFE6]">
+                                {mechDef.shortDescription}
+                              </div>
+                              <div>
+                                <strong className="text-[#8EE6AE]">GANAR:</strong>{' '}
+                                {mechDef.howToGain}
+                              </div>
+                              <div>
+                                <strong className="text-[#FFD166]">USAR:</strong>{' '}
+                                {mechDef.howToSpendOrTrigger}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* 4. EQUIPO (Visual Weapon Card + Armor, Accessory & Relics) */}
+                    <div className="space-y-1.5">
+                      <div className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest">
+                        EQUIPO
+                      </div>
+
+                      {/* Weapon Card */}
+                      <LaCriptaPixelTooltip
+                        title={`${eqWeapon.weapon.name} (Nv.${eqWeapon.level})`}
+                        category={`ARMA · ${dmgTypeLabel}`}
+                        description={`${eqWeapon.weapon.specialEffectText}${
+                          eqWeapon.activeRune
+                            ? ` | RUNA (${eqWeapon.activeRune.name}): ${eqWeapon.activeRune.benefitText} · ${eqWeapon.activeRune.tradeoffText}`
+                            : ''
+                        }`}
+                        footerLabel={`ESCALA CON ${eqWeapon.weapon.scalingStat} · TÉCNICA: ${eqWeapon.weapon.specialAttack.name}`}
+                        borderColor={eqWeapon.activeRune?.accentColor || '#E7A54A'}
+                        className="block w-full"
+                      >
+                        <div className="p-2.5 bg-[#150F20] border border-[#E7A54A]/70 flex items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-11 h-11 bg-[#0B0811] border border-[#E7A54A] flex items-center justify-center shrink-0 relative">
+                              <LaCriptaWeaponPixelIcon
+                                weaponId={eqWeapon.weapon.id}
+                                upgradeLevel={eqWeapon.level}
+                                size={34}
+                              />
+                              <span className="absolute -bottom-1 -right-1 px-1 bg-[#09070D] border border-[#FFD166] font-cripta-mono text-[8px] font-bold text-[#FFD166]">
+                                NV.{eqWeapon.level}
                               </span>
                             </div>
-
-                            {/* WEAPON RUNE / ELEMENTAL INFUSION SLOT */}
-                            <div className="pt-1.5 border-t border-[#2E223D] flex flex-col gap-1.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-[8px] font-cripta-pixel uppercase tracking-wider text-[#B57CFF] font-bold">
-                                  ◈ ENGARCE DE RUNA ELEMENTAL
-                                </span>
-                                {eqWeapon.activeRune && isSelf && onEquipWeaponRune && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      laCriptaAudio.playStoneClick();
-                                      onEquipWeaponRune(null);
-                                    }}
-                                    className="px-1.5 py-0.5 bg-[#1E142B] hover:bg-[#2E1F42] border border-[#B57CFF]/60 text-[8px] font-cripta-pixel text-[#D8C6A0] hover:text-[#FFD166] cursor-pointer"
-                                  >
-                                    QUITAR RUNA
-                                  </button>
-                                )}
+                            <div className="min-w-0">
+                              <div className="font-cripta-display text-xs font-black text-[#FFD166] uppercase truncate">
+                                {eqWeapon.weapon.name}
                               </div>
-
-                              {eqWeapon.activeRune ? (
-                                <div
-                                  className="p-1.5 bg-[#0D0914] border flex items-center gap-2"
-                                  style={{ borderColor: eqWeapon.activeRune.accentColor }}
-                                >
-                                  <LaCriptaWeaponRunePixelIcon
-                                    runeId={eqWeapon.activeRune.id}
-                                    size={24}
-                                  />
-                                  <div className="min-w-0 font-cripta-pixel">
-                                    <div
-                                      className="text-[10px] font-bold uppercase truncate"
-                                      style={{ color: eqWeapon.activeRune.accentColor }}
-                                    >
-                                      {eqWeapon.activeRune.name}
-                                    </div>
-                                    <div className="text-[8px] text-[#8EE6AE]">
-                                      ✦ {eqWeapon.activeRune.benefitText}
-                                    </div>
-                                    <div className="text-[8px] text-[#FF8FA3]">
-                                      ⚠ {eqWeapon.activeRune.tradeoffText}
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="px-2 py-1 bg-[#0D0914] border border-dashed border-[#382A4B] text-[9px] font-cripta-pixel text-[#D8C6A0]/55">
-                                  Sin runa engarzada (daño original: {eqWeapon.activeDamageType}). Adquiere runas en Tiendas o derrotando Élites y Minibosses.
-                                </div>
-                              )}
-
-                              {/* Owned Weapon Runes Switcher */}
-                              {(inspectedPlayer.ownedWeaponRunes || []).length > 0 && (
-                                <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                                  <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 mr-1">
-                                    RUNAS DISPONIBLES:
-                                  </span>
-                                  {(inspectedPlayer.ownedWeaponRunes || []).map((rId) => {
-                                    const rDef = CRIPTA_WEAPON_RUNES_REGISTRY[rId];
-                                    if (!rDef) return null;
-                                    const isEquippedRune =
-                                      inspectedPlayer.equippedWeaponRuneId === rId;
-                                    return (
-                                      <button
-                                        key={rId}
-                                        type="button"
-                                        disabled={!isSelf || !onEquipWeaponRune}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (!isSelf || !onEquipWeaponRune) return;
-                                          laCriptaAudio.playDoorVote();
-                                          onEquipWeaponRune(isEquippedRune ? null : rId);
-                                        }}
-                                        title={`${rDef.name}\n${rDef.benefitText}\n${rDef.tradeoffText}`}
-                                        className={`px-1.5 py-0.5 border flex items-center gap-1 text-[8px] font-cripta-pixel transition-all ${
-                                          isEquippedRune
-                                            ? 'bg-[#251838] border-[#FFD166] text-[#FFD166] font-bold'
-                                            : 'bg-[#120D1B] hover:bg-[#1E162B] border-[#4A3B5C] text-[#D9D0BC]'
-                                        } ${isSelf && onEquipWeaponRune ? 'cursor-pointer' : 'cursor-default'}`}
-                                      >
-                                        <LaCriptaWeaponRunePixelIcon runeId={rId} size={14} />
-                                        <span>{rDef.name.replace('Runa de ', '').replace('Runa del ', '')}</span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              )}
+                              <div className="mt-0.5 flex items-center gap-1.5">
+                                <LaCriptaDamageTypeBadge
+                                  damageType={eqWeapon.activeDamageType}
+                                  secondaryType={eqWeapon.secondaryDamageType}
+                                  compact
+                                />
+                                <span className="font-cripta-mono text-[10px] font-bold text-[#FF8FA3]">
+                                  {formatDamageRange(weaponDmgEst.min, weaponDmgEst.max)} daño
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </LaCriptaPixelTooltip>
 
-                        {/* Armor & Accessory Slots */}
-                        <div className="grid grid-cols-2 gap-1.5">
+                          {/* Compact Rune Switcher if player owns runes */}
+                          {(inspectedPlayer.ownedWeaponRunes || []).length > 0 && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              {(inspectedPlayer.ownedWeaponRunes || []).map((rId) => {
+                                const rDef = CRIPTA_WEAPON_RUNES_REGISTRY[rId];
+                                if (!rDef) return null;
+                                const isEquippedRune =
+                                  inspectedPlayer.equippedWeaponRuneId === rId;
+                                return (
+                                  <button
+                                    key={rId}
+                                    type="button"
+                                    disabled={!isSelf || !onEquipWeaponRune}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!isSelf || !onEquipWeaponRune) return;
+                                      laCriptaAudio.playDoorVote();
+                                      onEquipWeaponRune(isEquippedRune ? null : rId);
+                                    }}
+                                    title={`${rDef.name}: ${rDef.benefitText} (${rDef.tradeoffText})`}
+                                    className={`p-1 border transition-all ${
+                                      isEquippedRune
+                                        ? 'bg-[#251838] border-[#FFD166]'
+                                        : 'bg-[#120D1B] border-[#4A3B5C] opacity-70 hover:opacity-100'
+                                    } ${
+                                      isSelf && onEquipWeaponRune
+                                        ? 'cursor-pointer'
+                                        : 'cursor-default'
+                                    }`}
+                                  >
+                                    <LaCriptaWeaponRunePixelIcon
+                                      runeId={rId}
+                                      size={16}
+                                    />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </LaCriptaPixelTooltip>
+
+                      {/* Armor & Accessory Compact Cards */}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <LaCriptaPixelTooltip
+                          title={armorDef ? armorDef.name : 'Sin Armadura'}
+                          category="ARMADURA"
+                          description={
+                            armorDef
+                              ? armorDef.specialEffectText
+                              : 'Puedes adquirir corazas y túnicas en el Mercader.'
+                          }
+                          borderColor="#3E7B96"
+                        >
                           <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center gap-2">
-                            <div className="w-9 h-9 bg-[#0B0811] border border-[#3E7B96] flex items-center justify-center shrink-0">
+                            <div className="w-8 h-8 bg-[#0B0811] border border-[#3E7B96] flex items-center justify-center shrink-0">
                               {armorDef ? (
                                 <LaCriptaArmorPixelIcon
                                   armorId={armorDef.id}
-                                  size={26}
+                                  size={24}
                                 />
                               ) : (
                                 <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/35">
@@ -974,20 +1032,31 @@ export const LaCriptaContextualSidePanel: React.FC<
                               <div className="text-[9px] text-[#7BDFF2] font-bold uppercase truncate">
                                 {armorDef ? armorDef.name : 'Sin Armadura'}
                               </div>
-                              <div className="text-[8px] text-[#D8C6A0]/75 truncate">
+                              <div className="text-[8px] text-[#D8C6A0]/70 truncate">
                                 {armorDef
-                                  ? armorDef.specialEffectText
-                                  : 'Ranura de coraza'}
+                                  ? `+${armorDef.bonusMaxHp} PV · +${armorDef.bonusDefense} DEF`
+                                  : 'Vacío'}
                               </div>
                             </div>
                           </div>
+                        </LaCriptaPixelTooltip>
 
+                        <LaCriptaPixelTooltip
+                          title={accDef ? accDef.name : 'Sin Accesorio'}
+                          category="ACCESORIO"
+                          description={
+                            accDef
+                              ? accDef.specialEffectText
+                              : 'Puedes adquirir anillos y amuletos en el Mercader.'
+                          }
+                          borderColor="#7656A8"
+                        >
                           <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center gap-2">
-                            <div className="w-9 h-9 bg-[#0B0811] border border-[#7656A8] flex items-center justify-center shrink-0">
+                            <div className="w-8 h-8 bg-[#0B0811] border border-[#7656A8] flex items-center justify-center shrink-0">
                               {accDef ? (
                                 <LaCriptaAccessoryPixelIcon
                                   accessoryId={accDef.id}
-                                  size={26}
+                                  size={24}
                                 />
                               ) : (
                                 <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/35">
@@ -999,143 +1068,174 @@ export const LaCriptaContextualSidePanel: React.FC<
                               <div className="text-[9px] text-[#C8A6F5] font-bold uppercase truncate">
                                 {accDef ? accDef.name : 'Sin Accesorio'}
                               </div>
-                              <div className="text-[8px] text-[#D8C6A0]/75 truncate">
-                                {accDef
-                                  ? accDef.specialEffectText
-                                  : 'Ranura de talismán'}
+                              <div className="text-[8px] text-[#D8C6A0]/70 truncate">
+                                {accDef ? accDef.specialEffectText : 'Vacío'}
                               </div>
                             </div>
                           </div>
-                        </div>
+                        </LaCriptaPixelTooltip>
                       </div>
+
+                      {/* Relics Strip inside EQUIPO */}
+                      {playerRelics.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          {playerRelics.map((acq, idx) => {
+                            const rDef = CRIPTA_RELICS_REGISTRY[acq.relicId];
+                            if (!rDef) return null;
+                            return (
+                              <LaCriptaPixelTooltip
+                                key={`${acq.relicId}_${idx}`}
+                                title={rDef.name}
+                                category="RELIQUIA ACTIVA"
+                                description={rDef.description}
+                                footerLabel={`HALLADA EN: ${
+                                  acq.obtainedInDungeonName || 'LA CRIPTA'
+                                }`}
+                                borderColor="#FFD166"
+                              >
+                                <div className="px-2 py-1 bg-[#1A1228] border border-[#9B72CF] flex items-center gap-1.5 text-[9px] font-cripta-pixel text-[#FFD166] cursor-help">
+                                  <LaCriptaRelicPixelIcon
+                                    relicId={acq.relicId}
+                                    size={16}
+                                  />
+                                  <span>{rDef.name}</span>
+                                </div>
+                              </LaCriptaPixelTooltip>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
-                    {/* 3. ACTIVE STATUSES & RELICS */}
-                    {(inspectedPlayer.statuses?.length > 0 ||
-                      playerRelics.length > 0) && (
-                      <div className="grid grid-cols-1 gap-2">
-                        {inspectedPlayer.statuses?.length > 0 && (
-                          <div>
-                            <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest mb-1">
-                              ESTADOS ACTIVOS
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {inspectedPlayer.statuses.map((st) => (
-                                <LaCriptaStatusEffectBadge key={st.id} status={st} />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {playerRelics.length > 0 && (
-                          <div>
-                            <div className="text-[9px] font-cripta-pixel text-[#B57CFF] font-bold uppercase tracking-widest mb-1">
-                              ✦ RELIQUIAS ACTIVAS ({playerRelics.length})
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {playerRelics.map((acq, idx) => {
-                                const rDef = CRIPTA_RELICS_REGISTRY[acq.relicId];
-                                if (!rDef) return null;
-                                return (
-                                  <LaCriptaPixelTooltip
-                                    key={`${acq.relicId}_${idx}`}
-                                    title={rDef.name}
-                                    category="RELIQUIA ACTIVA"
-                                    description={rDef.description}
-                                    footerLabel={`HALLADA EN: ${
-                                      acq.obtainedInDungeonName || 'LA CRIPTA'
-                                    }`}
-                                    borderColor="#FFD166"
-                                  >
-                                    <div className="px-2 py-1 bg-[#1A1228] border border-[#9B72CF] flex items-center gap-1.5 text-[9px] font-cripta-pixel text-[#FFD166] cursor-help">
-                                      <LaCriptaRelicPixelIcon
-                                        relicId={acq.relicId}
-                                        size={16}
-                                      />
-                                      <span>{rDef.name}</span>
-                                    </div>
-                                  </LaCriptaPixelTooltip>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 4. TECHNIQUES & CLASS ABILITIES */}
+                    {/* 5. ESTADOS (Compact Visual Status Chips) */}
                     <div>
                       <div className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest mb-1.5">
-                        ✦ TÉCNICAS Y HABILIDADES
+                        ESTADOS
                       </div>
-                      <div className="space-y-1.5">
-                        {/* Weapon Special */}
-                        <div className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="font-cripta-display text-xs font-bold text-[#FFD166] uppercase">
+                      {inspectedPlayer.statuses?.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {inspectedPlayer.statuses.map((st) => (
+                            <LaCriptaStatusEffectBadge key={st.id} status={st} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="px-2.5 py-1.5 bg-[#120D1A] border border-[#281E36] text-[9px] font-cripta-pixel text-[#D8C6A0]/55">
+                          Sin estados alterados activos.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 6. HABILIDADES (Compact Visual Skill Chips with Hover Tooltip) */}
+                    <div>
+                      <div className="text-[9px] font-cripta-pixel text-[#E7A54A] font-bold uppercase tracking-widest mb-1.5">
+                        HABILIDADES
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {/* Weapon Special Chip */}
+                        <LaCriptaPixelTooltip
+                          title={eqWeapon.weapon.specialAttack.name}
+                          category={`TÉCNICA DE ARMA · CD ${eqWeapon.weapon.specialAttack.cooldownRounds}T`}
+                          description={eqWeapon.weapon.specialAttack.description}
+                          footerLabel={
+                            eqWeapon.weapon.specialAttack.dealsDamage === false
+                              ? `+${eqWeapon.weapon.specialAttack.partyHealBase || 14} PV GRUPO`
+                              : `${formatDamageRange(specialDmgEst.min, specialDmgEst.max)} DAÑO`
+                          }
+                          borderColor="#FFD166"
+                        >
+                          <div className="p-2 bg-[#140E1E] hover:bg-[#1C142B] border border-[#E7A54A]/70 flex flex-col items-center text-center gap-1 cursor-help">
+                            <LaCriptaWeaponPixelIcon
+                              weaponId={eqWeapon.weapon.id}
+                              upgradeLevel={eqWeapon.level}
+                              size={22}
+                            />
+                            <div className="font-cripta-pixel text-[8px] font-bold text-[#FFD166] uppercase truncate w-full">
                               {eqWeapon.weapon.specialAttack.name}
                             </div>
-                            <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/80">
-                              {eqWeapon.weapon.specialAttack.description}
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0 font-cripta-pixel text-[9px]">
-                            <div className="text-[#FF8FA3] font-bold">
-                              {eqWeapon.weapon.specialAttack.dealsDamage === false
+                            <div className="font-cripta-mono text-[8px] text-[#FF8FA3]">
+                              {(inspectedPlayer.weaponSpecialCooldown || 0) > 0
+                                ? `CD ${inspectedPlayer.weaponSpecialCooldown}T`
+                                : eqWeapon.weapon.specialAttack.dealsDamage === false
                                 ? `+${eqWeapon.weapon.specialAttack.partyHealBase || 14} PV`
                                 : formatDamageRange(specialDmgEst.min, specialDmgEst.max)}
                             </div>
-                            <div className="text-[#D8C6A0]/65">
-                              {(inspectedPlayer.weaponSpecialCooldown || 0) > 0
-                                ? `RECARGA: ${inspectedPlayer.weaponSpecialCooldown}T`
-                                : `CD ${eqWeapon.weapon.specialAttack.cooldownRounds}T`}
-                            </div>
                           </div>
-                        </div>
+                        </LaCriptaPixelTooltip>
 
-                        {/* Class Abilities */}
+                        {/* Class Abilities Chips */}
                         {(charDef?.abilities || []).map((ab) => {
-                          const liveCd = inspectedPlayer.abilityCooldowns?.[ab.id] || 0;
+                          const liveCd =
+                            inspectedPlayer.abilityCooldowns?.[ab.id] || 0;
                           return (
-                            <div
+                            <LaCriptaPixelTooltip
                               key={ab.id}
-                              className="p-2 bg-[#140E1E] border border-[#2E223D] flex items-center justify-between gap-2"
+                              title={ab.name}
+                              category={`HABILIDAD DE CLASE · CD ${ab.cooldownTurns}T`}
+                              description={ab.description}
+                              footerLabel={
+                                liveCd > 0
+                                  ? `EN RECARGA: ${liveCd} TURNOS`
+                                  : 'LISTA PARA USAR'
+                              }
+                              borderColor="#9B72CF"
                             >
-                              <div className="min-w-0">
-                                <div className="font-cripta-display text-xs font-bold text-[#C8A6F5] uppercase">
+                              <div className="p-2 bg-[#140E1E] hover:bg-[#1C142B] border border-[#4A3B5C] flex flex-col items-center text-center gap-1 cursor-help">
+                                <span className="w-5 h-5 bg-[#211533] border border-[#9B72CF] flex items-center justify-center text-[10px] font-cripta-pixel text-[#C8A6F5]">
+                                  ✦
+                                </span>
+                                <div className="font-cripta-pixel text-[8px] font-bold text-[#C8A6F5] uppercase truncate w-full">
                                   {ab.name}
                                 </div>
-                                <div className="text-[9px] font-cripta-pixel text-[#D8C6A0]/80">
-                                  {ab.description}
+                                <div
+                                  className={`font-cripta-mono text-[8px] ${
+                                    liveCd > 0 ? 'text-[#FF8FA3]' : 'text-[#8EE6AE]'
+                                  }`}
+                                >
+                                  {liveCd > 0 ? `CD ${liveCd}T` : `${ab.cooldownTurns}T CD`}
                                 </div>
                               </div>
-                              <span
-                                className={`px-1.5 py-0.5 border text-[8px] font-cripta-pixel shrink-0 ${
-                                  liveCd > 0
-                                    ? 'bg-[#2A141D] border-[#C93B5B] text-[#FF8FA3]'
-                                    : 'bg-[#1F162E] border-[#4A3B5C] text-[#D8C6A0]'
-                                }`}
-                              >
-                                {liveCd > 0 ? `RECARGA ${liveCd}T` : `CD ${ab.cooldownTurns}T`}
-                              </span>
-                            </div>
+                            </LaCriptaPixelTooltip>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* 5. PLAYER BACKPACK INVENTORY (6 SLOTS) */}
+                    {/* 7. MOCHILA (Visual Slot Grid: Items + Empty Slots) */}
                     <div>
-                      <div className="text-[9px] font-cripta-pixel text-[#8EE6AE] font-bold uppercase tracking-widest mb-1.5">
-                        ✦ MOCHILA DE CONSUMIBLES (
-                        {(inspectedPlayer.normalInventory || []).length}/
-                        {NORMAL_INVENTORY_MAX_SLOTS})
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[9px] font-cripta-pixel text-[#8EE6AE] font-bold uppercase tracking-widest">
+                          MOCHILA
+                        </span>
+                        <span className="font-cripta-mono text-[9px] text-[#D8C6A0]/70">
+                          {(inspectedPlayer.normalInventory || []).length} /{' '}
+                          {NORMAL_INVENTORY_MAX_SLOTS}
+                        </span>
                       </div>
-                      {groupedInv.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {groupedInv.map((g) => {
-                            const itemDef = CRIPTA_ITEMS_REGISTRY[g.itemId];
-                            if (!itemDef) return null;
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {Array.from({ length: NORMAL_INVENTORY_MAX_SLOTS }).map(
+                          (_, slotIdx) => {
+                            const rawItem = (inspectedPlayer.normalInventory || [])[
+                              slotIdx
+                            ];
+                            const itemId =
+                              typeof rawItem === 'string'
+                                ? rawItem
+                                : (rawItem as { itemId?: CriptaItemId })?.itemId;
+                            const itemDef = itemId
+                              ? CRIPTA_ITEMS_REGISTRY[itemId]
+                              : null;
+
+                            if (!itemId || !itemDef) {
+                              return (
+                                <div
+                                  key={`empty_${slotIdx}`}
+                                  className="h-12 bg-[#0D0914]/70 border border-dashed border-[#2A1F38] flex items-center justify-center text-[8px] font-cripta-pixel text-[#D8C6A0]/30 uppercase"
+                                >
+                                  VACÍO
+                                </div>
+                              );
+                            }
+
                             const canUseHere =
                               isSelf &&
                               !isDowned &&
@@ -1148,28 +1248,23 @@ export const LaCriptaContextualSidePanel: React.FC<
 
                             return (
                               <LaCriptaPixelTooltip
-                                key={g.itemId}
+                                key={`slot_${slotIdx}_${itemId}`}
                                 title={itemDef.name}
-                                category="MOCHILA"
+                                category="CONSUMIBLE"
                                 description={itemDef.description}
-                                footerLabel={`CANTIDAD: x${g.count}`}
-                                borderColor="#5EA87A"
-                                icon={
-                                  <LaCriptaItemPixelIcon
-                                    itemId={g.itemId}
-                                    size={16}
-                                  />
+                                footerLabel={
+                                  canUseHere ? 'CLIC EN USAR' : 'EN MOCHILA'
                                 }
+                                borderColor="#5EA87A"
                               >
-                                <div className="p-1.5 bg-[#140E1E] border border-[#382A4B] flex items-center justify-between gap-1.5 text-[10px] font-cripta-pixel text-[#F5EFE6]">
+                                <div className="h-12 px-2 bg-[#140E1E] border border-[#382A4B] flex items-center justify-between gap-1.5">
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <LaCriptaItemPixelIcon
-                                      itemId={g.itemId}
-                                      size={20}
+                                      itemId={itemId}
+                                      size={22}
                                     />
-                                    <span className="truncate">{itemDef.name}</span>
-                                    <span className="text-[#FFD166] font-bold shrink-0">
-                                      ×{g.count}
+                                    <span className="text-[8px] font-cripta-pixel text-[#F5EFE6] truncate">
+                                      {itemDef.name}
                                     </span>
                                   </div>
                                   {canUseHere && (
@@ -1178,12 +1273,12 @@ export const LaCriptaContextualSidePanel: React.FC<
                                       onClick={() => {
                                         laCriptaAudio.playDoorVote();
                                         onUseConsumable(
-                                          g.firstSlotIndex,
+                                          slotIdx,
                                           selectedTargetEnemyId || undefined,
                                           inspectedPlayer.id
                                         );
                                       }}
-                                      className="px-1.5 py-0.5 bg-[#1C2F23] hover:bg-[#274432] border border-[#5EA87A] text-[8px] font-bold text-[#8EE6AE] uppercase cursor-pointer shrink-0"
+                                      className="px-1 py-0.5 bg-[#1C2F23] hover:bg-[#274432] border border-[#5EA87A] text-[7px] font-cripta-pixel font-bold text-[#8EE6AE] uppercase cursor-pointer shrink-0"
                                     >
                                       USAR
                                     </button>
@@ -1191,19 +1286,15 @@ export const LaCriptaContextualSidePanel: React.FC<
                                 </div>
                               </LaCriptaPixelTooltip>
                             );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-[10px] font-cripta-pixel text-[#D8C6A0]/50">
-                          Sin objetos en la mochila.
-                        </div>
-                      )}
+                          }
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   {/* Footer */}
-                  <div className="px-4 py-2.5 bg-[#140E1F] border-t border-[#2E223D] flex items-center justify-between text-[10px] font-cripta-pixel text-[#D8C6A0]/75 shrink-0">
-                    <span>HOJA DE PERSONAJE · LA CRIPTA</span>
+                  <div className="px-4 py-2 bg-[#140E1F] border-t border-[#2E223D] flex items-center justify-between text-[9px] font-cripta-pixel text-[#D8C6A0]/75 shrink-0">
+                    <span>PANEL DE AVENTURERO</span>
                     <span>ESC PARA CERRAR</span>
                   </div>
                 </>
@@ -1357,46 +1448,23 @@ export const LaCriptaContextualSidePanel: React.FC<
                         />
                       </div>
 
-                      {/* Active Status Badges Floating at Bottom of Bestiary Stage if any */}
-                      {(Boolean(
-                        inspectedEnemy.poisonStacks &&
-                          inspectedEnemy.poisonStacks > 0
-                      ) ||
-                        Boolean(
-                          inspectedEnemy.vulnerableTurns &&
-                            inspectedEnemy.vulnerableTurns > 0
-                        ) ||
-                        Boolean(inspectedEnemy.isDefending)) && (
-                        <div className="relative z-20 mt-2 flex flex-wrap items-center justify-center gap-1.5 px-3">
-                          {Boolean(
-                            inspectedEnemy.poisonStacks &&
-                              inspectedEnemy.poisonStacks > 0
-                          ) && (
-                            <LaCriptaStatusEffectBadge
-                              effectType="POISON"
-                              turnsRemaining={inspectedEnemy.poisonStacks || 1}
-                              stacks={inspectedEnemy.poisonStacks}
-                            />
-                          )}
-                          {Boolean(
-                            inspectedEnemy.vulnerableTurns &&
-                              inspectedEnemy.vulnerableTurns > 0
-                          ) && (
-                            <LaCriptaStatusEffectBadge
-                              effectType="MARKED"
-                              turnsRemaining={inspectedEnemy.vulnerableTurns || 1}
-                            />
-                          )}
-                          {Boolean(inspectedEnemy.isDefending) && (
-                            <LaCriptaStatusEffectBadge
-                              effectType="SHIELDED"
-                              turnsRemaining={
-                                inspectedEnemy.defendingRoundsRemaining || 1
-                              }
-                            />
-                          )}
-                        </div>
-                      )}
+                      {/* Active Status Badges Floating at Bottom of Bestiary Stage (All Active Buffs/Debuffs) */}
+                      {(() => {
+                        const activeEnStatuses = getEnemyActiveStatuses(inspectedEnemy);
+                        if (activeEnStatuses.length === 0) return null;
+                        return (
+                          <div className="relative z-20 mt-2 flex flex-wrap items-center justify-center gap-1.5 px-3">
+                            {activeEnStatuses.map((st) => (
+                              <LaCriptaStatusEffectBadge
+                                key={st.id}
+                                effectType={st.effectType}
+                                turnsRemaining={st.remainingTurns}
+                                stacks={st.stacks}
+                              />
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* 3. PRIMARY STATS: SALUD | DAÑO | DEFENSA */}

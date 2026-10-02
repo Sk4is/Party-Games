@@ -17,6 +17,10 @@ import {
   CRIPTA_ARMORS_REGISTRY,
   getEquippedWeaponForPlayer,
 } from '../../data/la-cripta/criptaEquipmentAndEvents';
+import {
+  getClassMechanicForCharacter,
+  getPlayerClassMechanicHudState,
+} from '../../data/la-cripta/criptaClassMechanics';
 import { laCriptaAudio } from '../../utils/laCriptaAudio';
 import { LaCriptaPixelSprite } from './LaCriptaPixelSprite';
 import {
@@ -93,6 +97,7 @@ interface LaCriptaPartyHudProps {
   onInspectPlayer?: (playerId: string) => void;
   inspectedPlayerId?: string | null;
   onOpenStatusCodex?: () => void;
+  activeTargetedPlayerIdsDuringPresentation?: string[];
 }
 
 /**
@@ -110,7 +115,15 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [muted, setMuted] = useState(() => laCriptaAudio.isMuted());
+  const [masterVol, setMasterVol] = useState(() => laCriptaAudio.getMasterVolume());
   const [inspectedRelic, setInspectedRelic] = useState<CriptaAcquiredRelic | null>(null);
+
+  useEffect(() => {
+    return laCriptaAudio.subscribe(() => {
+      setMuted(laCriptaAudio.isMuted());
+      setMasterVol(laCriptaAudio.getMasterVolume());
+    });
+  }, []);
 
   // 60 FPS Animated Gold Counter & Treasury Pulse (Priority 12)
   const authoritativeGold = expeditionState.partyGold ?? 0;
@@ -355,6 +368,7 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
               <div
                 ref={goldCounterRef}
                 id="cripta-gold-counter-hud"
+                data-reward-target="gold"
                 data-cripta-gold-counter="true"
                 className={`relative inline-flex items-center gap-1.5 px-2.5 py-1 border font-cripta-mono text-xs font-extrabold cursor-help transition-all duration-300 ${
                   impactPulseActive
@@ -401,6 +415,7 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
           {onOpenStatusCodex && (
             <button
               type="button"
+              data-ui-target="statuses"
               onClick={() => {
                 laCriptaAudio.playStoneClick();
                 onOpenStatusCodex();
@@ -438,18 +453,44 @@ export const LaCriptaTopBar: React.FC<LaCriptaPartyHudProps> = ({
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handleToggleMute}
-            aria-label={muted ? 'Activar sonido' : 'Silenciar sonido'}
-            className="p-1.5 bg-[#16101E] hover:bg-[#282039] border border-[#282039] hover:border-[#D8C6A0]/40 text-[#D8C6A0] transition-colors cursor-pointer"
-          >
-            {muted ? (
-              <VolumeX className="w-3.5 h-3.5 text-[#8F263D]" />
-            ) : (
-              <Volume2 className="w-3.5 h-3.5 text-[#E7A54A]" />
-            )}
-          </button>
+          {/* Master Volume Control (0-100% slider + quick mute/unmute toggle) */}
+          <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-[#16101E] border border-[#282039]">
+            <button
+              type="button"
+              onClick={handleToggleMute}
+              aria-label={muted ? 'Activar sonido' : 'Silenciar sonido'}
+              title={muted ? 'Activar sonido' : 'Silenciar rápido'}
+              className="inline-flex items-center gap-1 text-[#D8C6A0] hover:text-[#FFD166] transition-colors cursor-pointer"
+            >
+              {muted ? (
+                <VolumeX className="w-3.5 h-3.5 text-[#8F263D]" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5 text-[#E7A54A]" />
+              )}
+              <span className="hidden xl:inline font-cripta-pixel text-[9px] font-bold text-[#D8C6A0] tracking-wider">
+                VOLUMEN
+              </span>
+            </button>
+
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={muted ? 0 : Math.round(masterVol * 100)}
+              aria-label="Volumen maestro de La Cripta"
+              onChange={(e) => {
+                const pct = Number.parseInt(e.target.value, 10);
+                const nextVol = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 65)) / 100;
+                laCriptaAudio.setMasterVolume(nextVol);
+              }}
+              className="w-14 sm:w-20 h-1.5 accent-[#E7A54A] bg-[#09070D] cursor-pointer"
+            />
+
+            <span className="font-cripta-mono text-[9px] font-bold text-[#FFD166] min-w-[28px] text-right">
+              {muted ? '0%' : `${Math.round(masterVol * 100)}%`}
+            </span>
+          </div>
 
           <button
             type="button"
@@ -484,6 +525,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
   isInventoryOpen = false,
   onInspectPlayer,
   inspectedPlayerId = null,
+  activeTargetedPlayerIdsDuringPresentation = [],
 }) => {
   const orderedPlayers = [...expeditionState.players].sort((a, b) => a.seatIndex - b.seatIndex);
   const playerCount = orderedPlayers.length;
@@ -507,7 +549,10 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
   const currentTurnAp = activeRoom?.currentTurnAp ?? 2;
   const maxTurnAp = activeRoom?.maxTurnAp ?? 2;
   const actedPlayerIds = activeRoom?.actedPlayerIdsThisRound || [];
-  const activeTargetedPlayerIds = activeRoom?.activeTargetedPlayerIds || [];
+  const activeTargetedPlayerIds = [
+    ...(activeRoom?.activeTargetedPlayerIds || []),
+    ...activeTargetedPlayerIdsDuringPresentation,
+  ];
   const isExploreOrBossPhase =
     expeditionState.phase === 'DUNGEON' ||
     expeditionState.phase === 'DUNGEON_ARRIVAL' ||
@@ -555,7 +600,15 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
           const isCurrentlyActing =
             !isDead && hasLivingEnemies && activeCombatActorId === player.id;
           const isTargetedByEnemy =
-            !isDead && hasLivingEnemies && activeTargetedPlayerIds.includes(player.id);
+            !isDead &&
+            hasLivingEnemies &&
+            (activeTargetedPlayerIds.includes(player.id) ||
+              Boolean(
+                combatRoundPhase === 'PLAYER_PHASE' &&
+                  activeRoom?.enemies?.some(
+                    (en) => en.hp > 0 && en.lastTargetedPlayerIds?.includes(player.id)
+                  )
+              ));
           const isInspected = inspectedPlayerId === player.id;
 
           const playerEvents = activeVisualEvents.filter(
@@ -601,6 +654,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
           return (
             <div
               key={player.id}
+              data-player-hud-card={player.id}
               onClick={() => {
                 if (onInspectPlayer) {
                   laCriptaAudio.playStoneClick();
@@ -678,38 +732,46 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                 </div>
               )}
 
-              {/* Active Turn / Readiness Tag */}
-              {!isDead && hasLivingEnemies && isExploreOrBossPhase && (
-                <div
-                  className={`pointer-events-none absolute -top-2.5 right-2 z-30 px-1.5 py-0.5 border text-[8px] font-cripta-pixel font-bold tracking-wider flex items-center gap-1 shadow ${
-                    isTargetedByEnemy
-                      ? 'bg-[#E03E52] border-[#FFD166] text-white animate-pulse'
-                      : isActiveTurnPlayer
-                      ? 'bg-[#FFD166] border-[#FFF3C4] text-[#0B0A0E]'
-                      : combatRoundPhase === 'PLAYER_PHASE' && hasActedThisRound
-                      ? 'bg-[#173626] border-[#5EA87A] text-[#8EE6AE]'
-                      : combatRoundPhase === 'PLAYER_PHASE'
-                      ? 'bg-[#1F182B] border-[#D8C6A0]/50 text-[#D8C6A0]'
-                      : 'bg-[#19111D] border-[#C93B5B]/60 text-[#FF758F]'
-                  }`}
-                >
-                  {isTargetedByEnemy ? (
-                    <span>◆ ¡OBJETIVO!</span>
-                  ) : isActiveTurnPlayer ? (
-                    <>
-                      <Swords className="w-2.5 h-2.5" />
-                      <span>
-                        {isMe ? 'TU TURNO' : 'EN TURNO'} · ◆{currentTurnAp}/{maxTurnAp} AP
-                      </span>
-                    </>
-                  ) : combatRoundPhase === 'PLAYER_PHASE' && hasActedThisRound ? (
-                    <span>✓ ACTUÓ</span>
-                  ) : combatRoundPhase === 'PLAYER_PHASE' ? (
-                    <span>EN ESPERA</span>
-                  ) : (
-                    <span>FASE ENEMIGA</span>
-                  )}
+              {/* Active Turn / Readiness / Fallen Tag */}
+              {isDead && isExploreOrBossPhase ? (
+                <div className="pointer-events-none absolute -top-2.5 right-2 z-30 px-1.5 py-0.5 bg-[#2A0E17] border border-[#C93B5B] text-[8px] font-cripta-pixel font-bold text-[#FF8FA3] tracking-wider flex items-center gap-1 shadow">
+                  <span>☠ CAÍDO · 0 PV</span>
                 </div>
+              ) : (
+                !isDead &&
+                hasLivingEnemies &&
+                isExploreOrBossPhase && (
+                  <div
+                    className={`pointer-events-none absolute -top-2.5 right-2 z-30 px-1.5 py-0.5 border text-[8px] font-cripta-pixel font-bold tracking-wider flex items-center gap-1 shadow ${
+                      isTargetedByEnemy
+                        ? 'bg-[#E03E52] border-[#FFD166] text-white animate-pulse'
+                        : isActiveTurnPlayer
+                        ? 'bg-[#FFD166] border-[#FFF3C4] text-[#0B0A0E]'
+                        : combatRoundPhase === 'PLAYER_PHASE' && hasActedThisRound
+                        ? 'bg-[#173626] border-[#5EA87A] text-[#8EE6AE]'
+                        : combatRoundPhase === 'PLAYER_PHASE'
+                        ? 'bg-[#1F182B] border-[#D8C6A0]/50 text-[#D8C6A0]'
+                        : 'bg-[#19111D] border-[#C93B5B]/60 text-[#FF758F]'
+                    }`}
+                  >
+                    {isTargetedByEnemy ? (
+                      <span>◆ ¡OBJETIVO!</span>
+                    ) : isActiveTurnPlayer ? (
+                      <>
+                        <Swords className="w-2.5 h-2.5" />
+                        <span>
+                          {isMe ? 'TU TURNO' : 'EN TURNO'} · ◆{currentTurnAp}/{maxTurnAp} AP
+                        </span>
+                      </>
+                    ) : combatRoundPhase === 'PLAYER_PHASE' && hasActedThisRound ? (
+                      <span>✓ ACTUÓ</span>
+                    ) : combatRoundPhase === 'PLAYER_PHASE' ? (
+                      <span>EN ESPERA</span>
+                    ) : (
+                      <span>FASE ENEMIGA</span>
+                    )}
+                  </div>
+                )
               )}
 
               {/* Animated Pixel Character Bust (Click inspects player) */}
@@ -760,6 +822,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                       <LaCriptaPixelSprite
                         characterId={charId}
                         animationState={isDead ? 'idle' : animState}
+                        classResource={player.classResource}
                         size="hud"
                       />
                     </div>
@@ -920,6 +983,74 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                   </div>
                 </div>
 
+                {/* Universal 9-Class Core Mechanic Strip (GUARDIA, CARGA ARCANA, COMBO, ACECHO, FERVOR, REACTIVOS, FURIA, COMPÁS, ESENCIA) */}
+                {(() => {
+                  const mechHud = !isDead ? getPlayerClassMechanicHudState(player) : null;
+                  const mechDef = getClassMechanicForCharacter(player.characterId);
+                  if (!mechHud || !mechDef) return null;
+                  return (
+                    <LaCriptaPixelTooltip
+                      title={`${mechHud.iconSymbol} ${mechDef.name} (${mechHud.current}/${mechHud.max})`}
+                      category={`MECÁNICA DE CLASE · ${charDef?.className || ''}`}
+                      description={`${mechDef.shortDescription} | GANAR: ${mechDef.howToGain} | USAR: ${mechDef.howToSpendOrTrigger}`}
+                      footerLabel={`${mechHud.stateBadge} · ${mechHud.bonusSummary}`}
+                      borderColor={mechHud.colorHex}
+                    >
+                      <div
+                        className="mt-1 flex items-center justify-between gap-1.5 px-1.5 py-0.5 bg-[#0A0710] border transition-colors cursor-help"
+                        style={{
+                          borderColor: mechHud.isReadyOrThreshold
+                            ? `${mechHud.colorHex}B0`
+                            : '#282039',
+                          boxShadow: mechHud.isReadyOrThreshold
+                            ? `0 0 8px ${mechHud.colorHex}30`
+                            : undefined,
+                        }}
+                      >
+                        <span
+                          className="text-[8px] font-cripta-pixel font-bold uppercase tracking-wider shrink-0 flex items-center gap-1"
+                          style={{ color: mechHud.colorHex }}
+                        >
+                          <span>{mechHud.iconSymbol}</span>
+                          <span>{mechHud.shortLabel}</span>
+                          <span className="text-[#F4EBD9] font-cripta-mono">
+                            {mechHud.pipsText}
+                          </span>
+                        </span>
+
+                        {mechHud.kind === 'FURIA' ? (
+                          <div className="flex-1 flex items-center gap-1.5 max-w-[110px]">
+                            <div className="flex-1 h-1.5 bg-[#050408] border border-[#451A1C] overflow-hidden relative">
+                              <div
+                                className="h-full transition-all duration-300"
+                                style={{
+                                  width: `${Math.min(100, mechHud.current)}%`,
+                                  backgroundColor:
+                                    mechHud.current >= 75
+                                      ? '#EF4444'
+                                      : mechHud.current >= 50
+                                      ? '#F97316'
+                                      : '#D97706',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <span
+                          className={`text-[7.5px] font-cripta-mono font-bold uppercase px-1 py-0.1 border truncate ${
+                            mechHud.isReadyOrThreshold
+                              ? 'bg-[#2A1B0E] border-[#FFD166]/80 text-[#FFD166]'
+                              : 'bg-[#120D1B] border-[#282039] text-[#D8C6A0]/80'
+                          }`}
+                        >
+                          {mechHud.stateBadge}
+                        </span>
+                      </div>
+                    </LaCriptaPixelTooltip>
+                  );
+                })()}
+
                 {/* Statuses & Dedicated MOCHILA / INSPECT Controls */}
                 <div
                   className="mt-1 flex items-center justify-between gap-1 min-h-[20px]"
@@ -949,7 +1080,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                             </span>
                           </LaCriptaPixelTooltip>
                         )}
-                        {player.statuses.slice(0, 4).map((st) => (
+                        {(player.statuses || []).slice(0, 4).map((st) => (
                           <LaCriptaStatusEffectBadge key={st.id} status={st} />
                         ))}
                       </>
@@ -975,7 +1106,7 @@ export const LaCriptaPartyHud: React.FC<LaCriptaPartyHudProps> = ({
                         <HudBackpackPixelIcon size={12} />
                         <span>MOCHILA</span>
                         <span className="px-1 bg-[#09070D] border border-[#4A3B5C] text-[#FFD166] font-cripta-mono text-[9px]">
-                          {normalInv.length}
+                          {normalInv.reduce((sum, st) => sum + (st.quantity || 1), 0)}/{player.inventoryCapacity || 6}
                         </span>
                       </button>
                     )}

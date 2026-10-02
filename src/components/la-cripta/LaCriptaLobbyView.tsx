@@ -463,12 +463,12 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
         </div>
       )}
 
-      {/* Main Preparation Stage: Left = 6 Character Cards (3x2 Desktop, 2x3 Mobile), Right = Detailed Selected/Inspected Character Panel & Start Controls */}
+      {/* Main Preparation Stage: Left = 9 Character Cards (3x3 Desktop, 2-col Tablet, 1-2 col Mobile), Right = Detailed Selected/Inspected Character Panel & Start Controls */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 items-stretch">
-        {/* LEFT 7 COLUMNS: The 6 Selectable Adventurer Panels */}
+        {/* LEFT 7 COLUMNS: The 9 Selectable Adventurer Panels (3x3 Grid) */}
         <section
           aria-label="Selección de aventurero"
-          className="xl:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4"
+          className="xl:col-span-7 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-3.5"
         >
           {ALL_CRIPTA_CHARACTER_IDS.map((charId) => {
             const charDef = CRIPTA_CHARACTERS_CATALOG[charId];
@@ -500,7 +500,7 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
                   laCriptaAudio.playCharacterSelect();
                   onSelectCharacter(charId);
                 }}
-                className={`group relative text-left p-3 sm:p-4 bg-[#140F1A] border-2 transition-all duration-150 flex flex-col justify-between overflow-hidden ${
+                className={`group relative text-left p-3 sm:p-3.5 bg-[#140F1A] border-2 transition-all duration-150 flex flex-col justify-between overflow-hidden ${
                   isOccupiedByOther
                     ? 'cursor-not-allowed opacity-85'
                     : 'cursor-pointer hover:-translate-y-0.5'
@@ -529,14 +529,28 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
                   }}
                 />
 
-                {/* Top Class Header */}
+                {/* Top Class Header + Resource Pill */}
                 <div className="relative z-10 flex items-center justify-between gap-1 w-full mb-1">
-                  <span
-                    className="font-cripta-display text-sm sm:text-base font-black tracking-wider truncate"
-                    style={{ color: isSelectedByMe ? '#E7A54A' : charDef.accentColor }}
-                  >
-                    {charDef.className}
-                  </span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span
+                      className="font-cripta-display text-sm sm:text-base font-black tracking-wider truncate"
+                      style={{ color: isSelectedByMe ? '#E7A54A' : charDef.accentColor }}
+                    >
+                      {charDef.className}
+                    </span>
+                    {charDef.resourceName && (
+                      <span
+                        className="px-1.5 py-0.2 border text-[8px] font-cripta-pixel font-bold uppercase tracking-wider shrink-0"
+                        style={{
+                          borderColor: `${charDef.accentColor}88`,
+                          backgroundColor: '#0B0811',
+                          color: charDef.accentColor,
+                        }}
+                      >
+                        {charDef.resourceName}
+                      </span>
+                    )}
+                  </div>
                   {isSelectedByMe && (
                     <CheckCircle2 className="w-4 h-4 text-[#E7A54A] shrink-0" />
                   )}
@@ -546,7 +560,7 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
                 </div>
 
                 {/* Center Illuminated Pixel-Art Character Sprite */}
-                <div className="relative z-10 my-1.5 py-1.5 flex items-center justify-center bg-[#09070D]/90 border border-[#282039]">
+                <div className="relative z-10 my-1 py-1.5 flex items-center justify-center bg-[#09070D]/90 border border-[#282039]">
                   <LaCriptaPixelSprite
                     characterId={charId}
                     size="md"
@@ -555,8 +569,8 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
                   />
                 </div>
 
-                {/* Mini 4-Stat Preview Bars */}
-                <div className="relative z-10 my-2">
+                {/* Mini 7-Stat Preview Bars */}
+                <div className="relative z-10 my-1.5">
                   <LaCriptaStatBlock
                     stats={charDef.stats}
                     triggerKey={`card_${charId}`}
@@ -565,7 +579,7 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
                 </div>
 
                 {/* Bottom Ownership / Status Strip */}
-                <div className="relative z-10 pt-2 mt-1 border-t border-[#282039] flex items-center justify-between gap-1.5 min-h-[26px]">
+                <div className="relative z-10 pt-1.5 mt-1 border-t border-[#282039] flex items-center justify-between gap-1.5 min-h-[24px]">
                   {occupyingPlayer ? (
                     <div className="flex items-center gap-1.5 min-w-0 w-full">
                       <span
@@ -598,7 +612,7 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
         <section className="xl:col-span-5 bg-[#140F1A] border-2 border-[#282039] p-4 sm:p-5 flex flex-col justify-between gap-4 shadow-[0_12px_34px_rgba(0,0,0,0.88)]">
           <div>
             {/* Dossier Header */}
-            <div className="flex items-start gap-4 border-b border-[#282039] pb-4 mb-4">
+            <div className="flex items-start gap-4 border-b border-[#282039] pb-4 mb-3">
               <div
                 className="p-2 bg-[#09070D] border-2 shrink-0 flex items-center justify-center"
                 style={{ borderColor: inspectedCharDef.accentColor }}
@@ -647,7 +661,7 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
                   <span className="text-[#D9D0BC]/70">{inspectedCharDef.title}</span>
                 </div>
 
-                <p className="text-xs text-[#E7A54A] font-medium mt-1.5">
+                <p className="text-xs text-[#E7A54A] font-medium mt-1">
                   {inspectedCharDef.role}
                 </p>
                 <p className="text-xs text-[#D9D0BC]/80 mt-1 leading-relaxed">
@@ -656,14 +670,37 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
               </div>
             </div>
 
-            {/* 4 Primary 10-Segment Square Stat Bars (VIDA, ATAQUE, DEFENSA, MAGIA) */}
-            <div className="bg-[#09070D] border border-[#282039] p-3.5 sm:p-4 mb-4">
-              <div className="flex items-center justify-between mb-2.5">
+            {/* Special Class Resource Panel (FURIA / COMPÁS / ESENCIA) */}
+            {inspectedCharDef.resourceName && inspectedCharDef.resourceDescription && (
+              <div
+                className="p-2.5 bg-[#09070D] border-l-2 border border-[#282039] mb-3"
+                style={{ borderLeftColor: inspectedCharDef.accentColor }}
+              >
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span
+                    className="text-[10px] font-cripta-pixel font-bold uppercase tracking-widest"
+                    style={{ color: inspectedCharDef.accentColor }}
+                  >
+                    ✦ RECURSO DE CLASE: {inspectedCharDef.resourceName} (0–{inspectedCharDef.resourceMax})
+                  </span>
+                  <span className="px-1.5 py-0.2 bg-[#161022] border border-[#3E2F4B] text-[9px] font-cripta-mono text-[#FFD166]">
+                    MECÁNICA ÚNICA
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#D9D0BC]/85 leading-snug">
+                  {inspectedCharDef.resourceDescription}
+                </p>
+              </div>
+            )}
+
+            {/* 7 Primary 10-Segment Square Stat Bars (VIDA, ATAQUE, DEFENSA, MAGIA, AGILIDAD, PRECISIÓN, VOLUNTAD) */}
+            <div className="bg-[#09070D] border border-[#282039] p-3 sm:p-3.5 mb-3">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-cripta-pixel text-[#D8C6A0] uppercase tracking-wider">
-                  APTITUDES DEL AVENTURERO
+                  7 ATRIBUTOS DEL AVENTURERO
                 </span>
                 <span className="text-[11px] font-cripta-mono text-[#D8C6A0]/70">
-                  PV INICIALES: {inspectedCharDef.maxHp}
+                  PV: {inspectedCharDef.maxHp} · DEF: {inspectedCharDef.baseArmor}
                 </span>
               </div>
 
@@ -672,6 +709,53 @@ export const LaCriptaLobbyView: React.FC<LaCriptaLobbyViewProps> = ({
                 triggerKey={`dossier_${inspectedCharacterId}`}
                 compact={false}
               />
+            </div>
+
+            {/* Class Synergy Hint */}
+            {inspectedCharDef.synergyHint && (
+              <div className="px-2.5 py-2 bg-[#120D1B] border border-[#3E2F4B] text-[10px] font-cripta-pixel text-[#D8C6A0]/90 leading-relaxed mb-3">
+                <span className="text-[#FFD166] font-bold">✦ SINERGIA DE GRUPO: </span>
+                {inspectedCharDef.synergyHint.replace(/^Sinergia:\s*/i, '')}
+              </div>
+            )}
+
+            {/* Class Abilities Preview */}
+            <div className="space-y-1.5 mb-2">
+              <div className="text-[10px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-widest">
+                TÉCNICAS Y RASGOS DE CLASE ({inspectedCharDef.abilities.length})
+              </div>
+              <div className="grid grid-cols-1 gap-1.5 max-h-[190px] overflow-y-auto pr-1">
+                {inspectedCharDef.abilities.map((ab) => (
+                  <div
+                    key={ab.id}
+                    className="p-2 bg-[#09070D]/90 border border-[#282039] flex flex-col gap-0.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-cripta-pixel text-[11px] font-bold text-[#E7A54A]">
+                        {ab.name}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {ab.resourceGain && (
+                          <span className="px-1.5 py-0.2 bg-[#1B1429] border border-[#E7A54A]/60 text-[8px] font-cripta-pixel text-[#FFD166]">
+                            +{ab.resourceGain} {inspectedCharDef.resourceName || 'REC'}
+                          </span>
+                        )}
+                        {ab.minResourceRequired && (
+                          <span className="px-1.5 py-0.2 bg-[#2A121B] border border-[#FF4D6D] text-[8px] font-cripta-pixel text-[#FF8FA3]">
+                            REQ. {ab.minResourceRequired}+ {inspectedCharDef.resourceName || 'REC'}
+                          </span>
+                        )}
+                        <span className="px-1.5 py-0.2 bg-[#19111D] border border-[#7656A8]/45 text-[9px] font-cripta-pixel text-[#D8C6A0]">
+                          {ab.type}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-[#D9D0BC]/75 leading-snug">
+                      {ab.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Lore Quote */}

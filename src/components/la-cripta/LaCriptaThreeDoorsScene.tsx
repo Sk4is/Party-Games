@@ -12,12 +12,16 @@ import {
   X,
 } from 'lucide-react';
 import {
+  CriptaAccessoryId,
+  CriptaArmorId,
+  CriptaCharacterId,
   CriptaDungeonDefinition,
   CriptaDungeonId,
   CriptaExpeditionState,
   CriptaPlayerRoundActionType,
   CriptaRoomEnemy,
   CriptaVisualEvent,
+  CriptaWeaponId,
   CriptaWeaponRuneId,
 } from '../../types/laCripta';
 import {
@@ -33,6 +37,8 @@ import {
 import {
   computeEnemyApproxDamageRange,
   computePlayerEffectiveStats,
+  CRIPTA_ACCESSORIES_REGISTRY,
+  CRIPTA_ARMORS_REGISTRY,
   CRIPTA_WEAPON_RUNES_REGISTRY,
   CRIPTA_WEAPONS_REGISTRY,
   estimatePlayerActionDamage,
@@ -40,6 +46,7 @@ import {
   getEquippedWeaponForPlayer,
   WEAPON_UPGRADE_MAX_LEVEL,
 } from '../../data/la-cripta/criptaEquipmentAndEvents';
+import { LaCriptaPixelSprite } from './LaCriptaPixelSprite';
 import { buildEnemyAiProfileForArchetype } from '../../data/la-cripta/criptaEnemyAiEngine';
 import { LaCriptaDoorArtwork } from './LaCriptaDoorArtwork';
 import { ROOM_TYPE_LABELS } from './LaCriptaRoomProgressTracker';
@@ -49,6 +56,13 @@ import {
   LaCriptaStatusPixelIcon,
 } from './LaCriptaStatusEffectBadge';
 import {
+  getClassMechanicForCharacter,
+  getEnemyActiveStatuses,
+  getPlayerActionMechanicBadge,
+  getPlayerClassMechanicHudState,
+} from '../../data/la-cripta/criptaClassMechanics';
+import {
+  CriptaEnemyLifecycleStage,
   LaCriptaCombatVfxOverlay,
   LaCriptaEnemyDeathOverlay,
   LaCriptaFloatingEventBadge,
@@ -69,8 +83,10 @@ import {
 import {
   LaCriptaBiomeStageBackdrop,
   LaCriptaCardPixelIllustration,
+  LaCriptaCombatCardArtwork,
   LaCriptaNonCombatStagePortrait,
   LaCriptaPlayableCard,
+  resolveWeaponCombatArtKey,
 } from './LaCriptaEncounterCards';
 import {
   CriptaContextualPanelMode,
@@ -131,12 +147,16 @@ interface LaCriptaThreeDoorsSceneProps {
   currentPlayerId: string;
   activeVisualEvents?: CriptaVisualEvent[];
   enemyAnimStates?: Record<string, 'idle' | 'hit' | 'lunge' | 'death'>;
+  enemyLifecycleStates?: Record<string, CriptaEnemyLifecycleStage>;
   isPresentingSequence?: boolean;
   presentationBannerText?: string | null;
   hitStopActive?: boolean;
   presentedEnemyHp?: Record<string, { hp: number; trailHp: number }>;
   dyingEnemies?: Record<string, CriptaRoomEnemy>;
   hideGroundDropsDuringDeath?: boolean;
+  presentedExpeditionDefeated?: boolean;
+  activeActingEnemyId?: string | null;
+  activeTargetedPlayerIdsDuringPresentation?: string[];
   onVoteDoor: (dungeonId: CriptaDungeonId) => void;
   onVoteFinalBossDoor?: () => void;
   onRetryDungeonInit?: () => void;
@@ -189,12 +209,16 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   currentPlayerId,
   activeVisualEvents = [],
   enemyAnimStates = {},
+  enemyLifecycleStates = {},
   isPresentingSequence = false,
   presentationBannerText = null,
   hitStopActive = false,
   presentedEnemyHp = {},
   dyingEnemies = {},
   hideGroundDropsDuringDeath = false,
+  presentedExpeditionDefeated = false,
+  activeActingEnemyId = null,
+  activeTargetedPlayerIdsDuringPresentation = [],
   onVoteDoor,
   onVoteFinalBossDoor,
   onRetryDungeonInit,
@@ -290,25 +314,153 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
       return null;
     }
 
-    const livingEnemies = activeRoom.enemies.filter((e) => e.hp > 0);
-    // Keep enemies visible while their presented HP > 0 or while their death animation is playing!
-    const visibleRoomEnemies = activeRoom.enemies.map((e) => {
-      if (dyingEnemies[e.id] && e.hp <= 0) {
-        return dyingEnemies[e.id];
-      }
-      return e;
-    }).filter(
-      (e) =>
-        e.hp > 0 ||
-        (presentedEnemyHp[e.id]?.hp ?? 0) > 0 ||
-        enemyAnimStates[e.id] === 'death' ||
-        Boolean(dyingEnemies[e.id])
+    const livingEnemies = activeRoom.enemies.filter(
+      (e) => e.hp > 0 && enemyLifecycleStates[e.id] !== 'DEAD_REMOVED'
     );
+    // Authoritative enemy lifecycle: ALIVE -> DYING -> DEAD_REMOVED
+    // Once an enemy enters DEAD_REMOVED, it must NEVER be rendered again in this encounter.
+    const visibleRoomEnemies = activeRoom.enemies
+      .filter((e) => enemyLifecycleStates[e.id] !== 'DEAD_REMOVED')
+      .map((e) => {
+        if (dyingEnemies[e.id] && e.hp <= 0) {
+          return dyingEnemies[e.id];
+        }
+        return e;
+      })
+      .filter(
+        (e) =>
+          enemyLifecycleStates[e.id] !== 'DEAD_REMOVED' &&
+          (e.hp > 0 ||
+            (presentedEnemyHp[e.id]?.hp ?? 0) > 0 ||
+            enemyAnimStates[e.id] === 'death' ||
+            enemyLifecycleStates[e.id] === 'DYING' ||
+            Boolean(dyingEnemies[e.id]))
+      );
     const activeTargetEnemy =
       livingEnemies.find((e) => e.id === selectedEnemyId) ||
       livingEnemies[0] ||
       visibleRoomEnemies[0] ||
       null;
+
+    const getEquipmentComparison = (opts: {
+      weaponId?: CriptaWeaponId;
+      armorId?: CriptaArmorId;
+      accessoryId?: CriptaAccessoryId;
+      weaponRuneId?: CriptaWeaponRuneId;
+      isForgeUpgrade?: boolean;
+    }): {
+      badge: string | null;
+      tone: 'upgrade' | 'downgrade' | 'neutral';
+      detailTooltip: string;
+    } => {
+      if (!me) {
+        return { badge: null, tone: 'neutral', detailTooltip: '' };
+      }
+      const eqWep = getEquippedWeaponForPlayer(me);
+      if (opts.isForgeUpgrade && eqWep) {
+        return {
+          badge: `MEJORA NV.${eqWep.level} → NV.${eqWep.level + 1} (+2–3 DAÑO BASE)`,
+          tone: 'upgrade',
+          detailTooltip: `Actual: ${eqWep.weapon.name} NV.${eqWep.level} (${eqWep.scaledMin}–${eqWep.scaledMax} daño). Al forjar sube a NV.${eqWep.level + 1} con +2 daño mínimo y +3 daño máximo.`,
+        };
+      }
+      if (opts.weaponId) {
+        const cand = CRIPTA_WEAPONS_REGISTRY[opts.weaponId];
+        if (!cand) return { badge: null, tone: 'neutral', detailTooltip: '' };
+        const candDmgType = cand.baseDamageType || 'FISICO';
+        if (!eqWep) {
+          return {
+            badge: `NUEVA ARMA: ${cand.baseMinDamage}–${cand.baseMaxDamage} DAÑO (${candDmgType})`,
+            tone: 'upgrade',
+            detailTooltip: `${cand.specialEffectText} Escala con ${cand.scalingStat}.`,
+          };
+        }
+        if (eqWep.weapon.id === cand.id) {
+          return {
+            badge: `YA EQUIPADA (NV.${eqWep.level} · ${eqWep.scaledMin}–${eqWep.scaledMax} DAÑO)`,
+            tone: 'neutral',
+            detailTooltip: `Ya llevas equipada ${cand.name}. Comprarla o reclamarla la templará a NV.${eqWep.level + 1}.`,
+          };
+        }
+        const dMin = cand.baseMinDamage - eqWep.scaledMin;
+        const dMax = cand.baseMaxDamage - eqWep.scaledMax;
+        const dAvg = (dMin + dMax) / 2;
+        const fmt = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+        return {
+          badge: `VS ${eqWep.weapon.name.slice(0, 14)}: ${fmt(dMin)}/${fmt(dMax)} DAÑO · ${candDmgType}`,
+          tone: dAvg > 0 ? 'upgrade' : dAvg < 0 ? 'downgrade' : 'neutral',
+          detailTooltip: `COMPARATIVA DE ARMA — Equipada: ${eqWep.weapon.name} NV.${eqWep.level} (${eqWep.scaledMin}–${eqWep.scaledMax} daño ${eqWep.activeDamageType}) vs Candidata: ${cand.name} (${cand.baseMinDamage}–${cand.baseMaxDamage} daño ${candDmgType}, escala con ${cand.scalingStat}). Técnica: ${cand.specialAttack?.name || 'Especial'}.`,
+        };
+      }
+      if (opts.armorId) {
+        const cand = CRIPTA_ARMORS_REGISTRY[opts.armorId];
+        if (!cand) return { badge: null, tone: 'neutral', detailTooltip: '' };
+        const cur = me.equippedArmorId
+          ? CRIPTA_ARMORS_REGISTRY[me.equippedArmorId]
+          : null;
+        if (cur && cur.id === cand.id) {
+          return {
+            badge: `YA EQUIPADA (+${cand.bonusDefense} DEF · +${cand.bonusMaxHp} PV)`,
+            tone: 'neutral',
+            detailTooltip: cand.specialEffectText,
+          };
+        }
+        const dDef = cand.bonusDefense - (cur?.bonusDefense || 0);
+        const dHp = cand.bonusMaxHp - (cur?.bonusMaxHp || 0);
+        const score = dDef * 2 + dHp * 0.5;
+        const fmt = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+        return {
+          badge: `VS ${cur ? cur.name.slice(0, 12) : 'SIN ARMADURA'}: ${fmt(dDef)} DEF · ${fmt(dHp)} PV`,
+          tone: score > 0 ? 'upgrade' : score < 0 ? 'downgrade' : 'neutral',
+          detailTooltip: `COMPARATIVA DE ARMADURA — Equipada: ${
+            cur ? `${cur.name} (+${cur.bonusDefense} DEF, +${cur.bonusMaxHp} PV)` : 'Ninguna'
+          } vs Candidata: ${cand.name} (+${cand.bonusDefense} DEF, +${cand.bonusMaxHp} PV). ${cand.specialEffectText}`,
+        };
+      }
+      if (opts.accessoryId) {
+        const cand = CRIPTA_ACCESSORIES_REGISTRY[opts.accessoryId];
+        if (!cand) return { badge: null, tone: 'neutral', detailTooltip: '' };
+        const cur = me.equippedAccessoryId
+          ? CRIPTA_ACCESSORIES_REGISTRY[me.equippedAccessoryId]
+          : null;
+        if (cur && cur.id === cand.id) {
+          return {
+            badge: 'ACCESORIO YA EQUIPADO',
+            tone: 'neutral',
+            detailTooltip: cand.specialEffectText,
+          };
+        }
+        const bonusParts: string[] = [];
+        if (cand.bonusAttack) bonusParts.push(`+${cand.bonusAttack} ATQ`);
+        if (cand.bonusMagic) bonusParts.push(`+${cand.bonusMagic} MAG`);
+        if (cand.bonusDefense) bonusParts.push(`+${cand.bonusDefense} DEF`);
+        if (cand.bonusAgility) bonusParts.push(`+${cand.bonusAgility} AGI`);
+        if (cand.bonusPrecision) bonusParts.push(`+${cand.bonusPrecision} PRE`);
+        if (cand.bonusWillpower) bonusParts.push(`+${cand.bonusWillpower} VOL`);
+        return {
+          badge: cur
+            ? `REEMPLAZA ${cur.name.slice(0, 12)} (${bonusParts.join(' · ') || 'EFECTO'})`
+            : `RANURA LIBRE: ${bonusParts.join(' · ') || 'BONO ESPECIAL'}`,
+          tone: cur ? 'neutral' : 'upgrade',
+          detailTooltip: `COMPARATIVA DE ACCESORIO — Equipado: ${
+            cur ? `${cur.name} (${cur.specialEffectText})` : 'Ninguno'
+          } vs Candidato: ${cand.name} (${cand.specialEffectText}).`,
+        };
+      }
+      if (opts.weaponRuneId) {
+        const cand = CRIPTA_WEAPON_RUNES_REGISTRY[opts.weaponRuneId];
+        if (!cand) return { badge: null, tone: 'neutral', detailTooltip: '' };
+        const alreadyOwned = (me.ownedWeaponRunes || []).includes(opts.weaponRuneId);
+        return {
+          badge: alreadyOwned
+            ? `RUNA YA EN INVENTARIO (${cand.infusedDamageType})`
+            : `INFUSIÓN ${cand.infusedDamageType}: ${cand.benefitText.slice(0, 26)}`,
+          tone: alreadyOwned ? 'neutral' : 'upgrade',
+          detailTooltip: `${cand.name}: Infunde daño ${cand.infusedDamageType}. Beneficio: ${cand.benefitText} Contrapartida: ${cand.tradeoffText}`,
+        };
+      }
+      return { badge: null, tone: 'neutral', detailTooltip: '' };
+    };
     const inspectedEnemy =
       activeRoom.enemies.find((e) => e.id === inspectedEnemyId) ||
       activeTargetEnemy ||
@@ -400,7 +552,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
           )
         : null;
 
-    const isDefeated = Boolean(expeditionState.expeditionDefeated);
+    // Do NOT reveal the defeat screen until the fatal attack, damage number, and player death animations finish!
+    const isDefeated =
+      Boolean(expeditionState.expeditionDefeated) &&
+      (presentedExpeditionDefeated || !isPresentingSequence);
     const hasDiscountRelic = Boolean(
       me &&
         playerHasRelic(
@@ -622,7 +777,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
 
             {/* CENTER OF LEFT STAGE: COMMANDING LARGE CREATURE / NPC / OBJECT ART */}
             <div
-              className={`relative z-20 flex-1 min-h-[200px] flex flex-col items-center justify-center my-2 transition-transform duration-75 ${
+              className={`relative z-20 flex-1 min-h-[180px] flex flex-col items-center justify-center my-1.5 transition-transform duration-75 ${
                 hitStopActive ? 'scale-[1.02] brightness-125' : ''
               }`}
             >
@@ -646,6 +801,24 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       (enemyAnimStates[enemy.id] === 'death' ||
                         Boolean(dyingEnemies[enemy.id]));
                     const isTargeted = activeTargetEnemy?.id === enemy.id && !isDead;
+                    const isActingNow =
+                      !isDead &&
+                      (activeActingEnemyId === enemy.id ||
+                        (!isPlayerPhase && activeRoom.activeCombatActorId === enemy.id));
+                    const sameSpeciesList = visibleRoomEnemies.filter(
+                      (e) => e.name === enemy.name
+                    );
+                    const instanceOrdinal =
+                      sameSpeciesList.length > 1
+                        ? sameSpeciesList.findIndex((e) => e.id === enemy.id) + 1
+                        : 0;
+                    const enemyDisplayNameWithInstance =
+                      instanceOrdinal > 0
+                        ? `${enemy.name} #${instanceOrdinal}`
+                        : enemy.name;
+                    const intendedTargetPlayers = (enemy.lastTargetedPlayerIds || [])
+                      .map((pid) => expeditionState.players.find((p) => p.id === pid))
+                      .filter(Boolean);
                     const animState =
                       enemyAnimStates[enemy.id] || (isDead ? 'death' : 'idle');
                     const enemyEvents = activeVisualEvents.filter(
@@ -668,6 +841,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     return (
                       <div
                         key={enemy.id}
+                        data-enemy-stage-id={enemy.id}
                         role="button"
                         tabIndex={isDead ? -1 : 0}
                         onClick={() => {
@@ -688,9 +862,11 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             }
                           }
                         }}
-                        className={`group relative flex flex-col items-center transition-all duration-500 outline-none ${
+                        className={`group relative flex flex-col items-center transition-all duration-300 outline-none ${
                           isDead
                             ? 'opacity-40 scale-90 translate-y-2 pointer-events-none'
+                            : isActingNow
+                            ? '-translate-y-1.5 scale-[1.04] z-30 drop-shadow-[0_6px_14px_rgba(231,165,74,0.35)]'
                             : isTargeted
                             ? 'scale-105 cursor-pointer z-20'
                             : 'opacity-85 hover:opacity-100 hover:scale-102 cursor-pointer z-10'
@@ -705,10 +881,15 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           </div>
                         )}
 
-                        {/* Multi-Enemy Target Indicator & Explicit Inspect Action */}
+                        {/* Acting Indicator + Multi-Enemy Target Indicator & Explicit Inspect Action */}
                         {!isDead && (
-                          <div className="mb-1 flex items-center gap-1">
-                            {visibleRoomEnemies.length > 1 && (
+                          <div className="mb-1 flex flex-wrap items-center justify-center gap-1">
+                            {isActingNow && (
+                              <div className="px-2 py-0.5 bg-[#1B1326]/95 border border-[#FFD166]/85 text-[8px] font-cripta-pixel font-bold text-[#FFD166] uppercase tracking-wider shadow-[0_0_10px_rgba(255,209,102,0.3)]">
+                                ◆ ACTÚA
+                              </div>
+                            )}
+                            {visibleRoomEnemies.length > 1 && !isActingNow && (
                               <div
                                 className={`px-2 py-0.5 border text-[8px] font-cripta-pixel font-bold uppercase tracking-wider transition-colors ${
                                   isTargeted
@@ -741,7 +922,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                                     ? 'bg-[#2A1C12] border-[#FFD166] text-[#FFD166]'
                                     : 'bg-[#120D1A]/95 hover:bg-[#211730] border-[#4A3B5C] hover:border-[#E7A54A] text-[#D8C6A0] hover:text-[#FFD166]'
                                 }`}
-                                title={`Examinar a ${enemy.name}`}
+                                title={`Examinar a ${enemyDisplayNameWithInstance}`}
                               >
                                 <Eye className="w-2.5 h-2.5 text-[#E7A54A]" />
                                 <span>EXAMINAR</span>
@@ -763,7 +944,8 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           )}
                           {isDead && (
                             <LaCriptaEnemyDeathOverlay
-                              enemyName={enemy.name}
+                              enemyName={enemyDisplayNameWithInstance}
+                              dungeonId={chosenDungeon.id}
                               isBossOrMiniboss={
                                 enemy.isBoss ||
                                 enemy.isFinalBoss ||
@@ -774,7 +956,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           <LaCriptaEnemyPixelSprite
                             enemy={enemy}
                             dungeonId={chosenDungeon.id}
-                            isTargeted={isTargeted}
+                            isTargeted={isTargeted || isActingNow}
                             animState={animState}
                             totalVisibleEnemies={visibleRoomEnemies.length}
                             enemyIndex={enemyIdx}
@@ -784,14 +966,34 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
 
                         {/* Secondary mini HP bar when multiple enemies exist */}
                         {visibleRoomEnemies.length > 1 && (
-                          <div className="mt-2 w-36 bg-[#0B0811]/95 border border-[#3E2F4B] p-1.5 text-center">
+                          <div
+                            className={`mt-2 w-40 bg-[#0B0811]/95 border p-1.5 text-center transition-colors ${
+                              isActingNow
+                                ? 'border-[#FFD166] shadow-[0_0_14px_rgba(255,209,102,0.35)]'
+                                : 'border-[#3E2F4B]'
+                            }`}
+                          >
                             <div className="text-[9px] font-cripta-display font-bold text-[#F5EFE6] truncate">
-                              {enemy.name}
+                              {enemyDisplayNameWithInstance}
                             </div>
                             <div className="mt-0.5 text-[7px] font-cripta-pixel font-bold text-[#FFD166] uppercase tracking-wider truncate">
-                              {enemy.profession ||
+                              {enemy.abilityName ||
+                                enemy.intent ||
+                                enemy.profession ||
                                 buildEnemyAiProfileForArchetype(enemy).profession}
                             </div>
+                            {intendedTargetPlayers.length > 0 && (
+                              <div className="mt-0.5 text-[7px] font-cripta-pixel font-bold text-[#FF8FA3] truncate">
+                                🎯{' '}
+                                {intendedTargetPlayers.length >= connectedPlayers.length &&
+                                connectedPlayers.length > 1
+                                  ? 'TODO EL GRUPO'
+                                  : intendedTargetPlayers
+                                      .map((tp) => tp?.name)
+                                      .filter(Boolean)
+                                      .join(', ')}
+                              </div>
+                            )}
                             <div className="mt-1 h-2 w-full bg-[#161020] border border-[#2D223B] overflow-hidden relative">
                               {/* Delayed trailing damage strip */}
                               <div
@@ -828,61 +1030,24 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                               </span>
                               <span>DEF {enemy.armor || 0}</span>
                             </div>
-                            {/* Active status badges on secondary multi-enemy card */}
-                            {(Boolean(enemy.poisonStacks && enemy.poisonStacks > 0) ||
-                              Boolean(enemy.vulnerableTurns && enemy.vulnerableTurns > 0) ||
-                              Boolean(
-                                enemy.attackBuffBonus &&
-                                  enemy.attackBuffBonus < 0 &&
-                                  (enemy.attackBuffRounds || 0) > 0
-                              ) ||
-                              Boolean(
-                                (enemy.defendingRoundsRemaining || 0) > 0 ||
-                                  (enemy.armorBuffBonus || 0) > 0
-                              )) && (
-                              <div className="mt-1 pt-1 border-t border-[#261C33] flex flex-wrap items-center justify-center gap-1">
-                                {Boolean(enemy.poisonStacks && enemy.poisonStacks > 0) && (
-                                  <LaCriptaStatusEffectBadge
-                                    effectType="POISON"
-                                    turnsRemaining={enemy.poisonStacks || 1}
-                                    stacks={enemy.poisonStacks}
-                                    compact
-                                  />
-                                )}
-                                {Boolean(enemy.vulnerableTurns && enemy.vulnerableTurns > 0) && (
-                                  <LaCriptaStatusEffectBadge
-                                    effectType="VULNERABLE"
-                                    turnsRemaining={enemy.vulnerableTurns || 1}
-                                    compact
-                                  />
-                                )}
-                                {Boolean(
-                                  enemy.attackBuffBonus &&
-                                    enemy.attackBuffBonus < 0 &&
-                                    (enemy.attackBuffRounds || 0) > 0
-                                ) && (
-                                  <LaCriptaStatusEffectBadge
-                                    effectType="WEAKENED"
-                                    turnsRemaining={enemy.attackBuffRounds || 1}
-                                    compact
-                                  />
-                                )}
-                                {Boolean(
-                                  (enemy.defendingRoundsRemaining || 0) > 0 ||
-                                    (enemy.armorBuffBonus || 0) > 0
-                                ) && (
-                                  <LaCriptaStatusEffectBadge
-                                    effectType="SHIELDED"
-                                    turnsRemaining={
-                                      enemy.defendingRoundsRemaining ||
-                                      enemy.armorBuffRounds ||
-                                      1
-                                    }
-                                    compact
-                                  />
-                                )}
-                              </div>
-                            )}
+                            {/* Active status badges on secondary multi-enemy card (All Buffs & Debuffs) */}
+                            {(() => {
+                              const activeEnStatuses = getEnemyActiveStatuses(enemy);
+                              if (activeEnStatuses.length === 0) return null;
+                              return (
+                                <div className="mt-1 pt-1 border-t border-[#261C33] flex flex-wrap items-center justify-center gap-1">
+                                  {activeEnStatuses.map((st) => (
+                                    <LaCriptaStatusEffectBadge
+                                      key={st.id}
+                                      effectType={st.effectType}
+                                      turnsRemaining={st.remainingTurns}
+                                      stacks={st.stacks}
+                                      compact
+                                    />
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -959,16 +1124,44 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       activeTargetEnemy.abilityName ||
                       activeTargetEnemy.intent ||
                       'ATAQUE DIRECTO';
+                    const intendedTargetIds =
+                      activeTargetEnemy.lastTargetedPlayerIds || [];
+                    const intendedTargetPlayers = intendedTargetIds
+                      .map((pid) => expeditionState.players.find((p) => p.id === pid))
+                      .filter(Boolean);
+                    const isAoeTarget =
+                      intendedTargetPlayers.length > 1 &&
+                      intendedTargetPlayers.length >= connectedPlayers.length;
 
                     return (
                       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#291E36]">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="px-1.5 py-0.5 bg-[#2A121D] border border-[#E63956] text-[8px] font-cripta-pixel font-bold text-[#FF8FA3] uppercase tracking-wider">
                             INTENCIÓN ENEMIGA
                           </span>
                           <span className="text-xs font-cripta-display font-bold text-[#FFD166] uppercase tracking-wide">
                             {telegraphedLabel}
                           </span>
+                          {intendedTargetPlayers.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#1E0F1C] border border-[#FF4D6D] text-[8px] font-cripta-pixel font-bold text-[#FFF3C4] uppercase">
+                              <span className="text-[#FF8FA3]">🎯 OBJETIVO:</span>
+                              {isAoeTarget ? (
+                                <span className="text-[#FFD166]">TODO EL GRUPO</span>
+                              ) : (
+                                intendedTargetPlayers.map((tp, idx) =>
+                                  tp ? (
+                                    <span
+                                      key={tp.id}
+                                      style={{ color: tp.color || '#FFD166' }}
+                                    >
+                                      {idx > 0 ? ', ' : ''}
+                                      {tp.name}
+                                    </span>
+                                  ) : null
+                                )
+                              )}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-[10px] font-cripta-pixel">
                           <LaCriptaPixelTooltip
@@ -1083,77 +1276,26 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     );
                   })()}
 
-                  {/* Active Status Effects on Target Enemy */}
-                  {(Boolean(activeTargetEnemy.poisonStacks && activeTargetEnemy.poisonStacks > 0) ||
-                    Boolean(activeTargetEnemy.vulnerableTurns && activeTargetEnemy.vulnerableTurns > 0) ||
-                    Boolean(
-                      activeTargetEnemy.attackBuffBonus &&
-                        activeTargetEnemy.attackBuffBonus < 0 &&
-                        (activeTargetEnemy.attackBuffRounds || 0) > 0
-                    ) ||
-                    Boolean(
-                      activeTargetEnemy.attackBuffBonus &&
-                        activeTargetEnemy.attackBuffBonus > 0 &&
-                        (activeTargetEnemy.attackBuffRounds || 0) > 0
-                    ) ||
-                    Boolean(
-                      activeTargetEnemy.isDefending ||
-                        (activeTargetEnemy.defendingRoundsRemaining || 0) > 0 ||
-                        (activeTargetEnemy.armorBuffBonus || 0) > 0
-                    )) && (
-                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#261C33]">
-                      <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-wider mr-1">
-                        ESTADOS:
-                      </span>
-                      {Boolean(activeTargetEnemy.poisonStacks && activeTargetEnemy.poisonStacks > 0) && (
-                        <LaCriptaStatusEffectBadge
-                          effectType="POISON"
-                          turnsRemaining={activeTargetEnemy.poisonStacks || 1}
-                          stacks={activeTargetEnemy.poisonStacks}
-                        />
-                      )}
-                      {Boolean(activeTargetEnemy.vulnerableTurns && activeTargetEnemy.vulnerableTurns > 0) && (
-                        <LaCriptaStatusEffectBadge
-                          effectType="VULNERABLE"
-                          turnsRemaining={activeTargetEnemy.vulnerableTurns || 1}
-                        />
-                      )}
-                      {Boolean(
-                        activeTargetEnemy.attackBuffBonus &&
-                          activeTargetEnemy.attackBuffBonus < 0 &&
-                          (activeTargetEnemy.attackBuffRounds || 0) > 0
-                      ) && (
-                        <LaCriptaStatusEffectBadge
-                          effectType="WEAKENED"
-                          turnsRemaining={activeTargetEnemy.attackBuffRounds || 1}
-                        />
-                      )}
-                      {Boolean(
-                        activeTargetEnemy.attackBuffBonus &&
-                          activeTargetEnemy.attackBuffBonus > 0 &&
-                          (activeTargetEnemy.attackBuffRounds || 0) > 0
-                      ) && (
-                        <LaCriptaStatusEffectBadge
-                          effectType="BLESSED"
-                          turnsRemaining={activeTargetEnemy.attackBuffRounds || 1}
-                        />
-                      )}
-                      {Boolean(
-                        activeTargetEnemy.isDefending ||
-                          (activeTargetEnemy.defendingRoundsRemaining || 0) > 0 ||
-                          (activeTargetEnemy.armorBuffBonus || 0) > 0
-                      ) && (
-                        <LaCriptaStatusEffectBadge
-                          effectType="SHIELDED"
-                          turnsRemaining={
-                            activeTargetEnemy.defendingRoundsRemaining ||
-                            activeTargetEnemy.armorBuffRounds ||
-                            1
-                          }
-                        />
-                      )}
-                    </div>
-                  )}
+                  {/* Active Status Effects on Target Enemy (All Buffs & Debuffs with full Tooltip clarity) */}
+                  {(() => {
+                    const targetStatuses = getEnemyActiveStatuses(activeTargetEnemy);
+                    if (targetStatuses.length === 0) return null;
+                    return (
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#261C33]">
+                        <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 uppercase tracking-wider mr-1">
+                          ESTADOS ACTIVOS:
+                        </span>
+                        {targetStatuses.map((st) => (
+                          <LaCriptaStatusEffectBadge
+                            key={st.id}
+                            effectType={st.effectType}
+                            turnsRemaining={st.remainingTurns}
+                            stacks={st.stacks}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 /* Non-combat / Cleared Room Stage Footer */
@@ -1201,12 +1343,12 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           : 'bg-[#161120] border-[#4A3B5C] text-[#D8C6A0]'
                       }`}
                     >
-                      {isPresentingSequence && presentationBannerText
-                        ? `✦ ${presentationBannerText} · RESOLVIENDO...`
-                        : !isPlayerPhase
-                        ? '⚔ TURNO DEL ENEMIGO · RESOLVIENDO...'
+                      {!isPlayerPhase || Boolean(activeActingEnemyId)
+                        ? '◆ TURNO ENEMIGO'
+                        : isPresentingSequence && presentationBannerText
+                        ? `✦ ${presentationBannerText}`
                         : isTurnActionLocked
-                        ? '✦ ACCIÓN ENVIADA · RESOLVIENDO...'
+                        ? '✦ RESOLVIENDO ACCIÓN...'
                         : isMyTurn
                         ? `✦ ¡TU TURNO, ${me?.name || 'HÉROE'}! · ELIGE 1 CARTA`
                         : `TURNO DE: ${activeTurnPlayer?.name || 'COMPAÑERO'}`}
@@ -1279,310 +1421,627 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
             </div>
 
             {/* ===============================================================
-                CENTER OF RIGHT BOARD: PLAYABLE CARDS / ENCOUNTER OPTIONS
+                CENTER OF RIGHT BOARD (.gameContent): PLAYABLE CARDS / ENCOUNTER OPTIONS
+                Responsive room fitting with smooth vertical scroll when needed so progression is NEVER cut off
                 =============================================================== */}
-            <div className="relative z-10 flex-1 flex flex-col items-center justify-center my-3">
-              {/* CASE A: EXPEDITION DEFEATED */}
+            <div className="gameContent relative z-10 flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start my-1 py-1.5 pb-6 pr-1">
+              {/* CASE A: EXPEDITION DEFEATED (FULL PARTY FALLEN STATE — ONLY AFTER DEATH SEQUENCE COMPLETES) */}
               {isDefeated ? (
-                <div className="max-w-lg w-full bg-[#170D16] border-2 border-[#C93B5B] p-6 text-center shadow-[0_0_45px_rgba(201,59,91,0.35)]">
-                  <div className="text-xs font-cripta-pixel text-[#FF8FA3] uppercase tracking-widest">
-                    EXPEDICIÓN CAÍDA
+                <div className="my-auto max-w-2xl w-full bg-[#140B14]/95 border-2 border-[#C93B5B] p-4 sm:p-6 text-center shadow-[0_0_45px_rgba(201,59,91,0.35)] flex flex-col items-center gap-3.5">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#2B0E18] border border-[#C93B5B] text-[10px] font-cripta-pixel font-bold text-[#FF8FA3] uppercase tracking-widest">
+                    <span>☠ EXPEDICIÓN FALLIDA · LA CRIPTA OS HA RECLAMADO</span>
                   </div>
-                  <h3 className="mt-1 font-cripta-display text-2xl sm:text-3xl font-black text-[#F5EFE6] uppercase">
-                    LA CRIPTA HA RECLAMADO AL GRUPO
+                  <h3 className="font-cripta-display text-2xl sm:text-3xl font-black text-[#F5EFE6] uppercase tracking-wide">
+                    LA CRIPTA OS HA RECLAMADO
                   </h3>
-                  <p className="mt-2 text-xs font-cripta-pixel text-[#D8C6A0]/80 leading-relaxed">
-                    Todos los aventureros han caído en {chosenDungeon.name}. Podéis
-                    iniciar una nueva expedición o regresar a la sala de preparación.
+                  <p className="text-xs font-cripta-pixel text-[#D8C6A0]/85 leading-relaxed max-w-xl">
+                    {activeRoom.outcomeLog ||
+                      `Todos los aventureros han caído en ${chosenDungeon.name} (${activeRoom.title}).`}
                   </p>
-                  <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                    {isHost && (
-                      <button
-                        type="button"
-                        onClick={onRerollExpedition}
-                        className="px-5 py-2.5 bg-[#E7A54A] hover:bg-[#F3B861] text-[#09070D] font-cripta-pixel text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        <span>NUEVA EXPEDICIÓN</span>
-                      </button>
-                    )}
+
+                  {/* Fallen Party Portraits Strip */}
+                  <div className="w-full flex flex-wrap items-center justify-center gap-2.5 py-1">
+                    {expeditionState.players
+                      .filter((p) => p.isConnected)
+                      .map((p) => {
+                        const cId = (p.characterId || 'caballero') as CriptaCharacterId;
+                        const cDef = CRIPTA_CHARACTERS_CATALOG[cId];
+                        return (
+                          <div
+                            key={p.id}
+                            className="px-3 py-1.5 bg-[#0D0811] border border-[#C93B5B]/60 flex items-center gap-2.5 opacity-85"
+                          >
+                            <div className="grayscale contrast-125">
+                              <LaCriptaPixelSprite
+                                characterId={cId}
+                                animationState="debuff"
+                                size="sm"
+                              />
+                            </div>
+                            <div className="text-left">
+                              <div className="text-[10px] font-cripta-pixel font-bold text-[#F5EFE6] uppercase">
+                                {p.name}
+                              </div>
+                              <div className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 uppercase">
+                                {cDef?.className || cId}
+                              </div>
+                              <div className="text-[9px] font-cripta-mono font-bold text-[#FF8FA3]">
+                                0 / {p.maxHp} PV · CAÍDO
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Expedition Summary Metrics: Mazmorra, Sala, Enemigos Derrotados, Oro Obtenido */}
+                  <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div className="p-2 bg-[#0D0914] border border-[#3E2F4B]">
+                      <div className="text-[8px] font-cripta-pixel text-[#D8C6A0]/65 uppercase">
+                        MAZMORRA ALCANZADA
+                      </div>
+                      <div className="mt-0.5 text-[11px] font-cripta-display font-bold text-[#FFD166] truncate">
+                        {chosenDungeon.name}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-[#0D0914] border border-[#3E2F4B]">
+                      <div className="text-[8px] font-cripta-pixel text-[#D8C6A0]/65 uppercase">
+                        SALA ALCANZADA
+                      </div>
+                      <div className="mt-0.5 text-sm font-cripta-mono font-black text-[#E8DFCE]">
+                        SALA {roomRoman} ({completedDoorCount}/3 SELLOS)
+                      </div>
+                    </div>
+                    <div className="p-2 bg-[#0D0914] border border-[#3E2F4B]">
+                      <div className="text-[8px] font-cripta-pixel text-[#D8C6A0]/65 uppercase">
+                        ENEMIGOS DERROTADOS
+                      </div>
+                      <div className="mt-0.5 text-sm font-cripta-mono font-black text-[#FF8FA3]">
+                        {expeditionState.runStats?.enemiesDefeated ?? 0}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-[#0D0914] border border-[#3E2F4B]">
+                      <div className="text-[8px] font-cripta-pixel text-[#D8C6A0]/65 uppercase">
+                        ORO OBTENIDO
+                      </div>
+                      <div className="mt-0.5 text-sm font-cripta-mono font-black text-[#FFD166]">
+                        {partyGold}G
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-1 flex flex-wrap items-center justify-center gap-3">
                     <button
                       type="button"
-                      onClick={onReturnToLobby}
-                      className="px-5 py-2.5 bg-[#1F162B] hover:bg-[#2B1F3B] border border-[#4A3B5C] text-[#D9D0BC] font-cripta-pixel text-xs uppercase tracking-wider cursor-pointer"
+                      onClick={() => {
+                        laCriptaAudio.playDoorVote();
+                        onRerollExpedition();
+                      }}
+                      className="px-5 py-2.5 bg-[#E7A54A] hover:bg-[#F3B861] text-[#09070D] font-cripta-pixel text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_16px_rgba(231,165,74,0.35)]"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>NUEVA EXPEDICIÓN</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        laCriptaAudio.playStoneClick();
+                        onReturnToLobby();
+                      }}
+                      className="px-5 py-2.5 bg-[#1F162B] hover:bg-[#2B1F3B] border border-[#4A3B5C] text-[#D9D0BC] font-cripta-pixel text-xs uppercase tracking-wider cursor-pointer transition-all"
                     >
                       VOLVER AL LOBBY
                     </button>
                   </div>
                 </div>
               ) : hasActiveCombat ? (
-                /* CASE B: ACTIVE COMBAT — SEQUENTIAL TURN CARD HAND */
-                <div className="w-full flex flex-col items-center justify-center gap-4">
-                  {/* Helper Banner when waiting for another teammate's turn */}
-                  {!isMyTurn && isPlayerPhase && !iAmDead && (
-                    <div className="px-4 py-2 bg-[#161021]/90 border border-[#4A3B5C] text-xs font-cripta-pixel text-[#D8C6A0] text-center">
-                      Esperando a que{' '}
-                      <strong className="text-[#FFD166]">
-                        {activeTurnPlayer?.name || 'tu compañero'}
-                      </strong>{' '}
-                      juegue sus cartas ({currentTurnAp} AP restantes)...
-                    </div>
-                  )}
+                /* CASE B: ACTIVE COMBAT — SINGLE CONSOLIDATED ENEMY TURN PRESENTATION vs FALLEN PLAYER vs PLAYER CARD HAND */
+                <div className="my-auto w-full flex flex-col items-center justify-center gap-3">
+                  {!isPlayerPhase || Boolean(activeActingEnemyId) ? (
+                    /* B1: ONE PRIMARY ENEMY TURN PRESENTATION (Sections 9, 10, 11, 12) */
+                    (() => {
+                      const actingEnemyId =
+                        activeActingEnemyId ||
+                        activeRoom.activeCombatActorId ||
+                        visibleRoomEnemies[0]?.id ||
+                        null;
+                      const actingEnemy =
+                        visibleRoomEnemies.find((e) => e.id === actingEnemyId) ||
+                        visibleRoomEnemies[0] ||
+                        null;
+                      const sameSpecies = actingEnemy
+                        ? visibleRoomEnemies.filter((e) => e.name === actingEnemy.name)
+                        : [];
+                      const speciesOrd =
+                        actingEnemy && sameSpecies.length > 1
+                          ? sameSpecies.findIndex((e) => e.id === actingEnemy.id) + 1
+                          : 0;
+                      const actingName = actingEnemy
+                        ? speciesOrd > 0
+                          ? `${actingEnemy.name} #${speciesOrd}`
+                          : actingEnemy.name
+                        : 'CRIATURA HOSTIL';
+                      const abilityLabel =
+                        actingEnemy?.preparedTelegraphLabel ||
+                        actingEnemy?.abilityName ||
+                        actingEnemy?.intent ||
+                        'ATAQUE HOSTIL';
+                      const targetIds =
+                        activeTargetedPlayerIdsDuringPresentation.length > 0
+                          ? activeTargetedPlayerIdsDuringPresentation
+                          : actingEnemy?.lastTargetedPlayerIds ||
+                            activeRoom.activeTargetedPlayerIds ||
+                            [];
+                      const targetNames = targetIds
+                        .map(
+                          (pid) =>
+                            expeditionState.players.find((p) => p.id === pid)?.name
+                        )
+                        .filter(Boolean);
+                      const targetSummary =
+                        targetNames.length >= connectedPlayers.length &&
+                        connectedPlayers.length > 1
+                          ? 'TODO EL GRUPO'
+                          : targetNames.length > 0
+                          ? targetNames.join(', ')
+                          : aliveOrderedPlayers[0]?.name || 'AVENTURERO';
 
-                  {iAmDead && (
-                    <div className="px-4 py-2 bg-[#261019] border border-[#C93B5B] text-xs font-cripta-pixel text-[#FF8FA3] text-center">
-                      Has caído en combate. Tus compañeros pueden revivirte en un
-                      Santuario, Hoguera o tras despejar la sala.
-                    </div>
-                  )}
+                      const latestPlayerDmgEvents = activeVisualEvents.filter(
+                        (ev) => ev.kind === 'DAMAGE_PLAYER'
+                      );
+                      const latestPlayerStatusEvents = activeVisualEvents.filter(
+                        (ev) =>
+                          ev.kind === 'STATUS_APPLIED' && ev.targetType === 'PLAYER'
+                      );
 
-                  {/* TACTICAL COMBAT CARDS (Basic Attack + Guard + Weapon Special + 2 Active Class Abilities) */}
-                  <div className="w-full flex flex-wrap items-stretch justify-center gap-2.5 sm:gap-3">
-                    {/* CARD 1: BASIC WEAPON ATTACK (1 Card Per Turn) */}
-                    {(() => {
-                      const basicUsed = Boolean(me?.basicAttackUsedThisTurn);
-                      const dmgTag = attackEst?.damageTypeLabel || 'FÍSICO';
-                      const matchupBadge =
-                        attackEst?.matchupState === 'WEAKNESS'
-                          ? `✦ VULNERABLE (+${attackEst.matchupDeltaPct}%)`
-                          : attackEst?.matchupState === 'RESISTANCE'
-                          ? `⚠ RESISTE (${attackEst.matchupDeltaPct}%)`
-                          : `OBJETIVO: ${activeTargetEnemy?.name.slice(0, 12) || 'ENEMIGO'}`;
                       return (
-                        <LaCriptaPlayableCard
-                          title={myWeapon ? myWeapon.name : 'Ataque Básico'}
-                          categoryLabel={`ARMA · DAÑO ${dmgTag}`}
-                          costLabel="1 AP"
-                          cooldownLabel={
-                            basicUsed
-                              ? 'EJECUTADO'
-                              : myEquippedWeapon?.activeRune
-                              ? `◈ ${myEquippedWeapon.activeRune.infusedDamageType}`
-                              : `NV.${myWeaponLv}`
-                          }
-                          headlineValue={
-                            attackEst
-                              ? `${formatDamageRange(attackEst.min, attackEst.max)} DAÑO`
-                              : '4–6 DAÑO'
-                          }
-                          summary={
-                            myEquippedWeapon?.activeRune
-                              ? `${myEquippedWeapon.activeRune.benefitText} (${myEquippedWeapon.activeRune.tradeoffText})`
-                              : `Golpe ${dmgTag.toLowerCase()} con ${
-                                  myWeapon ? myWeapon.name : 'tu arma'
-                                } contra ${activeTargetEnemy?.name || 'objetivo'}.`
-                          }
-                          tooltipDescription={
-                            myWeapon
-                              ? `${myWeapon.specialEffectText} Escala con ${myWeapon.scalingStat}.${
-                                  myEquippedWeapon?.activeRune
-                                    ? ` Infusión activa: ${myEquippedWeapon.activeRune.name} (${myEquippedWeapon.activeRune.benefitText} · ${myEquippedWeapon.activeRune.tradeoffText}).`
-                                    : ''
-                                }`
-                              : 'Ataque básico con tu arma equipada.'
-                          }
-                          accentColor={
-                            basicUsed
-                              ? 'slate'
-                              : attackEst?.matchupState === 'WEAKNESS'
-                              ? 'emerald'
-                              : 'crimson'
-                          }
-                          disabled={!isMyTurn || currentTurnAp < 1 || basicUsed}
-                          turnLocked={isTurnActionLocked}
-                          weaponId={myWeapon?.id}
-                          upgradeLevel={myWeaponLv}
-                          illustration={
-                            <LaCriptaCardPixelIllustration
-                              kind="ATTACK_SWORD"
+                        <div className="w-full max-w-xl bg-[#110C1A]/95 border-2 border-[#4A3B5C] px-6 py-5 text-center shadow-[0_12px_36px_rgba(0,0,0,0.85)] flex flex-col items-center gap-2.5">
+                          <div className="inline-flex items-center gap-2 px-3 py-0.5 bg-[#1E142B] border border-[#E7A54A]/70 text-[10px] font-cripta-pixel font-bold text-[#FFD166] uppercase tracking-widest">
+                            ◆ TURNO ENEMIGO
+                          </div>
+
+                          <div className="mt-1 font-cripta-display text-2xl sm:text-3xl font-black text-[#F5EFE6] uppercase tracking-wider">
+                            {actingName}
+                          </div>
+
+                          <div className="px-3.5 py-1 bg-[#1A1124] border border-[#6B538C] font-cripta-pixel text-xs sm:text-sm font-bold text-[#FFD166] uppercase tracking-widest">
+                            {abilityLabel}
+                          </div>
+
+                          <div className="mt-0.5 font-cripta-pixel text-xs sm:text-sm font-bold text-[#FF8FA3] uppercase tracking-wider flex items-center justify-center gap-2">
+                            <span>→</span>
+                            <span className="text-[#F5EFE6]">{targetSummary}</span>
+                          </div>
+
+                          {/* Impact & Status Resolution Readout when active during animation */}
+                          {(latestPlayerDmgEvents.length > 0 ||
+                            latestPlayerStatusEvents.length > 0) && (
+                            <div className="mt-2 pt-2.5 border-t border-[#2D213B] w-full flex flex-col items-center gap-1.5">
+                              {latestPlayerDmgEvents.map((dEv) => (
+                                <div
+                                  key={dEv.id}
+                                  className="px-3 py-1 bg-[#2B101B] border border-[#E63956] font-cripta-mono text-sm font-black text-[#FF8FA3] uppercase tracking-wider"
+                                >
+                                  {dEv.label || `-${Math.abs(dEv.value || 0)} PV`}
+                                </div>
+                              ))}
+                              {latestPlayerStatusEvents.map((sEv) => {
+                                const stDef = sEv.statusType
+                                  ? CRIPTA_STATUS_EFFECTS_REGISTRY[sEv.statusType]
+                                  : null;
+                                return (
+                                  <div
+                                    key={sEv.id}
+                                    className="px-3 py-1 bg-[#22132C] border border-[#B57CFF] font-cripta-pixel text-[10px] font-bold text-[#E0AAFF] uppercase tracking-wider"
+                                  >
+                                    <div>{stDef?.name || sEv.label}</div>
+                                    {sEv.sublabel && (
+                                      <div className="text-[8.5px] text-[#D8C6A0]/85 mt-0.5">
+                                        {sEv.sublabel}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
+                  ) : iAmDead ? (
+                    /* B2: INDIVIDUAL PLAYER DEATH / FALLEN SPECTATOR PANEL IN COMBAT */
+                    <div className="w-full max-w-2xl bg-[#190C14]/95 border-2 border-[#C93B5B] p-5 text-center shadow-[0_0_32px_rgba(201,59,91,0.3)] flex flex-col items-center gap-3">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#2E101B] border border-[#C93B5B] text-[9px] font-cripta-pixel font-bold text-[#FF8FA3] uppercase tracking-widest">
+                        ☠ HAS CAÍDO EN COMBATE · MODO ESPECTADOR
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {me && (
+                          <div className="grayscale contrast-125">
+                            <LaCriptaPixelSprite
+                              characterId={
+                                (me.characterId || 'caballero') as CriptaCharacterId
+                              }
+                              animationState="debuff"
+                              size="sm"
+                            />
+                          </div>
+                        )}
+                        <div className="text-left">
+                          <div className="text-sm font-cripta-display font-black text-[#F5EFE6] uppercase">
+                            {me?.name || 'Aventurero'} — 0 / {me?.maxHp || 0} PV
+                          </div>
+                          <div className="text-[10px] font-cripta-pixel text-[#D8C6A0]/80">
+                            Turno actual de:{' '}
+                            <strong className="text-[#FFD166]">
+                              {activeTurnPlayer?.name || 'Compañero'}
+                            </strong>{' '}
+                            ({currentTurnAp} AP restantes)
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs font-cripta-pixel text-[#D8C6A0]/85 leading-relaxed max-w-lg">
+                        Tus compañeros vivos pueden revivirte al despejar la sala, en una
+                        Hoguera o Santuario, o mediante Tributo Vital / Oro (20G) en la
+                        barra inferior.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Helper Banner when waiting for another teammate's turn */}
+                      {!isMyTurn && isPlayerPhase && (
+                        <div className="px-4 py-2 bg-[#161021]/90 border border-[#4A3B5C] text-xs font-cripta-pixel text-[#D8C6A0] text-center">
+                          Esperando a que{' '}
+                          <strong className="text-[#FFD166]">
+                            {activeTurnPlayer?.name || 'tu compañero'}
+                          </strong>{' '}
+                          juegue sus cartas ({currentTurnAp} AP restantes)...
+                        </div>
+                      )}
+
+                      {/* TACTICAL COMBAT CARDS (Basic Attack + Guard + Weapon Special + 2 Active Class Abilities) */}
+                      <div className="w-full flex flex-wrap lg:flex-nowrap items-stretch justify-center gap-2 sm:gap-2.5">
+                        {/* CARD 1: BASIC WEAPON ATTACK (1 Card Per Turn) */}
+                        {(() => {
+                          const basicUsed = Boolean(me?.basicAttackUsedThisTurn);
+                          const dmgTag = attackEst?.damageTypeLabel || 'TAJANTE';
+                          const specialProp = myEquippedWeapon?.activeRune
+                            ? `◆ RUNA ${myEquippedWeapon.activeRune.infusedDamageType}`
+                            : attackEst?.matchupState === 'WEAKNESS'
+                            ? `◆ +${attackEst.matchupDeltaPct}% vs. VULNERABLE`
+                            : attackEst?.matchupState === 'RESISTANCE'
+                            ? `◆ ${attackEst.matchupDeltaPct}% (RESISTE)`
+                            : myWeapon?.onHitStatus
+                            ? `◆ APLICA ${
+                                CRIPTA_STATUS_EFFECTS_REGISTRY[myWeapon.onHitStatus]
+                                  ?.name.toUpperCase() || myWeapon.onHitStatus
+                              }`
+                            : `◆ ESCALA ${myWeapon?.scalingStat || 'ATQ'}`;
+                          return (
+                            <LaCriptaPlayableCard
+                              title={myWeapon ? myWeapon.name : 'Ataque Básico'}
+                              categoryLabel={dmgTag}
+                              costLabel="1 AP"
+                              cooldownLabel={basicUsed ? '⏱ USADA' : 'LISTA'}
+                              headlineValue={
+                                attackEst
+                                  ? `${formatDamageRange(attackEst.min, attackEst.max)} DAÑO`
+                                  : '4–6 DAÑO'
+                              }
+                              summary={specialProp}
+                              tooltipDescription={
+                                myWeapon
+                                  ? `Inflige ${
+                                      attackEst
+                                        ? formatDamageRange(attackEst.min, attackEst.max)
+                                        : '4–6'
+                                    } de daño ${dmgTag}. ${myWeapon.specialEffectText} Escala con ${
+                                      myWeapon.scalingStat
+                                    }.${
+                                      myEquippedWeapon?.activeRune
+                                        ? ` Runa activa: ${myEquippedWeapon.activeRune.name} (${myEquippedWeapon.activeRune.benefitText}).`
+                                        : ''
+                                    }`
+                                  : 'Inflige daño directo con tu arma equipada.'
+                              }
+                              accentColor={
+                                basicUsed
+                                  ? 'slate'
+                                  : attackEst?.matchupState === 'WEAKNESS'
+                                  ? 'emerald'
+                                  : 'crimson'
+                              }
+                              disabled={!isMyTurn || currentTurnAp < 1 || basicUsed}
+                              turnLocked={isTurnActionLocked}
                               weaponId={myWeapon?.id}
                               upgradeLevel={myWeaponLv}
+                              illustration={
+                                <LaCriptaCombatCardArtwork
+                                  artKey={resolveWeaponCombatArtKey(
+                                    myWeapon?.id,
+                                    false,
+                                    attackEst?.damageTypeLabel
+                                  )}
+                                  cardId={myWeapon?.id || 'basic_attack'}
+                                  weaponId={myWeapon?.id}
+                                  upgradeLevel={myWeaponLv}
+                                />
+                              }
+                              onClick={() => submitPlayerCombatChoice('ATTACK')}
+                              footerBadge={
+                                basicUsed
+                                  ? '⏱ 1 RONDA'
+                                  : getPlayerActionMechanicBadge(me, 'ATTACK') || `NV.${myWeaponLv}`
+                              }
+                            />
+                          );
+                        })()}
+
+                        {/* CARD 2: DEFEND / GUARD (1 AP — Pure defense, never deals damage) */}
+                        <LaCriptaPlayableCard
+                          title="Guardia de Hierro"
+                          categoryLabel="DEFENSA"
+                          costLabel="1 AP"
+                          cooldownLabel="LISTA"
+                          headlineValue="+8 ARMADURA"
+                          summary="◆ CONTRAGOLPE"
+                          tooltipDescription="Otorga +4 Armadura, Escudo (+4 mitigación por 2 rondas) y restaura +5 PV. CONTRAGOLPE: +18% daño en tu próximo ataque."
+                          accentColor="cyan"
+                          disabled={!isMyTurn || currentTurnAp < 1}
+                          turnLocked={isTurnActionLocked}
+                          illustration={
+                            <LaCriptaCombatCardArtwork
+                              artKey="common_iron_guard"
+                              cardId="guardia_de_hierro"
                             />
                           }
-                          onClick={() => submitPlayerCombatChoice('ATTACK')}
+                          onClick={() => submitPlayerCombatChoice('DEFEND')}
                           footerBadge={
-                            isTurnActionLocked ? 'TURNO EN RESOLUCIÓN' : matchupBadge
+                            getPlayerActionMechanicBadge(me, 'DEFEND') || '◆ +5 PV · ESCUDO'
                           }
                         />
-                      );
-                    })()}
 
-                    {/* CARD 2: DEFEND / GUARD (1 AP — Pure defense, never deals damage) */}
-                    <LaCriptaPlayableCard
-                      title="Guardia de Hierro"
-                      categoryLabel="DEFENSA · NO HACE DAÑO"
-                      costLabel="1 AP"
-                      cooldownLabel="SIEMPRE LISTA"
-                      headlineValue="+ARMADURA + ESCUDO"
-                      summary="Mitiga 40% de daño, +5 PV y prepara Contragolpe (+18% daño)."
-                      tooltipDescription="Postura puramente defensiva (no inflige daño directo). Otorga +2–4 Armadura, Escudo por 2 rondas, recupera +5 PV y potencia un +18% tu siguiente ataque."
-                      accentColor="cyan"
-                      disabled={!isMyTurn || currentTurnAp < 1}
-                      turnLocked={isTurnActionLocked}
-                      illustration={
-                        <LaCriptaCardPixelIllustration kind="DEFEND_SHIELD" />
-                      }
-                      onClick={() => submitPlayerCombatChoice('DEFEND')}
-                      footerBadge="DEFENSA + CONTRAGOLPE"
-                    />
-
-                    {/* CARD 3: WEAPON SPECIAL TECHNIQUE (1 AP) */}
-                    {myWeapon && (
-                      <LaCriptaPlayableCard
-                        title={myWeapon.specialAttack?.name || 'Técnica de Arma'}
-                        categoryLabel={`TÉCNICA · ${
-                          specialEst?.damageTypeLabel || myWeapon.name.toUpperCase()
-                        }`}
-                        costLabel="1 AP"
-                        cooldownLabel={
-                          mySpecialCd > 0 ? `CD: ${mySpecialCd}T` : 'LISTA'
-                        }
-                        headlineValue={
-                          myWeapon.specialAttack?.dealsDamage === false
-                            ? `+${myWeapon.specialAttack?.partyHealBase || 14} PV GRUPO`
-                            : specialEst && specialEst.max > 0
-                            ? `${formatDamageRange(specialEst.min, specialEst.max)} ${
-                                myWeapon.specialAttack?.targetRule === 'ALL_ENEMIES'
-                                  ? 'DAÑO · ÁREA'
-                                  : myWeapon.specialAttack?.targetRule === 'CLEAVE_2' ||
-                                    myWeapon.specialAttack?.targetRule === 'CHAIN_2'
-                                  ? 'DAÑO · 2 OBJ.'
-                                  : 'DAÑO'
-                              }`
-                            : '7–11 DAÑO'
-                        }
-                        summary={
-                          (
-                            myWeapon.specialAttack?.description ||
-                            myWeapon.specialEffectText ||
-                            'Técnica especial de arma.'
-                          ).split('.')[0] + '.'
-                        }
-                        tooltipDescription={`${
-                          myWeapon.specialAttack?.description ||
-                          myWeapon.specialEffectText
-                        } Recarga: ${
-                          myWeapon.specialAttack?.cooldownRounds || 2
-                        } rondas.`}
-                        accentColor={
-                          myWeapon.specialAttack?.dealsDamage === false ||
-                          specialEst?.matchupState === 'WEAKNESS'
-                            ? 'emerald'
-                            : 'amber'
-                        }
-                        disabled={!isMyTurn || currentTurnAp < 1 || mySpecialCd > 0}
-                        turnLocked={isTurnActionLocked}
-                        weaponId={myWeapon.id}
-                        upgradeLevel={myWeaponLv}
-                        illustration={
-                          <LaCriptaCardPixelIllustration
-                            kind="WEAPON_TECHNIQUE"
-                            weaponId={myWeapon.id}
-                            upgradeLevel={myWeaponLv}
-                          />
-                        }
-                        onClick={() => submitPlayerCombatChoice('WEAPON_SPECIAL')}
-                        footerBadge={
-                          mySpecialCd > 0
-                            ? `ENFRIAMIENTO (${mySpecialCd}T)`
-                            : specialEst?.matchupState === 'WEAKNESS'
-                            ? `✦ VULNERABLE (+${specialEst.matchupDeltaPct}%)`
-                            : specialEst?.matchupState === 'RESISTANCE'
-                            ? `⚠ RESISTE (${specialEst.matchupDeltaPct}%)`
-                            : `CD: ${myWeapon.specialAttack?.cooldownRounds || 2} RONDAS`
-                        }
-                      />
-                    )}
-
-                    {/* CARDS 4 & 5: ACTIVE CLASS ABILITIES (2 distinct active skills per class) */}
-                    {(myCharDef?.abilities || [])
-                      .filter((ab) => ab.type !== 'PASIVA')
-                      .map((ab) => {
-                        const abCd = me?.abilityCooldowns?.[ab.id] || 0;
-                        const abDealsDamage =
-                          ab.dealsDamage ??
-                          (ab.kind === 'DAMAGE' ||
-                            ab.category === 'ATTACK' ||
-                            ab.category === 'DEBUFF');
-                        const abEst =
-                          me && activeTargetEnemy
-                            ? estimatePlayerActionDamage(
-                                me,
-                                'ABILITY',
-                                activeTargetEnemy,
-                                livingEnemies,
-                                expeditionState.partyRelics || [],
-                                ab.id
-                              )
-                            : null;
-
-                        const headline = !abDealsDamage
-                          ? ab.kind === 'HEAL' || ab.category === 'HEAL'
-                            ? `+${ab.healAmount || ab.power || 16} PV GRUPO`
-                            : `+${ab.shieldGrant || 3} ARM · PROVOCAR`
-                          : abEst && abEst.max > 0
-                          ? `${formatDamageRange(abEst.min, abEst.max)} ${
-                              ab.targetRule === 'ALL_ENEMIES'
-                                ? 'DAÑO · ÁREA'
-                                : ab.targetRule === 'CHAIN_2' || ab.targetRule === 'CLEAVE_2'
-                                ? 'DAÑO · 2 OBJ.'
-                                : 'DAÑO'
-                            }`
-                          : `${ab.power || 14} DAÑO`;
-
-                        const categoryBadge = !abDealsDamage
-                          ? ab.kind === 'HEAL' || ab.category === 'HEAL'
-                            ? 'CURACIÓN · NO DAÑA'
-                            : 'DEFENSA · NO DAÑA'
-                          : ab.targetRule === 'ALL_ENEMIES'
-                          ? `HABILIDAD ÁREA · ${myCharDef?.className || ''}`
-                          : `HABILIDAD · ${myCharDef?.className || ''}`;
-
-                        return (
+                        {/* CARD 3: WEAPON SPECIAL TECHNIQUE (1 AP) */}
+                        {myWeapon && (
                           <LaCriptaPlayableCard
-                            key={ab.id}
-                            title={ab.name}
-                            categoryLabel={categoryBadge}
+                            title={myWeapon.specialAttack?.name || 'Técnica de Arma'}
+                            categoryLabel={
+                              myWeapon.specialAttack?.dealsDamage === false
+                                ? 'CURACIÓN'
+                                : specialEst?.damageTypeLabel || 'TÉCNICA'
+                            }
                             costLabel="1 AP"
-                            cooldownLabel={abCd > 0 ? `CD: ${abCd}T` : 'LISTA'}
-                            headlineValue={headline}
-                            summary={(ab.description || '').split('.')[0] + '.'}
-                            tooltipDescription={`${ab.description} Recarga: ${
-                              ab.cooldownTurns || 2
+                            cooldownLabel={
+                              mySpecialCd > 0 ? `⏱ ${mySpecialCd}` : 'LISTA'
+                            }
+                            headlineValue={
+                              myWeapon.specialAttack?.dealsDamage === false
+                                ? `+${myWeapon.specialAttack?.partyHealBase || 14} PV`
+                                : specialEst && specialEst.max > 0
+                                ? `${formatDamageRange(specialEst.min, specialEst.max)} DAÑO`
+                                : '7–11 DAÑO'
+                            }
+                            summary={
+                              myWeapon.specialAttack?.dealsDamage === false
+                                ? `◆ PURIFICA ${myWeapon.specialAttack?.purifyCount || 1}`
+                                : myWeapon.specialAttack?.poisonStacks
+                                ? `◆ VENENO ${myWeapon.specialAttack.poisonStacks}`
+                                : myWeapon.specialAttack?.armorBreak
+                                ? `◆ ROMPE ${myWeapon.specialAttack.armorBreak} ARM.`
+                                : myWeapon.specialAttack?.vulnerableTurns
+                                ? `◆ VULNERABLE ${myWeapon.specialAttack.vulnerableTurns}T`
+                                : myWeapon.specialAttack?.targetRule === 'ALL_ENEMIES'
+                                ? '◆ GOLPE EN ÁREA'
+                                : specialEst?.matchupState === 'WEAKNESS'
+                                ? `◆ +${specialEst.matchupDeltaPct}% vs. VULNERABLE`
+                                : '◆ TÉCNICA DE ARMA'
+                            }
+                            tooltipDescription={`${
+                              myWeapon.specialAttack?.description ||
+                              myWeapon.specialEffectText
+                            } ENFRIAMIENTO: ${
+                              myWeapon.specialAttack?.cooldownRounds || 2
                             } rondas.`}
                             accentColor={
-                              !abDealsDamage
-                                ? ab.kind === 'HEAL'
-                                  ? 'emerald'
-                                  : 'cyan'
-                                : 'purple'
+                              myWeapon.specialAttack?.dealsDamage === false ||
+                              specialEst?.matchupState === 'WEAKNESS'
+                                ? 'emerald'
+                                : 'amber'
                             }
-                            disabled={!isMyTurn || currentTurnAp < 1 || abCd > 0}
+                            disabled={!isMyTurn || currentTurnAp < 1 || mySpecialCd > 0}
                             turnLocked={isTurnActionLocked}
+                            weaponId={myWeapon.id}
+                            upgradeLevel={myWeaponLv}
                             illustration={
-                              <LaCriptaCardPixelIllustration
-                                kind={
-                                  !abDealsDamage && ab.kind === 'DEFEND'
-                                    ? 'DEFEND_SHIELD'
-                                    : 'CLASS_SKILL'
-                                }
+                              <LaCriptaCombatCardArtwork
+                                artKey={resolveWeaponCombatArtKey(
+                                  myWeapon.id,
+                                  true,
+                                  specialEst?.damageTypeLabel
+                                )}
+                                cardId={`${myWeapon.id}_special`}
+                                weaponId={myWeapon.id}
+                                upgradeLevel={myWeaponLv}
                               />
                             }
-                            onClick={() =>
-                              submitPlayerCombatChoice('ABILITY', undefined, ab.id)
-                            }
+                            onClick={() => submitPlayerCombatChoice('WEAPON_SPECIAL')}
                             footerBadge={
-                              abCd > 0
-                                ? `RECARGANDO (${abCd}T)`
-                                : `CD: ${ab.cooldownTurns || 2} RONDAS`
+                              mySpecialCd > 0
+                                ? `⏱ ${mySpecialCd} ${mySpecialCd === 1 ? 'RONDA' : 'RONDAS'}`
+                                : getPlayerActionMechanicBadge(me, 'WEAPON_SPECIAL') ||
+                                  `⏱ CD ${myWeapon.specialAttack?.cooldownRounds || 2}`
                             }
                           />
-                        );
-                      })}
-                  </div>
+                        )}
 
-                  {/* Secondary Bottom Strip under Combat Cards: Weapon Damage Identity + Rune Infusion Switcher + Dedicated MOCHILA Control */}
+                        {/* CARDS 4 & 5: ACTIVE CLASS ABILITIES (2 distinct active skills per class) */}
+                        {(myCharDef?.abilities || [])
+                          .filter((ab) => ab.type !== 'PASIVA')
+                          .map((ab) => {
+                            const abCd = me?.abilityCooldowns?.[ab.id] || 0;
+                            const myRes =
+                              me?.classResource ??
+                              myCharDef?.classResource?.initialValue ??
+                              0;
+                            const minResReq =
+                              ab.minResourceRequired ?? ab.resourceCost ?? 0;
+                            const lacksResource = minResReq > 0 && myRes < minResReq;
+                            const resLabel =
+                              myCharDef?.classResource?.shortLabel ||
+                              myCharDef?.classResource?.label ||
+                              'REC';
+
+                            const abDealsDamage =
+                              ab.dealsDamage ??
+                              (ab.kind === 'DAMAGE' ||
+                                ab.category === 'ATTACK' ||
+                                ab.category === 'DEBUFF');
+                            const abEst =
+                              me && activeTargetEnemy
+                                ? estimatePlayerActionDamage(
+                                    me,
+                                    'ABILITY',
+                                    activeTargetEnemy,
+                                    livingEnemies,
+                                    expeditionState.partyRelics || [],
+                                    ab.id
+                                  )
+                                : null;
+
+                            const headline = !abDealsDamage
+                              ? ab.kind === 'HEAL' || ab.category === 'HEAL'
+                                ? `+${ab.healAmount || ab.power || 16} PV`
+                                : `+${ab.shieldGrant || 5} ARMADURA`
+                              : abEst && abEst.max > 0
+                              ? `${formatDamageRange(abEst.min, abEst.max)} DAÑO`
+                              : `${ab.power || 14} DAÑO`;
+
+                            const categoryBadge = !abDealsDamage
+                              ? ab.kind === 'HEAL' || ab.category === 'HEAL'
+                                ? 'CURACIÓN'
+                                : ab.kind === 'BUFF'
+                                ? 'APOYO'
+                                : 'DEFENSA'
+                              : ab.targetRule === 'ALL_ENEMIES'
+                              ? 'ÁREA'
+                              : abEst?.damageTypeLabel || 'HABILIDAD';
+
+                            const specialPropertyLine = !abDealsDamage
+                              ? ab.purifyCount
+                                ? `◆ PURIFICA ${ab.purifyCount}`
+                                : ab.kind === 'HEAL' || ab.category === 'HEAL'
+                                ? '◆ BENDICE GRUPO'
+                                : ab.id === 'muro_de_hierro'
+                                ? '◆ PROVOCA ENEMIGOS'
+                                : '◆ ESCUDO GRUPAL'
+                              : ab.statusToApply
+                              ? `◆ ${
+                                  CRIPTA_STATUS_EFFECTS_REGISTRY[ab.statusToApply]?.name.toUpperCase() ||
+                                  ab.statusToApply
+                                } ${ab.statusTurns || ab.statusStacks || 2}`
+                              : ab.armorBreak
+                              ? `◆ ROMPE ${ab.armorBreak} ARM.`
+                              : ab.targetRule === 'ALL_ENEMIES'
+                              ? '◆ GOLPE EN ÁREA'
+                              : '◆ IMPACTO CRÍTICO';
+
+                            const mechBadge = getPlayerActionMechanicBadge(
+                              me,
+                              'ABILITY',
+                              ab.id
+                            );
+
+                            return (
+                              <LaCriptaPlayableCard
+                                key={ab.id}
+                                title={ab.name}
+                                categoryLabel={categoryBadge}
+                                costLabel="1 AP"
+                                cooldownLabel={
+                                  abCd > 0
+                                    ? `⏱ ${abCd}`
+                                    : lacksResource
+                                    ? `REQ. ${minResReq} ${resLabel}`
+                                    : 'LISTA'
+                                }
+                                headlineValue={headline}
+                                summary={specialPropertyLine}
+                                tooltipDescription={`${ab.description} ENFRIAMIENTO: ${
+                                  ab.cooldownTurns || 2
+                                } rondas.`}
+                                accentColor={
+                                  !abDealsDamage
+                                    ? ab.kind === 'HEAL'
+                                      ? 'emerald'
+                                      : 'cyan'
+                                    : 'purple'
+                                }
+                                disabled={
+                                  !isMyTurn ||
+                                  currentTurnAp < 1 ||
+                                  abCd > 0 ||
+                                  lacksResource
+                                }
+                                turnLocked={isTurnActionLocked}
+                                illustration={
+                                  <LaCriptaCombatCardArtwork
+                                    artKey={ab.artKey || ab.id}
+                                    cardId={ab.id}
+                                  />
+                                }
+                                onClick={() =>
+                                  submitPlayerCombatChoice('ABILITY', undefined, ab.id)
+                                }
+                                footerBadge={
+                                  abCd > 0
+                                    ? `⏱ ${abCd} ${abCd === 1 ? 'RONDA' : 'RONDAS'}`
+                                    : lacksResource
+                                    ? `FALTA ${resLabel} (${myRes}/${minResReq})`
+                                    : mechBadge || `⏱ CD ${ab.cooldownTurns || 2}`
+                                }
+                              />
+                            );
+                          })}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Secondary Bottom Strip under Combat Cards: Universal 9-Class Mechanic Bar + Weapon Identity + Rune Switcher + MOCHILA */}
                   <div className="mt-2 flex flex-wrap items-center justify-center gap-2.5">
+                    {(() => {
+                      const mechHud = getPlayerClassMechanicHudState(me);
+                      const mechDef = getClassMechanicForCharacter(me?.characterId);
+                      if (!mechHud || !mechDef) return null;
+                      return (
+                        <LaCriptaPixelTooltip
+                          title={`${mechHud.iconSymbol} ${mechDef.name} (${mechHud.current}/${mechHud.max})`}
+                          category={`MECÁNICA ÚNICA · ${myCharDef?.className || ''}`}
+                          description={`${mechDef.shortDescription} | CÓMO GANAR: ${mechDef.howToGain} | CÓMO USAR: ${mechDef.howToSpendOrTrigger}`}
+                          footerLabel={`${mechHud.stateBadge} · ${mechHud.bonusSummary}`}
+                          borderColor={mechHud.colorHex}
+                        >
+                          <div
+                            className="px-2.5 py-1.5 bg-[#120C1C] border flex items-center gap-2 cursor-help"
+                            style={{ borderColor: mechHud.colorHex }}
+                          >
+                            <span
+                              className="text-[9px] font-cripta-pixel font-bold uppercase tracking-wider"
+                              style={{ color: mechHud.colorHex }}
+                            >
+                              {mechHud.iconSymbol} {mechHud.label}:
+                            </span>
+                            <span
+                              className="font-cripta-mono text-[11px] font-black"
+                              style={{ color: mechHud.colorHex }}
+                            >
+                              {mechHud.pipsText}
+                            </span>
+                            <span className="text-[8px] font-cripta-pixel text-[#FFD166]">
+                              {mechHud.stateBadge} · {mechHud.bonusSummary}
+                            </span>
+                          </div>
+                        </LaCriptaPixelTooltip>
+                      );
+                    })()}
                     {myEquippedWeapon && (
                       <div className="px-2.5 py-1.5 bg-[#120D1A] border border-[#3E2F4B] flex flex-wrap items-center gap-2">
                         <span className="text-[8px] font-cripta-pixel text-[#D8C6A0]/70 uppercase">
@@ -1668,10 +2127,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                 </div>
               ) : (
                 /* CASE C: NON-COMBAT ENCOUNTERS (EVENTS, SHRINES, SHOP, PUZZLE, TREASURE) OR CLEARED ROOM */
-                <div className="w-full flex flex-col items-center justify-center gap-4">
+                <div className="my-auto w-full flex flex-col items-center justify-center gap-2.5 pb-4">
                   {/* Narrative Prompt / Resolution Banner */}
-                  <div className="max-w-3xl w-full bg-[#140E1D]/95 border border-[#3E2F4B] px-4 py-3 text-center">
-                    <p className="text-xs sm:text-sm font-cripta-pixel text-[#E8DFCE] leading-relaxed">
+                  <div className="max-w-3xl w-full bg-[#140E1D]/95 border border-[#3E2F4B] px-3.5 py-2 text-center">
+                    <p className="text-xs sm:text-[13px] font-cripta-pixel text-[#E8DFCE] leading-snug">
                       {activeRoom.outcomeLog ||
                         activeRoom.narrative ||
                         activeRoom.subtitle}
@@ -1729,6 +2188,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                               ? 'ORO'
                               : 'CONSUMIBLE');
                           const isClaimingThis = Boolean(claimingDropIds[resolvedDropId]);
+                          const dropComparison = getEquipmentComparison({
+                            weaponId: drop.weaponId,
+                            weaponRuneId: drop.weaponRuneId,
+                          });
 
                           return (
                             <div
@@ -1755,6 +2218,11 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                                 costLabel="RECLAMAR"
                                 cooldownLabel={resolvedRarity}
                                 summary={resolvedSummary}
+                                tooltipDescription={
+                                  dropComparison.detailTooltip || resolvedSummary
+                                }
+                                comparisonBadge={dropComparison.badge}
+                                comparisonTone={dropComparison.tone}
                                 accentColor={
                                   drop.weaponRuneId ||
                                   drop.type === 'RELIC_PEDESTAL' ||
@@ -1815,6 +2283,13 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           const isSold = Boolean(slot.sold || slot.soldOut);
                           const displayPrice = slot.priceGold;
                           const canAfford = partyGold >= displayPrice && !isSold;
+                          const shopComparison = getEquipmentComparison({
+                            weaponId: slot.weaponId,
+                            armorId: slot.armorId,
+                            accessoryId: slot.accessoryId,
+                            weaponRuneId: slot.weaponRuneId,
+                            isForgeUpgrade: slot.kind === 'FORGE_UPGRADE',
+                          });
 
                           return (
                             <LaCriptaPlayableCard
@@ -1824,6 +2299,13 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                               costLabel={isSold ? 'AGOTADO' : `${displayPrice} ORO`}
                               cooldownLabel={slot.rarity || 'COMÚN'}
                               summary={slot.description || 'Artículo del mercader errante.'}
+                              tooltipDescription={
+                                shopComparison.detailTooltip ||
+                                slot.description ||
+                                'Artículo del mercader errante.'
+                              }
+                              comparisonBadge={shopComparison.badge}
+                              comparisonTone={shopComparison.tone}
                               accentColor={
                                 isSold
                                   ? 'slate'
@@ -1890,10 +2372,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         })}
                       </div>
 
-                      {/* Shop Reroll Action Bar */}
-                      {onBuyShopSlot && (
-                        <div className="mt-1 flex items-center justify-center">
-                          {(() => {
+                      {/* Shop Reroll & Non-Blocking Exit Action Bar */}
+                      <div className="mt-1 flex flex-wrap items-center justify-center gap-2.5">
+                        {onBuyShopSlot &&
+                          (() => {
                             const rerollCost = 10 + (activeRoom.shopRerollCount || 0) * 6;
                             const canReroll = partyGold >= rerollCost && !iAmDead;
                             return (
@@ -1908,13 +2390,24 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                               >
                                 <RotateCcw className="w-3.5 h-3.5 text-[#E7A54A]" />
                                 <span>
-                                  RENOVAR MERCANCÍA DEL MERCADER ({rerollCost} ORO)
+                                  RENOVAR MERCANCÍA ({rerollCost} ORO)
                                 </span>
                               </button>
                             );
                           })()}
-                        </div>
-                      )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            laCriptaAudio.playDoorVote();
+                            onAdvanceRoom();
+                          }}
+                          className="px-4 py-2 bg-[#15281E] hover:bg-[#1E3B2C] border border-[#5EA87A] text-[10px] font-cripta-pixel font-bold text-[#8EE6AE] uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_12px_rgba(94,168,122,0.2)]"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5 text-[#8EE6AE]" />
+                          <span>SALIR SIN COMPRAR · CONTINUAR</span>
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -1938,12 +2431,15 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       />
                     )}
 
-                  {/* INTERACTIVE ROOM OPTIONS (EVENTS, SHRINES, TREASURE, REST, TRAP) AS LARGE PLAYABLE CARDS */}
-                  {!activeRoom.resolved &&
+                  {/* INTERACTIVE ROOM OPTIONS + PROGRESSION DOOR CARD IN RESPONSIVE FITTING ROW */}
+                  {((!activeRoom.resolved &&
                     activeRoom.options &&
-                    activeRoom.options.length > 0 && (
-                      <div className="w-full flex flex-wrap items-stretch justify-center gap-4">
-                        {activeRoom.options.map((opt, idx) => {
+                    activeRoom.options.length > 0) ||
+                    (canAdvance && onAdvanceRoom)) && (
+                    <div className="w-full flex flex-wrap items-stretch justify-center gap-2.5 sm:gap-3">
+                      {!activeRoom.resolved &&
+                        activeRoom.options &&
+                        activeRoom.options.map((opt, idx) => {
                           const hasHpCost = Boolean(opt.costHp && opt.costHp > 0);
                           const hasGoldCost = Boolean(
                             opt.costGold && opt.costGold > 0
@@ -2025,8 +2521,13 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           );
                         })}
 
-                        {/* Weapon Forge Upgrade Card if available in REST / WEAPON_UPGRADE */}
-                        {canForgeUpgradeHere && myWeapon && onUpgradeWeapon && (
+                      {/* Weapon Forge Upgrade Card if available in REST / WEAPON_UPGRADE */}
+                      {!activeRoom.resolved &&
+                        activeRoom.options &&
+                        activeRoom.options.length > 0 &&
+                        canForgeUpgradeHere &&
+                        myWeapon &&
+                        onUpgradeWeapon && (
                           <LaCriptaPlayableCard
                             title={`Forjar ${myWeapon.name}`}
                             categoryLabel="YUNQUE DE FORJA"
@@ -2057,14 +2558,11 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             }
                           />
                         )}
-                      </div>
-                    )}
 
-                  {/* READY TO LEAVE / GIANT DOOR ADVANCE CARD */}
-                  {canAdvance && onAdvanceRoom && (
-                    <div className="mt-2 flex flex-wrap items-stretch justify-center gap-4">
                       {/* Secret Room Discovery Card if available */}
-                      {activeRoom.hasSecretEntrance &&
+                      {canAdvance &&
+                        onAdvanceRoom &&
+                        activeRoom.hasSecretEntrance &&
                         !activeRoom.secretDiscovered &&
                         !inSecretRoom &&
                         onDiscoverSecret && (
@@ -2094,64 +2592,66 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         )}
 
                       {/* Primary Advance / Cross Giant Door Card */}
-                      <LaCriptaPlayableCard
-                        title={
-                          inSecretRoom
-                            ? 'Salir de Cámara Oculta'
-                            : isLastRoomInDungeon
-                            ? completedDoorCount + 1 >= 3
-                              ? 'Despertar Umbral Final'
-                              : 'Completar Mazmorra'
-                            : 'Cruzar Compuerta'
-                        }
-                        categoryLabel={
-                          isLastRoomInDungeon
-                            ? 'SELLO DE LA MAZMORRA'
-                            : `AVANZAR A SALA ${currentRoomIndex + 2}`
-                        }
-                        costLabel="LISTO"
-                        cooldownLabel={`${readyPlayerIds.length}/${totalConnected}`}
-                        summary={
-                          iAmReadyToAdvance
-                            ? 'Esperando a que el resto del grupo confirme cruzar la compuerta...'
-                            : isLastRoomInDungeon
-                            ? 'Has derrotado al Guardián. Regresa a la Cámara de las Puertas con el sello conquistado.'
-                            : 'Las pesadas hojas de piedra se abrirán ante el grupo para cruzar hacia la siguiente cámara.'
-                        }
-                        accentColor="amber"
-                        selected={iAmReadyToAdvance}
-                        voterBadges={expeditionState.players
-                          .filter(
-                            (p) => p.isConnected && readyPlayerIds.includes(p.id)
-                          )
-                          .map((p) => ({
-                            id: p.id,
-                            name: p.name,
-                            color: '#FFD166',
-                          }))}
-                        illustration={
-                          <LaCriptaDoorCardIllustration
-                            dungeon={chosenDungeon}
-                            isReadyOrSelected={iAmReadyToAdvance}
-                          />
-                        }
-                        onClick={() => {
-                          laCriptaAudio.playDoorVote();
-                          if (unclaimedDrops.length > 0 && onClaimGroundDrop) {
-                            unclaimedDrops.forEach((d) =>
-                              onClaimGroundDrop(d.dropId || d.id)
-                            );
+                      {canAdvance && onAdvanceRoom && (
+                        <LaCriptaPlayableCard
+                          title={
+                            inSecretRoom
+                              ? 'Salir de Cámara Oculta'
+                              : isLastRoomInDungeon
+                              ? completedDoorCount + 1 >= 3
+                                ? 'Despertar Umbral Final'
+                                : 'Completar Mazmorra'
+                              : 'Cruzar Compuerta'
                           }
-                          onAdvanceRoom();
-                        }}
-                        footerBadge={
-                          iAmReadyToAdvance
-                            ? '✓ ESPERANDO GRUPO'
-                            : unclaimedDrops.length > 0
-                            ? 'RECLAMAR Y AVANZAR →'
-                            : 'CRUZAR PUERTA →'
-                        }
-                      />
+                          categoryLabel={
+                            isLastRoomInDungeon
+                              ? 'SELLO DE LA MAZMORRA'
+                              : `AVANZAR A SALA ${currentRoomIndex + 2}`
+                          }
+                          costLabel="LISTO"
+                          cooldownLabel={`${readyPlayerIds.length}/${totalConnected}`}
+                          summary={
+                            iAmReadyToAdvance
+                              ? 'Esperando a que el resto del grupo confirme cruzar la compuerta...'
+                              : isLastRoomInDungeon
+                              ? 'Has derrotado al Guardián. Regresa a la Cámara de las Puertas con el sello conquistado.'
+                              : 'Las pesadas hojas de piedra se abrirán ante el grupo para cruzar hacia la siguiente cámara.'
+                          }
+                          accentColor="amber"
+                          selected={iAmReadyToAdvance}
+                          voterBadges={expeditionState.players
+                            .filter(
+                              (p) => p.isConnected && readyPlayerIds.includes(p.id)
+                            )
+                            .map((p) => ({
+                              id: p.id,
+                              name: p.name,
+                              color: '#FFD166',
+                            }))}
+                          illustration={
+                            <LaCriptaDoorCardIllustration
+                              dungeon={chosenDungeon}
+                              isReadyOrSelected={iAmReadyToAdvance}
+                            />
+                          }
+                          onClick={() => {
+                            laCriptaAudio.playDoorVote();
+                            if (unclaimedDrops.length > 0 && onClaimGroundDrop) {
+                              unclaimedDrops.forEach((d) =>
+                                onClaimGroundDrop(d.dropId || d.id)
+                              );
+                            }
+                            onAdvanceRoom();
+                          }}
+                          footerBadge={
+                            iAmReadyToAdvance
+                              ? '✓ ESPERANDO GRUPO'
+                              : unclaimedDrops.length > 0
+                              ? 'RECLAMAR Y AVANZAR →'
+                              : 'CRUZAR PUERTA →'
+                          }
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -2243,8 +2743,17 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   // ===========================================================================
   if (
     completedDoorCount >= 3 ||
+    expeditionState.phase === 'FINAL_BOSS_DOOR_READY' ||
     expeditionState.phase === 'FINAL_BOSS_ENTRANCE'
   ) {
+    const canonicalCompletedIds =
+      Array.isArray(expeditionState.completedDungeonIds) &&
+      expeditionState.completedDungeonIds.length > 0
+        ? expeditionState.completedDungeonIds
+        : Array.isArray(expeditionState.completedBiomes) &&
+          expeditionState.completedBiomes.length > 0
+        ? expeditionState.completedBiomes
+        : [];
     return (
       <div className="relative z-10 flex-1 min-h-0 w-full h-full px-3 sm:px-6 py-2 flex flex-col justify-center gap-2 select-none overflow-y-auto">
         <LaCriptaGiantDoorTransition
@@ -2254,8 +2763,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
           <LaCriptaDoorCounterBadge completedDoorCount={3} />
         </div>
         <LaCriptaFinalBossDoorScene
-          completedDungeonIds={expeditionState.completedDungeonIds || []}
-          players={expeditionState.players}
+          completedDungeonIds={canonicalCompletedIds}
+          completedBiomes={canonicalCompletedIds}
+          finalBossDoorVotes={expeditionState.finalBossDoorVotes || {}}
+          players={expeditionState.players || []}
           currentPlayerId={currentPlayerId}
           isUnlocking={expeditionState.phase === 'FINAL_BOSS_ENTRANCE'}
           onVoteBossDoor={() => {
@@ -2280,14 +2791,14 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
   const isReturningToDoors = expeditionState.phase === 'RETURNING_TO_DOORS';
 
   return (
-    <div className="relative z-10 flex-1 min-h-0 w-full h-full max-w-6xl mx-auto px-3 sm:px-6 py-2 flex flex-col justify-center gap-2.5 sm:gap-3.5 select-none overflow-y-auto">
+    <div className="relative z-10 flex-1 min-h-0 w-full h-full max-w-6xl mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-2 flex flex-col justify-start gap-2.5 sm:gap-3.5 select-none overflow-y-auto">
       <LaCriptaGiantDoorTransition
         transition={expeditionState.roomDoorTransition}
       />
 
       {/* Returning-to-Doors Celebration Banner */}
       {isReturningToDoors && (
-        <div className="mx-auto px-5 py-1.5 bg-[#1F1529] border-2 border-[#FFD166] text-center shadow-[0_0_28px_rgba(231,165,74,0.45)] animate-bounce">
+        <div className="mx-auto px-5 py-1.5 bg-[#1F1529] border-2 border-[#FFD166] text-center shadow-[0_0_28px_rgba(231,165,74,0.45)]">
           <div className="text-xs sm:text-sm font-cripta-display font-black text-[#FFD166] tracking-widest uppercase">
             ✦ PUERTA {completedDoorCount} / 3 SUPERADA ✦
           </div>
@@ -2297,9 +2808,9 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
         </div>
       )}
 
-      {/* Top Title Header */}
-      <header className="text-center">
-        <h1 className="font-cripta-display text-2xl sm:text-3xl md:text-4xl font-black tracking-widest text-[#D8C6A0] uppercase">
+      {/* Top Title Header — Fixed height so hovering a door NEVER changes layout or pushes doors down */}
+      <header className="text-center shrink-0">
+        <h1 className="font-cripta-display text-2xl sm:text-3xl md:text-4xl font-black tracking-widest text-[#D8C6A0] uppercase leading-tight">
           {openingDungeonDef
             ? `ADENTRÁNDOSE EN ${openingDungeonDef.name}`
             : completedDoorCount === 0
@@ -2311,32 +2822,36 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
             : `ELIGE VUESTRA PUERTA ${completedDoorCount + 1} DE 3`}
         </h1>
 
-        {openingDungeonDef ? (
-          <p
-            className="mt-1 text-xs font-cripta-pixel tracking-wider uppercase animate-pulse"
-            style={{ color: openingDungeonDef.palette.highlight }}
-          >
-            ✦ LOS CERROJOS CEDEN · EL GRUPO CRUZA EL UMBRAL ✦
-          </p>
-        ) : hoveredDoorId && CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId] ? (
-          <p
-            className="mt-1 text-xs font-cripta-pixel tracking-wider uppercase transition-colors duration-300"
-            style={{ color: CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].palette.highlight }}
-          >
-            ✦ {CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].name} ·{' '}
-            {CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].artTheme.hoverPrompt ||
-              CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].subtitle}{' '}
-            ✦
-          </p>
-        ) : (
-          !isSolo &&
-          !expeditionState.voteTieWarning && (
-            <p className="mt-1 text-xs font-cripta-pixel text-[#D8C6A0]/65 tracking-wider">
+        {/* Fixed 24px subtitle slot — always rendered in both solo & multiplayer so doors never shift on hover */}
+        <div className="mt-1 h-[24px] flex items-center justify-center overflow-hidden">
+          {openingDungeonDef ? (
+            <p
+              className="text-xs font-cripta-pixel tracking-wider uppercase animate-pulse truncate"
+              style={{ color: openingDungeonDef.palette.highlight }}
+            >
+              ✦ LOS CERROJOS CEDEN · EL GRUPO CRUZA EL UMBRAL ✦
+            </p>
+          ) : hoveredDoorId && CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId] ? (
+            <p
+              className="text-xs font-cripta-pixel tracking-wider uppercase transition-colors duration-300 truncate"
+              style={{ color: CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].palette.highlight }}
+            >
+              ✦ {CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].name} ·{' '}
+              {CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].artTheme.hoverPrompt ||
+                CRIPTA_DUNGEONS_REGISTRY[hoveredDoorId].subtitle}{' '}
+              ✦
+            </p>
+          ) : !isSolo && !expeditionState.voteTieWarning ? (
+            <p className="text-xs font-cripta-pixel text-[#D8C6A0]/65 tracking-wider truncate">
               VOTOS DEL GRUPO: {Object.keys(expeditionState.doorVotes).length} /{' '}
               {totalConnected}
             </p>
-          )
-        )}
+          ) : (
+            <p className="text-xs font-cripta-pixel text-[#D8C6A0]/60 tracking-wider uppercase truncate">
+              ✦ INSPECCIONA LOS TRES UMBRALES Y ELIGE TU CAMINO ✦
+            </p>
+          )}
+        </div>
 
         {/* Multiplayer Tie Notice */}
         {expeditionState.voteTieWarning && !isOpeningPhase && (
@@ -2365,8 +2880,8 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
         )}
       </header>
 
-      {/* THREE ARCHITECTURAL DOORS SIDE-BY-SIDE (FIXED FLOOR BASELINE) */}
-      <section className="relative max-w-5xl mx-auto w-full pt-2">
+      {/* THREE ARCHITECTURAL DOORS SIDE-BY-SIDE (STRICT ZERO-MOVEMENT HOVER ARCHITECTURE) */}
+      <section className="relative max-w-5xl mx-auto w-full pt-2 shrink-0">
         {/* Continuous Stone Threshold Floor Line shared by all 3 doors */}
         <div
           className="pointer-events-none absolute left-2 right-2 top-[233px] sm:top-[276px] lg:top-[310px] h-[3px] z-0"
@@ -2397,10 +2912,33 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                 role="button"
                 tabIndex={isOpeningPhase ? -1 : 0}
                 aria-label={`Puerta a ${dungeon.name}`}
-                onMouseEnter={() => {
+                data-hovered={isHovered ? 'true' : 'false'}
+                data-selected={isVotedByMe ? 'true' : 'false'}
+                onMouseEnter={(e) => {
+                  const slotEl = e.currentTarget;
+                  const labelEl = slotEl.querySelector('.dungeonDoorLabel');
+                  const beforeSlotRect = slotEl.getBoundingClientRect();
+                  const beforeLabelRect = labelEl?.getBoundingClientRect();
                   setHoveredDoorId(dungeonId);
                   if (!isOpeningPhase) {
                     laCriptaAudio.playDoorHover();
+                  }
+                  if (import.meta.env.DEV) {
+                    window.requestAnimationFrame(() => {
+                      const afterSlotRect = slotEl.getBoundingClientRect();
+                      const afterLabelRect = labelEl?.getBoundingClientRect();
+                      if (
+                        Math.abs(afterSlotRect.y - beforeSlotRect.y) > 0.5 ||
+                        (beforeLabelRect &&
+                          afterLabelRect &&
+                          Math.abs(afterLabelRect.y - beforeLabelRect.y) > 0.5)
+                      ) {
+                        console.warn('Door hover layout shift detected', {
+                          beforeSlotRect,
+                          afterSlotRect,
+                        });
+                      }
+                    });
                   }
                 }}
                 onMouseLeave={() => {
@@ -2419,59 +2957,61 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                     onVoteDoor(dungeonId);
                   }
                 }}
-                className={`group relative flex flex-col items-center transition-all duration-700 outline-none ${
+                className={`dungeonDoorSlot dungeonDoorOption group relative h-[325px] sm:h-[368px] lg:h-[402px] flex flex-col items-center outline-none ${
                   isDimmedOtherDoor
-                    ? 'opacity-15 scale-[0.92] blur-[1px] pointer-events-none'
+                    ? 'opacity-15 pointer-events-none'
                     : isThisDoorOpening
-                    ? 'scale-[1.12] z-30'
+                    ? 'z-30'
                     : 'cursor-pointer'
                 }`}
               >
-                {/* Fixed Door Stage — All 3 doors share identical height & bottom=0 anchor */}
-                <div
-                  className="relative w-full h-[225px] sm:h-[268px] lg:h-[302px] flex items-end justify-center transition-all duration-500"
-                  style={{
-                    filter:
-                      isThisDoorOpening
-                        ? `drop-shadow(0 0 42px ${dungeon.palette.glow})`
-                        : isVotedByMe || voters.length > 0
-                        ? `drop-shadow(0 0 18px ${dungeon.palette.glow}77)`
-                        : isHovered
-                        ? `drop-shadow(0 0 14px ${dungeon.palette.highlight}66)`
-                        : 'none',
-                  }}
-                >
-                  <LaCriptaDoorArtwork
-                    dungeon={dungeon}
-                    isHovered={isHovered}
-                    isVotedByMe={isVotedByMe}
-                    isOpening={isThisDoorOpening}
-                    voteCount={voters.length}
-                  />
+                {/* Fixed Door Visual Frame — All 3 doors share identical fixed height & bottom=0 anchor */}
+                <div className="dungeonDoorVisualFrame relative w-full h-[225px] sm:h-[268px] lg:h-[302px] shrink-0">
+                  <div
+                    className="dungeonDoorVisual absolute inset-0 flex items-end justify-center"
+                    style={{
+                      filter:
+                        isThisDoorOpening
+                          ? `drop-shadow(0 0 42px ${dungeon.palette.glow})`
+                          : isVotedByMe || voters.length > 0
+                          ? `drop-shadow(0 0 18px ${dungeon.palette.glow}77)`
+                          : isHovered
+                          ? `drop-shadow(0 0 14px ${dungeon.palette.highlight}66)`
+                          : 'none',
+                    }}
+                  >
+                    <LaCriptaDoorArtwork
+                      dungeon={dungeon}
+                      isHovered={isHovered}
+                      isVotedByMe={isVotedByMe}
+                      isOpening={isThisDoorOpening}
+                      voteCount={voters.length}
+                    />
 
-                  {isThisDoorOpening && (
-                    <div
-                      className="pointer-events-none absolute inset-x-[22%] top-[21%] bottom-[8%] flex flex-col items-center justify-end pb-3 animate-pulse z-30"
-                      style={{
-                        background: `radial-gradient(ellipse at 50% 55%, ${dungeon.palette.highlight}99 0%, ${dungeon.palette.glow}66 45%, rgba(8,6,12,0.92) 90%)`,
-                        boxShadow: `inset 0 0 34px ${dungeon.palette.glow}, 0 0 36px ${dungeon.palette.highlight}66`,
-                      }}
-                    >
-                      <span
-                        className="px-2.5 py-0.5 bg-[#09070D]/95 border text-[9px] font-cripta-pixel font-bold uppercase tracking-widest shadow-lg"
+                    {isThisDoorOpening && (
+                      <div
+                        className="pointer-events-none absolute inset-x-[22%] top-[21%] bottom-[8%] flex flex-col items-center justify-end pb-3 animate-pulse z-30"
                         style={{
-                          borderColor: dungeon.palette.highlight,
-                          color: dungeon.palette.highlight,
+                          background: `radial-gradient(ellipse at 50% 55%, ${dungeon.palette.highlight}99 0%, ${dungeon.palette.glow}66 45%, rgba(8,6,12,0.92) 90%)`,
+                          boxShadow: `inset 0 0 34px ${dungeon.palette.glow}, 0 0 36px ${dungeon.palette.highlight}66`,
                         }}
                       >
-                        ✦ UMBRAL ABIERTO ✦
-                      </span>
-                    </div>
-                  )}
+                        <span
+                          className="px-2.5 py-0.5 bg-[#09070D]/95 border text-[9px] font-cripta-pixel font-bold uppercase tracking-widest shadow-lg"
+                          style={{
+                            borderColor: dungeon.palette.highlight,
+                            color: dungeon.palette.highlight,
+                          }}
+                        >
+                          ✦ UMBRAL ABIERTO ✦
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Fixed-Baseline Label Block Directly Beneath the Door */}
-                <div className="mt-3 w-full min-h-[82px] flex flex-col items-center justify-start text-center px-1">
+                {/* Fixed-Height Label Block Directly Beneath the Door — Never transforms or shifts */}
+                <div className="dungeonDoorLabel mt-3 w-full h-[88px] shrink-0 flex flex-col items-center justify-start text-center px-1 overflow-hidden">
                   <h2
                     className="font-cripta-display text-sm sm:text-lg md:text-xl font-bold tracking-wide transition-colors leading-tight line-clamp-1"
                     style={{
@@ -2488,7 +3028,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   </div>
 
                   {/* Compact Player Selection Indicators */}
-                  <div className="mt-1.5 min-h-[22px] flex flex-wrap items-center justify-center gap-1.5">
+                  <div className="mt-1.5 h-[22px] flex flex-wrap items-center justify-center gap-1.5">
                     {voters.map((voter) => (
                       <span
                         key={voter.id}

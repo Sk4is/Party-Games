@@ -191,13 +191,15 @@ export const LaCriptaVfxSprite: React.FC<LaCriptaVfxSpriteProps> = ({
 
         {resolvedStyle === 'explosion' && (
           <g>
-            <rect x="4" y="4" width="16" height="16" fill="#C93B5B" />
-            <rect x="6" y="6" width="12" height="12" fill="#E7A54A" />
-            <rect x="9" y="9" width="6" height="6" fill="#FFF3C4" />
-            <rect x="1" y="10" width="3" height="4" fill="#FFD166" />
-            <rect x="20" y="10" width="3" height="4" fill="#FFD166" />
-            <rect x="10" y="1" width="4" height="3" fill="#FFD166" />
-            <rect x="10" y="20" width="4" height="3" fill="#FFD166" />
+            {/* Starburst pixel spark without solid rectangular background */}
+            <rect x="11" y="2" width="2" height="20" fill="#E7A54A" />
+            <rect x="2" y="11" width="20" height="2" fill="#E7A54A" />
+            <rect x="5" y="5" width="3" height="3" fill="#C93B5B" />
+            <rect x="16" y="5" width="3" height="3" fill="#C93B5B" />
+            <rect x="5" y="16" width="3" height="3" fill="#C93B5B" />
+            <rect x="16" y="16" width="3" height="3" fill="#C93B5B" />
+            <rect x="8" y="8" width="8" height="8" fill="#FFD166" />
+            <rect x="10" y="10" width="4" height="4" fill="#FFF3C4" />
           </g>
         )}
 
@@ -448,6 +450,11 @@ export interface ActiveDirectionalTravel {
   label?: string;
   color: string;
   isCrit?: boolean;
+  sourceEnemyId?: string;
+  sourceEnemyName?: string;
+  targetPlayerId?: string;
+  targetPlayerName?: string;
+  targetPlayerColor?: string;
 }
 
 export interface ActiveGoldBurst {
@@ -458,8 +465,8 @@ export interface ActiveGoldBurst {
 }
 
 /**
- * True pixel-art projectile sprite for RANGED, MAGIC, ALCHEMY, and LIFESTEAL travel.
- * Normal melee attacks (slash, cleave, blunt, claw) NEVER throw objects across the screen!
+ * True pixel-art projectile sprite for ENEMY RANGED/MAGIC/ALCHEMY and LIFESTEAL travel.
+ * Player attacks NEVER launch generic objects or projectiles across the screen!
  */
 const ProjectilePixelSprite: React.FC<{
   vfxStyle: NonNullable<CriptaVisualEvent['vfxStyle']>;
@@ -475,7 +482,7 @@ const ProjectilePixelSprite: React.FC<{
     >
       {(vfxStyle === 'arrow' || vfxStyle === 'pierce') && (
         <g>
-          {/* High-velocity fletched arrow / bolt oriented toward the left enemy stage */}
+          {/* High-velocity fletched arrow / bolt */}
           <rect x="2" y="11" width="4" height="2" fill="#FFFFFF" />
           <rect x="4" y="9" width="3" height="6" fill="#E2E8F0" />
           <rect x="3" y="10" width="3" height="4" fill="#FFD166" />
@@ -562,6 +569,22 @@ const ProjectilePixelSprite: React.FC<{
           <rect x="15" y="4" width="3" height="3" fill="#FF4D6D" />
         </g>
       )}
+
+      {(vfxStyle === 'claw' || vfxStyle === 'slash' || vfxStyle === 'blunt' || vfxStyle === 'cleave') && (
+        <g>
+          {/* Crisp diagonal pixel-art slash arc (no rectangular background) */}
+          <rect x="3" y="18" width="3" height="3" fill="#8F263D" />
+          <rect x="6" y="15" width="3" height="3" fill="#E03E52" />
+          <rect x="9" y="12" width="3" height="3" fill="#FF6B8B" />
+          <rect x="12" y="9" width="3" height="3" fill="#FFD166" />
+          <rect x="15" y="6" width="3" height="3" fill="#FFF3C4" />
+          <rect x="18" y="3" width="3" height="3" fill="#FFD166" />
+          <rect x="7" y="18" width="2" height="2" fill="#C93B5B" />
+          <rect x="10" y="15" width="2" height="2" fill="#E03E52" />
+          <rect x="13" y="12" width="2" height="2" fill="#FFD166" />
+          <rect x="16" y="9" width="2" height="2" fill="#E03E52" />
+        </g>
+      )}
     </svg>
   );
 };
@@ -570,12 +593,56 @@ export const LaCriptaDirectionalTravelOverlay: React.FC<{
   travel: ActiveDirectionalTravel | null;
 }> = ({ travel }) => {
   const [progress, setProgress] = useState<'START' | 'END'>('START');
+  const [coords, setCoords] = useState<{
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!travel) {
       setProgress('START');
+      setCoords(null);
       return;
     }
+
+    // Dynamically measure exact source enemy element and target player HUD card
+    const winW = window.innerWidth || 1280;
+    const winH = window.innerHeight || 720;
+
+    let startX = winW * 0.23;
+    let startY = winH * 0.42;
+    let endX = winW * 0.48;
+    let endY = winH * 0.88;
+
+    if (travel.sourceEnemyId) {
+      const enemyEl = document.querySelector(
+        `[data-enemy-stage-id="${travel.sourceEnemyId}"]`
+      );
+      if (enemyEl) {
+        const er = enemyEl.getBoundingClientRect();
+        if (er.width > 0 && er.height > 0) {
+          startX = er.left + er.width / 2;
+          startY = er.top + er.height / 2;
+        }
+      }
+    }
+
+    if (travel.targetPlayerId) {
+      const playerCardEl = document.querySelector(
+        `[data-player-hud-card="${travel.targetPlayerId}"]`
+      );
+      if (playerCardEl) {
+        const pr = playerCardEl.getBoundingClientRect();
+        if (pr.width > 0 && pr.height > 0) {
+          endX = pr.left + pr.width / 2;
+          endY = pr.top + pr.height / 2;
+        }
+      }
+    }
+
+    setCoords({ startX, startY, endX, endY });
     setProgress('START');
     const raf = window.requestAnimationFrame(() => {
       setProgress('END');
@@ -583,30 +650,62 @@ export const LaCriptaDirectionalTravelOverlay: React.FC<{
     return () => window.cancelAnimationFrame(raf);
   }, [travel]);
 
-  if (!travel) return null;
+  if (!travel || !coords) return null;
 
-  // Player -> Enemy moves from right action area toward left enemy stage
-  // Enemy -> Player moves from left enemy stage toward bottom player HUD
-  // Lifesteal moves from left enemy stage toward bottom player HUD in a swirling siphon arc
-  const startTransform =
-    travel.direction === 'PLAYER_TO_ENEMY'
-      ? 'translate(62vw, 64vh) scale(0.85)'
-      : 'translate(22vw, 42vh) scale(0.9)';
-
-  const endTransform =
-    travel.direction === 'PLAYER_TO_ENEMY'
-      ? 'translate(24vw, 40vh) scale(1.15)'
-      : 'translate(48vw, 84vh) scale(1.12)';
+  const startTransform = `translate3d(${coords.startX.toFixed(1)}px, ${coords.startY.toFixed(
+    1
+  )}px, 0) scale(0.9)`;
+  const endTransform = `translate3d(${coords.endX.toFixed(1)}px, ${coords.endY.toFixed(
+    1
+  )}px, 0) scale(1.12)`;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden select-none">
+      {/* Explicit Target Trajectory Line & Target Reticle on the Targeted Player's HUD Card */}
+      {travel.direction === 'ENEMY_TO_PLAYER' && (
+        <>
+          <svg className="pointer-events-none absolute inset-0 w-full h-full">
+            <line
+              x1={coords.startX}
+              y1={coords.startY}
+              x2={coords.endX}
+              y2={coords.endY}
+              stroke={travel.targetPlayerColor || '#FF4D6D'}
+              strokeWidth="2.5"
+              strokeDasharray="6 6"
+              opacity="0.78"
+            />
+          </svg>
+          <div
+            style={{
+              transform: `translate3d(${coords.endX.toFixed(1)}px, ${coords.endY.toFixed(
+                1
+              )}px, 0)`,
+            }}
+            className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+          >
+            {travel.targetPlayerName && (
+              <div
+                className="mt-1 px-2 py-0.5 bg-[#1E0810]/95 border text-[9px] font-cripta-pixel font-black uppercase tracking-widest whitespace-nowrap shadow-[0_0_12px_rgba(255,209,102,0.5)]"
+                style={{
+                  borderColor: '#FFD166',
+                  color: '#FFD166',
+                }}
+              >
+                ◆ BLANCO: {travel.targetPlayerName} ◆
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       <div
         style={{
           transform: progress === 'START' ? startTransform : endTransform,
           transition:
             travel.direction === 'LIFESTEAL_TO_PLAYER'
-              ? 'transform 460ms cubic-bezier(0.22, 1, 0.36, 1)'
-              : 'transform 340ms cubic-bezier(0.16, 1, 0.3, 1)',
+              ? 'transform 560ms cubic-bezier(0.22, 1, 0.36, 1)'
+              : 'transform 520ms cubic-bezier(0.16, 1, 0.3, 1)',
         }}
         className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
       >
@@ -625,12 +724,13 @@ export const LaCriptaDirectionalTravelOverlay: React.FC<{
             isCrit={travel.isCrit}
           />
         </div>
-        {travel.label && (
+        {(travel.label || travel.targetPlayerName) && (
           <span
-            style={{ borderColor: travel.color, color: travel.color }}
-            className="px-2 py-0.5 bg-[#09070D]/95 border text-[9px] font-cripta-pixel font-bold uppercase tracking-widest shadow-lg"
+            style={{ borderColor: travel.color, color: '#FFD166' }}
+            className="px-2 py-0.5 bg-[#09070D]/95 border-2 text-[9px] font-cripta-pixel font-bold uppercase tracking-widest shadow-lg whitespace-nowrap"
           >
-            {travel.label}
+            {travel.label ? `${travel.label}` : ''}
+            {travel.targetPlayerName ? ` → ${travel.targetPlayerName}` : ''}
           </span>
         )}
       </div>
@@ -639,66 +739,121 @@ export const LaCriptaDirectionalTravelOverlay: React.FC<{
 };
 
 /**
- * 60 FPS Gold Collection Coin Arc & Banner Overlay (Priority 12).
- * Spawns gleaming pixel gold coins that arc from the chamber toward the top-right ORO counter.
+ * 60 FPS Gold Collection Coin Arc & Banner Overlay (Requirements 2 & 3).
+ * Dynamically measures [data-reward-target="gold"] when the animation starts.
+ * NEVER targets ESTADOS or uses hardcoded coordinates.
  */
 export const LaCriptaGoldCollectionOverlay: React.FC<{
   burst: ActiveGoldBurst | null;
 }> = ({ burst }) => {
   const [phase, setPhase] = useState<'START' | 'FLY'>('START');
+  const [targetCoords, setTargetCoords] = useState<{
+    x: number;
+    y: number;
+    sourceX: number;
+    sourceY: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!burst || !burst.isGain) {
       setPhase('START');
+      setTargetCoords(null);
       return;
     }
+
+    // Measure the EXPLICIT dedicated [data-reward-target="gold"] element right when animation starts
+    const goldCounterEl = document.querySelector('[data-reward-target="gold"]');
+    const winW = window.innerWidth || 1280;
+    const winH = window.innerHeight || 720;
+
+    let targetX = winW * 0.75;
+    let targetY = 26;
+    if (goldCounterEl) {
+      const rect = goldCounterEl.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        targetX = rect.left + rect.width / 2;
+        targetY = rect.top + rect.height / 2;
+      }
+    }
+
+    const sourceX = winW * 0.48;
+    const sourceY = winH * 0.52;
+
+    setTargetCoords({ x: targetX, y: targetY, sourceX, sourceY });
     setPhase('START');
+
     const raf = window.requestAnimationFrame(() => {
       setPhase('FLY');
     });
-    return () => window.cancelAnimationFrame(raf);
+
+    const impactTimer = window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('cripta-gold-counter-impact'));
+    }, 620);
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(impactTimer);
+    };
   }, [burst]);
 
-  if (!burst || !burst.isGain) return null;
+  if (!burst || !burst.isGain || !targetCoords) return null;
 
   const coinOffsets = [
-    { startX: 44, startY: 54, delayMs: 0 },
-    { startX: 48, startY: 58, delayMs: 55 },
-    { startX: 52, startY: 52, delayMs: 110 },
-    { startX: 46, startY: 50, delayMs: 165 },
-    { startX: 54, startY: 56, delayMs: 215 },
-    { startX: 50, startY: 60, delayMs: 265 },
+    { dx: -44, dy: 12, delayMs: 0 },
+    { dx: -18, dy: 28, delayMs: 45 },
+    { dx: 22, dy: -14, delayMs: 90 },
+    { dx: -28, dy: -22, delayMs: 135 },
+    { dx: 38, dy: 18, delayMs: 180 },
+    { dx: 6, dy: 34, delayMs: 225 },
   ];
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden select-none">
-      {coinOffsets.map((c, idx) => (
-        <div
-          key={`${burst.id}_coin_${idx}`}
-          style={{
-            transform:
-              phase === 'START'
-                ? `translate(${c.startX}vw, ${c.startY}vh) scale(0.95)`
-                : 'translate(83vw, 3.5vh) scale(0.65)',
-            opacity: phase === 'START' ? 1 : 0.25,
-            transition: `transform 680ms cubic-bezier(0.2, 0.9, 0.3, 1) ${c.delayMs}ms, opacity 680ms ease-in ${c.delayMs}ms`,
-          }}
-          className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2"
-        >
-          <svg
-            width={26}
-            height={26}
-            viewBox="0 0 12 12"
-            shapeRendering="crispEdges"
-            className="drop-shadow-[0_0_12px_rgba(255,209,102,0.95)]"
+      {/* Initial Source Gold Burst Ring */}
+      <div
+        style={{
+          transform: `translate3d(${targetCoords.sourceX.toFixed(1)}px, ${targetCoords.sourceY.toFixed(
+            1
+          )}px, 0) scale(${phase === 'START' ? 0.5 : 1.55})`,
+          opacity: phase === 'START' ? 0.95 : 0,
+          transition: 'transform 420ms ease-out, opacity 420ms ease-out',
+        }}
+        className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-[#FFD166] bg-[#FFD166]/20"
+      />
+
+      {coinOffsets.map((c, idx) => {
+        const startX = targetCoords.sourceX + c.dx;
+        const startY = targetCoords.sourceY + c.dy;
+        return (
+          <div
+            key={`${burst.id}_coin_${idx}`}
+            style={{
+              transform:
+                phase === 'START'
+                  ? `translate3d(${startX.toFixed(1)}px, ${startY.toFixed(1)}px, 0) scale(1)`
+                  : `translate3d(${targetCoords.x.toFixed(1)}px, ${targetCoords.y.toFixed(
+                      1
+                    )}px, 0) scale(0.65)`,
+              opacity: phase === 'START' ? 1 : 0.25,
+              transition: `transform 640ms cubic-bezier(0.2, 0.9, 0.3, 1) ${c.delayMs}ms, opacity 640ms ease-in ${c.delayMs}ms`,
+            }}
+            className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 will-change-transform"
           >
-            <rect x="3" y="1" width="6" height="10" fill="#B66E19" />
-            <rect x="2" y="2" width="8" height="8" fill="#E7A54A" />
-            <rect x="3" y="2" width="6" height="8" fill="#FFD166" />
-            <rect x="5" y="3" width="2" height="6" fill="#FFF3C4" />
-          </svg>
-        </div>
-      ))}
+            <svg
+              width={24}
+              height={24}
+              viewBox="0 0 12 12"
+              shapeRendering="crispEdges"
+              className="drop-shadow-[0_0_12px_rgba(255,209,102,0.95)]"
+            >
+              <rect x="3" y="1" width="6" height="10" fill="#B66E19" />
+              <rect x="2" y="2" width="8" height="8" fill="#E7A54A" />
+              <rect x="3" y="2" width="6" height="8" fill="#FFD166" />
+              <rect x="5" y="3" width="2" height="6" fill="#FFF3C4" />
+            </svg>
+          </div>
+        );
+      })}
 
       {/* Crisp Central Treasury Callout */}
       <div className="absolute left-1/2 top-[20%] -translate-x-1/2 flex flex-col items-center animate-cripta-crit-pop">
@@ -728,34 +883,52 @@ export const LaCriptaGoldCollectionOverlay: React.FC<{
 };
 
 // ============================================================================
-// ENEMY DEATH COLLAPSE & SOUL DISSOLVE OVERLAY (Section 6 & Death Animations)
+// ENEMY DEATH COLLAPSE & BIOME-SPECIFIC SOUL DISSOLVE OVERLAY (Requirement 8)
 // ============================================================================
 
 export const LaCriptaEnemyDeathOverlay: React.FC<{
   enemyName: string;
   isBossOrMiniboss?: boolean;
-}> = ({ enemyName, isBossOrMiniboss = false }) => {
+  dungeonId?: string;
+}> = ({ enemyName, isBossOrMiniboss = false, dungeonId }) => {
+  // Biome-specific residue & dissolving particle palette
+  const biomeColors =
+    dungeonId === 'cavernas_heladas' || dungeonId === 'templo_sumergido'
+      ? { primary: '#7BDFF2', secondary: '#E0FBFC', residue: 'ESCARCHA Y CRISTAL' }
+      : dungeonId === 'jardin_podrido' || dungeonId === 'cripta_de_esporas'
+      ? { primary: '#80FF72', secondary: '#5EA87A', residue: 'ESPORAS Y CENIZA FÚNGICA' }
+      : dungeonId === 'forja_infernal' || dungeonId === 'reloj_de_fuego'
+      ? { primary: '#FF6B35', secondary: '#FFD166', residue: 'BRASAS Y ESCORIA' }
+      : dungeonId === 'palacio_de_los_espejos' || dungeonId === 'observatorio_estelar'
+      ? { primary: '#E0AAFF', secondary: '#FFFFFF', residue: 'ESQUIRLAS DE ESPEJO' }
+      : { primary: '#9B72CF', secondary: '#FF4D6D', residue: 'ESENCIA ESPECTRAL' };
+
   return (
     <div className="pointer-events-none absolute inset-0 z-40 flex flex-col items-center justify-center select-none">
-      {/* Rising Soul / Bone / Ember Pixel Particles */}
+      {/* Rising Biome-Specific Dissolve & Spectral Particles */}
       <svg
-        width={isBossOrMiniboss ? 220 : 160}
-        height={isBossOrMiniboss ? 220 : 160}
+        width={isBossOrMiniboss ? 220 : 168}
+        height={isBossOrMiniboss ? 220 : 168}
         viewBox="0 0 32 32"
         shapeRendering="crispEdges"
         className="animate-pulse"
       >
-        <rect x="14" y="6" width="4" height="4" fill="#FFF3C4" />
-        <rect x="8" y="10" width="3" height="3" fill="#E7A54A" />
-        <rect x="21" y="9" width="3" height="3" fill="#C93B5B" />
-        <rect x="6" y="18" width="3" height="3" fill="#9B72CF" />
-        <rect x="23" y="17" width="3" height="3" fill="#FFD166" />
-        <rect x="11" y="22" width="4" height="2" fill="#D9D0BC" />
-        <rect x="18" y="23" width="4" height="2" fill="#D9D0BC" />
-        <rect x="15" y="13" width="2" height="8" fill="#FF4D6D" />
+        <rect x="14" y="5" width="4" height="4" fill={biomeColors.secondary} />
+        <rect x="7" y="9" width="3" height="3" fill={biomeColors.primary} />
+        <rect x="21" y="8" width="3" height="3" fill={biomeColors.primary} />
+        <rect x="5" y="17" width="3" height="3" fill={biomeColors.secondary} />
+        <rect x="23" y="16" width="3" height="3" fill={biomeColors.primary} />
+        <rect x="11" y="13" width="2" height="7" fill={biomeColors.primary} />
+        <rect x="18" y="12" width="2" height="7" fill={biomeColors.secondary} />
+        {/* Dissolving ground residue at threshold */}
+        <rect x="8" y="24" width="16" height="2" fill={biomeColors.primary} opacity="0.75" />
+        <rect x="11" y="26" width="10" height="2" fill={biomeColors.secondary} opacity="0.55" />
       </svg>
-      <div className="mt-1 px-3 py-1 bg-[#1A0910]/95 border-2 border-[#FF4D6D] text-[10px] sm:text-xs font-cripta-pixel font-black text-[#FFD166] uppercase tracking-widest shadow-[0_0_24px_rgba(255,77,109,0.8)]">
-        ☠ {enemyName} DERROTADO ☠
+      <div
+        className="mt-1 px-3 py-1 bg-[#140810]/95 border-2 text-[10px] sm:text-xs font-cripta-pixel font-black text-[#FFD166] uppercase tracking-widest shadow-[0_0_24px_rgba(255,77,109,0.8)]"
+        style={{ borderColor: biomeColors.primary }}
+      >
+        ☠ {enemyName} ABATIDO ☠
       </div>
     </div>
   );
@@ -764,6 +937,8 @@ export const LaCriptaEnemyDeathOverlay: React.FC<{
 // ============================================================================
 // ACTION PRESENTATION QUEUE COMPILER & ENGINE HOOK (Sections 1–20)
 // ============================================================================
+
+export type CriptaEnemyLifecycleStage = 'ALIVE' | 'DYING' | 'DEAD_REMOVED';
 
 export interface LaCriptaPresentationState {
   isPresentingSequence: boolean;
@@ -774,16 +949,20 @@ export interface LaCriptaPresentationState {
   activeGoldBurst: ActiveGoldBurst | null;
   playerAnimationStates: Record<string, CriptaSpriteAnimationState>;
   enemyAnimStates: Record<string, 'idle' | 'hit' | 'lunge' | 'death'>;
+  enemyLifecycleStates: Record<string, CriptaEnemyLifecycleStage>;
   presentedEnemyHp: Record<string, { hp: number; trailHp: number }>;
   presentedPlayerHp: Record<string, { hp: number; trailHp: number }>;
   dyingEnemies: Record<string, CriptaRoomEnemy>;
   hideGroundDropsDuringDeath: boolean;
+  presentedExpeditionDefeated: boolean;
   playerCardImpacts: Record<
     string,
     'DAMAGE' | 'HEAL' | 'SHIELD' | 'BUFF' | 'DEBUFF' | 'ANTICIPATION'
   >;
   activeRelicRevealId: CriptaVisualEvent['relicId'] | null;
   showBossPhaseTransition: boolean;
+  activeActingEnemyId: string | null;
+  activeTargetedPlayerIdsDuringPresentation: string[];
 }
 
 export function useLaCriptaPresentationQueue(
@@ -798,6 +977,7 @@ export function useLaCriptaPresentationQueue(
   const prevEnemyHpRef = useRef<Record<string, number>>({});
   const prevPlayerHpRef = useRef<Record<string, number>>({});
   const knownEnemiesByIdRef = useRef<Record<string, CriptaRoomEnemy>>({});
+  const deadRemovedEnemyIdsRef = useRef<Set<string>>(new Set());
 
   const [isPresentingSequence, setIsPresentingSequence] = useState(false);
   const [presentationBannerText, setPresentationBannerText] = useState<string | null>(
@@ -813,6 +993,9 @@ export function useLaCriptaPresentationQueue(
   const [enemyAnimStates, setEnemyAnimStates] = useState<
     Record<string, 'idle' | 'hit' | 'lunge' | 'death'>
   >({});
+  const [enemyLifecycleStates, setEnemyLifecycleStates] = useState<
+    Record<string, CriptaEnemyLifecycleStage>
+  >({});
   const [presentedEnemyHp, setPresentedEnemyHp] = useState<
     Record<string, { hp: number; trailHp: number }>
   >({});
@@ -821,6 +1004,7 @@ export function useLaCriptaPresentationQueue(
   >({});
   const [dyingEnemies, setDyingEnemies] = useState<Record<string, CriptaRoomEnemy>>({});
   const [hideGroundDropsDuringDeath, setHideGroundDropsDuringDeath] = useState(false);
+  const [presentedExpeditionDefeated, setPresentedExpeditionDefeated] = useState(false);
   const [playerCardImpacts, setPlayerCardImpacts] = useState<
     Record<string, 'DAMAGE' | 'HEAL' | 'SHIELD' | 'BUFF' | 'DEBUFF' | 'ANTICIPATION'>
   >({});
@@ -828,6 +1012,11 @@ export function useLaCriptaPresentationQueue(
     CriptaVisualEvent['relicId'] | null
   >(null);
   const [showBossPhaseTransition, setShowBossPhaseTransition] = useState(false);
+  const [activeActingEnemyId, setActiveActingEnemyId] = useState<string | null>(null);
+  const [
+    activeTargetedPlayerIdsDuringPresentation,
+    setActiveTargetedPlayerIdsDuringPresentation,
+  ] = useState<string[]>([]);
 
   const clearScheduledTimers = () => {
     for (const id of timersRef.current) {
@@ -852,9 +1041,16 @@ export function useLaCriptaPresentationQueue(
         ? expeditionState.discoveredSecretRoom
         : seq[idx] || null;
 
-    const roomKey = `${expeditionState.phase}_${expeditionState.selectedDungeonId || 'none'}_${
+    // Normalize phase so DUNGEON_ARRIVAL -> DUNGEON never resets in-flight room combat state
+    const isDungeonPlayPhase =
+      expeditionState.phase === 'DUNGEON' ||
+      expeditionState.phase === 'DUNGEON_ARRIVAL' ||
+      expeditionState.phase === 'ENTERING_DUNGEON';
+    const normalizedPhase = isDungeonPlayPhase ? 'DUNGEON_PLAY' : expeditionState.phase;
+
+    const roomKey = `${normalizedPhase}_${expeditionState.selectedDungeonId || 'none'}_${
       activeRoom?.id || idx
-    }`;
+    }_${Boolean(expeditionState.inSecretRoom)}`;
 
     // If room or phase changed (or on initial connect/reconnect), snap all presentation state to authoritative state
     if (roomKey !== lastRoomKeyRef.current) {
@@ -871,15 +1067,27 @@ export function useLaCriptaPresentationQueue(
       setEnemyAnimStates({});
       setDyingEnemies({});
       setHideGroundDropsDuringDeath(false);
+      setPresentedExpeditionDefeated(Boolean(expeditionState.expeditionDefeated));
       setPlayerCardImpacts({});
+      setActiveActingEnemyId(null);
+      setActiveTargetedPlayerIdsDuringPresentation([]);
 
+      deadRemovedEnemyIdsRef.current = new Set();
+      const snapLifecycle: Record<string, CriptaEnemyLifecycleStage> = {};
       const snapEnemyHp: Record<string, { hp: number; trailHp: number }> = {};
       const nextPrevEnemy: Record<string, number> = {};
       for (const en of activeRoom?.enemies || []) {
         snapEnemyHp[en.id] = { hp: en.hp, trailHp: en.hp };
         nextPrevEnemy[en.id] = en.hp;
         knownEnemiesByIdRef.current[en.id] = { ...en };
+        if (en.hp <= 0) {
+          deadRemovedEnemyIdsRef.current.add(en.id);
+          snapLifecycle[en.id] = 'DEAD_REMOVED';
+        } else {
+          snapLifecycle[en.id] = 'ALIVE';
+        }
       }
+      setEnemyLifecycleStates(snapLifecycle);
       setPresentedEnemyHp(snapEnemyHp);
       prevEnemyHpRef.current = nextPrevEnemy;
 
@@ -899,6 +1107,12 @@ export function useLaCriptaPresentationQueue(
       for (const en of activeRoom.enemies) {
         if (en.hp > 0) {
           knownEnemiesByIdRef.current[en.id] = { ...en };
+          if (deadRemovedEnemyIdsRef.current.has(en.id)) {
+            deadRemovedEnemyIdsRef.current.delete(en.id);
+          }
+          setEnemyLifecycleStates((prev) =>
+            prev[en.id] ? prev : { ...prev, [en.id]: 'ALIVE' }
+          );
         }
         if (prevEnemyHpRef.current[en.id] === undefined) {
           prevEnemyHpRef.current[en.id] = en.hp;
@@ -912,7 +1126,10 @@ export function useLaCriptaPresentationQueue(
 
     // If no presentation sequence is active and no new batch is pending, keep displayed HP synced
     const batchId = expeditionState.lastEventBatch?.batchId || 0;
-    if (!isPresentingSequence && batchId === lastProcessedBatchIdRef.current) {
+    const isNowPresenting =
+      isPresentingSequence || performance.now() < activeBatchEndTimeRef.current;
+    if (!isNowPresenting && batchId === lastProcessedBatchIdRef.current) {
+      setPresentedExpeditionDefeated(Boolean(expeditionState.expeditionDefeated));
       if (activeRoom?.enemies) {
         setPresentedEnemyHp((prev) => {
           const next = { ...prev };
@@ -944,14 +1161,17 @@ export function useLaCriptaPresentationQueue(
     lastProcessedBatchIdRef.current = batch.batchId;
 
     const events = batch.events || [];
-    if (events.length === 0) return;
+    if (events.length === 0) {
+      setPresentedExpeditionDefeated(Boolean(expeditionState.expeditionDefeated));
+      return;
+    }
 
     // DO NOT preempt or cancel an in-flight player/enemy presentation!
     // If a previous batch is still resolving, queue this new batch to begin right after the current one finishes.
     const nowPerf = performance.now();
     const baseQueueOffsetMs =
       activeBatchEndTimeRef.current > nowPerf
-        ? Math.ceil(activeBatchEndTimeRef.current - nowPerf) + 220
+        ? Math.ceil(activeBatchEndTimeRef.current - nowPerf) + 250
         : 0;
     if (baseQueueOffsetMs === 0) {
       clearScheduledTimers();
@@ -1029,28 +1249,55 @@ export function useLaCriptaPresentationQueue(
       batch.actorAction?.startsWith('ENEMY_') || enemyAttackHeaderEvents.length > 0;
     const isPlayerOffensiveBatch =
       !isEnemyTurnBatch && enemyDamageEvents.length > 0;
-    const hasEnemyDeath = deathEvents.length > 0;
 
-    // If an enemy died in this batch, keep them visible on stage in dyingEnemies and hide new ground drops until death finishes!
+    // Identify ONLY enemies that died in THIS batch and are NOT already in DEAD_REMOVED!
+    const newlyDyingEnemyIds: string[] = [];
+    for (const dEv of deathEvents) {
+      if (
+        dEv.targetId &&
+        !deadRemovedEnemyIdsRef.current.has(dEv.targetId) &&
+        !newlyDyingEnemyIds.includes(dEv.targetId)
+      ) {
+        newlyDyingEnemyIds.push(dEv.targetId);
+      }
+    }
+    for (const en of activeRoom?.enemies || []) {
+      if (
+        en.hp <= 0 &&
+        !deadRemovedEnemyIdsRef.current.has(en.id) &&
+        (prevEnemyHpRef.current[en.id] ?? 0) > 0 &&
+        !newlyDyingEnemyIds.includes(en.id)
+      ) {
+        newlyDyingEnemyIds.push(en.id);
+      }
+    }
+    const hasEnemyDeath = newlyDyingEnemyIds.length > 0;
+
+    // Hold expedition defeat screen hidden while this batch's fatal attack/damage/death sequence resolves
+    if (expeditionState.expeditionDefeated) {
+      setPresentedExpeditionDefeated(false);
+    }
+
+    // Immediately register ONLY newly dying enemies in state (synchronously in this effect, NOT delayed!)
+    // so they remain mounted on stage in ALIVE -> HIT -> DYING states until STAGE 7 finishes,
+    // while NEVER resurrecting enemies that already entered DEAD_REMOVED!
     if (hasEnemyDeath) {
-      schedule(() => {
-        setHideGroundDropsDuringDeath(true);
-        const dyingMap: Record<string, CriptaRoomEnemy> = {};
-        for (const dEv of deathEvents) {
-          if (dEv.targetId && knownEnemiesByIdRef.current[dEv.targetId]) {
-            dyingMap[dEv.targetId] = {
-              ...knownEnemiesByIdRef.current[dEv.targetId],
-              hp: 0,
+      setHideGroundDropsDuringDeath(true);
+      setDyingEnemies((prev) => {
+        const dyingMap: Record<string, CriptaRoomEnemy> = { ...prev };
+        for (const dyingId of newlyDyingEnemyIds) {
+          const baseEnemy =
+            knownEnemiesByIdRef.current[dyingId] ||
+            activeRoom?.enemies?.find((e) => e.id === dyingId);
+          if (baseEnemy) {
+            dyingMap[dyingId] = {
+              ...baseEnemy,
+              hp: Math.max(1, prevEnemyHpRef.current[dyingId] || 1),
             };
           }
         }
-        for (const en of activeRoom?.enemies || []) {
-          if (en.hp <= 0 && (prevEnemyHpRef.current[en.id] ?? 0) > 0) {
-            dyingMap[en.id] = { ...en, hp: 0 };
-          }
-        }
-        setDyingEnemies(dyingMap);
-      }, baseQueueOffsetMs);
+        return dyingMap;
+      });
     }
 
     setIsPresentingSequence(true);
@@ -1067,9 +1314,14 @@ export function useLaCriptaPresentationQueue(
     }
 
     // =========================================================================
-    // STAGE 1: ANTICIPATION (360ms)
+    // STAGE 1: PLAYER ACTION TITLE & ANTICIPATION (Requirements 4, 6, 10)
+    // Player Action Title: ~950ms | Attack Anticipation: ~500ms
+    // NEVER launch generic objects/projectiles from player to enemy!
     // =========================================================================
     if (isPlayerOffensiveBatch && batch.actorPlayerId) {
+      const actorPlayer = expeditionState.players.find(
+        (p) => p.id === batch.actorPlayerId
+      );
       const firstDmg = enemyDamageEvents[0];
       const vfx = firstDmg?.vfxStyle || 'slash';
       const antStyle =
@@ -1080,18 +1332,18 @@ export function useLaCriptaPresentationQueue(
           : vfx === 'alchemy'
           ? 'alchemy'
           : 'melee';
-      const isProjectileAttack =
-        antStyle === 'ranged' || antStyle === 'magic' || antStyle === 'alchemy';
 
+      const actionTitleLabel =
+        activeRoom?.lastPlayedCardTitle ||
+        firstDmg?.sublabel?.split('·')[0]?.trim() ||
+        'ATAQUE';
+
+      // Step 1A: Announce Player Action Title clearly (650ms) + Anticipation (450ms) = 1100ms total before impact
       schedule(() => {
+        setActiveActingEnemyId(null);
+        setActiveTargetedPlayerIdsDuringPresentation([]);
         setPresentationBannerText(
-          antStyle === 'magic'
-            ? 'CANALIZANDO CONJURO...'
-            : antStyle === 'ranged'
-            ? 'APUNTANDO PROYECTIL...'
-            : antStyle === 'alchemy'
-            ? 'PREPARANDO MEZCLA...'
-            : 'PREPARANDO GOLPE...'
+          `${actorPlayer?.name?.toUpperCase() || 'HÉROE'}: ${actionTitleLabel.toUpperCase()}`
         );
         setPlayerAnimationStates({
           [batch.actorPlayerId!]:
@@ -1100,59 +1352,38 @@ export function useLaCriptaPresentationQueue(
         setPlayerCardImpacts({ [batch.actorPlayerId!]: 'ANTICIPATION' });
         laCriptaAudio.playAttackAnticipation(antStyle);
       }, cursorMs);
-      cursorMs += 360;
+      cursorMs += 620;
+
+      // Step 1B: Weapon / Skill Strike Lunge (No generic floating objects thrown across screen!)
+      schedule(() => {
+        laCriptaAudio.playAttackTravel(vfx);
+      }, cursorMs);
+      cursorMs += 380;
 
       // =======================================================================
-      // STAGE 2: RANGED/MAGIC/ALCHEMY PROJECTILE OR MELEE WEAPON LUNGE (340ms)
-      // Priority 9: NEVER throw generic objects at enemies for normal melee attacks!
-      // =======================================================================
-      if (isProjectileAttack) {
-        schedule(() => {
-          setPresentationBannerText('¡IMPACTO EN CURSO!');
-          laCriptaAudio.playAttackTravel(vfx);
-          setActiveTravel({
-            id: `travel_${batch.batchId}`,
-            direction: 'PLAYER_TO_ENEMY',
-            vfxStyle: vfx,
-            label: firstDmg?.sublabel?.split('·')[0]?.trim(),
-            color: firstDmg?.color || '#FFD166',
-            isCrit: firstDmg?.isCrit || firstDmg?.kind === 'CRIT_ENEMY',
-          });
-        }, cursorMs);
-        cursorMs += 340;
-      } else {
-        // Melee lunge directly into the strike without throwing a floating icon across the screen
-        schedule(() => {
-          setPresentationBannerText('¡GOLPE CUERPO A CUERPO!');
-          laCriptaAudio.playAttackTravel('slash');
-        }, cursorMs);
-        cursorMs += 190;
-      }
-
-      // =======================================================================
-      // STAGE 3: ENEMY IMPACT & DAMAGE NUMBERS (Staggered 220ms for Multi-Target)
+      // STAGE 3: ENEMY IMPACT & DAMAGE NUMBERS (Impact + 1250ms Damage Visibility)
       // =======================================================================
       enemyDamageEvents.forEach((dmgEv, hitIdx) => {
-        const hitTime = cursorMs + hitIdx * 220;
+        const hitTime = cursorMs + hitIdx * 280;
         schedule(() => {
-          setActiveTravel(null);
           const isCritHit = Boolean(dmgEv.isCrit || dmgEv.kind === 'CRIT_ENEMY');
           laCriptaAudio.playImpactByDamageType(dmgEv.sublabel, isCritHit);
 
-          // Short visual Hit-Stop (65–95ms) on strong physical or critical impacts
+          // Visual Hit-Stop (85–115ms) on impact
           if (isCritHit || hitIdx === 0) {
             setHitStopActive(true);
-            schedule(() => setHitStopActive(false), isCritHit ? 95 : 65);
+            schedule(() => setHitStopActive(false), isCritHit ? 115 : 85);
           }
 
           if (dmgEv.targetId) {
+            const targetId = dmgEv.targetId;
+            // Enemy enters HIT state (NEVER 'death' yet, even if HP reaches 0!)
             setEnemyAnimStates((prev) => ({
               ...prev,
-              [dmgEv.targetId!]: 'hit',
+              [targetId]: 'hit',
             }));
 
             // Smoothly drop enemy HP bar NOW (with delayed trailing strip)
-            const targetId = dmgEv.targetId;
             const beforeHp =
               prevEnemyHpRef.current[targetId] ??
               (authoritativeEnemyHp[targetId] || 0) + Math.abs(dmgEv.value || 0);
@@ -1170,7 +1401,14 @@ export function useLaCriptaPresentationQueue(
               },
             }));
 
-            // Trailing strip catches up after 520ms
+            // Return enemy from 'hit' recoil to 'idle' after 420ms (unless Stage 7 sets 'death')
+            schedule(() => {
+              setEnemyAnimStates((prev) =>
+                prev[targetId] === 'hit' ? { ...prev, [targetId]: 'idle' } : prev
+              );
+            }, 420);
+
+            // Trailing strip catches up after 650ms
             schedule(() => {
               setPresentedEnemyHp((prev) => ({
                 ...prev,
@@ -1179,27 +1417,56 @@ export function useLaCriptaPresentationQueue(
                   trailHp: prev[targetId]?.hp ?? afterHp,
                 },
               }));
-            }, 520);
+            }, 650);
           }
 
           setActiveVisualEvents((prev) => [...prev, dmgEv]);
         }, hitTime);
       });
 
-      cursorMs += enemyDamageEvents.length * 220 + 680;
+      // Keep damage numbers comfortably readable (1250ms)
+      cursorMs += enemyDamageEvents.length * 280 + 1150;
     } else if (isEnemyTurnBatch) {
       // =======================================================================
-      // ENEMY TURN SEQUENCING: Anticipation (380ms) -> Lunge/Strike -> Player Hit
+      // ENEMY TURN SEQUENCING (Requirements 4, 9, 10, 11):
+      // 1. TURNO ENEMIGO — [ENEMY NAME] (highlight ONLY that enemy, 950ms)
+      // 2. [ENEMY NAME] PREPARA [ABILITY] -> OBJETIVO: [PLAYER] (550ms)
+      // 3. Projectile / Lunge toward specific target player + Impact Result (1350ms)
       // =======================================================================
       const enemyActorId =
-        batch.actorPlayerId || enemyAttackHeaderEvents[0]?.targetId || undefined;
+        batch.actorPlayerId || enemyAttackHeaderEvents[0]?.targetId || null;
+      const actingEnemyObj =
+        (enemyActorId
+          ? activeRoom?.enemies?.find((e) => e.id === enemyActorId) ||
+            knownEnemiesByIdRef.current[enemyActorId]
+          : null) || null;
       const headerEv = enemyAttackHeaderEvents[0];
+      const enemyDisplayName = actingEnemyObj?.name?.toUpperCase() || 'CRIATURA ENEMIGA';
+      const abilityDisplayName = headerEv?.label || 'ATAQUE';
 
+      const targetPlayerIds = playerDamageEvents
+        .map((e) => e.targetId)
+        .filter((id): id is string => Boolean(id));
+      const targetPlayerNames = targetPlayerIds
+        .map((pid) => expeditionState.players.find((p) => p.id === pid)?.name)
+        .filter(Boolean)
+        .join(', ');
+
+      // Step 1: Announce TURNO ENEMIGO + Enemy Name & highlight ONLY that enemy
+      schedule(() => {
+        setActiveActingEnemyId(enemyActorId);
+        setActiveTargetedPlayerIdsDuringPresentation(targetPlayerIds);
+        setPresentationBannerText(`⚔ TURNO ENEMIGO · ${enemyDisplayName}`);
+        laCriptaAudio.playAttackAnticipation('enemy');
+      }, cursorMs);
+      cursorMs += 850;
+
+      // Step 2: Announce "[ENEMY NAME] PREPARA [ABILITY]" + Target Player
       schedule(() => {
         setPresentationBannerText(
-          headerEv?.label
-            ? `⚔ ATAQUE ENEMIGO: ${headerEv.label}`
-            : '⚔ TURNO DEL ENEMIGO · RESOLVIENDO...'
+          targetPlayerNames
+            ? `⚔ ${enemyDisplayName} PREPARA ${abilityDisplayName} → OBJETIVO: ${targetPlayerNames.toUpperCase()}`
+            : `⚔ ${enemyDisplayName} PREPARA ${abilityDisplayName}`
         );
         if (enemyActorId) {
           setEnemyAnimStates({ [enemyActorId]: 'lunge' });
@@ -1207,44 +1474,41 @@ export function useLaCriptaPresentationQueue(
         if (headerEv) {
           setActiveVisualEvents([headerEv]);
         }
-        laCriptaAudio.playAttackAnticipation('enemy');
       }, cursorMs);
-      cursorMs += 400;
+      cursorMs += 620;
 
       if (playerDamageEvents.length > 0) {
-        const enemyVfx = playerDamageEvents[0]?.vfxStyle || 'claw';
-        const isEnemyRangedOrMagic =
-          enemyVfx === 'arcane' ||
-          enemyVfx === 'arrow' ||
-          enemyVfx === 'pierce' ||
-          enemyVfx === 'alchemy';
+        const enemyVfx = playerDamageEvents[0]?.vfxStyle || headerEv?.vfxStyle || 'claw';
+        const firstTargetPid = playerDamageEvents[0]?.targetId;
+        const firstTargetPlayer = firstTargetPid
+          ? expeditionState.players.find((p) => p.id === firstTargetPid)
+          : undefined;
 
-        if (isEnemyRangedOrMagic) {
-          schedule(() => {
-            laCriptaAudio.playAttackTravel(enemyVfx);
-            setActiveTravel({
-              id: `en_travel_${batch.batchId}`,
-              direction: 'ENEMY_TO_PLAYER',
-              vfxStyle: enemyVfx,
-              label: headerEv?.label,
-              color: '#C93B5B',
-            });
-          }, cursorMs);
-          cursorMs += 340;
-        } else {
-          schedule(() => {
-            laCriptaAudio.playAttackTravel('claw');
-          }, cursorMs);
-          cursorMs += 200;
-        }
+        // Launch enemy directional attack / projectile directly toward the targeted player's HUD card!
+        schedule(() => {
+          laCriptaAudio.playAttackTravel(enemyVfx);
+          setActiveTravel({
+            id: `en_travel_${batch.batchId}`,
+            direction: 'ENEMY_TO_PLAYER',
+            vfxStyle: enemyVfx,
+            label: abilityDisplayName,
+            color: '#C93B5B',
+            sourceEnemyId: enemyActorId || undefined,
+            sourceEnemyName: enemyDisplayName,
+            targetPlayerId: firstTargetPid,
+            targetPlayerName: firstTargetPlayer?.name || targetPlayerNames || undefined,
+            targetPlayerColor: firstTargetPlayer?.color || '#FF4D6D',
+          });
+        }, cursorMs);
+        cursorMs += 520;
 
         playerDamageEvents.forEach((pDmgEv, pIdx) => {
-          const hitTime = cursorMs + pIdx * 210;
+          const hitTime = cursorMs + pIdx * 260;
           schedule(() => {
             setActiveTravel(null);
             laCriptaAudio.playImpactByDamageType('FISICO', false);
             setHitStopActive(true);
-            schedule(() => setHitStopActive(false), 70);
+            schedule(() => setHitStopActive(false), 85);
 
             if (pDmgEv.targetId) {
               const pid = pDmgEv.targetId;
@@ -1273,14 +1537,14 @@ export function useLaCriptaPresentationQueue(
                     trailHp: prev[pid]?.hp ?? afterHp,
                   },
                 }));
-              }, 520);
+              }, 650);
             }
 
             setActiveVisualEvents((prev) => [...prev, pDmgEv]);
           }, hitTime);
         });
 
-        cursorMs += playerDamageEvents.length * 210 + 680;
+        cursorMs += playerDamageEvents.length * 260 + 1150;
       }
 
       // If Espina Viva reflected damage back to the enemy, present it sequentially AFTER player hit!
@@ -1301,7 +1565,7 @@ export function useLaCriptaPresentationQueue(
             setActiveVisualEvents((prev) => [...prev, refEv]);
           });
         }, cursorMs);
-        cursorMs += 580;
+        cursorMs += 780;
       }
     } else if (playerDamageEvents.length > 0) {
       // Non-enemy player damage (e.g., trap, blood tribute, poison/bleed tick at end of round)
@@ -1324,16 +1588,16 @@ export function useLaCriptaPresentationQueue(
                 ...prev,
                 [pid]: { hp: afterHp, trailHp: afterHp },
               }));
-            }, 480);
+            }, 600);
           }
           setActiveVisualEvents((prev) => [...prev, pDmgEv]);
-        }, cursorMs + pIdx * 180);
+        }, cursorMs + pIdx * 220);
       });
-      cursorMs += playerDamageEvents.length * 180 + 620;
+      cursorMs += playerDamageEvents.length * 220 + 950;
     }
 
     // =========================================================================
-    // STAGE 4: SHIELD / GUARD / BLOCK (680ms)
+    // STAGE 4: SHIELD / GUARD / BLOCK (1050ms)
     // =========================================================================
     if (shieldEvents.length > 0) {
       schedule(() => {
@@ -1353,11 +1617,11 @@ export function useLaCriptaPresentationQueue(
         }
         setActiveVisualEvents((prev) => [...prev, ...shieldEvents]);
       }, cursorMs);
-      cursorMs += 680;
+      cursorMs += 1050;
     }
 
     // =========================================================================
-    // STAGE 5: STATUS EFFECTS, BUFFS & DEBUFFS (Sequenced after impact! 760ms)
+    // STAGE 5: STATUS EFFECTS, BUFFS & DEBUFFS (Sequenced after impact! 1200ms)
     // =========================================================================
     if (statusAndBuffEvents.length > 0) {
       schedule(() => {
@@ -1398,15 +1662,19 @@ export function useLaCriptaPresentationQueue(
         }
         setActiveVisualEvents((prev) => [...prev, ...statusAndBuffEvents]);
       }, cursorMs);
-      cursorMs += 760;
+      cursorMs += 1200;
     }
 
     // =========================================================================
-    // STAGE 6: SEQUENTIAL LIFESTEAL / HEALING (NEVER simultaneous with attack!)
+    // STAGE 6: SEQUENTIAL LIFESTEAL / HEALING (NEVER simultaneous with attack! 1200ms)
     // =========================================================================
     if (healEvents.length > 0) {
       // If this batch also dealt enemy damage, show life-essence traveling from Enemy -> Player first!
       if (isPlayerOffensiveBatch) {
+        const healTargetPlayerId = healEvents.find((e) => e.targetType === 'PLAYER')?.targetId;
+        const healTargetPlayer = healTargetPlayerId
+          ? expeditionState.players.find((p) => p.id === healTargetPlayerId)
+          : undefined;
         schedule(() => {
           setPresentationBannerText('✦ DRENAJE VITAL EN CURSO ✦');
           laCriptaAudio.playLifestealTravel();
@@ -1416,9 +1684,12 @@ export function useLaCriptaPresentationQueue(
             vfxStyle: 'lifesteal',
             label: 'ESENCIA VITAL',
             color: '#E03E52',
+            sourceEnemyId: enemyDamageEvents[0]?.targetId,
+            targetPlayerId: healTargetPlayerId,
+            targetPlayerName: healTargetPlayer?.name,
           });
         }, cursorMs);
-        cursorMs += 480;
+        cursorMs += 540;
       }
 
       schedule(() => {
@@ -1457,27 +1728,82 @@ export function useLaCriptaPresentationQueue(
         }
         setActiveVisualEvents((prev) => [...prev, ...healEvents]);
       }, cursorMs);
-      cursorMs += 780;
+      cursorMs += 1150;
     }
 
     // =========================================================================
-    // STAGE 7: DRAMATIC ENEMY DEATH SEQUENCE (1650ms)
+    // STAGE 7: DRAMATIC ENEMY DEATH SEQUENCE (Requirements 15, 16, 17, 18)
+    // Enemy transitions from ALIVE ('hit') -> DYING ('death') -> DEAD_REMOVED!
+    // If multiple enemies die in one action, stagger their deaths cleanly and
+    // remove each enemy permanently when its death animation finishes.
     // =========================================================================
     if (hasEnemyDeath) {
+      newlyDyingEnemyIds.forEach((dyingId, idx) => {
+        const deathStartMs = cursorMs + idx * 320;
+        const deathEndMs = deathStartMs + 1150;
+        const matchingDeathEvents = deathEvents.filter((e) => e.targetId === dyingId);
+
+        schedule(() => {
+          setPresentationBannerText('☠ ¡CRIATURA ABATIDA! ☠');
+          laCriptaAudio.playEnemyDeath();
+          setEnemyLifecycleStates((prev) => ({
+            ...prev,
+            [dyingId]: 'DYING',
+          }));
+          setEnemyAnimStates((prev) => ({
+            ...prev,
+            [dyingId]: 'death',
+          }));
+          setPresentedEnemyHp((prev) => ({
+            ...prev,
+            [dyingId]: { hp: 0, trailHp: 0 },
+          }));
+          if (matchingDeathEvents.length > 0) {
+            setActiveVisualEvents((prev) => [...prev, ...matchingDeathEvents]);
+          }
+        }, deathStartMs);
+
+        // Permanently transition this enemy to DEAD_REMOVED once its death completes
+        schedule(() => {
+          deadRemovedEnemyIdsRef.current.add(dyingId);
+          setEnemyLifecycleStates((prev) => ({
+            ...prev,
+            [dyingId]: 'DEAD_REMOVED',
+          }));
+          setDyingEnemies((prev) => {
+            const next = { ...prev };
+            delete next[dyingId];
+            return next;
+          });
+          setEnemyAnimStates((prev) => {
+            const next = { ...prev };
+            delete next[dyingId];
+            return next;
+          });
+        }, deathEndMs);
+      });
+
+      cursorMs += (newlyDyingEnemyIds.length - 1) * 320 + 1200;
+    }
+
+    // =========================================================================
+    // STAGE 7B: PLAYER DEATH & EXPEDITION DEFEAT SEQUENCE (Requirements 19–24)
+    // Play player death state and pause briefly BEFORE revealing defeat screen!
+    // =========================================================================
+    if (expeditionState.expeditionDefeated) {
       schedule(() => {
-        setPresentationBannerText('☠ ¡CRIATURA ABATIDA! ☠');
-        laCriptaAudio.playEnemyDeath();
-        for (const dEv of deathEvents) {
-          if (dEv.targetId) {
-            setEnemyAnimStates((prev) => ({
-              ...prev,
-              [dEv.targetId!]: 'death',
-            }));
+        setPresentationBannerText('☠ ¡EL GRUPO HA CAÍDO EN LA CRIPTA! ☠');
+        setActiveActingEnemyId(null);
+        setActiveTargetedPlayerIdsDuringPresentation([]);
+        const fallenMap: Record<string, CriptaSpriteAnimationState> = {};
+        for (const p of expeditionState.players) {
+          if (p.isConnected) {
+            fallenMap[p.id] = 'debuff';
           }
         }
-        setActiveVisualEvents((prev) => [...prev, ...deathEvents]);
+        setPlayerAnimationStates(fallenMap);
       }, cursorMs);
-      cursorMs += 1650;
+      cursorMs += 1050;
     }
 
     // =========================================================================
@@ -1486,7 +1812,6 @@ export function useLaCriptaPresentationQueue(
     if (lootAndRewardEvents.length > 0 || hasEnemyDeath) {
       schedule(() => {
         setHideGroundDropsDuringDeath(false);
-        setDyingEnemies({});
         if (lootAndRewardEvents.length > 0) {
           const goldGainEv = lootAndRewardEvents.find(
             (e) => e.kind === 'GAIN_GOLD' && (e.value || 0) > 0
@@ -1498,7 +1823,7 @@ export function useLaCriptaPresentationQueue(
               label: goldGainEv.sublabel,
               isGain: true,
             });
-            schedule(() => setActiveGoldBurst(null), 1150);
+            schedule(() => setActiveGoldBurst(null), 1200);
           }
 
           const relicEv = lootAndRewardEvents.find(
@@ -1520,7 +1845,7 @@ export function useLaCriptaPresentationQueue(
         }
       }, cursorMs);
       if (lootAndRewardEvents.length > 0) {
-        cursorMs += 820;
+        cursorMs += 950;
       }
     }
 
@@ -1536,7 +1861,7 @@ export function useLaCriptaPresentationQueue(
     // =========================================================================
     // STAGE 9: ACTION_END — Sync Final Authoritative HP & Release Presentation Lock
     // =========================================================================
-    const totalDuration = Math.max(baseQueueOffsetMs + 720, cursorMs);
+    const totalDuration = Math.max(baseQueueOffsetMs + 950, cursorMs);
     activeBatchEndTimeRef.current = performance.now() + totalDuration;
 
     schedule(() => {
@@ -1550,6 +1875,9 @@ export function useLaCriptaPresentationQueue(
         setPlayerCardImpacts({});
         setDyingEnemies({});
         setHideGroundDropsDuringDeath(false);
+        setActiveActingEnemyId(null);
+        setActiveTargetedPlayerIdsDuringPresentation([]);
+        setPresentedExpeditionDefeated(Boolean(expeditionState.expeditionDefeated));
       }
 
       // Final authoritative sync
@@ -1570,10 +1898,10 @@ export function useLaCriptaPresentationQueue(
 
     // Clear floating badges after sequence ends so the last status/damage number stays readable
     schedule(() => {
-      if (performance.now() >= activeBatchEndTimeRef.current + 500) {
+      if (performance.now() >= activeBatchEndTimeRef.current + 650) {
         setActiveVisualEvents([]);
       }
-    }, totalDuration + 700);
+    }, totalDuration + 850);
   }, [expeditionState]);
 
   return {
@@ -1585,12 +1913,16 @@ export function useLaCriptaPresentationQueue(
     activeGoldBurst,
     playerAnimationStates,
     enemyAnimStates,
+    enemyLifecycleStates,
     presentedEnemyHp,
     presentedPlayerHp,
     dyingEnemies,
     hideGroundDropsDuringDeath,
+    presentedExpeditionDefeated,
     playerCardImpacts,
     activeRelicRevealId,
     showBossPhaseTransition,
+    activeActingEnemyId,
+    activeTargetedPlayerIdsDuringPresentation,
   };
 }

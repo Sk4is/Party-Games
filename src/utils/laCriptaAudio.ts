@@ -1,35 +1,144 @@
+const VOLUME_STORAGE_KEY = 'laCripta.masterVolume';
+const MUTE_STORAGE_KEY = 'laCripta.muted';
+const DEFAULT_MASTER_VOLUME = 0.65;
+
 class LaCriptaAudioEngine {
   private ctx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
   private muted = false;
+  private masterVolume = DEFAULT_MASTER_VOLUME;
+  private listeners = new Set<() => void>();
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedVol = window.localStorage.getItem(VOLUME_STORAGE_KEY);
+        if (savedVol !== null) {
+          const parsed = Number.parseFloat(savedVol);
+          if (Number.isFinite(parsed)) {
+            this.masterVolume = Math.max(0, Math.min(1, parsed));
+          }
+        }
+        const savedMute = window.localStorage.getItem(MUTE_STORAGE_KEY);
+        if (savedMute === 'true') {
+          this.muted = true;
+        }
+      } catch {
+        // Ignore storage errors in restricted environments
+      }
+    }
+  }
+
+  private notifyListeners() {
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch {
+        // Ignore listener errors
+      }
+    });
+  }
+
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private syncMasterGain() {
+    if (!this.ctx || !this.masterGain) return;
+    const effectiveGain = this.muted || this.masterVolume <= 0 ? 0 : this.masterVolume;
+    this.masterGain.gain.setValueAtTime(effectiveGain, this.ctx.currentTime);
+  }
 
   private getContext(): AudioContext | null {
-    if (typeof window === 'undefined' || this.muted) return null;
+    if (typeof window === 'undefined' || this.muted || this.masterVolume <= 0) return null;
     if (!this.ctx) {
       const AudioCtx =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.connect(this.ctx.destination);
+        this.syncMasterGain();
       }
+    }
+    if (this.ctx && !this.masterGain) {
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.connect(this.ctx.destination);
+      this.syncMasterGain();
     }
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
+    this.syncMasterGain();
     return this.ctx;
   }
 
+  private getOutputNode(ctx: AudioContext): AudioNode {
+    if (!this.masterGain) {
+      this.masterGain = ctx.createGain();
+      this.masterGain.connect(ctx.destination);
+      this.syncMasterGain();
+    }
+    return this.masterGain;
+  }
+
   public isMuted(): boolean {
-    return this.muted;
+    return this.muted || this.masterVolume <= 0;
+  }
+
+  public getMasterVolume(): number {
+    return this.masterVolume;
+  }
+
+  public setMasterVolume(volume: number): number {
+    const clamped = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : DEFAULT_MASTER_VOLUME));
+    this.masterVolume = Math.round(clamped * 100) / 100;
+    if (this.masterVolume > 0 && this.muted) {
+      this.muted = false;
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(VOLUME_STORAGE_KEY, String(this.masterVolume));
+        window.localStorage.setItem(MUTE_STORAGE_KEY, String(this.muted));
+      } catch {
+        // Ignore storage errors
+      }
+    }
+    this.syncMasterGain();
+    this.notifyListeners();
+    return this.masterVolume;
   }
 
   public toggleMute(): boolean {
-    this.muted = !this.muted;
-    return this.muted;
+    if (this.muted || this.masterVolume <= 0) {
+      this.muted = false;
+      if (this.masterVolume <= 0) {
+        this.masterVolume = DEFAULT_MASTER_VOLUME;
+      }
+    } else {
+      this.muted = true;
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(MUTE_STORAGE_KEY, String(this.muted));
+        window.localStorage.setItem(VOLUME_STORAGE_KEY, String(this.masterVolume));
+      } catch {
+        // Ignore storage errors
+      }
+    }
+    this.syncMasterGain();
+    this.notifyListeners();
+    return this.isMuted();
   }
 
   public playStoneClick() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -42,7 +151,7 @@ class LaCriptaAudioEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(out);
     osc.start(now);
     osc.stop(now + 0.075);
   }
@@ -50,6 +159,7 @@ class LaCriptaAudioEngine {
   public playCharacterSelect() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const freqs = [220, 277.18, 329.63];
@@ -63,7 +173,7 @@ class LaCriptaAudioEngine {
       gain.gain.linearRampToValueAtTime(0.11, t + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.34);
     });
@@ -76,6 +186,7 @@ class LaCriptaAudioEngine {
   public playDoorHover() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -89,7 +200,7 @@ class LaCriptaAudioEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(out);
     osc.start(now);
     osc.stop(now + 0.16);
   }
@@ -97,6 +208,7 @@ class LaCriptaAudioEngine {
   public playDoorVote() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     // Heavy stone seal thud + iron ring
@@ -108,7 +220,7 @@ class LaCriptaAudioEngine {
     thudGain.gain.setValueAtTime(0.24, now);
     thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
     thud.connect(thudGain);
-    thudGain.connect(ctx.destination);
+    thudGain.connect(out);
     thud.start(now);
     thud.stop(now + 0.18);
 
@@ -120,7 +232,7 @@ class LaCriptaAudioEngine {
     ringGain.gain.setValueAtTime(0.09, now + 0.03);
     ringGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
     ring.connect(ringGain);
-    ringGain.connect(ctx.destination);
+    ringGain.connect(out);
     ring.start(now + 0.03);
     ring.stop(now + 0.31);
   }
@@ -128,6 +240,7 @@ class LaCriptaAudioEngine {
   public playDoorOpeningSequence() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     // 1. Deep ancient stone grinding drone (0s -> 3.6s)
@@ -144,7 +257,7 @@ class LaCriptaAudioEngine {
     rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + 3.7);
 
     rumble.connect(rumbleGain);
-    rumbleGain.connect(ctx.destination);
+    rumbleGain.connect(out);
     rumble.start(now);
     rumble.stop(now + 3.8);
 
@@ -159,7 +272,7 @@ class LaCriptaAudioEngine {
       clankGain.gain.setValueAtTime(0.12, t);
       clankGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
       clank.connect(clankGain);
-      clankGain.connect(ctx.destination);
+      clankGain.connect(out);
       clank.start(t);
       clank.stop(t + 0.13);
     });
@@ -176,7 +289,7 @@ class LaCriptaAudioEngine {
       gain.gain.linearRampToValueAtTime(0.075, t + 0.45);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 2.05);
     });
@@ -185,6 +298,7 @@ class LaCriptaAudioEngine {
   public playSwordSlash(isCrit = false) {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     // Sharp metallic blade sweep
@@ -198,7 +312,7 @@ class LaCriptaAudioEngine {
     bladeGain.gain.exponentialRampToValueAtTime(0.001, now + (isCrit ? 0.2 : 0.14));
 
     blade.connect(bladeGain);
-    bladeGain.connect(ctx.destination);
+    bladeGain.connect(out);
     blade.start(now);
     blade.stop(now + (isCrit ? 0.21 : 0.15));
 
@@ -211,7 +325,7 @@ class LaCriptaAudioEngine {
     impactGain.gain.setValueAtTime(isCrit ? 0.28 : 0.2, now + 0.03);
     impactGain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
     impact.connect(impactGain);
-    impactGain.connect(ctx.destination);
+    impactGain.connect(out);
     impact.start(now + 0.03);
     impact.stop(now + 0.2);
 
@@ -225,7 +339,7 @@ class LaCriptaAudioEngine {
       ringGain.gain.setValueAtTime(0.14, now + 0.04);
       ringGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
       ring.connect(ringGain);
-      ringGain.connect(ctx.destination);
+      ringGain.connect(out);
       ring.start(now + 0.04);
       ring.stop(now + 0.31);
     }
@@ -234,6 +348,7 @@ class LaCriptaAudioEngine {
   public playMagicCast() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const notes = [293.66, 369.99, 440, 587.33];
@@ -248,7 +363,7 @@ class LaCriptaAudioEngine {
       gain.gain.linearRampToValueAtTime(0.11, t + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.21);
     });
@@ -257,6 +372,7 @@ class LaCriptaAudioEngine {
   public playShieldGuard() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     // Steel shield clang + resonant harmonic
@@ -269,7 +385,7 @@ class LaCriptaAudioEngine {
       gain.gain.setValueAtTime(idx === 0 ? 0.18 : 0.1, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(now);
       osc.stop(now + 0.25);
     });
@@ -278,6 +394,7 @@ class LaCriptaAudioEngine {
   public playEnemyDeath() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const crumble = ctx.createOscillator();
@@ -288,7 +405,7 @@ class LaCriptaAudioEngine {
     gain.gain.setValueAtTime(0.2, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
     crumble.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(out);
     crumble.start(now);
     crumble.stop(now + 0.35);
   }
@@ -296,6 +413,7 @@ class LaCriptaAudioEngine {
   public playHealChime() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     [329.63, 440, 659.25].forEach((freq, idx) => {
@@ -308,7 +426,7 @@ class LaCriptaAudioEngine {
       gain.gain.linearRampToValueAtTime(0.1, t + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.25);
     });
@@ -317,6 +435,7 @@ class LaCriptaAudioEngine {
   public playGoldChange(isPositive = true) {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const freqs = isPositive ? [587.33, 880] : [440, 293.66];
@@ -329,7 +448,7 @@ class LaCriptaAudioEngine {
       gain.gain.setValueAtTime(0.11, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.17);
     });
@@ -338,6 +457,7 @@ class LaCriptaAudioEngine {
   public playReviveFanfare() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const chord = [261.63, 329.63, 392.0, 523.25];
@@ -351,7 +471,7 @@ class LaCriptaAudioEngine {
       gain.gain.linearRampToValueAtTime(0.12, t + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.46);
     });
@@ -363,6 +483,7 @@ class LaCriptaAudioEngine {
   public playRoomDoorClose() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     // Low stone slide rumble
@@ -375,7 +496,7 @@ class LaCriptaAudioEngine {
     slideGain.gain.linearRampToValueAtTime(0.14, now + 0.05);
     slideGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
     slide.connect(slideGain);
-    slideGain.connect(ctx.destination);
+    slideGain.connect(out);
     slide.start(now);
     slide.stop(now + 0.42);
 
@@ -389,7 +510,7 @@ class LaCriptaAudioEngine {
     slamGain.gain.setValueAtTime(0.24, tSlam);
     slamGain.gain.exponentialRampToValueAtTime(0.001, tSlam + 0.24);
     slam.connect(slamGain);
-    slamGain.connect(ctx.destination);
+    slamGain.connect(out);
     slam.start(tSlam);
     slam.stop(tSlam + 0.25);
   }
@@ -400,6 +521,7 @@ class LaCriptaAudioEngine {
   public playRoomDoorOpen(isMiniboss = false) {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     // Unlatch metallic click + stone parting
@@ -411,7 +533,7 @@ class LaCriptaAudioEngine {
     unlatchGain.gain.setValueAtTime(0.15, now);
     unlatchGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
     unlatch.connect(unlatchGain);
-    unlatchGain.connect(ctx.destination);
+    unlatchGain.connect(out);
     unlatch.start(now);
     unlatch.stop(now + 0.21);
 
@@ -427,7 +549,7 @@ class LaCriptaAudioEngine {
         gain.gain.linearRampToValueAtTime(0.12, t + 0.08);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(out);
         osc.start(t);
         osc.stop(t + 0.68);
       });
@@ -440,6 +562,7 @@ class LaCriptaAudioEngine {
   public playMinibossEnrage() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     [98, 146.83, 196].forEach((freq, idx) => {
@@ -453,7 +576,7 @@ class LaCriptaAudioEngine {
       gain.gain.linearRampToValueAtTime(0.13, t + 0.04);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.44);
     });
@@ -462,6 +585,7 @@ class LaCriptaAudioEngine {
   public playRuneCorrect(stepIndex = 0) {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
     const scale = [329.63, 392.0, 440.0, 523.25, 587.33, 659.25];
     const freq = scale[stepIndex % scale.length];
@@ -475,7 +599,7 @@ class LaCriptaAudioEngine {
     gain.gain.linearRampToValueAtTime(0.14, now + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(out);
     osc.start(now);
     osc.stop(now + 0.23);
   }
@@ -483,6 +607,7 @@ class LaCriptaAudioEngine {
   public playRuneWrong() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     [155.56, 110].forEach((freq, idx) => {
@@ -495,7 +620,7 @@ class LaCriptaAudioEngine {
       gain.gain.setValueAtTime(0.16, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.21);
     });
@@ -504,6 +629,7 @@ class LaCriptaAudioEngine {
   public playRouletteTick() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -514,7 +640,7 @@ class LaCriptaAudioEngine {
     gain.gain.setValueAtTime(0.1, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.032);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(out);
     osc.start(now);
     osc.stop(now + 0.035);
   }
@@ -530,6 +656,7 @@ class LaCriptaAudioEngine {
   public playPuzzleSuccess() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
     const notes = [293.66, 369.99, 440.0, 587.33];
     notes.forEach((freq, idx) => {
@@ -542,7 +669,7 @@ class LaCriptaAudioEngine {
       gain.gain.linearRampToValueAtTime(0.14, t + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.36);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.38);
     });
@@ -551,6 +678,7 @@ class LaCriptaAudioEngine {
   public playPuzzleFailure() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
     [196, 155.56, 116.54].forEach((freq, idx) => {
       const osc = ctx.createOscillator();
@@ -562,7 +690,7 @@ class LaCriptaAudioEngine {
       gain.gain.setValueAtTime(0.14, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.26);
     });
@@ -571,6 +699,7 @@ class LaCriptaAudioEngine {
   public playMechanismRotate() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -581,7 +710,7 @@ class LaCriptaAudioEngine {
     gain.gain.setValueAtTime(0.14, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(out);
     osc.start(now);
     osc.stop(now + 0.13);
   }
@@ -589,6 +718,7 @@ class LaCriptaAudioEngine {
   public playLockOpen() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
     [261.63, 392.0, 523.25].forEach((freq, idx) => {
       const osc = ctx.createOscillator();
@@ -599,7 +729,7 @@ class LaCriptaAudioEngine {
       gain.gain.setValueAtTime(0.12, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.24);
     });
@@ -621,6 +751,7 @@ class LaCriptaAudioEngine {
   ) {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -652,7 +783,7 @@ class LaCriptaAudioEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(out);
     osc.start(now);
     osc.stop(now + 0.23);
   }
@@ -663,6 +794,7 @@ class LaCriptaAudioEngine {
   public playAttackTravel(vfxStyle?: string) {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -686,7 +818,7 @@ class LaCriptaAudioEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(out);
     osc.start(now);
     osc.stop(now + 0.17);
   }
@@ -697,6 +829,7 @@ class LaCriptaAudioEngine {
   public playImpactByDamageType(damageType?: string, isCrit = false) {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
     const dt = (damageType || '').toUpperCase();
 
@@ -710,7 +843,7 @@ class LaCriptaAudioEngine {
       gain.gain.setValueAtTime(isCrit ? 0.32 : 0.25, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
       thud.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       thud.start(now);
       thud.stop(now + 0.26);
       if (isCrit) this.playSwordSlash(true);
@@ -727,7 +860,7 @@ class LaCriptaAudioEngine {
       gain.gain.setValueAtTime(isCrit ? 0.24 : 0.18, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
       snap.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       snap.start(now);
       snap.stop(now + 0.15);
       return;
@@ -754,6 +887,7 @@ class LaCriptaAudioEngine {
   public playLifestealTravel() {
     const ctx = this.getContext();
     if (!ctx) return;
+    const out = this.getOutputNode(ctx);
     const now = ctx.currentTime;
 
     [246.94, 329.63, 493.88].forEach((freq, idx) => {
@@ -767,7 +901,7 @@ class LaCriptaAudioEngine {
       gain.gain.linearRampToValueAtTime(0.11, t + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out);
       osc.start(t);
       osc.stop(t + 0.25);
     });

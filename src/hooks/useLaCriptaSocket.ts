@@ -505,20 +505,53 @@ export function useLaCriptaSocket({
     };
   }, []);
 
+  const trailingCursorTimeoutRef = useRef<number | null>(null);
+  const pendingCursorPayloadRef = useRef<{
+    xNormalized: number;
+    yNormalized: number;
+    sceneId: CriptaSceneId;
+  } | null>(null);
+
   const sendCursorMove = useCallback(
     (xNormalized: number, yNormalized: number, sceneId: CriptaSceneId) => {
+      const clampedX = Math.max(0, Math.min(1, Number(xNormalized.toFixed(4))));
+      const clampedY = Math.max(0, Math.min(1, Number(yNormalized.toFixed(4))));
+      pendingCursorPayloadRef.current = {
+        xNormalized: clampedX,
+        yNormalized: clampedY,
+        sceneId,
+      };
+
       const now = performance.now();
-      if (now - lastCursorSentAtRef.current < 30) return;
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        lastCursorSentAtRef.current = now;
-        const clampedX = Math.max(0, Math.min(1, Number(xNormalized.toFixed(4))));
-        const clampedY = Math.max(0, Math.min(1, Number(yNormalized.toFixed(4))));
-        safeSendWebSocket(wsRef.current, {
-          type: 'CURSOR_MOVE',
-          xNormalized: clampedX,
-          yNormalized: clampedY,
-          sceneId,
-        } satisfies CriptaClientMessage);
+      const elapsed = now - lastCursorSentAtRef.current;
+      if (elapsed >= 16) {
+        if (trailingCursorTimeoutRef.current !== null) {
+          window.clearTimeout(trailingCursorTimeoutRef.current);
+          trailingCursorTimeoutRef.current = null;
+        }
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          lastCursorSentAtRef.current = now;
+          safeSendWebSocket(wsRef.current, {
+            type: 'CURSOR_MOVE',
+            xNormalized: clampedX,
+            yNormalized: clampedY,
+            sceneId,
+          } satisfies CriptaClientMessage);
+        }
+      } else if (trailingCursorTimeoutRef.current === null) {
+        trailingCursorTimeoutRef.current = window.setTimeout(() => {
+          trailingCursorTimeoutRef.current = null;
+          const pending = pendingCursorPayloadRef.current;
+          if (pending && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            lastCursorSentAtRef.current = performance.now();
+            safeSendWebSocket(wsRef.current, {
+              type: 'CURSOR_MOVE',
+              xNormalized: pending.xNormalized,
+              yNormalized: pending.yNormalized,
+              sceneId: pending.sceneId,
+            } satisfies CriptaClientMessage);
+          }
+        }, Math.max(4, Math.ceil(16 - elapsed)));
       }
     },
     []

@@ -17,7 +17,8 @@ import { laCriptaAudio } from '../../utils/laCriptaAudio';
  * "EL CORAZÓN DE LA CRIPTA" unlocks as the physical interaction.
  */
 export const LaCriptaFinalBossDoorChamber: React.FC<{
-  completedDungeonIds: CriptaDungeonId[];
+  completedDungeonIds?: CriptaDungeonId[];
+  completedBiomes?: CriptaDungeonId[];
   connectedPlayers: CriptaPlayer[];
   finalBossDoorVotes: Record<string, boolean>;
   currentPlayerId: string;
@@ -25,15 +26,35 @@ export const LaCriptaFinalBossDoorChamber: React.FC<{
   onClickBossDoor: () => void;
 }> = ({
   completedDungeonIds,
-  connectedPlayers,
-  finalBossDoorVotes,
+  completedBiomes,
+  connectedPlayers = [],
+  finalBossDoorVotes = {},
   currentPlayerId,
   isOpening,
   onClickBossDoor,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const voters = connectedPlayers.filter((p) => Boolean(finalBossDoorVotes[p.id]));
-  const votedByMe = Boolean(finalBossDoorVotes[currentPlayerId]);
+  const FALLBACK_SEAL_BIOMES: CriptaDungeonId[] = [
+    'catacumbas_del_rey',
+    'forja_infernal',
+    'el_abismo',
+  ];
+  const rawCompleted =
+    Array.isArray(completedDungeonIds) && completedDungeonIds.length > 0
+      ? completedDungeonIds
+      : Array.isArray(completedBiomes) && completedBiomes.length > 0
+      ? completedBiomes
+      : FALLBACK_SEAL_BIOMES;
+  const resolvedCompletedDungeons: CriptaDungeonId[] = [0, 1, 2].map(
+    (idx) => rawCompleted[idx] || FALLBACK_SEAL_BIOMES[idx]
+  );
+  const voters = connectedPlayers.filter(
+    (p) => Boolean(finalBossDoorVotes[p.id] || p.votedFinalBossDoor)
+  );
+  const votedByMe = Boolean(
+    finalBossDoorVotes[currentPlayerId] ||
+      connectedPlayers.find((p) => p.id === currentPlayerId)?.votedFinalBossDoor
+  );
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col items-center gap-4 select-none">
@@ -41,7 +62,7 @@ export const LaCriptaFinalBossDoorChamber: React.FC<{
       <div className="flex flex-col items-center gap-2">
         <LaCriptaDoorCounterBadge completedDoorCount={3} />
         <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-cripta-pixel text-[#E7A54A]">
-          {completedDungeonIds.slice(0, 3).map((dId, idx) => {
+          {resolvedCompletedDungeons.slice(0, 3).map((dId, idx) => {
             const dName = CRIPTA_DUNGEONS_REGISTRY[dId]?.name || dId;
             return (
               <span
@@ -96,12 +117,8 @@ export const LaCriptaFinalBossDoorChamber: React.FC<{
                 onClickBossDoor();
               }
             }}
-            className={`group relative w-full max-w-md flex flex-col items-center cursor-pointer outline-none transition-transform duration-500 ${
-              isOpening
-                ? 'scale-105 z-20'
-                : isHovered || votedByMe
-                ? '-translate-y-1.5'
-                : ''
+            className={`dungeonDoorSlot group relative w-full max-w-md flex flex-col items-center cursor-pointer outline-none ${
+              isOpening ? 'z-20' : ''
             }`}
             style={{
               filter:
@@ -556,23 +573,40 @@ export const LaCriptaRunVictoryScreen: React.FC<{
 };
 
 export const LaCriptaFinalBossDoorScene: React.FC<{
-  completedBiomes: CriptaDungeonId[];
+  completedBiomes?: CriptaDungeonId[];
+  completedDungeonIds?: CriptaDungeonId[];
+  finalBossDoorVotes?: Record<string, boolean>;
   players: CriptaPlayer[];
   currentPlayerId: string;
   isUnlocking: boolean;
   onVoteBossDoor: () => void;
-}> = ({ completedBiomes, players, currentPlayerId, isUnlocking, onVoteBossDoor }) => {
+}> = ({
+  completedBiomes,
+  completedDungeonIds,
+  finalBossDoorVotes = {},
+  players = [],
+  currentPlayerId,
+  isUnlocking,
+  onVoteBossDoor,
+}) => {
   const connectedPlayers = players.filter((p) => p.isConnected);
-  const votesMap: Record<string, boolean> = {};
+  const votesMap: Record<string, boolean> = { ...finalBossDoorVotes };
   for (const p of players) {
     if (p.votedFinalBossDoor) {
       votesMap[p.id] = true;
     }
   }
+  const canonicalBiomes =
+    Array.isArray(completedDungeonIds) && completedDungeonIds.length > 0
+      ? completedDungeonIds
+      : Array.isArray(completedBiomes) && completedBiomes.length > 0
+      ? completedBiomes
+      : [];
 
   return (
     <LaCriptaFinalBossDoorChamber
-      completedDungeonIds={completedBiomes}
+      completedDungeonIds={canonicalBiomes}
+      completedBiomes={canonicalBiomes}
       connectedPlayers={connectedPlayers}
       finalBossDoorVotes={votesMap}
       currentPlayerId={currentPlayerId}

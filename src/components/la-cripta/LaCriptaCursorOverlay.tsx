@@ -98,7 +98,13 @@ export const LaCriptaCursorOverlay: React.FC<LaCriptaCursorOverlayProps> = ({
       return el;
     };
 
-    const tick = () => {
+    let lastFrameTime = performance.now();
+
+    const tick = (frameNow: number) => {
+      const dtSec = Math.min(0.06, Math.max(0.001, (frameNow - lastFrameTime) / 1000));
+      lastFrameTime = frameNow;
+      const smoothingFactor = 1 - Math.exp(-22 * dtSec);
+
       const container = containerRef.current;
       if (container) {
         const rect = container.getBoundingClientRect();
@@ -123,9 +129,9 @@ export const LaCriptaCursorOverlay: React.FC<LaCriptaCursorOverlayProps> = ({
             continue;
           }
 
-          // Smooth exponential interpolation
-          state.currentX += (state.targetX - state.currentX) * 0.32;
-          state.currentY += (state.targetY - state.currentY) * 0.32;
+          // Frame-rate independent smooth exponential interpolation with subpixel precision
+          state.currentX += (state.targetX - state.currentX) * smoothingFactor;
+          state.currentY += (state.targetY - state.currentY) * smoothingFactor;
 
           let node = domNodesRef.current.get(playerId);
           if (!node) {
@@ -159,8 +165,8 @@ export const LaCriptaCursorOverlay: React.FC<LaCriptaCursorOverlayProps> = ({
           const sameScene = state.sceneId === activeSceneRef.current;
           node.style.opacity = sameScene ? '1' : '0.28';
 
-          const pxX = Math.round(state.currentX * width);
-          const pxY = Math.round(state.currentY * height);
+          const pxX = (state.currentX * width).toFixed(2);
+          const pxY = (state.currentY * height).toFixed(2);
           node.style.transform = `translate3d(${pxX}px, ${pxY}px, 0)`;
         }
       }

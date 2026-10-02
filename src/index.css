@@ -1846,6 +1846,141 @@ body,
   animation: cripta-flask-bubble 3.8s steps(1, end) infinite;
 }
 
+@keyframes cripta-scarf-wave {
+  0%, 100% {
+    transform: translateX(0px) translateY(0px);
+  }
+  50% {
+    transform: translateX(-1px) translateY(0.5px);
+  }
+}
+
+@keyframes cripta-blade-glint {
+  0%, 82%, 100% {
+    opacity: 0.15;
+  }
+  86%, 91% {
+    opacity: 1;
+  }
+}
+
+@keyframes cripta-head-turn {
+  0%, 75%, 100% {
+    transform: translateY(0px);
+  }
+  35%, 55% {
+    transform: translateY(-0.5px);
+  }
+}
+
+@keyframes cripta-weapon-heft {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(1px);
+  }
+}
+
+@keyframes cripta-barbarian-breathe-heavy {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes cripta-jester-strum {
+  0%, 100% {
+    transform: translate(0px, 0px);
+  }
+  25% {
+    transform: translate(1px, 1px);
+  }
+  50% {
+    transform: translate(0px, 1px);
+  }
+  75% {
+    transform: translate(-1px, 0px);
+  }
+}
+
+@keyframes cripta-jester-bells {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(1px);
+  }
+}
+
+@keyframes cripta-music-notes-float {
+  0% {
+    opacity: 0;
+    transform: translate(0px, 2px);
+  }
+  25% {
+    opacity: 0.95;
+    transform: translate(-1px, 0px);
+  }
+  75% {
+    opacity: 0.85;
+    transform: translate(1px, -3px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0px, -5px);
+  }
+}
+
+@keyframes cripta-staff-orb {
+  0%, 100% {
+    transform: translateY(0px);
+    opacity: 0.88;
+  }
+  50% {
+    transform: translateY(-1.5px);
+    opacity: 1;
+  }
+}
+
+.animate-cripta-scarf-wave {
+  animation: cripta-scarf-wave 2.6s steps(2, end) infinite;
+}
+
+.animate-cripta-blade-glint {
+  animation: cripta-blade-glint 5.4s steps(1, end) infinite;
+}
+
+.animate-cripta-head-turn {
+  animation: cripta-head-turn 3.4s steps(2, end) infinite;
+}
+
+.animate-cripta-weapon-heft {
+  animation: cripta-weapon-heft 2.8s steps(2, end) infinite;
+}
+
+.animate-cripta-barbarian-breathe-heavy {
+  animation: cripta-barbarian-breathe-heavy 1.6s steps(2, end) infinite;
+}
+
+.animate-cripta-jester-strum {
+  animation: cripta-jester-strum 1.2s steps(4, end) infinite;
+}
+
+.animate-cripta-jester-bells {
+  animation: cripta-jester-bells 2.2s steps(2, end) infinite;
+}
+
+.animate-cripta-music-notes {
+  animation: cripta-music-notes-float 2.8s ease-in-out infinite;
+}
+
+.animate-cripta-staff-orb {
+  animation: cripta-staff-orb 2.4s steps(2, end) infinite;
+}
+
 .animate-cripta-sprite-enter {
   animation: cripta-sprite-enter 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -2018,6 +2153,263 @@ body,
   animation: cripta-room-shake 0.26s ease-in-out forwards;
 }
 
+/* ============================================================================
+   ORIGINAL 6 PLAYABLE CHARACTERS — REFINED LAYERED IDLE ANIMATIONS
+   ============================================================================ */
+
+/* 1. CABALLERO: Heavy, grounded breathing + 1px shoulder/shield weight shift + rare visor & helmet glint */
+@keyframes criptaKnightHeavyBreathe {
+  0%, 72%, 100% { transform: translateY(0px); }
+  36%, 54% { transform: translateY(1px); }
+}
+
+@keyframes criptaKnightShoulderShift {
+  0%, 68%, 100% { transform: translate(0px, 0px); }
+  34%, 52% { transform: translate(0px, 1px); }
+}
+
+@keyframes criptaKnightShieldShift {
+  0%, 64%, 100% { transform: translate(0px, 0px); }
+  32%, 50% { transform: translate(-0.6px, 1px); }
+}
+
+@keyframes criptaKnightClothSway {
+  0%, 100% { transform: translateX(0px); }
+  50% { transform: translateX(-0.7px); }
+}
+
+@keyframes criptaKnightVisorGlint {
+  0%, 84%, 100% { opacity: 0; transform: translateX(-1px); }
+  88% { opacity: 0.95; transform: translateX(0px); }
+  93% { opacity: 0.55; transform: translateX(2px); }
+}
+
+@keyframes criptaKnightHelmetGlint {
+  0%, 78%, 100% { opacity: 0; }
+  82% { opacity: 0.88; }
+  86% { opacity: 0.25; }
+}
+
+/* 2. MAGO: Hat tip sway, robe secondary movement, soft crystal pulse, subtle eye brighten/dim, 60fps orbiting arcane motes */
+@keyframes criptaMageHatTip {
+  0%, 100% { transform: translate(0px, 0px) rotate(0deg); }
+  50% { transform: translate(-0.8px, 0.5px) rotate(-1.5deg); }
+}
+
+@keyframes criptaMageRobeHem {
+  0%, 100% { transform: translateX(0px); }
+  50% { transform: translateX(0.75px); }
+}
+
+@keyframes criptaMageCrystalPulse {
+  0%, 100% { opacity: 0.78; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes criptaMageEyeGlow {
+  0%, 100% { opacity: 0.72; }
+  45%, 60% { opacity: 1; }
+}
+
+@keyframes criptaMageMoteOrbitA {
+  0% { transform: translate3d(-3.2px, 1.2px, 0) scale(0.85); opacity: 0.25; }
+  25% { transform: translate3d(0px, -2.4px, 0) scale(1.08); opacity: 0.95; }
+  50% { transform: translate3d(3.2px, -0.4px, 0) scale(0.95); opacity: 0.75; }
+  75% { transform: translate3d(0.4px, 2.2px, 0) scale(0.8); opacity: 0.2; }
+  100% { transform: translate3d(-3.2px, 1.2px, 0) scale(0.85); opacity: 0.25; }
+}
+
+@keyframes criptaMageMoteOrbitB {
+  0% { transform: translate3d(2.8px, -1.6px, 0) scale(0.9); opacity: 0.35; }
+  33% { transform: translate3d(-2.6px, -0.8px, 0) scale(1.05); opacity: 0.9; }
+  66% { transform: translate3d(-0.5px, 2.4px, 0) scale(0.82); opacity: 0.3; }
+  100% { transform: translate3d(2.8px, -1.6px, 0) scale(0.9); opacity: 0.35; }
+}
+
+/* 3. PÍCARO: Alert restless weight shift (no bouncing), slight head scan, scarf tip sway, dagger glint */
+@keyframes criptaRogueWeightShift {
+  0%, 58%, 100% { transform: translate(0px, 0px); }
+  22%, 42% { transform: translate(0.7px, 0.4px); }
+  74%, 88% { transform: translate(-0.5px, 0.3px); }
+}
+
+@keyframes criptaRogueHeadAlert {
+  0%, 64%, 100% { transform: translate(0px, 0px); }
+  24%, 44% { transform: translate(0.85px, 0px); }
+  76%, 88% { transform: translate(-0.6px, 0.3px); }
+}
+
+@keyframes criptaRogueDaggerPoise {
+  0%, 100% { transform: translate(0px, 0px); }
+  45% { transform: translate(0.4px, -0.6px); }
+}
+
+/* 4. CAZADOR: Controlled breathing, feather/cloak breeze, slight bow poise, occasional hand adjustment, visual scan */
+@keyframes criptaHunterScan {
+  0%, 66%, 100% { transform: translate(0px, 0px); }
+  26%, 46% { transform: translate(0.85px, 0px); }
+}
+
+@keyframes criptaHunterFeatherSway {
+  0%, 100% { transform: translate(0px, 0px) rotate(0deg); }
+  50% { transform: translate(-0.8px, 0.4px) rotate(-2deg); }
+}
+
+@keyframes criptaHunterBowPoise {
+  0%, 100% { transform: translate(0px, 0px); }
+  50% { transform: translate(0.35px, -0.55px); }
+}
+
+@keyframes criptaHunterHandAdjust {
+  0%, 74%, 100% { transform: translate(0px, 0px); }
+  80%, 88% { transform: translate(-0.7px, -0.5px); }
+}
+
+/* 5. CLÉRIGO: Subtle robe movement, gentle sacred relic pulse, tiny head movement, smooth 60fps warm golden particles */
+@keyframes criptaClericHeadPeace {
+  0%, 70%, 100% { transform: translate(0px, 0px); }
+  35%, 52% { transform: translate(0px, -0.5px); }
+}
+
+@keyframes criptaClericStoleSway {
+  0%, 100% { transform: translateX(0px); }
+  50% { transform: translateX(0.65px); }
+}
+
+@keyframes criptaClericGoldenMoteA {
+  0% { transform: translate3d(0px, 2px, 0) scale(0.8); opacity: 0; }
+  25% { transform: translate3d(-1.2px, -1.5px, 0) scale(1.05); opacity: 0.92; }
+  70% { transform: translate3d(0.9px, -5.5px, 0) scale(0.92); opacity: 0.65; }
+  100% { transform: translate3d(-0.4px, -8.5px, 0) scale(0.7); opacity: 0; }
+}
+
+@keyframes criptaClericGoldenMoteB {
+  0% { transform: translate3d(0px, 1.5px, 0) scale(0.75); opacity: 0; }
+  30% { transform: translate3d(1.3px, -2px, 0) scale(1); opacity: 0.85; }
+  75% { transform: translate3d(-0.8px, -6px, 0) scale(0.88); opacity: 0.5; }
+  100% { transform: translate3d(0.5px, -9px, 0) scale(0.65); opacity: 0; }
+}
+
+/* 6. ALQUIMISTA: Subtle bottle tilt, liquid slosh, glass reflection, apparatus reaction */
+@keyframes criptaAlchemistFlaskTilt {
+  0%, 100% { transform: translate(0px, 0px) rotate(0deg); }
+  45% { transform: translate(0.35px, -0.55px) rotate(1.4deg); }
+  75% { transform: translate(-0.25px, 0.25px) rotate(-0.8deg); }
+}
+
+@keyframes criptaAlchemistLiquidSlosh {
+  0%, 100% { transform: translateX(0px) scaleY(1); }
+  45% { transform: translateX(0.55px) scaleY(1.04); }
+  75% { transform: translateX(-0.45px) scaleY(0.97); }
+}
+
+@keyframes criptaAlchemistGlassGlint {
+  0%, 76%, 100% { opacity: 0.28; }
+  82% { opacity: 0.95; }
+  88% { opacity: 0.45; }
+}
+
+@keyframes criptaAlchemistApparatusTick {
+  0%, 68%, 100% { transform: translate(0px, 0px); }
+  74%, 84% { transform: translate(0.5px, -0.5px); }
+}
+
+.animate-cripta-knight-breathe {
+  animation: criptaKnightHeavyBreathe 4.4s ease-in-out infinite;
+}
+.animate-cripta-knight-shoulder {
+  animation: criptaKnightShoulderShift 4.4s ease-in-out infinite;
+}
+.animate-cripta-knight-shield {
+  animation: criptaKnightShieldShift 4.4s ease-in-out infinite;
+}
+.animate-cripta-knight-cloth {
+  animation: criptaKnightClothSway 3.8s ease-in-out infinite;
+}
+.animate-cripta-knight-visor-glint {
+  animation: criptaKnightVisorGlint 7.2s ease-in-out infinite;
+}
+.animate-cripta-knight-helmet-glint {
+  animation: criptaKnightHelmetGlint 6.4s ease-in-out infinite;
+}
+
+.animate-cripta-mage-hat {
+  animation: criptaMageHatTip 3.8s ease-in-out infinite;
+  transform-origin: 22px 6px;
+}
+.animate-cripta-mage-robe {
+  animation: criptaMageRobeHem 3.4s ease-in-out infinite;
+}
+.animate-cripta-mage-crystal {
+  animation: criptaMageCrystalPulse 2.8s ease-in-out infinite;
+  transform-origin: 41px 11px;
+}
+.animate-cripta-mage-eyes {
+  animation: criptaMageEyeGlow 3.6s ease-in-out infinite;
+}
+.animate-cripta-mage-mote-a {
+  animation: criptaMageMoteOrbitA 3.6s linear infinite;
+  will-change: transform, opacity;
+}
+.animate-cripta-mage-mote-b {
+  animation: criptaMageMoteOrbitB 4.4s linear infinite;
+  will-change: transform, opacity;
+}
+
+.animate-cripta-rogue-stance {
+  animation: criptaRogueWeightShift 4.2s ease-in-out infinite;
+}
+.animate-cripta-rogue-head {
+  animation: criptaRogueHeadAlert 4.8s ease-in-out infinite;
+}
+.animate-cripta-rogue-dagger {
+  animation: criptaRogueDaggerPoise 3.1s ease-in-out infinite;
+}
+
+.animate-cripta-hunter-scan {
+  animation: criptaHunterScan 5.2s ease-in-out infinite;
+}
+.animate-cripta-hunter-feather {
+  animation: criptaHunterFeatherSway 3.3s ease-in-out infinite;
+  transform-origin: 12px 9px;
+}
+.animate-cripta-hunter-bow {
+  animation: criptaHunterBowPoise 3.8s ease-in-out infinite;
+}
+.animate-cripta-hunter-hand {
+  animation: criptaHunterHandAdjust 5.6s ease-in-out infinite;
+}
+
+.animate-cripta-cleric-head {
+  animation: criptaClericHeadPeace 4.2s ease-in-out infinite;
+}
+.animate-cripta-cleric-stole {
+  animation: criptaClericStoleSway 3.6s ease-in-out infinite;
+}
+.animate-cripta-cleric-mote-a {
+  animation: criptaClericGoldenMoteA 3.8s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.animate-cripta-cleric-mote-b {
+  animation: criptaClericGoldenMoteB 4.5s ease-in-out infinite 1.7s;
+  will-change: transform, opacity;
+}
+
+.animate-cripta-alchemist-flask {
+  animation: criptaAlchemistFlaskTilt 3.6s ease-in-out infinite;
+  transform-origin: 39px 26px;
+}
+.animate-cripta-alchemist-liquid {
+  animation: criptaAlchemistLiquidSlosh 3.6s ease-in-out infinite;
+  transform-origin: 39px 28px;
+}
+.animate-cripta-alchemist-glint {
+  animation: criptaAlchemistGlassGlint 5.4s ease-in-out infinite;
+}
+.animate-cripta-alchemist-apparatus {
+  animation: criptaAlchemistApparatusTick 4.8s ease-in-out infinite;
+}
+
 /* Subtle Fantasy Arcade CRT Treatment (pointer-events: none guaranteed) */
 .cripta-crt-scanlines {
   pointer-events: none !important;
@@ -2060,7 +2452,34 @@ body,
   .animate-fort-spin-hum,
   .animate-cripta-torch,
   .animate-cripta-mote,
-  .animate-cripta-door-tremor {
+  .animate-cripta-door-tremor,
+  .animate-cripta-knight-breathe,
+  .animate-cripta-knight-shoulder,
+  .animate-cripta-knight-shield,
+  .animate-cripta-knight-cloth,
+  .animate-cripta-knight-visor-glint,
+  .animate-cripta-knight-helmet-glint,
+  .animate-cripta-mage-hat,
+  .animate-cripta-mage-robe,
+  .animate-cripta-mage-crystal,
+  .animate-cripta-mage-eyes,
+  .animate-cripta-mage-mote-a,
+  .animate-cripta-mage-mote-b,
+  .animate-cripta-rogue-stance,
+  .animate-cripta-rogue-head,
+  .animate-cripta-rogue-dagger,
+  .animate-cripta-hunter-scan,
+  .animate-cripta-hunter-feather,
+  .animate-cripta-hunter-bow,
+  .animate-cripta-hunter-hand,
+  .animate-cripta-cleric-head,
+  .animate-cripta-cleric-stole,
+  .animate-cripta-cleric-mote-a,
+  .animate-cripta-cleric-mote-b,
+  .animate-cripta-alchemist-flask,
+  .animate-cripta-alchemist-liquid,
+  .animate-cripta-alchemist-glint,
+  .animate-cripta-alchemist-apparatus {
     animation: none !important;
   }
   .fort-gauge-fill {

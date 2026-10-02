@@ -162,9 +162,18 @@ function buildDefaultPlayer(
     hp: 0,
     maxHp: 0,
     armor: 0,
+    agility: 5,
+    precision: 5,
+    willpower: 5,
     bonusAttack: 0,
     bonusDefense: 0,
     bonusMagic: 0,
+    bonusAgility: 0,
+    bonusPrecision: 0,
+    bonusWillpower: 0,
+    classResource: 0,
+    maxClassResource: 0,
+    classResourceKind: null,
     equippedWeaponId: null,
     weaponUpgradeLevel: 1,
     equippedWeaponRuneId: null,
@@ -344,7 +353,12 @@ export class LaCriptaServer {
   ): string | null {
     const livingPlayers = room.players
       .filter((p) => p.isConnected && !p.isDead && p.hp > 0)
-      .sort((a, b) => a.seatIndex - b.seatIndex);
+      .sort((a, b) => {
+        const initDiff =
+          computePlayerEffectiveStats(b).initiativeScore -
+          computePlayerEffectiveStats(a).initiativeScore;
+        return initDiff !== 0 ? initDiff : a.seatIndex - b.seatIndex;
+      });
     if (livingPlayers.length === 0) return null;
     if (livingPlayers.length === 1) return livingPlayers[0].id;
 
@@ -474,9 +488,24 @@ export class LaCriptaServer {
         ...p,
         characterId: p.characterId ?? null,
         selectedCharacterId: p.characterId ?? null,
+        agility: p.agility ?? (p.characterId ? CRIPTA_CHARACTERS_CATALOG[p.characterId]?.stats.agility : 5),
+        precision: p.precision ?? (p.characterId ? CRIPTA_CHARACTERS_CATALOG[p.characterId]?.stats.precision : 5),
+        willpower: p.willpower ?? (p.characterId ? CRIPTA_CHARACTERS_CATALOG[p.characterId]?.stats.willpower : 5),
         bonusAttack: p.bonusAttack ?? 0,
         bonusDefense: p.bonusDefense ?? 0,
         bonusMagic: p.bonusMagic ?? 0,
+        bonusAgility: p.bonusAgility ?? 0,
+        bonusPrecision: p.bonusPrecision ?? 0,
+        bonusWillpower: p.bonusWillpower ?? 0,
+        classResource:
+          p.classResource ??
+          (p.characterId ? CRIPTA_CHARACTERS_CATALOG[p.characterId]?.classResource?.initialValue ?? 0 : 0),
+        maxClassResource:
+          p.maxClassResource ??
+          (p.characterId ? CRIPTA_CHARACTERS_CATALOG[p.characterId]?.classResource?.maxValue ?? 0 : 0),
+        classResourceKind:
+          p.classResourceKind ??
+          (p.characterId ? CRIPTA_CHARACTERS_CATALOG[p.characterId]?.classResource?.kind ?? null : null),
         equippedWeaponId:
           p.equippedWeaponId ??
           (p.characterId ? STARTER_WEAPON_BY_CLASS[p.characterId] : null),
@@ -498,9 +527,10 @@ export class LaCriptaServer {
         isDead: Boolean(p.isDead || (p.characterId && p.maxHp > 0 && p.hp <= 0)),
         deathsCount: p.deathsCount ?? 0,
         statuses: (p.statuses || []).map((st) => ({ ...st })),
+        votedFinalBossDoor: Boolean(room.finalBossDoorVotes?.[p.id]),
       })),
       selectedCharacters: { ...room.selectedCharacters },
-      offeredDungeons: [...room.offeredDungeons],
+      offeredDungeons: [...(room.offeredDungeons || [])],
       doorVotes: { ...room.doorVotes },
       finalBossDoorVotes: room.finalBossDoorVotes ? { ...room.finalBossDoorVotes } : {},
       decisionResolved: Boolean(room.decisionResolved),
@@ -577,6 +607,8 @@ export class LaCriptaServer {
       inSecretRoom: Boolean(room.inSecretRoom),
       dungeonCompleted: Boolean(room.dungeonCompleted),
       expeditionDefeated: Boolean(room.expeditionDefeated),
+      defeatReason: room.defeatReason ?? null,
+      defeatedByEnemyName: room.defeatedByEnemyName ?? null,
       lastEventBatch: room.lastEventBatch ? { ...room.lastEventBatch } : null,
     };
   }
@@ -779,6 +811,12 @@ export class LaCriptaServer {
         player.maxHp = charDef.maxHp;
         player.hp = charDef.maxHp;
         player.armor = charDef.baseArmor;
+        player.agility = charDef.stats.agility;
+        player.precision = charDef.stats.precision;
+        player.willpower = charDef.stats.willpower;
+        player.classResource = charDef.classResource?.initialValue ?? 0;
+        player.maxClassResource = charDef.classResource?.maxValue ?? 0;
+        player.classResourceKind = charDef.classResource?.kind ?? null;
         player.equippedWeaponId = STARTER_WEAPON_BY_CLASS[charId];
         player.weaponUpgradeLevel = 1;
         player.weaponSpecialCooldown = 0;
@@ -789,7 +827,7 @@ export class LaCriptaServer {
       }
 
       case 'START_EXPEDITION': {
-        if (!player.isHost) {
+        if (!player.isHost && !room.expeditionDefeated && room.phase !== 'RUN_VICTORY') {
           this.sendError(ws, 'Solo el líder de la expedición puede iniciar la partida.');
           return;
         }
@@ -798,7 +836,8 @@ export class LaCriptaServer {
           room.phase !== 'DUNGEON' &&
           room.phase !== 'DUNGEON_ARRIVAL' &&
           room.phase !== 'FINAL_BOSS_COMBAT' &&
-          room.phase !== 'RUN_VICTORY'
+          room.phase !== 'RUN_VICTORY' &&
+          !room.expeditionDefeated
         ) {
           return;
         }
@@ -864,6 +903,8 @@ export class LaCriptaServer {
         room.inSecretRoom = false;
         room.dungeonCompleted = false;
         room.expeditionDefeated = false;
+        room.defeatReason = null;
+        room.defeatedByEnemyName = null;
         room.lastEventBatch = null;
         room.phase = 'THREE_DOORS';
 
@@ -873,6 +914,9 @@ export class LaCriptaServer {
           p.bonusAttack = 0;
           p.bonusDefense = 0;
           p.bonusMagic = 0;
+          p.bonusAgility = 0;
+          p.bonusPrecision = 0;
+          p.bonusWillpower = 0;
           p.equippedWeaponId = p.characterId ? STARTER_WEAPON_BY_CLASS[p.characterId] : 'espada_oxidada';
           p.weaponUpgradeLevel = 1;
           p.equippedWeaponRuneId = null;
@@ -895,6 +939,12 @@ export class LaCriptaServer {
               p.maxHp = cDef.maxHp;
               p.hp = cDef.maxHp;
               p.armor = cDef.baseArmor;
+              p.agility = cDef.stats.agility;
+              p.precision = cDef.stats.precision;
+              p.willpower = cDef.stats.willpower;
+              p.classResource = cDef.classResource?.initialValue ?? 0;
+              p.maxClassResource = cDef.classResource?.maxValue ?? 0;
+              p.classResourceKind = cDef.classResource?.kind ?? null;
             }
           }
         }
@@ -1197,12 +1247,31 @@ export class LaCriptaServer {
     }
   }
 
-  private checkAndApplyPartyDefeat(room: ServerCriptaRoom): boolean {
+  private checkAndApplyPartyDefeat(
+    room: ServerCriptaRoom,
+    defeatReason?: string,
+    killerName?: string,
+    visualEvents?: CriptaVisualEvent[]
+  ): boolean {
     const connected = room.players.filter((p) => p.isConnected);
     const checkList = connected.length > 0 ? connected : room.players;
     const allDead = checkList.every((p) => p.isDead || p.hp <= 0);
     if (allDead) {
       room.expeditionDefeated = true;
+      room.defeatReason =
+        defeatReason || room.defeatReason || 'Caídos en las profundidades de La Cripta';
+      room.defeatedByEnemyName = killerName || room.defeatedByEnemyName || null;
+      if (visualEvents) {
+        visualEvents.push({
+          id: `ev_defeat_${Date.now()}`,
+          kind: 'EXPEDITION_DEFEATED',
+          targetType: 'PARTY',
+          label: 'EXPEDICIÓN CAÍDA',
+          sublabel: room.defeatReason,
+          color: '#E03E52',
+          vfxStyle: 'explosion',
+        });
+      }
       return true;
     }
     return false;
@@ -2492,7 +2561,10 @@ export class LaCriptaServer {
   private handleVoteFinalBossDoor(room: ServerCriptaRoom, player: CriptaPlayer) {
     if (
       room.phase !== 'FINAL_BOSS_DOOR_READY' &&
-      !(room.phase === 'THREE_DOORS' && (room.completedDoorCount ?? 0) >= 3)
+      !(
+        (room.phase === 'THREE_DOORS' || room.phase === 'RETURNING_TO_DOORS') &&
+        (room.completedDoorCount ?? 0) >= 3
+      )
     ) {
       return;
     }
@@ -2616,6 +2688,31 @@ export class LaCriptaServer {
       }
     }
 
+    // Class Resource on Enemy Death:
+    // - Nigromante (Cosecha de Almas): +1 ESENCIA (max 5) & +4 PV
+    // - Bárbaro (Sed de Batalla): +20 FURIA (max 100)
+    for (const p of room.players) {
+      if (p.isDead || p.hp <= 0) continue;
+      if (p.characterId === 'nigromante') {
+        p.classResource = Math.min(5, (p.classResource || 0) + 1);
+        p.hp = Math.min(p.maxHp, p.hp + 4);
+        room.runStats.healingDone += 4;
+        visualEvents.push({
+          id: `ev_${ts}_nigro_soul_${p.id}_${killedEnemy.id}`,
+          kind: 'HEAL_PLAYER',
+          targetType: 'PLAYER',
+          targetId: p.id,
+          value: 4,
+          label: `+1 ESENCIA (${p.classResource}/5) · +4 PV`,
+          sublabel: 'COSECHA DE ALMAS',
+          color: '#34D399',
+          vfxStyle: 'arcane',
+        });
+      } else if (p.characterId === 'barbaro') {
+        p.classResource = Math.min(100, (p.classResource || 0) + 20);
+      }
+    }
+
     // Authoritative Enemy Loot Drop Roll (Requirements 10, 11, 18 & Miniboss Guaranteed Rewards Section 44)
     if (!killedEnemy.isFinalBoss) {
       const enemyIdx = Math.max(0, activeRoom.enemies.indexOf(killedEnemy));
@@ -2669,7 +2766,7 @@ export class LaCriptaServer {
         }
       }
 
-      // Dungeon Minibosses also drop a guaranteed high-tier tonic/potion AND a biome-forged weapon cache alongside their Relic drop!
+      // Dungeon Minibosses also drop distinctive Custodio Special Loot: a named Custodio Elixir, a Biome-Forged Signature Weapon, and a Custodio Relic!
       if (killedEnemy.isMiniboss || (killedEnemy.isBoss && !killedEnemy.isFinalBoss)) {
         if (!activeRoom.groundDrops) activeRoom.groundDrops = [];
         const bonusMinibossItems: CriptaItemId[] = [
@@ -2689,7 +2786,7 @@ export class LaCriptaServer {
           dropId: bonusDropId,
           kind: 'ITEM',
           type: 'ITEM',
-          label: bonusItemDef?.name || 'Elixir del Custodio',
+          label: `Reserva de ${killedEnemy.name}: ${bonusItemDef?.name || 'Elixir Mayor'}`,
           itemId: pickedBonusItem,
           droppedByEnemyName: killedEnemy.name,
           xPercent: 34,
@@ -2697,7 +2794,7 @@ export class LaCriptaServer {
           claimedByPlayerId: null,
         });
 
-        // Also drop a canonical Biome Weapon from the Miniboss so the party can claim a real weapon reward card!
+        // Also drop a canonical Biome Weapon forged by the Miniboss so the party can claim a distinctive weapon reward card!
         const preferredClasses = room.players
           .filter((p) => p.isConnected)
           .map((p) => p.characterId)
@@ -2716,7 +2813,7 @@ export class LaCriptaServer {
             dropId: wepDropId,
             kind: 'WEAPON',
             type: 'WEAPON',
-            label: minibossWepDef.name,
+            label: `Trofeo de ${killedEnemy.name}: ${minibossWepDef.name}`,
             weaponId: minibossWeaponId,
             droppedByEnemyName: killedEnemy.name,
             xPercent: 66,
@@ -2724,6 +2821,23 @@ export class LaCriptaServer {
             claimedByPlayerId: null,
           });
         }
+
+        // Grant a permanent +1 Attack & +1 Defense Custodio Trophy blessing to all living adventurers!
+        for (const p of room.players) {
+          if (!p.isDead && p.hp > 0) {
+            p.bonusAttack = (p.bonusAttack || 0) + 1;
+            p.armor = Math.min(24, p.armor + 1);
+          }
+        }
+        visualEvents.push({
+          id: `ev_${ts}_miniboss_special_loot_${killedEnemy.id}`,
+          kind: 'LOOT_ITEM',
+          targetType: 'PARTY',
+          label: `★ BOTÍN ESPECIAL DE ${killedEnemy.name.toUpperCase()}`,
+          sublabel: 'RELIQUIA + ARMA DE CUSTODIO + ELIXIR (+1 ATQ / +1 DEF)',
+          color: '#FFD166',
+          vfxStyle: 'gold',
+        });
       }
     }
   }
@@ -2796,11 +2910,11 @@ export class LaCriptaServer {
     const baseGoldReward = activeRoom.isFinalBossRoom
       ? 160
       : isMinibossRoom
-      ? 60
+      ? 58
       : activeRoom.type === 'ELITE'
-      ? 38
-      : 22;
-    const goldReward = baseGoldReward + (hasGoldRelic ? 8 : 0);
+      ? 30
+      : 15;
+    const goldReward = baseGoldReward + (hasGoldRelic ? 6 : 0);
     const victoryHeal = isMinibossRoom ? 12 : 8;
 
     activeRoom.rewardSummary = {
@@ -3031,22 +3145,7 @@ export class LaCriptaServer {
   }
 
   private getPlayerInitiativeSpeed(player: CriptaPlayer): number {
-    switch (player.characterId) {
-      case 'picaro':
-        return 90;
-      case 'cazador':
-        return 80;
-      case 'alquimista':
-        return 70;
-      case 'mago':
-        return 60;
-      case 'clerigo':
-        return 50;
-      case 'caballero':
-        return 40;
-      default:
-        return 50;
-    }
+    return computePlayerEffectiveStats(player).initiativeScore;
   }
 
   private handleLockRoundAction(
@@ -3184,6 +3283,17 @@ export class LaCriptaServer {
         );
         return;
       }
+      const minRes = chosenAb?.minResourceRequired ?? chosenAb?.resourceCost ?? 0;
+      const curRes = player.classResource ?? charDef?.classResource?.initialValue ?? 0;
+      if (minRes > 0 && curRes < minRes) {
+        this.sendError(
+          ws,
+          `${chosenAb?.name || 'La técnica'} requiere al menos ${minRes} de ${
+            charDef?.classResource?.label || 'recurso'
+          } (actual: ${curRes}).`
+        );
+        return;
+      }
     }
 
     // Validate ITEM action if chosen
@@ -3281,7 +3391,12 @@ export class LaCriptaServer {
   ) {
     const livingConnected = room.players
       .filter((p) => p.isConnected && !p.isDead && p.hp > 0)
-      .sort((a, b) => a.seatIndex - b.seatIndex);
+      .sort((a, b) => {
+        const initDiff =
+          computePlayerEffectiveStats(b).initiativeScore -
+          computePlayerEffectiveStats(a).initiativeScore;
+        return initDiff !== 0 ? initDiff : a.seatIndex - b.seatIndex;
+      });
 
     const actedSet = new Set(activeRoom.actedPlayerIdsThisRound || []);
     const unactedPlayers = livingConnected.filter((p) => !actedSet.has(p.id));
@@ -3368,10 +3483,8 @@ export class LaCriptaServer {
     }
 
     activeRoom.combatRoundPhase = 'ENEMY_PHASE_WARNING';
-    activeRoom.combatBannerText = 'TURNO DEL ENEMIGO';
     activeRoom.activeCombatActorId = null;
     activeRoom.activeTurnPlayerId = null;
-    activeRoom.activeTargetedPlayerIds = [];
     this.broadcastRoomState(room);
 
     const startEnemyPhaseResolution = () => {
@@ -3406,7 +3519,7 @@ export class LaCriptaServer {
         if (enemyIdx >= currentLivingEnemies.length) {
           scheduleStep(() => {
             this.resolveEndOfCombatRound(room, activeRoom);
-          }, 1350);
+          }, 2750);
           return;
         }
 
@@ -3439,16 +3552,16 @@ export class LaCriptaServer {
 
         scheduleStep(() => {
           stepEnemyAction(enemyIdx + 1);
-        }, 1650);
+        }, 3150);
       };
 
       stepEnemyAction(0);
     };
 
-    // Wait 1750ms so the player's attack/ability/status/heal sequence fully resolves on screen BEFORE enemy phase starts
+    // Wait 2650ms so the player's attack/ability/status/heal sequence fully resolves on screen BEFORE enemy phase starts
     scheduleStep(() => {
       startEnemyPhaseResolution();
-    }, 1750);
+    }, 2650);
   }
 
   private executeSinglePlayerRoundAction(
@@ -3536,9 +3649,9 @@ export class LaCriptaServer {
         ? 'arcane'
         : player.characterId === 'cazador'
         ? 'arrow'
-        : player.characterId === 'clerigo'
+        : player.characterId === 'clerigo' || player.characterId === 'bardo'
         ? 'holy'
-        : player.characterId === 'alquimista'
+        : player.characterId === 'alquimista' || player.characterId === 'nigromante'
         ? 'alchemy'
         : 'slash';
 
@@ -3841,12 +3954,20 @@ export class LaCriptaServer {
             }
             if (rolled.appliedOnHitStatus) {
               const stDef = CRIPTA_STATUS_EFFECTS_REGISTRY[rolled.appliedOnHitStatus];
+              if (rolled.appliedOnHitStatus === 'POISON') {
+                en.poisonStacks = (en.poisonStacks || 0) + 1;
+              } else if (rolled.appliedOnHitStatus === 'BLEED') {
+                en.bleedStacks = (en.bleedStacks || 0) + 1;
+              } else if (rolled.appliedOnHitStatus === 'BURN') {
+                en.burnStacks = (en.burnStacks || 0) + 1;
+              } else if (rolled.appliedOnHitStatus === 'CORROSION') {
+                en.corrosionTurns = (en.corrosionTurns || 0) + 2;
+              }
               if (
                 rolled.appliedOnHitStatus === 'POISON' ||
                 rolled.appliedOnHitStatus === 'BLEED' ||
                 rolled.appliedOnHitStatus === 'BURN'
               ) {
-                en.poisonStacks = (en.poisonStacks || 0) + 1;
                 if (!spec.poisonStacks) {
                   appliedStatusEvents.push({
                     id: `ev_${ts}_wspec_ohs_${en.id}_${i}`,
@@ -3854,7 +3975,7 @@ export class LaCriptaServer {
                     targetType: 'ENEMY',
                     targetId: en.id,
                     sourcePlayerId: player.id,
-                    label: `+${stDef?.name || 'VENENO'} (1)`,
+                    label: `+${stDef?.name || 'ESTADO'} (1)`,
                     sublabel: eqWeapon.weapon.name.toUpperCase(),
                     color: stDef?.visualTreatment.color || '#5EA87A',
                     statusType: rolled.appliedOnHitStatus,
@@ -3864,6 +3985,11 @@ export class LaCriptaServer {
                 rolled.appliedOnHitStatus === 'CURSE' ||
                 rolled.appliedOnHitStatus === 'MARKED'
               ) {
+                if (rolled.appliedOnHitStatus === 'CURSE') {
+                  en.curseTurns = (en.curseTurns || 0) + 2;
+                } else {
+                  en.markedTurns = (en.markedTurns || 0) + 2;
+                }
                 en.vulnerableTurns = (en.vulnerableTurns || 0) + 2;
                 if (!spec.vulnerableTurns) {
                   appliedStatusEvents.push({
@@ -3883,6 +4009,9 @@ export class LaCriptaServer {
                 rolled.appliedOnHitStatus === 'BLINDED' ||
                 rolled.appliedOnHitStatus === 'WEAKENED'
               ) {
+                if (rolled.appliedOnHitStatus === 'FROST') {
+                  en.frostTurns = (en.frostTurns || 0) + 2;
+                }
                 en.attackBuffBonus = -2;
                 en.attackBuffRounds = 2;
                 appliedStatusEvents.push({
@@ -3926,6 +4055,18 @@ export class LaCriptaServer {
           if (prevHp > 0 && en.hp <= 0) {
             this.handleEnemyKilledSideEffects(room, activeRoom, en, visualEvents, ts);
           }
+        }
+
+        // Generate Class Resource on Weapon Special (All 9 Classes)
+        const maxResWep = charDef?.classResource?.maxValue || 5;
+        if (player.characterId === 'barbaro') {
+          player.classResource = Math.min(100, (player.classResource ?? 0) + 22);
+        } else if (player.characterId === 'bardo') {
+          player.classResource = Math.min(4, (player.classResource ?? 0) + 1);
+        } else if (player.characterId === 'nigromante') {
+          player.classResource = Math.min(6, (player.classResource ?? 0) + 1);
+        } else {
+          player.classResource = Math.min(maxResWep, (player.classResource ?? 0) + 1);
         }
 
         if (spec.shieldGrant && spec.shieldGrant > 0) {
@@ -3973,8 +4114,10 @@ export class LaCriptaServer {
       room.runStats.healingDone += healAmt;
       applyStatusEffectToPlayer(player, 'SHIELDED', player.id, currentTurn, 2);
 
-      // If Caballero defends, also provoke and protect the most wounded ally!
+      // Class mechanic interaction on DEFEND (0 damage to enemies!)
+      const maxResDef = charDef?.classResource?.maxValue || 5;
       if (player.characterId === 'caballero') {
+        player.classResource = Math.min(maxResDef, (player.classResource ?? 0) + 2);
         player.tauntTurnsRemaining = 1;
         const woundedAlly = room.players
           .filter((p) => p.id !== player.id && !p.isDead && p.hp > 0)
@@ -3982,6 +4125,16 @@ export class LaCriptaServer {
         if (woundedAlly) {
           woundedAlly.protectedByPlayerId = player.id;
         }
+      } else if (player.characterId === 'mago') {
+        // Mago venting 1 Carga Arcana into extra shield when defending
+        if ((player.classResource ?? 0) > 0) {
+          player.classResource = Math.max(0, (player.classResource ?? 0) - 1);
+          player.armor = Math.min(24, player.armor + 2);
+        }
+      } else if (player.characterId === 'barbaro') {
+        player.classResource = Math.min(100, (player.classResource ?? 0) + 10);
+      } else {
+        player.classResource = Math.min(maxResDef, (player.classResource ?? 0) + 1);
       }
 
       visualEvents.push(
@@ -4044,11 +4197,93 @@ export class LaCriptaServer {
 
       // CASE A: NON-DAMAGING DEFENSIVE / HEALING / BUFF ABILITIES (NEVER DAMAGE ENEMIES!)
       if (!abilityDealsDamage) {
-        if (ability.id === 'muro_de_hierro' || ability.category === 'DEFEND') {
+        if (ability.id === 'grito_de_guerra') {
+          if (!room.runStats) room.runStats = buildDefaultRunStats();
+          room.runStats.supportActionsUsed += 1;
+          const maxRes = charDef?.classResource?.maxValue || 100;
+          player.classResource = Math.min(maxRes, (player.classResource ?? 0) + 25);
+
+          for (const p of room.players) {
+            if (!p.isDead && p.hp > 0) {
+              p.bonusAttack = Math.min(12, (p.bonusAttack || 0) + 1);
+              p.armor = Math.min(24, p.armor + 2);
+              applyStatusEffectToPlayer(p, 'BLESSED', player.id, currentTurn, 2);
+              visualEvents.push({
+                id: `ev_${ts}_grito_${p.id}`,
+                kind: 'STATUS_APPLIED',
+                targetType: 'PLAYER',
+                targetId: p.id,
+                sourcePlayerId: player.id,
+                label: '+1 ATAQUE · +2 DEFENSA · BENDICIÓN',
+                sublabel: 'GRITO DE GUERRA',
+                color: '#D85A4A',
+                statusType: 'BLESSED',
+              });
+            }
+          }
+          visualEvents.push({
+            id: `ev_${ts}_grito_furia_${player.id}`,
+            kind: 'SHIELD_PLAYER',
+            targetType: 'PLAYER',
+            targetId: player.id,
+            sourcePlayerId: player.id,
+            value: 25,
+            label: `+25 FURIA (${player.classResource}/100)`,
+            sublabel: 'RUGIDO ANCESTRAL',
+            color: '#FF5A36',
+            vfxStyle: 'slash',
+          });
+          logParts.push(
+            `¡${player.name} desata ${abilityName} (+25 FURIA, +1 ATAQUE, +2 ARMADURA y BENDICIÓN grupal)!`
+          );
+        } else if (ability.id === 'himno_del_alba_astral') {
+          if (!room.runStats) room.runStats = buildDefaultRunStats();
+          room.runStats.supportActionsUsed += 1;
+          const currCompas = player.classResource ?? 2;
+          const isCrescendo = currCompas >= 5;
+          player.classResource = Math.max(0, currCompas - 2);
+          const baseHeal = (ability.healAmount || 16) + (isCrescendo ? 10 : 0);
+          const healAmt = Math.round((baseHeal + magStat * 1.1 + effStats.willpower * 0.8) * healMult);
+          const armorGrant = (ability.shieldGrant || 2) + (isCrescendo ? 2 : 0) + Math.floor(effStats.willpower / 4);
+
+          for (const p of room.players) {
+            if (!p.isDead && p.hp > 0) {
+              p.hp = Math.min(p.maxHp, p.hp + healAmt);
+              room.runStats.healingDone += healAmt;
+              player.recentHealingDone = (player.recentHealingDone || 0) + healAmt;
+              p.armor = Math.min(24, p.armor + armorGrant);
+              purifyPlayerDebuffs(p, isCrescendo ? 2 : 1);
+              applyStatusEffectToPlayer(p, 'BLESSED', player.id, currentTurn, isCrescendo ? 3 : 2);
+              if (isCrescendo) {
+                applyStatusEffectToPlayer(p, 'REGENERATION', player.id, currentTurn, 2);
+              }
+              visualEvents.push({
+                id: `ev_${ts}_bardo_himno_${p.id}`,
+                kind: 'HEAL_PLAYER',
+                targetType: 'PLAYER',
+                targetId: p.id,
+                value: healAmt,
+                label: `+${healAmt} PV · +${armorGrant} ARM`,
+                sublabel: isCrescendo ? '¡CRESCENDO ASTRAL! +BENDICIÓN +REGEN' : 'HIMNO DEL ALBA +BENDICIÓN',
+                color: '#5EC2B7',
+                statusType: 'BLESSED',
+                vfxStyle: 'holy',
+              });
+            }
+          }
+          player.threatScore = (player.threatScore || 0) + 14;
+          logParts.push(
+            `¡${player.name} interpreta ${abilityName}${isCrescendo ? ' en CRESCENDO PERFECTO' : ''}: restaura +${healAmt} PV, otorga +${armorGrant} ARMADURA, purifica y bendice a la expedición!`
+          );
+        } else if (ability.id === 'muro_de_hierro' || ability.category === 'DEFEND') {
+          player.classResource = Math.min(5, (player.classResource ?? 0) + 2);
           player.tauntTurnsRemaining = 2;
           player.isDefendingThisRound = true;
           player.threatScore = (player.threatScore || 0) + 24;
-          const shieldAmt = ability.shieldGrant || 3;
+          const shieldAmt =
+            (ability.shieldGrant || 3) +
+            Math.floor(effStats.willpower / 5) +
+            Math.floor((player.classResource || 0) * 0.8);
           const woundedAlly = room.players
             .filter((p) => p.id !== player.id && !p.isDead && p.hp > 0)
             .sort((a, b) => a.hp / Math.max(1, a.maxHp) - b.hp / Math.max(1, b.maxHp))[0];
@@ -4076,9 +4311,90 @@ export class LaCriptaServer {
           logParts.push(
             `${player.name} alza ${abilityName}: provoca a los enemigos, intercepta golpes y otorga +${shieldAmt} ARMADURA y ESCUDO al grupo.`
           );
-        } else if (ability.id === 'elixir_transmutado') {
+        } else if (ability.id === 'velo_de_espejos' || ability.id === 'convergencia_astral') {
+          // Mago safe discharge of Carga Arcana into group shield & blessing (0 damage)
+          const discharged = player.classResource ?? 0;
+          player.classResource = 0;
+          const shieldGrant = 5 + discharged * 2;
+          for (const p of room.players) {
+            if (!p.isDead && p.hp > 0) {
+              p.armor = Math.min(24, p.armor + shieldGrant);
+              applyStatusEffectToPlayer(p, 'BLESSED', player.id, currentTurn, 2);
+              visualEvents.push({
+                id: `ev_${ts}_mago_conv_${p.id}`,
+                kind: 'SHIELD_PLAYER',
+                targetType: 'PLAYER',
+                targetId: p.id,
+                value: shieldGrant,
+                label: `+${shieldGrant} ARMADURA · BENDECIDO`,
+                sublabel: discharged > 0 ? `CONVERGENCIA (${discharged} CARGAS)` : 'CONVERGENCIA ASTRAL',
+                color: '#9B72CF',
+                statusType: 'BLESSED',
+                vfxStyle: 'arcane',
+              });
+            }
+          }
+          logParts.push(
+            `${player.name} disipa ${discharged} Carga Arcana con ${abilityName}, otorgando +${shieldGrant} ARMADURA y BENDECIDO al grupo.`
+          );
+        } else if (ability.id === 'ganzua_maestra') {
+          // Pícaro Velo de Humo y Apertura: +2 COMBO, +Escudo, +Veneno a enemigos (0 daño directo)
+          player.classResource = Math.min(3, (player.classResource ?? 0) + 2);
+          player.armor = Math.min(24, player.armor + 5);
+          applyStatusEffectToPlayer(player, 'SHIELDED', player.id, currentTurn, 2);
+          applyStatusEffectToPlayer(player, 'BLESSED', player.id, currentTurn, 2);
+          for (const en of livingEnemies) {
+            en.poisonStacks = (en.poisonStacks || 0) + 2;
+          }
+          visualEvents.push({
+            id: `ev_${ts}_pic_smoke_${player.id}`,
+            kind: 'SHIELD_PLAYER',
+            targetType: 'PLAYER',
+            targetId: player.id,
+            value: 5,
+            label: `+2 COMBO (${player.classResource}/3) · +5 ARM`,
+            sublabel: 'VELO DE HUMO · +2 VENENO ENEMIGO',
+            color: '#48C78E',
+            statusType: 'SHIELDED',
+            vfxStyle: 'shield',
+          });
+          logParts.push(
+            `${player.name} despliega ${abilityName}: gana +2 COMBO, +5 ARMADURA y envenena a los enemigos.`
+          );
+        } else if (ability.id === 'pacto_de_ceniza') {
+          // Nigromante Pacto de Hueso y Ceniza: sacrifica 4 PV, gana +3 ESENCIA, +6 Escudo grupal y Maldición
+          const sacCost = Math.min(4, Math.max(0, player.hp - 1));
+          player.hp = Math.max(1, player.hp - sacCost);
+          player.classResource = Math.min(6, (player.classResource ?? 0) + 3);
+          for (const p of room.players) {
+            if (!p.isDead && p.hp > 0) {
+              p.armor = Math.min(24, p.armor + 6);
+              applyStatusEffectToPlayer(p, 'SHIELDED', player.id, currentTurn, 2);
+            }
+          }
+          for (const en of livingEnemies) {
+            en.curseTurns = (en.curseTurns || 0) + 2;
+            en.vulnerableTurns = (en.vulnerableTurns || 0) + 2;
+          }
+          visualEvents.push({
+            id: `ev_${ts}_nig_pact_${player.id}`,
+            kind: 'SHIELD_PLAYER',
+            targetType: 'PLAYER',
+            targetId: player.id,
+            value: 6,
+            label: `+3 ESENCIA (${player.classResource}/6) · +6 ARM ÓSEA`,
+            sublabel: `PACTO DE SANGRE (-${sacCost} PV) · MALDICE ENEMIGOS`,
+            color: '#9B72CF',
+            statusType: 'SHIELDED',
+            vfxStyle: 'arcane',
+          });
+          logParts.push(
+            `${player.name} sella ${abilityName} (-${sacCost} PV): cosecha +3 ESENCIA, otorga +6 ARMADURA ÓSEA al grupo y maldice a los enemigos.`
+          );
+        } else if (ability.id === 'elixir_transmutado' || ability.id === 'destilado_vital') {
+          player.classResource = Math.min(3, (player.classResource ?? 0) + 2);
           const baseHeal = ability.healAmount || ability.power || 15;
-          const healAmt = Math.round((baseHeal + magStat * 0.9) * healMult);
+          const healAmt = Math.round((baseHeal + magStat * 0.9 + effStats.willpower * 0.7) * healMult);
           const extraPurify = playerHasRelic(
             player,
             room.partyRelics || [],
@@ -4118,9 +4434,15 @@ export class LaCriptaServer {
             `${player.name} destila ${abilityName}: restaura +${healAmt} PV al grupo, purifica aflicciones y aplica REGENERACIÓN.`
           );
         } else {
-          // Luz del Relicario or any pure healing/blessing ability
+          // Luz del Relicario / Balada del Valor or any pure healing/blessing ability
+          if (player.characterId === 'clerigo') {
+            player.classResource = Math.min(5, (player.classResource ?? 0) + 2);
+          } else if (player.characterId === 'bardo') {
+            player.classResource = Math.min(4, (player.classResource ?? 0) + 1);
+          }
           const baseHeal = ability.healAmount || ability.power || 18;
-          const healAmt = Math.round((baseHeal + magStat * 1.1) * healMult);
+          const fervorBonus = player.characterId === 'clerigo' ? 1 + (player.classResource || 0) * 0.08 : 1;
+          const healAmt = Math.round((baseHeal + magStat * 1.1 + effStats.willpower * 0.8) * healMult * fervorBonus);
           for (const p of room.players) {
             if (!p.isDead && p.hp > 0) {
               p.hp = Math.min(p.maxHp, p.hp + healAmt);
@@ -4149,6 +4471,68 @@ export class LaCriptaServer {
         }
       } else {
         // CASE B: OFFENSIVE / TACTICAL DEBUFF CLASS ABILITIES
+        // Consume or generate class resources for all 9 classes
+        const maxRes = charDef?.classResource?.maxValue || 5;
+        const currRes = player.classResource ?? (charDef?.classResource?.initialValue || 0);
+        let consumedFullResource = false;
+
+        if (ability.id === 'quebrantahuesos') {
+          consumedFullResource = currRes >= 75;
+          player.classResource = Math.max(0, currRes - 50);
+          const selfHeal = Math.min(18, Math.max(6, Math.round((player.maxHp - player.hp) * 0.28)));
+          if (selfHeal > 0 && player.hp < player.maxHp) {
+            player.hp = Math.min(player.maxHp, player.hp + selfHeal);
+            visualEvents.push({
+              id: `ev_${ts}_queb_self_${player.id}`,
+              kind: 'HEAL_PLAYER',
+              targetType: 'PLAYER',
+              targetId: player.id,
+              sourcePlayerId: player.id,
+              value: selfHeal,
+              label: `+${selfHeal} PV (SED DE BATALLA)`,
+              color: '#D85A4A',
+              vfxStyle: 'heal',
+            });
+          }
+        } else if (ability.id === 'hachazo_brutal') {
+          player.classResource = Math.min(100, currRes + 25);
+        } else if (ability.id === 'tajo_de_antorcha' || ability.id === 'embate_de_paves') {
+          consumedFullResource = currRes >= 3;
+          player.classResource = 0;
+        } else if (ability.id === 'llama_sepulcral' || ability.id === 'descarga_arcana') {
+          const nextCharge = Math.min(5, currRes + 2);
+          player.classResource = nextCharge;
+          if (nextCharge >= 5) {
+            consumedFullResource = true;
+            // Sobrecarga Arcana: +35% power, slight 2 HP arcane recoil
+            player.hp = Math.max(1, player.hp - 2);
+          }
+        } else if (ability.id === 'filo_artero' || ability.id === 'ejecucion_carmesi') {
+          consumedFullResource = currRes >= 3;
+          player.classResource = 0;
+        } else if (ability.id === 'marca_de_presa') {
+          player.classResource = Math.min(3, currRes + 2);
+        } else if (ability.id === 'virote_de_plata' || ability.id === 'tiro_perforante') {
+          consumedFullResource = currRes >= 3;
+          player.classResource = 0;
+        } else if (ability.id === 'plegaria_de_ceniza' || ability.id === 'juicio_del_alba') {
+          consumedFullResource = currRes >= 3;
+          player.classResource = 0;
+        } else if (ability.id === 'frasco_corrosivo' || ability.id === 'reaccion_en_cadena') {
+          consumedFullResource = currRes >= 2;
+          player.classResource = currRes > 0 ? 0 : 1;
+        } else if (ability.id === 'acorde_disonante') {
+          player.classResource = Math.min(4, currRes + 1);
+        } else if (ability.id === 'coda_del_eclipse') {
+          consumedFullResource = currRes >= 3;
+          player.classResource = 0;
+        } else if (ability.id === 'drenaje_umbrio' || ability.id === 'cosecha_de_almas') {
+          player.classResource = Math.min(6, currRes + 2);
+        } else if (ability.id === 'explosion_cadaverica' || ability.id === 'explosion_osea') {
+          consumedFullResource = currRes >= 4;
+          player.classResource = 0;
+        }
+
         let hitTargets: CriptaRoomEnemy[] = [target];
         if (ability.targetRule === 'ALL_ENEMIES') {
           hitTargets = [...livingEnemies];
@@ -4171,7 +4555,12 @@ export class LaCriptaServer {
             i > 0 && (ability.targetRule === 'CHAIN_2' || ability.targetRule === 'CLEAVE_2'),
             ability.id
           );
-          const dmg = Math.max(4, Math.round(rolledAb.damage * dmgMultiplier));
+          let dmg = Math.max(4, Math.round(rolledAb.damage * dmgMultiplier));
+          if (ability.id === 'quebrantahuesos' && consumedFullResource) {
+            dmg = Math.round(dmg * 1.25);
+          } else if (ability.id === 'explosion_osea' && consumedFullResource) {
+            dmg = Math.round(dmg * 1.3);
+          }
           const abIsCrit = rolledAb.isCrit || isCrit;
           const prevTargetHp = en.hp;
           en.hp = Math.max(0, en.hp - dmg);
@@ -4195,8 +4584,11 @@ export class LaCriptaServer {
                 statusType: 'VULNERABLE',
               });
             }
-            // Embate de Escudo interrupts enemy telegraphed heavy attack!
-            if (ability.id === 'embate_de_escudo' && en.memory?.preparedAbilityId) {
+            // Embate de Escudo or Quebrantahuesos interrupts enemy telegraphed heavy attack!
+            if (
+              (ability.id === 'embate_de_escudo' || ability.id === 'quebrantahuesos') &&
+              en.memory?.preparedAbilityId
+            ) {
               en.memory.preparedAbilityId = null;
               en.preparedTelegraphLabel = undefined;
               en.intent = 'ATAQUE';
@@ -4214,15 +4606,21 @@ export class LaCriptaServer {
                 statusType: 'WEAKENED',
               });
             }
+            if (ability.id === 'acorde_disonante') {
+              en.attackBuffBonus = -2;
+              en.attackBuffRounds = 2;
+            }
             if (ability.statusToApply) {
               const stDef = CRIPTA_STATUS_EFFECTS_REGISTRY[ability.statusToApply];
               if (
                 ability.statusToApply === 'POISON' ||
                 ability.statusToApply === 'BLEED' ||
-                ability.statusToApply === 'BURN'
+                ability.statusToApply === 'BURN' ||
+                ability.statusToApply === 'CORROSION'
               ) {
                 const baseStacks =
-                  ability.id === 'hoja_envenenada' || ability.id === 'bomba_corrosiva' ? 2 : 1;
+                  ability.statusStacks ||
+                  (ability.id === 'hoja_envenenada' || ability.id === 'bomba_corrosiva' ? 2 : 2);
                 const extraStacks = playerHasRelic(
                   player,
                   room.partyRelics || [],
@@ -4230,16 +4628,25 @@ export class LaCriptaServer {
                 )
                   ? 1
                   : 0;
-                const addedStacks = baseStacks + extraStacks;
-                en.poisonStacks = (en.poisonStacks || 0) + addedStacks;
+                const addedStacks = baseStacks + extraStacks + (consumedFullResource ? 1 : 0);
+                if (ability.statusToApply === 'BLEED') {
+                  en.bleedStacks = (en.bleedStacks || 0) + addedStacks;
+                } else if (ability.statusToApply === 'BURN') {
+                  en.burnStacks = (en.burnStacks || 0) + addedStacks;
+                } else if (ability.statusToApply === 'CORROSION') {
+                  en.corrosionTurns = (en.corrosionTurns || 0) + addedStacks;
+                  en.poisonStacks = (en.poisonStacks || 0) + 2;
+                } else {
+                  en.poisonStacks = (en.poisonStacks || 0) + addedStacks;
+                }
                 appliedAbStatusEvents.push({
                   id: `ev_${ts}_ab_st_${en.id}_${i}`,
                   kind: 'STATUS_APPLIED',
                   targetType: 'ENEMY',
                   targetId: en.id,
                   sourcePlayerId: player.id,
-                  label: `+${stDef?.name || 'VENENO'} (${addedStacks})`,
-                  sublabel: `${en.poisonStacks * 4} DAÑO/RONDA`,
+                  label: `+${stDef?.name || 'ESTADO'} (${addedStacks})`,
+                  sublabel: abilityName.toUpperCase(),
                   color: stDef?.visualTreatment.color || '#5EA87A',
                   statusType: ability.statusToApply,
                 });
@@ -4248,7 +4655,12 @@ export class LaCriptaServer {
                 ability.statusToApply === 'CURSE' ||
                 ability.statusToApply === 'VULNERABLE'
               ) {
-                const turnsAdded = ability.statusTurns || 2;
+                const turnsAdded = (ability.statusTurns || ability.statusStacks || 2) + (consumedFullResource ? 1 : 0);
+                if (ability.statusToApply === 'MARKED') {
+                  en.markedTurns = (en.markedTurns || 0) + turnsAdded;
+                } else if (ability.statusToApply === 'CURSE') {
+                  en.curseTurns = (en.curseTurns || 0) + turnsAdded;
+                }
                 en.vulnerableTurns = (en.vulnerableTurns || 0) + turnsAdded;
                 appliedAbStatusEvents.push({
                   id: `ev_${ts}_ab_st_${en.id}_${i}`,
@@ -4257,7 +4669,7 @@ export class LaCriptaServer {
                   targetId: en.id,
                   sourcePlayerId: player.id,
                   label: `+${stDef?.name || 'MARCADO'} (${turnsAdded}T)`,
-                  sublabel: '+20% DAÑO RECIBIDO',
+                  sublabel: '+25% DAÑO RECIBIDO',
                   color: stDef?.visualTreatment.color || '#E7A54A',
                   statusType: ability.statusToApply,
                 });
@@ -4266,7 +4678,10 @@ export class LaCriptaServer {
                 ability.statusToApply === 'FROST' ||
                 ability.statusToApply === 'BLINDED'
               ) {
-                const turnsAdded = ability.statusTurns || 2;
+                const turnsAdded = ability.statusTurns || ability.statusStacks || 2;
+                if (ability.statusToApply === 'FROST') {
+                  en.frostTurns = (en.frostTurns || 0) + turnsAdded;
+                }
                 en.attackBuffBonus = -2;
                 en.attackBuffRounds = turnsAdded;
                 appliedAbStatusEvents.push({
@@ -4390,7 +4805,13 @@ export class LaCriptaServer {
             rolledAtk.appliedOnHitStatus === 'BLEED' ||
             rolledAtk.appliedOnHitStatus === 'BURN'
           ) {
-            target.poisonStacks = (target.poisonStacks || 0) + 1;
+            if (rolledAtk.appliedOnHitStatus === 'BLEED') {
+              target.bleedStacks = (target.bleedStacks || 0) + 1;
+            } else if (rolledAtk.appliedOnHitStatus === 'BURN') {
+              target.burnStacks = (target.burnStacks || 0) + 1;
+            } else {
+              target.poisonStacks = (target.poisonStacks || 0) + 1;
+            }
             appliedAtkStatusEvents.push({
               id: `ev_${ts}_atk_ohs_${target.id}`,
               kind: 'STATUS_APPLIED',
@@ -4398,7 +4819,7 @@ export class LaCriptaServer {
               targetId: target.id,
               sourcePlayerId: player.id,
               label: `+${stDef?.name || 'VENENO'} (1)`,
-              sublabel: `${target.poisonStacks * 4} DAÑO/RONDA`,
+              sublabel: eqWeapon.weapon.name.toUpperCase(),
               color: stDef?.visualTreatment.color || '#5EA87A',
               statusType: rolledAtk.appliedOnHitStatus,
             });
@@ -4406,6 +4827,11 @@ export class LaCriptaServer {
             rolledAtk.appliedOnHitStatus === 'CURSE' ||
             rolledAtk.appliedOnHitStatus === 'MARKED'
           ) {
+            if (rolledAtk.appliedOnHitStatus === 'CURSE') {
+              target.curseTurns = (target.curseTurns || 0) + 2;
+            } else {
+              target.markedTurns = (target.markedTurns || 0) + 2;
+            }
             target.vulnerableTurns = (target.vulnerableTurns || 0) + 2;
             appliedAtkStatusEvents.push({
               id: `ev_${ts}_atk_ohv_${target.id}`,
@@ -4423,6 +4849,9 @@ export class LaCriptaServer {
             rolledAtk.appliedOnHitStatus === 'BLINDED' ||
             rolledAtk.appliedOnHitStatus === 'WEAKENED'
           ) {
+            if (rolledAtk.appliedOnHitStatus === 'FROST') {
+              target.frostTurns = (target.frostTurns || 0) + 2;
+            }
             target.attackBuffBonus = -2;
             target.attackBuffRounds = 2;
             appliedAtkStatusEvents.push({
@@ -4483,6 +4912,21 @@ export class LaCriptaServer {
 
       if (prevTargetHp > 0 && target.hp <= 0) {
         this.handleEnemyKilledSideEffects(room, activeRoom, target, visualEvents, ts);
+      }
+
+      // Generate Class Resource on Basic Attack (All 9 Classes)
+      const maxResAtk = charDef?.classResource?.maxValue || 5;
+      if (player.characterId === 'barbaro') {
+        player.classResource = Math.min(100, (player.classResource ?? 0) + (atkIsCrit ? 26 : 18));
+      } else if (player.characterId === 'bardo') {
+        player.classResource = Math.min(4, (player.classResource ?? 0) + 1);
+      } else if (player.characterId === 'nigromante') {
+        player.classResource = Math.min(6, (player.classResource ?? 0) + 1);
+      } else if (player.characterId === 'picaro') {
+        const hasBleedOrPoison = (target.bleedStacks || 0) > 0 || (target.poisonStacks || 0) > 0;
+        player.classResource = Math.min(3, (player.classResource ?? 0) + (hasBleedOrPoison ? 2 : 1));
+      } else {
+        player.classResource = Math.min(maxResAtk, (player.classResource ?? 0) + 1);
       }
 
       if (playerHasRelic(player, room.partyRelics || [], 'espina_viva') && target.hp > 0) {
@@ -4813,14 +5257,41 @@ export class LaCriptaServer {
     );
     const dmgMult = ability.damageMultiplier ?? 1.0;
 
+    const enemyVfxStyle: NonNullable<CriptaVisualEvent['vfxStyle']> =
+      ability.statusToApply === 'POISON' ||
+      enemy.statusThreat === 'POISON' ||
+      enemy.profession === 'CHAMÁN'
+        ? 'alchemy'
+        : enemy.roleTag === 'CASTER' ||
+          enemy.profession === 'CONTROLADOR' ||
+          enemy.profession === 'INVOCADOR' ||
+          ability.actionKind === 'APPLY_STATUS' ||
+          ability.statusToApply === 'CURSE' ||
+          ability.statusToApply === 'WEAKENED' ||
+          ability.statusToApply === 'VULNERABLE'
+        ? 'arcane'
+        : enemy.profession === 'TIRADOR' || enemy.profession === 'ASESINO'
+        ? 'arrow'
+        : enemy.roleTag === 'TANK' ||
+          enemy.profession === 'GUARDIÁN' ||
+          enemy.profession === 'TANQUE' ||
+          enemy.profession === 'BRUTO'
+        ? 'blunt'
+        : 'claw';
+
+    const intendedTargetNames = targetPlayers.map((tp) => tp.name).join(', ');
+
     visualEvents.push({
       id: `ev_${ts}_en_lunge_${enemy.id}`,
       kind: 'ENEMY_ATTACK',
       targetType: 'ENEMY',
       targetId: enemy.id,
       label: ability.name.toUpperCase(),
+      sublabel: intendedTargetNames
+        ? `${enemy.name.toUpperCase()} → ${intendedTargetNames.toUpperCase()}`
+        : enemy.name.toUpperCase(),
       color: '#C93B5B',
-      vfxStyle: 'claw',
+      vfxStyle: enemyVfxStyle,
     });
 
     for (let tIdx = 0; tIdx < targetPlayers.length; tIdx++) {
@@ -4852,10 +5323,25 @@ export class LaCriptaServer {
         }
       }
 
+      const targetEffStats = computePlayerEffectiveStats(targetPlayer);
+
+      // Roll AGILIDAD Evasion! High AGILIDAD allows dodging part of incoming damage & avoiding debuffs
+      const evasionSeed =
+        ((room.dungeonSeed || room.seed) +
+          currentRound * 59 +
+          enemyStepIndex * 31 +
+          tIdx * 17 +
+          targetPlayer.seatIndex * 13) >>>
+        0;
+      const evadedAttack =
+        !interceptedByProtector &&
+        targetEffStats.evasionPct > 0 &&
+        evasionSeed % 100 < targetEffStats.evasionPct;
+
       const hasFrostDebuff = Boolean(playerHasStatus(targetPlayer, 'FROST'));
       const effectiveArmor = hasFrostDebuff
-        ? Math.max(0, targetPlayer.armor - 2)
-        : targetPlayer.armor;
+        ? Math.max(0, targetEffStats.defense - 2)
+        : targetEffStats.defense;
       const shieldBuff = playerHasStatus(targetPlayer, 'SHIELDED');
       const markedDebuff = playerHasStatus(targetPlayer, 'MARKED');
 
@@ -4877,6 +5363,15 @@ export class LaCriptaServer {
         netDamage = Math.max(2, Math.round(netDamage * 0.62));
       }
 
+      // Bárbaro high-Fury recklessness (75+ FURIA: +15% damage taken for +28% damage dealt)
+      if (targetPlayer.characterId === 'barbaro' && (targetPlayer.classResource || 0) >= 75) {
+        netDamage = Math.round(netDamage * 1.15);
+      }
+
+      if (evadedAttack) {
+        netDamage = Math.max(1, Math.round(netDamage * 0.35));
+      }
+
       if (markedDebuff) {
         netDamage = Math.round(netDamage * 1.35);
         targetPlayer.statuses = targetPlayer.statuses.filter((s) => s.effectType !== 'MARKED');
@@ -4887,18 +5382,30 @@ export class LaCriptaServer {
       if (!room.runStats) room.runStats = buildDefaultRunStats();
       room.runStats.damageReceived += netDamage;
 
+      // Bárbaro gains FURIA when taking damage!
+      if (targetPlayer.characterId === 'barbaro' && targetPlayer.hp > 0) {
+        targetPlayer.classResource = Math.min(
+          100,
+          (targetPlayer.classResource ?? 0) + Math.min(25, Math.max(10, Math.round(netDamage * 1.1)))
+        );
+      } else if (targetPlayer.characterId === 'caballero' && targetPlayer.hp > 0) {
+        targetPlayer.classResource = Math.min(5, (targetPlayer.classResource ?? 0) + 1);
+      }
+
       visualEvents.push({
         id: `ev_${ts}_p_hit_${targetPlayer.id}_${tIdx}`,
         kind: 'DAMAGE_PLAYER',
         targetType: 'PLAYER',
         targetId: targetPlayer.id,
         value: -netDamage,
-        label: `-${netDamage} PV`,
+        label: evadedAttack ? `¡ESQUIVA ÁGIL! -${netDamage} PV` : `-${netDamage} PV`,
         sublabel: interceptedByProtector
           ? `INTERCEPTÓ POR ALIADO · ${ability.name.toUpperCase()}`
+          : evadedAttack
+          ? `AGILIDAD (${targetEffStats.evasionPct}%) REDUJO EL GOLPE`
           : `${enemy.name.toUpperCase()} · ${ability.name.toUpperCase()}`,
-        color: '#C93B5B',
-        vfxStyle: 'claw',
+        color: evadedAttack ? '#38BDF8' : '#C93B5B',
+        vfxStyle: enemyVfxStyle,
       });
 
       // Relic: Espina Viva reflects 3 damage to attacker
@@ -4924,35 +5431,53 @@ export class LaCriptaServer {
         }
       }
 
-      // Apply status if ability specifies statusToApply
+      // Apply status if ability specifies statusToApply (Checked against VOLUNTAD Status Resistance & Evasion!)
       let statusLog = '';
-      if (targetPlayer.hp > 0 && ability.statusToApply) {
-        const applied = applyStatusEffectToPlayer(
-          targetPlayer,
-          ability.statusToApply,
-          enemy.id,
-          currentRound,
-          ability.statusTurns || 2
-        );
-        if (applied) {
-          if (
-            this.hasPartyRelic(room, 'sello_del_vacio') &&
-            (applied.effectType === 'CONFUSION' || applied.effectType === 'CURSE')
-          ) {
-            applied.remainingTurns = Math.max(1, applied.remainingTurns - 1);
-          }
-          const sDef = CRIPTA_STATUS_EFFECTS_REGISTRY[applied.effectType];
-          statusLog = ` y aplica ${applied.name} (${applied.remainingTurns}T)`;
+      if (targetPlayer.hp > 0 && ability.statusToApply && !evadedAttack) {
+        const resistSeed = (evasionSeed + 43) >>> 0;
+        const resistedByWillpower =
+          targetEffStats.statusResistPct > 0 &&
+          resistSeed % 100 < targetEffStats.statusResistPct;
+
+        if (resistedByWillpower) {
+          statusLog = ` (¡${targetPlayer.name} RESISTIÓ ${ability.statusToApply} con VOLUNTAD!)`;
           visualEvents.push({
-            id: `ev_${ts}_st_${targetPlayer.id}_${tIdx}`,
+            id: `ev_${ts}_res_${targetPlayer.id}_${tIdx}`,
             kind: 'STATUS_APPLIED',
             targetType: 'PLAYER',
             targetId: targetPlayer.id,
-            label: `+${applied.name} (${applied.remainingTurns}T)`,
-            sublabel: ability.name,
-            color: sDef?.visualTreatment.color || '#E7A54A',
-            statusType: applied.effectType,
+            label: '¡RESISTIDO! (VOLUNTAD)',
+            sublabel: `${targetEffStats.statusResistPct}% RES. ESTADOS`,
+            color: '#C084FC',
           });
+        } else {
+          const applied = applyStatusEffectToPlayer(
+            targetPlayer,
+            ability.statusToApply,
+            enemy.id,
+            currentRound,
+            ability.statusTurns || 2
+          );
+          if (applied) {
+            if (
+              this.hasPartyRelic(room, 'sello_del_vacio') &&
+              (applied.effectType === 'CONFUSION' || applied.effectType === 'CURSE')
+            ) {
+              applied.remainingTurns = Math.max(1, applied.remainingTurns - 1);
+            }
+            const sDef = CRIPTA_STATUS_EFFECTS_REGISTRY[applied.effectType];
+            statusLog = ` y aplica ${applied.name} (${applied.remainingTurns}T)`;
+            visualEvents.push({
+              id: `ev_${ts}_st_${targetPlayer.id}_${tIdx}`,
+              kind: 'STATUS_APPLIED',
+              targetType: 'PLAYER',
+              targetId: targetPlayer.id,
+              label: `+${applied.name} (${applied.remainingTurns}T)`,
+              sublabel: ability.name,
+              color: sDef?.visualTreatment.color || '#E7A54A',
+              statusType: applied.effectType,
+            });
+          }
         }
       }
 
@@ -4967,6 +5492,16 @@ export class LaCriptaServer {
         targetPlayer.isDead = true;
         targetPlayer.deathsCount = (targetPlayer.deathsCount || 0) + 1;
         targetPlayer.statuses = [];
+        visualEvents.push({
+          id: `ev_${ts}_p_death_${targetPlayer.id}`,
+          kind: 'PLAYER_DEATH',
+          targetType: 'PLAYER',
+          targetId: targetPlayer.id,
+          label: `¡${targetPlayer.name.toUpperCase()} HA CAÍDO!`,
+          sublabel: `DERROTADO POR ${enemy.name.toUpperCase()}`,
+          color: '#E03E52',
+          vfxStyle: 'explosion',
+        });
         logParts.push(`¡${targetPlayer.name} ha CAÍDO en combate!`);
         this.broadcastMessage(room, {
           type: 'NOTIFICATION',
@@ -4986,7 +5521,14 @@ export class LaCriptaServer {
       ts
     );
 
-    if (this.checkAndApplyPartyDefeat(room)) {
+    if (
+      this.checkAndApplyPartyDefeat(
+        room,
+        `Derrotados por ${enemy.name} (${ability.name})`,
+        enemy.name,
+        visualEvents
+      )
+    ) {
       logParts.push('¡TODA LA EXPEDICIÓN HA CAÍDO EN LA CRIPTA!');
     }
 
@@ -5008,7 +5550,7 @@ export class LaCriptaServer {
     const visualEvents: CriptaVisualEvent[] = [];
     const logParts: string[] = [];
 
-    // 1. Resolve enemy end-of-round Poison stacks & decrement temporary buffs/vulnerability
+    // 1. Resolve enemy end-of-round Poison, Bleed, Burn stacks & decrement temporary buffs/debuffs
     for (const enemy of activeRoom.enemies) {
       if (enemy.hp <= 0) continue;
       if ((enemy.poisonStacks || 0) > 0) {
@@ -5032,8 +5574,62 @@ export class LaCriptaServer {
           this.handleEnemyKilledSideEffects(room, activeRoom, enemy, visualEvents, ts);
         }
       }
+      if (enemy.hp > 0 && (enemy.bleedStacks || 0) > 0) {
+        const bDmg = enemy.bleedStacks! * 4;
+        const prevHp = enemy.hp;
+        enemy.hp = Math.max(0, enemy.hp - bDmg);
+        if (!room.runStats) room.runStats = buildDefaultRunStats();
+        room.runStats.damageDealt += bDmg;
+        visualEvents.push({
+          id: `ev_${ts}_en_bleed_${enemy.id}`,
+          kind: 'DAMAGE_ENEMY',
+          targetType: 'ENEMY',
+          targetId: enemy.id,
+          value: -bDmg,
+          label: `-${bDmg} PV (SANGRADO)`,
+          color: '#E03E52',
+        });
+        logParts.push(`${enemy.name} sufre -${bDmg} PV por sangrado.`);
+        enemy.bleedStacks = Math.max(0, (enemy.bleedStacks || 0) - 1);
+        if (prevHp > 0 && enemy.hp <= 0) {
+          this.handleEnemyKilledSideEffects(room, activeRoom, enemy, visualEvents, ts);
+        }
+      }
+      if (enemy.hp > 0 && (enemy.burnStacks || 0) > 0) {
+        const burnDmg = enemy.burnStacks! * 5;
+        const prevHp = enemy.hp;
+        enemy.hp = Math.max(0, enemy.hp - burnDmg);
+        if (!room.runStats) room.runStats = buildDefaultRunStats();
+        room.runStats.damageDealt += burnDmg;
+        visualEvents.push({
+          id: `ev_${ts}_en_burn_${enemy.id}`,
+          kind: 'DAMAGE_ENEMY',
+          targetType: 'ENEMY',
+          targetId: enemy.id,
+          value: -burnDmg,
+          label: `-${burnDmg} PV (QUEMADURA)`,
+          color: '#F59E0B',
+        });
+        logParts.push(`${enemy.name} sufre -${burnDmg} PV por quemadura.`);
+        enemy.burnStacks = Math.max(0, (enemy.burnStacks || 0) - 1);
+        if (prevHp > 0 && enemy.hp <= 0) {
+          this.handleEnemyKilledSideEffects(room, activeRoom, enemy, visualEvents, ts);
+        }
+      }
       if ((enemy.vulnerableTurns || 0) > 0) {
         enemy.vulnerableTurns = Math.max(0, enemy.vulnerableTurns! - 1);
+      }
+      if ((enemy.markedTurns || 0) > 0) {
+        enemy.markedTurns = Math.max(0, enemy.markedTurns! - 1);
+      }
+      if ((enemy.curseTurns || 0) > 0) {
+        enemy.curseTurns = Math.max(0, enemy.curseTurns! - 1);
+      }
+      if ((enemy.corrosionTurns || 0) > 0) {
+        enemy.corrosionTurns = Math.max(0, enemy.corrosionTurns! - 1);
+      }
+      if ((enemy.frostTurns || 0) > 0) {
+        enemy.frostTurns = Math.max(0, enemy.frostTurns! - 1);
       }
       if ((enemy.attackBuffRounds || 0) > 0) {
         enemy.attackBuffRounds = Math.max(0, enemy.attackBuffRounds! - 1);
@@ -5102,6 +5698,16 @@ export class LaCriptaServer {
         logParts.push(`[${player.name}: ${tickResult.logSegments.join(' · ')}]`);
       }
       if (tickResult.diedFromStatus) {
+        visualEvents.push({
+          id: `ev_${ts}_p_death_dot_${player.id}`,
+          kind: 'PLAYER_DEATH',
+          targetType: 'PLAYER',
+          targetId: player.id,
+          label: `¡${player.name.toUpperCase()} HA CAÍDO!`,
+          sublabel: 'CONSUMIDO POR AFLICCIÓN',
+          color: '#E03E52',
+          vfxStyle: 'explosion',
+        });
         this.broadcastMessage(room, {
           type: 'NOTIFICATION',
           text: `¡${player.name} ha caído por sus aflicciones!`,
@@ -5130,7 +5736,14 @@ export class LaCriptaServer {
       }
     }
 
-    if (this.checkAndApplyPartyDefeat(room)) {
+    if (
+      this.checkAndApplyPartyDefeat(
+        room,
+        'Consumidos por aflicciones letales al final de la ronda',
+        'Aflicción Letal',
+        visualEvents
+      )
+    ) {
       logParts.push('¡TODA LA EXPEDICIÓN HA CAÍDO EN LA CRIPTA!');
       activeRoom.outcomeLog = logParts.join(' ');
       room.isResolvingRound = false;
@@ -5508,27 +6121,32 @@ export class LaCriptaServer {
         if (!p.isDead && p.hp > 0) {
           p.bonusAttack = (p.bonusAttack || 0) + 1;
           p.bonusMagic = (p.bonusMagic || 0) + 1;
+          p.bonusPrecision = (p.bonusPrecision || 0) + 1;
           p.hp = Math.min(p.maxHp, p.hp + 12);
           applyStatusEffectToPlayer(p, 'BLESSED', 'rest_train', 1, 2);
         }
       }
       pushPartyStatEvents(12, 0, 1, 1, 'BLESSED', false);
     } else if (opt.id.includes('shrine_blessing')) {
+      const actorEff = computePlayerEffectiveStats(player);
+      const willBonusHeal = Math.floor(actorEff.willpower * 0.8);
       for (const p of room.players) {
         if (!p.isDead && p.hp > 0) {
-          p.hp = Math.min(p.maxHp, p.hp + 22);
+          p.hp = Math.min(p.maxHp, p.hp + 22 + willBonusHeal);
           p.armor = Math.min(24, p.armor + 3);
           p.bonusMagic = (p.bonusMagic || 0) + 1;
+          p.bonusWillpower = (p.bonusWillpower || 0) + 1;
           purifyPlayerDebuffs(p, 99);
           applyStatusEffectToPlayer(p, 'BLESSED', 'shrine', 1, 3);
         }
       }
-      pushPartyStatEvents(22, 3, 0, 1, 'BLESSED', true);
+      pushPartyStatEvents(22 + willBonusHeal, 3, 0, 1, 'BLESSED', true);
     } else if (opt.id.includes('shrine_forge')) {
       for (const p of room.players) {
         if (!p.isDead && p.hp > 0) {
           p.hp = Math.min(p.maxHp, p.hp + 15);
           p.armor = Math.min(24, p.armor + 2);
+          p.bonusPrecision = (p.bonusPrecision || 0) + 1;
           applyStatusEffectToPlayer(p, 'SHIELDED', 'shrine_forge', 1, 3);
         }
       }
@@ -5537,9 +6155,13 @@ export class LaCriptaServer {
       }
       pushPartyStatEvents(15, 2, 0, 0, 'SHIELDED', false);
     } else if (opt.id.includes('event_relic_trial')) {
+      const actorEff = computePlayerEffectiveStats(player);
+      // High VOLUNTAD reduces health sacrifice in dark/occult trials!
+      const trialHpCost = Math.max(3, 10 - Math.floor(actorEff.willpower * 0.6));
       room.partyGold = (room.partyGold ?? 0) + 20;
       room.runStats.goldEarned += 20;
-      player.hp = Math.max(4, player.hp - 10);
+      player.hp = Math.max(4, player.hp - trialHpCost);
+      player.bonusWillpower = (player.bonusWillpower || 0) + 1;
       const trialRelicId = pickUnownedRelic(
         (room.dungeonSeed || room.seed) + activeRoom.index * 53 + ts,
         2,
@@ -5554,11 +6176,13 @@ export class LaCriptaServer {
         kind: 'DAMAGE_PLAYER',
         targetType: 'PLAYER',
         targetId: player.id,
-        value: -10,
-        label: '-10 PV (PRUEBA DEL RELICARIO)',
+        value: -trialHpCost,
+        label: `-${trialHpCost} PV (TEMPLADO POR VOLUNTAD +1 VOL)`,
         color: '#C93B5B',
       });
     } else if (opt.id.includes('shrine_pact')) {
+      const actorEff = computePlayerEffectiveStats(player);
+      const pactHpCost = Math.max(3, 8 - Math.floor(actorEff.willpower * 0.5));
       room.partyGold = (room.partyGold ?? 0) + 55;
       room.runStats.goldEarned += 55;
       visualEvents.push({
@@ -5573,13 +6197,14 @@ export class LaCriptaServer {
       });
       for (const p of room.players) {
         if (!p.isDead && p.hp > 0) {
-          p.hp = Math.max(4, p.hp - 8);
+          p.hp = Math.max(4, p.hp - pactHpCost);
           p.armor = Math.min(24, p.armor + 4);
           p.bonusAttack = (p.bonusAttack || 0) + 2;
+          p.bonusWillpower = (p.bonusWillpower || 0) + 1;
           applyStatusEffectToPlayer(p, 'BLEED', 'shrine_pact', 1, 2);
         }
       }
-      pushPartyStatEvents(-8, 4, 2, 0, 'BLEED', false);
+      pushPartyStatEvents(-pactHpCost, 4, 2, 0, 'BLEED', false);
     } else if (opt.id.includes('shop_elixir')) {
       for (const p of room.players) {
         if (!p.isDead && p.hp > 0) {
@@ -5636,15 +6261,31 @@ export class LaCriptaServer {
       }
       pushPartyStatEvents(18, 0, 1, 1, 'BLESSED', false);
     } else if (opt.id.includes('trap_disarm')) {
-      room.partyGold = (room.partyGold ?? 0) + 20;
-      room.runStats.goldEarned += 20;
+      // AGILIDAD and PRECISIÓN increase trap disarm gold and grant +1 AGILIDAD
+      const maxPartyAgiPre = Math.max(
+        ...room.players
+          .filter((p) => !p.isDead && p.hp > 0)
+          .map((p) => {
+            const eff = computePlayerEffectiveStats(p);
+            return eff.agility + eff.precision;
+          }),
+        10
+      );
+      const trapGold = 20 + Math.min(20, Math.max(0, (maxPartyAgiPre - 10) * 2));
+      room.partyGold = (room.partyGold ?? 0) + trapGold;
+      room.runStats.goldEarned += trapGold;
+      for (const p of room.players) {
+        if (!p.isDead && p.hp > 0) {
+          p.bonusAgility = (p.bonusAgility || 0) + 1;
+        }
+      }
       visualEvents.push({
         id: `ev_${ts}_gold`,
         kind: 'GAIN_GOLD',
         targetType: 'PARTY',
-        value: 20,
-        label: '+20 ORO',
-        sublabel: 'TRAMPA DESACTIVADA',
+        value: trapGold,
+        label: `+${trapGold} ORO · +1 AGILIDAD`,
+        sublabel: 'TRAMPA DESACTIVADA CON PRECISIÓN',
         color: '#E7A54A',
         vfxStyle: 'gold',
       });
@@ -5652,20 +6293,27 @@ export class LaCriptaServer {
       const trapStDef = CRIPTA_STATUS_EFFECTS_REGISTRY[threatProfile.trapStatus];
       for (const p of room.players) {
         if (!p.isDead && p.hp > 0) {
-          p.hp = Math.max(4, p.hp - 6);
+          const pEff = computePlayerEffectiveStats(p);
+          // High AGILIDAD or DEFENSA reduces trap damage!
+          const trapDmg = Math.max(2, 6 - Math.floor((pEff.agility + pEff.defense) / 6));
+          p.hp = Math.max(4, p.hp - trapDmg);
           p.armor = Math.min(24, p.armor + 2);
-          applyStatusEffectToPlayer(p, threatProfile.trapStatus, 'trap', 1);
+          // High VOLUNTAD can resist the trap affliction!
+          const resistedTrapStatus = pEff.willpower >= 7;
+          if (!resistedTrapStatus) {
+            applyStatusEffectToPlayer(p, threatProfile.trapStatus, 'trap', 1);
+          }
           visualEvents.push(
             {
               id: `ev_${ts}_trap_dmg_${p.id}`,
               kind: 'DAMAGE_PLAYER',
               targetType: 'PLAYER',
               targetId: p.id,
-              value: -6,
-              label: '-6 PV',
-              sublabel: `+${trapStDef.name}`,
+              value: -trapDmg,
+              label: `-${trapDmg} PV`,
+              sublabel: resistedTrapStatus ? '¡AFLICCIÓN RESISTIDA (VOLUNTAD)!' : `+${trapStDef.name}`,
               color: '#C93B5B',
-              statusType: threatProfile.trapStatus,
+              statusType: resistedTrapStatus ? undefined : threatProfile.trapStatus,
             },
             {
               id: `ev_${ts}_trap_arm_${p.id}`,
@@ -5889,7 +6537,7 @@ export class LaCriptaServer {
     if (!room.runStats) room.runStats = buildDefaultRunStats();
 
     if (obj.objectKind === 'SKULL' || obj.objectKind === 'SKELETON') {
-      const goldFound = 14;
+      const goldFound = 10;
       room.partyGold = (room.partyGold ?? 0) + goldFound;
       room.runStats.goldEarned += goldFound;
       obj.outcomeSummary = `+${goldFound} ORO hallado por ${player.name}`;
@@ -6113,8 +6761,225 @@ export class LaCriptaServer {
       };
 
       const currentMeter = mg.alchemicalMeter ?? 20;
-      const maxMistakes = mg.maxMistakes ?? 2;
+      const maxMistakes = mg.maxMistakes ?? 3;
       const family = mg.family;
+
+      // 0. WHEEL_OF_FORTUNE (8-sector Biome Wheel of Fortune)
+      if (mg.minigameType === 'WHEEL_OF_FORTUNE') {
+        const targetSeq = mg.targetSequence || mg.targetPattern || [];
+        const authoritativeSectorIdx =
+          typeof runeIndex === 'number' && runeIndex >= 0 && runeIndex < 8
+            ? runeIndex
+            : typeof targetSeq[0] === 'number'
+            ? targetSeq[0] % 8
+            : Math.abs(room.seed + ts + activeRoom.index * 53) % 8;
+
+        mg.wheelOutcomeIndex = authoritativeSectorIdx;
+        mg.rouletteLandedSectorIndex = authoritativeSectorIdx;
+        mg.rouletteSpinStartedAt = ts;
+        mg.completed = true;
+        activeRoom.resolved = true;
+        activeRoom.state = 'RESOLVED';
+        activeRoom.lifecyclePhase = 'READY_TO_LEAVE';
+        if (activeRoom.puzzleRunes) {
+          activeRoom.puzzleRunes.solved = true;
+        }
+
+        switch (authoritativeSectorIdx) {
+          case 0: {
+            // +45 ORO
+            mg.succeeded = true;
+            mg.wheelOutcomeLabel = 'Arca del Tesoro Real (+45 ORO)';
+            mg.rewardSummary = '+45 ORO · ARCA DEL TESORO REAL';
+            room.partyGold = (room.partyGold ?? 0) + 45;
+            room.runStats.goldEarned += 45;
+            visualEvents.push({
+              id: `ev_${ts}_wof_0`,
+              kind: 'GAIN_GOLD',
+              targetType: 'PARTY',
+              value: 45,
+              label: '+45 ORO',
+              sublabel: 'RUEDA DEL DESTINO',
+              color: '#FFD166',
+              vfxStyle: 'gold',
+            });
+            activeRoom.outcomeLog = `¡${player.name} gira la Rueda del Destino! Resultado: Arca del Tesoro Real (+45 ORO).`;
+            break;
+          }
+          case 1: {
+            // +24 VIDA & Purify
+            mg.succeeded = true;
+            mg.wheelOutcomeLabel = 'Fuente Restauradora (+24 PV y Purificación)';
+            mg.rewardSummary = '+24 PV · PURIFICACIÓN GRUPAL';
+            for (const p of room.players) {
+              if (!p.isDead && p.hp > 0) {
+                p.hp = Math.min(p.maxHp, p.hp + 24);
+                room.runStats.healingDone += 24;
+                purifyPlayerDebuffs(p, 99);
+                visualEvents.push({
+                  id: `ev_${ts}_wof_1_${p.id}`,
+                  kind: 'HEAL_PLAYER',
+                  targetType: 'PLAYER',
+                  targetId: p.id,
+                  value: 24,
+                  label: '+24 PV',
+                  sublabel: 'FUENTE RESTAURADORA',
+                  color: '#4ADE80',
+                  vfxStyle: 'heal',
+                });
+              }
+            }
+            activeRoom.outcomeLog = `¡${player.name} gira la Rueda del Destino! Resultado: Fuente Restauradora (+24 PV y Purificación).`;
+            break;
+          }
+          case 2: {
+            // PACTO (-8 PV / +35 ORO & +1 ATQ)
+            mg.succeeded = true;
+            mg.wheelOutcomeLabel = 'Tributo de Sangre (-8 PV, +35 ORO y +1 ATAQUE)';
+            mg.rewardSummary = '+35 ORO · +1 ATAQUE · -8 PV (TRIBUTO)';
+            room.partyGold = (room.partyGold ?? 0) + 35;
+            room.runStats.goldEarned += 35;
+            for (const p of room.players) {
+              if (!p.isDead && p.hp > 0) {
+                p.hp = Math.max(4, p.hp - 8);
+                p.bonusAttack = (p.bonusAttack || 0) + 1;
+              }
+            }
+            visualEvents.push({
+              id: `ev_${ts}_wof_2`,
+              kind: 'GAIN_GOLD',
+              targetType: 'PARTY',
+              value: 35,
+              label: '+35 ORO · +1 ATQ (-8 PV)',
+              sublabel: 'PACTO DE LA RUEDA',
+              color: '#F87171',
+              vfxStyle: 'gold',
+            });
+            activeRoom.outcomeLog = `¡${player.name} gira la Rueda del Destino! Resultado: Tributo de Sangre (-8 PV a cambio de +35 ORO y +1 ATAQUE).`;
+            break;
+          }
+          case 3: {
+            // +2 ATQ / +2 DEF & ESCUDO
+            mg.succeeded = true;
+            mg.wheelOutcomeLabel = 'Temple de Batalla (+2 ATAQUE, +2 ARMADURA y ESCUDO)';
+            mg.rewardSummary = '+2 ATAQUE · +2 ARMADURA · ESCUDO';
+            for (const p of room.players) {
+              if (!p.isDead && p.hp > 0) {
+                p.bonusAttack = (p.bonusAttack || 0) + 2;
+                p.armor = Math.min(24, p.armor + 2);
+                applyStatusEffectToPlayer(p, 'SHIELDED', 'roulette', 1, 3);
+                visualEvents.push({
+                  id: `ev_${ts}_wof_3_${p.id}`,
+                  kind: 'GAIN_DEFENSE',
+                  targetType: 'PLAYER',
+                  targetId: p.id,
+                  value: 2,
+                  label: '+2 ATQ / +2 DEF',
+                  sublabel: '+ESCUDO (3T)',
+                  color: '#60A5FA',
+                  vfxStyle: 'shield',
+                });
+              }
+            }
+            activeRoom.outcomeLog = `¡${player.name} gira la Rueda del Destino! Resultado: Temple de Batalla (+2 ATAQUE, +2 ARMADURA y ESCUDO).`;
+            break;
+          }
+          case 4: {
+            // RELIQUIA / +2 MAGIA
+            mg.succeeded = true;
+            mg.wheelOutcomeLabel = 'Favor del Oráculo (Reliquia Ancestral +2 MAGIA)';
+            mg.rewardSummary = 'RELIQUIA ANCESTRAL · +2 MAGIA';
+            const relicId = pickUnownedRelic(
+              (room.dungeonSeed || room.seed) + activeRoom.index * 91 + ts,
+              2,
+              room.players,
+              room.partyRelics || []
+            );
+            if (relicId) {
+              this.grantRelicAuthoritatively(room, player, relicId, visualEvents);
+            }
+            for (const p of room.players) {
+              if (!p.isDead && p.hp > 0) {
+                p.bonusMagic = (p.bonusMagic || 0) + 2;
+              }
+            }
+            activeRoom.outcomeLog = `¡${player.name} gira la Rueda del Destino! Resultado: Favor del Oráculo (Reliquia Ancestral y +2 MAGIA).`;
+            break;
+          }
+          case 5: {
+            // POCIÓN + 20 ORO
+            mg.succeeded = true;
+            mg.wheelOutcomeLabel = 'Alijo del Boticario (Poción de Curación + 20 ORO)';
+            mg.rewardSummary = 'POCIÓN DE CURACIÓN · +20 ORO';
+            room.partyGold = (room.partyGold ?? 0) + 20;
+            room.runStats.goldEarned += 20;
+            this.grantNormalItemAuthoritatively(
+              room,
+              player,
+              'pocion_curacion',
+              'CHEST',
+              'WHEEL_OF_FORTUNE',
+              undefined,
+              visualEvents
+            );
+            activeRoom.outcomeLog = `¡${player.name} gira la Rueda del Destino! Resultado: Alijo del Boticario (Poción de Curación y +20 ORO).`;
+            break;
+          }
+          case 6: {
+            // DESCARGA (-10 PV pero +20 ORO)
+            mg.succeeded = false;
+            mg.wheelOutcomeLabel = 'Chispazo Rúnico (-10 PV y +20 ORO residuales)';
+            mg.rewardSummary = 'DESCARGA RÚNICA (-10 PV · +20 ORO)';
+            room.partyGold = (room.partyGold ?? 0) + 20;
+            room.runStats.goldEarned += 20;
+            player.hp = Math.max(4, player.hp - 10);
+            visualEvents.push({
+              id: `ev_${ts}_wof_6_${player.id}`,
+              kind: 'DAMAGE_PLAYER',
+              targetType: 'PLAYER',
+              targetId: player.id,
+              value: -10,
+              label: '-10 PV (CHISPAZO RÚNICO)',
+              sublabel: '+20 ORO RESIDUALES',
+              color: '#EF4444',
+            });
+            activeRoom.outcomeLog = `¡${player.name} gira la Rueda del Destino! Resultado: Chispazo Rúnico (-10 PV, pero halláis +20 ORO entre las chispas).`;
+            break;
+          }
+          default: {
+            // Sector 7: ¡PREMIO MAYOR! (+55 ORO, +18 PV y BENDECIDO)
+            mg.succeeded = true;
+            mg.wheelOutcomeLabel = '¡PREMIO MAYOR! Corona de la Fortuna (+55 ORO, +18 PV y BENDECIDO)';
+            mg.rewardSummary = '¡PREMIO MAYOR! +55 ORO · +18 PV · BENDECIDO';
+            room.partyGold = (room.partyGold ?? 0) + 55;
+            room.runStats.goldEarned += 55;
+            for (const p of room.players) {
+              if (!p.isDead && p.hp > 0) {
+                p.hp = Math.min(p.maxHp, p.hp + 18);
+                room.runStats.healingDone += 18;
+                applyStatusEffectToPlayer(p, 'BLESSED', 'roulette_jackpot', 1, 3);
+              }
+            }
+            visualEvents.push({
+              id: `ev_${ts}_wof_7`,
+              kind: 'GAIN_GOLD',
+              targetType: 'PARTY',
+              value: 55,
+              label: '¡PREMIO MAYOR! +55 ORO · +18 PV',
+              sublabel: '+BENDECIDO (3T)',
+              color: '#FDE047',
+              vfxStyle: 'gold',
+            });
+            activeRoom.outcomeLog = `¡${player.name} gira la Rueda del Destino! ¡PREMIO MAYOR: +55 ORO, +18 PV y BENDECIDO para toda la expedición!`;
+            break;
+          }
+        }
+
+        this.emitVisualEventBatch(room, visualEvents, player.id, 'PUZZLE');
+        this.syncLegacyNodes(room);
+        this.broadcastRoomState(room);
+        return;
+      }
 
       // 1. CURSED_ROULETTE
       if (family === 'CURSED_ROULETTE') {
@@ -6551,17 +7416,118 @@ export class LaCriptaServer {
         }
       } else {
         mg.mistakes = (mg.mistakes ?? 0) + 1;
-        const trapDmg = mg.minigameType === 'TRAP_STEPPING' ? 7 : 5;
-        player.hp = Math.max(4, player.hp - trapDmg);
-        visualEvents.push({
-          id: `ev_${ts}_mg_fail_${player.id}`,
-          kind: 'DAMAGE_PLAYER',
-          targetType: 'PLAYER',
-          targetId: player.id,
-          value: -trapDmg,
-          label: `-${trapDmg} PV (FALLO DE MECANISMO)`,
-          color: '#C93B5B',
-        });
+        const mistakeNum = mg.mistakes;
+        mg.attemptsRemaining = Math.max(0, maxMistakes - mistakeNum);
+
+        // Varied, meaningful puzzle consequences (Sections 40-44):
+        // Mistake 1 -> Arcane Trap Shock (-8 PV + Status or Party -6 PV)
+        // Mistake 2 -> Seal Curse / Gold Tribute (-7 PV, -10 ORO & MALDICIÓN 2T)
+        // Mistake 3 (Final) -> Mechanism Collapses (-10 PV to party, seal locks with 0 bonus gold)
+        const baseTrapDmg = mg.minigameType === 'TRAP_STEPPING' ? 9 : mistakeNum >= maxMistakes ? 10 : 7;
+        const currentGold = room.partyGold ?? 0;
+
+        if (mistakeNum === 2 && currentGold >= 8) {
+          const goldLost = Math.min(currentGold, 10);
+          room.partyGold = currentGold - goldLost;
+          player.hp = Math.max(0, player.hp - baseTrapDmg);
+          if (!room.runStats) room.runStats = buildDefaultRunStats();
+          room.runStats.damageReceived += baseTrapDmg;
+          const appliedCurse = applyStatusEffectToPlayer(player, 'CURSE', 'puzzle_trap', 1, 2);
+          visualEvents.push(
+            {
+              id: `ev_${ts}_mg_gold_${player.id}`,
+              kind: 'LOSE_GOLD',
+              targetType: 'PARTY',
+              value: -goldLost,
+              label: `-${goldLost} ORO (TRIBUTO FORZADO)`,
+              color: '#E7A54A',
+              vfxStyle: 'gold',
+            },
+            {
+              id: `ev_${ts}_mg_fail_${player.id}`,
+              kind: 'DAMAGE_PLAYER',
+              targetType: 'PLAYER',
+              targetId: player.id,
+              value: -baseTrapDmg,
+              label: `-${baseTrapDmg} PV (SELLO MALDITO)`,
+              sublabel: appliedCurse ? '+MALDICIÓN (2T)' : 'DESCARGA RÚNICA',
+              color: '#C93B5B',
+            }
+          );
+          mg.lastPenaltyDetail = {
+            penaltyType: 'CURSE_DEBUFF',
+            title: 'MALDICIÓN DEL SELLO RÚNICO',
+            description: `${player.name} sufre -${baseTrapDmg} PV, recibe MALDICIÓN (2T) y el altar drena -${goldLost} ORO.`,
+            hpLost: baseTrapDmg,
+            goldLost,
+            statusApplied: 'MALDICIÓN (2T)',
+            targetPlayerName: player.name,
+            mistakeNumber: mistakeNum,
+            maxMistakes,
+            timestamp: ts,
+          };
+        } else {
+          player.hp = Math.max(0, player.hp - baseTrapDmg);
+          if (!room.runStats) room.runStats = buildDefaultRunStats();
+          room.runStats.damageReceived += baseTrapDmg;
+          const debuffType =
+            room.selectedDungeonId === 'jardin_podrido'
+              ? 'POISON'
+              : room.selectedDungeonId === 'forja_infernal'
+              ? 'BURN'
+              : 'WEAKENED';
+          const appliedSt = applyStatusEffectToPlayer(player, debuffType, 'puzzle_trap', 1, 2);
+          visualEvents.push({
+            id: `ev_${ts}_mg_fail_${player.id}`,
+            kind: 'DAMAGE_PLAYER',
+            targetType: 'PLAYER',
+            targetId: player.id,
+            value: -baseTrapDmg,
+            label: `-${baseTrapDmg} PV (TRAMPA RÚNICA)`,
+            sublabel: appliedSt ? `+${appliedSt.name.toUpperCase()} (2T)` : 'FALLO DE MECANISMO',
+            color: '#C93B5B',
+          });
+          mg.lastPenaltyDetail = {
+            penaltyType: mistakeNum >= maxMistakes ? 'MECHANISM_SEALED' : 'HP_DRAIN',
+            title:
+              mistakeNum >= maxMistakes
+                ? 'MECANISMO COLAPSADO — PASO FORZADO'
+                : 'TRAMPA RÚNICA ACTIVADA',
+            description: `${player.name} sufre -${baseTrapDmg} PV${
+              appliedSt ? ` y ${appliedSt.name.toUpperCase()} (2T)` : ''
+            } por activar el glifo incorrecto.`,
+            hpLost: baseTrapDmg,
+            statusApplied: appliedSt ? `${appliedSt.name.toUpperCase()} (2T)` : undefined,
+            targetPlayerName: player.name,
+            mistakeNumber: mistakeNum,
+            maxMistakes,
+            timestamp: ts,
+          };
+        }
+
+        if (player.hp <= 0) {
+          player.hp = 0;
+          player.isDead = true;
+          player.deathsCount = (player.deathsCount || 0) + 1;
+          player.statuses = [];
+          visualEvents.push({
+            id: `ev_${ts}_p_death_puz_${player.id}`,
+            kind: 'PLAYER_DEATH',
+            targetType: 'PLAYER',
+            targetId: player.id,
+            label: `¡${player.name.toUpperCase()} HA CAÍDO!`,
+            sublabel: `TRAMPA DE «${mg.title.toUpperCase()}»`,
+            color: '#E03E52',
+            vfxStyle: 'explosion',
+          });
+        }
+
+        this.checkAndApplyPartyDefeat(
+          room,
+          `Aplastados por la trampa de «${mg.title}»`,
+          mg.title,
+          visualEvents
+        );
 
         if ((mg.mistakes ?? 0) >= maxMistakes) {
           mg.completed = true;
@@ -6569,10 +7535,8 @@ export class LaCriptaServer {
           activeRoom.resolved = true;
           activeRoom.state = 'RESOLVED';
           if (activeRoom.puzzleRunes) activeRoom.puzzleRunes.solved = true;
-          room.partyGold = (room.partyGold ?? 0) + 18;
-          room.runStats.goldEarned += 18;
-          mg.rewardSummary = 'MECANISMO FORZADO (+18 ORO)';
-          activeRoom.outcomeLog = `${player.name} fuerza el mecanismo tras recibir -${trapDmg} PV. Obtenéis +18 ORO y el paso queda despejado.`;
+          mg.rewardSummary = 'MECANISMO SELLADO — SIN RECOMPENSA RÚNICA';
+          activeRoom.outcomeLog = `¡El mecanismo de «${mg.title}» se bloquea tras ${maxMistakes} fallos (-${baseTrapDmg} PV a ${player.name})! La compuerta cede pero el tesoro rúnico se pierde.`;
         } else {
           if (mg.minigameType === 'RUNE_SEQUENCE') {
             mg.currentStep = 0;
@@ -6580,7 +7544,7 @@ export class LaCriptaServer {
             mg.playerInputs = [];
             if (activeRoom.puzzleRunes) activeRoom.puzzleRunes.currentInput = [];
           }
-          activeRoom.outcomeLog = `¡Fallo en «${mg.title}» (-${trapDmg} PV a ${player.name})! Intentos restantes: ${
+          activeRoom.outcomeLog = `¡Secuencia incorrecta en «${mg.title}» (-${baseTrapDmg} PV a ${player.name})! Intentos restantes: ${
             maxMistakes - (mg.mistakes ?? 0)
           }.`;
         }
@@ -6948,6 +7912,17 @@ export class LaCriptaServer {
             room.completedDungeonIds
           );
         } else {
+          const allDungeonIds = Object.keys(
+            CRIPTA_DUNGEONS_REGISTRY
+          ) as CriptaDungeonId[];
+          for (const fallbackId of allDungeonIds) {
+            if (
+              room.completedDungeonIds.length < 3 &&
+              !room.completedDungeonIds.includes(fallbackId)
+            ) {
+              room.completedDungeonIds.push(fallbackId);
+            }
+          }
           room.offeredDungeons = [];
         }
         room.doorVotes = {};
@@ -6960,21 +7935,30 @@ export class LaCriptaServer {
         room.inSecretRoom = false;
         room.transitioningToRoomIndex = null;
         room.roomDoorTransition = null;
-        room.phase = 'RETURNING_TO_DOORS';
+        room.phase =
+          room.completedDoorCount >= 3
+            ? 'FINAL_BOSS_DOOR_READY'
+            : 'RETURNING_TO_DOORS';
 
         this.emitVisualEventBatch(room, visualEvents, player.id, 'DOOR_CLEAR');
         this.broadcastRoomState(room);
 
         if (room.doorOpeningTimer) {
           clearTimeout(room.doorOpeningTimer);
-        }
-        room.doorOpeningTimer = setTimeout(() => {
           room.doorOpeningTimer = null;
-          if (room.phase === 'RETURNING_TO_DOORS') {
-            room.phase = 'THREE_DOORS';
-            this.broadcastRoomState(room);
-          }
-        }, 1400);
+        }
+        if (room.phase === 'RETURNING_TO_DOORS') {
+          room.doorOpeningTimer = setTimeout(() => {
+            room.doorOpeningTimer = null;
+            if (room.phase === 'RETURNING_TO_DOORS') {
+              room.phase =
+                (room.completedDoorCount ?? 0) >= 3
+                  ? 'FINAL_BOSS_DOOR_READY'
+                  : 'THREE_DOORS';
+              this.broadcastRoomState(room);
+            }
+          }, 1400);
+        }
         return;
       } else {
         this.activateDungeonRoomAtIndex(room, nextIdx);

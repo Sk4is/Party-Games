@@ -447,36 +447,62 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
         </g>
       )}
 
-      {/* 3. ESPADÓN DEL REY HUNDIDO / ESPADA ÍGNEA (Colossal Greatswords) */}
-      {(weaponId === 'espadon_del_rey_hundido' || weaponId === 'espada_ignea') && (
+      {/* 3. ESPADÓN DEL REY HUNDIDO, ESPADA ÍGNEA & ESPADA BASTARDA REAL */}
+      {(weaponId === 'espadon_del_rey_hundido' ||
+        weaponId === 'espada_ignea' ||
+        weaponId === 'espada_bastarda_real') && (
         <g>
           <rect
             x="20"
             y="2"
             width="8"
             height="7"
-            fill={weaponId === 'espada_ignea' ? '#FEF08A' : '#67E8F9'}
+            fill={
+              weaponId === 'espada_ignea'
+                ? '#FEF08A'
+                : weaponId === 'espada_bastarda_real'
+                ? '#F8FAFC'
+                : '#67E8F9'
+            }
           />
           <rect
             x="17"
             y="5"
             width="8"
             height="7"
-            fill={weaponId === 'espada_ignea' ? '#F97316' : '#06B6D4'}
+            fill={
+              weaponId === 'espada_ignea'
+                ? '#F97316'
+                : weaponId === 'espada_bastarda_real'
+                ? '#E2E8F0'
+                : '#06B6D4'
+            }
           />
           <rect
             x="14"
             y="8"
             width="8"
             height="7"
-            fill={weaponId === 'espada_ignea' ? '#EA580C' : '#0E7490'}
+            fill={
+              weaponId === 'espada_ignea'
+                ? '#EA580C'
+                : weaponId === 'espada_bastarda_real'
+                ? '#94A3B8'
+                : '#0E7490'
+            }
           />
           <rect
             x="11"
             y="11"
             width="8"
             height="7"
-            fill={weaponId === 'espada_ignea' ? '#9A3412' : '#155E75'}
+            fill={
+              weaponId === 'espada_ignea'
+                ? '#9A3412'
+                : weaponId === 'espada_bastarda_real'
+                ? '#64748B'
+                : '#155E75'
+            }
           />
           {/* Glowing Core & Shimmer */}
           <rect x="23" y="4" width="3" height="3" fill="#FFFFFF" />
@@ -485,14 +511,26 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
             y="7"
             width="3"
             height="3"
-            fill={weaponId === 'espada_ignea' ? '#FDE047' : '#CFFAFE'}
+            fill={
+              weaponId === 'espada_ignea'
+                ? '#FDE047'
+                : weaponId === 'espada_bastarda_real'
+                ? '#FFD166'
+                : '#CFFAFE'
+            }
           />
           <rect
             x="15"
             y="11"
             width="3"
             height="3"
-            fill={weaponId === 'espada_ignea' ? '#FDBA74' : '#67E8F9'}
+            fill={
+              weaponId === 'espada_ignea'
+                ? '#FDBA74'
+                : weaponId === 'espada_bastarda_real'
+                ? '#F59E0B'
+                : '#67E8F9'
+            }
           />
           {/* Royal Golden / Molten Crossguard */}
           <rect x="6" y="13" width="6" height="4" fill="#F59E0B" />
@@ -503,7 +541,13 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
             y="17"
             width="2"
             height="2"
-            fill={weaponId === 'espada_ignea' ? '#EF4444' : '#22D3EE'}
+            fill={
+              weaponId === 'espada_ignea'
+                ? '#EF4444'
+                : weaponId === 'espada_bastarda_real'
+                ? '#FFF3C4'
+                : '#22D3EE'
+            }
           />
           {/* Heavy Two-Handed Hilt */}
           <rect x="5" y="20" width="5" height="5" fill="#451A03" />
@@ -511,9 +555,10 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
         </g>
       )}
 
-      {/* 4. DAGAS, ESTOQUE & GUADAÑA DEL VERDUGO */}
+      {/* 4. DAGAS, ESTOQUE, COLMILLOS DE SOMBRA & GUADAÑA DEL VERDUGO */}
       {(weaponId === 'dagas_melladas' ||
         weaponId === 'hojas_colmillo_venenoso' ||
+        weaponId === 'dagas_sombra_nocturna' ||
         weaponId === 'estoque_carmesi' ||
         weaponId === 'guadana_del_verdugo') && (
         <g>
@@ -544,38 +589,68 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
             </>
           ) : (
             <>
-              {/* Twin Daggers / Venom Fangs */}
+              {/* Twin Daggers / Venom Fangs / Night Shadow Fangs */}
               <rect
                 x="20"
                 y="4"
                 width="5"
                 height="5"
-                fill={weaponId === 'hojas_colmillo_venenoso' ? '#86EFAC' : '#E2E8F0'}
+                fill={
+                  weaponId === 'hojas_colmillo_venenoso'
+                    ? '#86EFAC'
+                    : weaponId === 'dagas_sombra_nocturna'
+                    ? '#D8B4FE'
+                    : '#E2E8F0'
+                }
               />
               <rect
                 x="16"
                 y="8"
                 width="5"
                 height="5"
-                fill={weaponId === 'hojas_colmillo_venenoso' ? '#22C55E' : '#94A3B8'}
+                fill={
+                  weaponId === 'hojas_colmillo_venenoso'
+                    ? '#22C55E'
+                    : weaponId === 'dagas_sombra_nocturna'
+                    ? '#9333EA'
+                    : '#94A3B8'
+                }
               />
               <rect
                 x="13"
                 y="12"
                 width="4"
                 height="4"
-                fill={weaponId === 'hojas_colmillo_venenoso' ? '#15803D' : '#64748B'}
+                fill={
+                  weaponId === 'hojas_colmillo_venenoso'
+                    ? '#15803D'
+                    : weaponId === 'dagas_sombra_nocturna'
+                    ? '#581C87'
+                    : '#64748B'
+                }
               />
-              <rect x="9" y="15" width="8" height="3" fill="#D97706" />
+              <rect
+                x="9"
+                y="15"
+                width="8"
+                height="3"
+                fill={weaponId === 'dagas_sombra_nocturna' ? '#C93B5B' : '#D97706'}
+              />
               <rect x="7" y="18" width="4" height="5" fill="#451A03" />
               <rect x="5" y="23" width="3" height="3" fill="#FBBF24" />
-              {/* Secondary Off-Hand Dagger / Venom Droplets */}
+              {/* Secondary Off-Hand Dagger */}
               <rect
                 x="23"
                 y="11"
-                width="3"
-                height="4"
-                fill={weaponId === 'hojas_colmillo_venenoso' ? '#4ADE80' : '#CBD5E1'}
+                width="4"
+                height="5"
+                fill={
+                  weaponId === 'hojas_colmillo_venenoso'
+                    ? '#4ADE80'
+                    : weaponId === 'dagas_sombra_nocturna'
+                    ? '#F43F5E'
+                    : '#CBD5E1'
+                }
               />
               <rect x="14" y="5" width="2" height="2" fill="#FEF08A" />
             </>
@@ -587,21 +662,65 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
       {(weaponId === 'baston_ceniza' ||
         weaponId === 'vara_de_cristal_astral' ||
         weaponId === 'grimorio_prohibido_arma' ||
+        weaponId === 'grimorio_sepulcral' ||
         weaponId === 'cetro_del_eclipse' ||
         weaponId === 'baculo_del_eclipse') && (
         <g>
-          {weaponId === 'grimorio_prohibido_arma' ? (
+          {weaponId === 'grimorio_prohibido_arma' ||
+          weaponId === 'grimorio_sepulcral' ? (
             <>
-              <rect x="6" y="4" width="20" height="23" fill="#2E1065" />
-              <rect x="8" y="6" width="16" height="19" fill="#4C1D95" />
+              <rect
+                x="6"
+                y="4"
+                width="20"
+                height="23"
+                fill={weaponId === 'grimorio_sepulcral' ? '#14261D' : '#2E1065'}
+              />
+              <rect
+                x="8"
+                y="6"
+                width="16"
+                height="19"
+                fill={weaponId === 'grimorio_sepulcral' ? '#1E3A2F' : '#4C1D95'}
+              />
               <rect x="22" y="6" width="3" height="19" fill="#FEF3C7" />
-              <rect x="6" y="4" width="3" height="23" fill="#F59E0B" />
-              {/* Forbidden Eye & Eldritch Sigil on Cover */}
-              <rect x="11" y="10" width="9" height="8" fill="#A855F7" />
-              <rect x="13" y="12" width="5" height="4" fill="#FEF08A" />
+              <rect
+                x="6"
+                y="4"
+                width="3"
+                height="23"
+                fill={weaponId === 'grimorio_sepulcral' ? '#D6D3D1' : '#F59E0B'}
+              />
+              {/* Skull / Forbidden Eye on Cover */}
+              <rect
+                x="11"
+                y="10"
+                width="9"
+                height="8"
+                fill={weaponId === 'grimorio_sepulcral' ? '#E7E5E4' : '#A855F7'}
+              />
+              <rect
+                x="13"
+                y="12"
+                width="5"
+                height="4"
+                fill={weaponId === 'grimorio_sepulcral' ? '#34D399' : '#FEF08A'}
+              />
               <rect x="15" y="13" width="2" height="2" fill="#0F172A" />
-              <rect x="10" y="7" width="2" height="2" fill="#FBBF24" />
-              <rect x="18" y="20" width="2" height="2" fill="#FBBF24" />
+              <rect
+                x="10"
+                y="7"
+                width="2"
+                height="2"
+                fill={weaponId === 'grimorio_sepulcral' ? '#6EE7B7' : '#FBBF24'}
+              />
+              <rect
+                x="18"
+                y="20"
+                width="2"
+                height="2"
+                fill={weaponId === 'grimorio_sepulcral' ? '#A855F7' : '#FBBF24'}
+              />
             </>
           ) : (
             <>
@@ -641,19 +760,25 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
         weaponId === 'ballesta_de_asedio' ||
         weaponId === 'canon_de_azufre') && (
         <g>
-          {weaponId === 'ballesta_de_asedio' || weaponId === 'canon_de_azufre' ? (
+          {weaponId === 'canon_de_azufre' ? (
+            <>
+              {/* Heavy Brass & Iron Hand-Cannon with Glowing Sulfur Core */}
+              <rect x="5" y="9" width="22" height="9" fill="#1E293B" />
+              <rect x="7" y="10" width="18" height="6" fill="#475569" />
+              <rect x="23" y="8" width="5" height="11" fill="#D97706" />
+              <rect x="25" y="10" width="3" height="7" fill="#F97316" />
+              <rect x="26" y="12" width="2" height="3" fill="#FEF08A" />
+              <rect x="11" y="12" width="8" height="3" fill="#EF4444" />
+              <rect x="6" y="18" width="7" height="8" fill="#78350F" />
+              <rect x="14" y="6" width="4" height="3" fill="#FBBF24" />
+            </>
+          ) : weaponId === 'ballesta_de_asedio' ? (
             <>
               <rect x="4" y="8" width="24" height="4" fill="#64748B" />
               <rect x="6" y="9" width="20" height="2" fill="#E2E8F0" />
               <rect x="13" y="5" width="6" height="23" fill="#78350F" />
               <rect x="15" y="3" width="2" height="19" fill="#FEF08A" />
-              <rect
-                x="13"
-                y="2"
-                width="6"
-                height="4"
-                fill={weaponId === 'canon_de_azufre' ? '#F97316' : '#22C55E'}
-              />
+              <rect x="13" y="2" width="6" height="4" fill="#22C55E" />
               <rect x="11" y="15" width="10" height="3" fill="#F59E0B" />
             </>
           ) : (
@@ -714,7 +839,7 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
         </g>
       )}
 
-      {/* 7. HACHAS, MARTILLOS, MAZAS, ALABARDAS & RELICARIOS */}
+      {/* 7. HACHAS, MARTILLOS, MAZAS, PICOS, ALABARDAS & RELICARIOS */}
       {(weaponId === 'maza_consagrada' ||
         weaponId === 'simbolo_del_alba' ||
         weaponId === 'martillo_del_juicio' ||
@@ -753,9 +878,43 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
               <rect x="14" y="3" width="4" height="26" fill="#78350F" />
               <rect x="13" y="8" width="6" height="6" fill="#F59E0B" />
             </>
+          ) : weaponId === 'alabarda_del_juramento' ? (
+            <>
+              {/* Golden Bastion Halberd with Spear Point, Crescent Axe Blade & Back Fluke */}
+              <rect x="14" y="1" width="4" height="6" fill="#FEF08A" />
+              <rect x="15" y="2" width="2" height="5" fill="#FFFFFF" />
+              <rect x="14" y="7" width="4" height="23" fill="#78350F" />
+              <rect x="15" y="7" width="2" height="23" fill="#B45309" />
+              <polygon points="4,6 14,8 14,18 5,20 3,13" fill="#F59E0B" />
+              <rect x="4" y="8" width="3" height="10" fill="#FEF3C7" />
+              <polygon points="18,9 26,7 23,14 18,15" fill="#D97706" />
+              <rect x="12" y="8" width="8" height="4" fill="#FBBF24" />
+            </>
+          ) : weaponId === 'pico_de_minero_runico' ? (
+            <>
+              {/* Curved Twin-Pick Head with Glowing Cyan Runes */}
+              <polygon points="3,9 14,5 18,5 29,9 26,12 16,9 6,12" fill="#475569" />
+              <rect x="4" y="8" width="5" height="2" fill="#38BDF8" />
+              <rect x="23" y="8" width="5" height="2" fill="#38BDF8" />
+              <rect x="13" y="4" width="6" height="6" fill="#F59E0B" />
+              <rect x="14" y="10" width="4" height="19" fill="#5C341D" />
+              <rect x="15" y="10" width="2" height="19" fill="#8A5230" />
+            </>
+          ) : weaponId === 'relicario_serafin' || weaponId === 'simbolo_del_alba' ? (
+            <>
+              {/* Radiant Sunburst Reliquary / Dawn Scepter */}
+              <rect x="14" y="1" width="4" height="4" fill="#FEF08A" />
+              <rect x="7" y="8" width="4" height="4" fill="#FEF08A" />
+              <rect x="21" y="8" width="4" height="4" fill="#FEF08A" />
+              <rect x="9" y="4" width="14" height="12" fill="#D97706" />
+              <rect x="11" y="6" width="10" height="8" fill="#FDE047" />
+              <rect x="13" y="8" width="6" height="4" fill="#FFFFFF" />
+              <rect x="14" y="16" width="4" height="13" fill="#78350F" />
+              <rect x="12" y="26" width="8" height="3" fill="#FBBF24" />
+            </>
           ) : (
             <>
-              {/* Massive Warhammer / Bone Maul / Sacred Mace */}
+              {/* Massive Warhammer / Bone Maul / Sacred Flanged Mace */}
               <rect
                 x="6"
                 y="4"
@@ -764,8 +923,8 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
                 fill={
                   weaponId === 'martillo_del_osario'
                     ? '#CBD5E1'
-                    : weaponId === 'pico_de_minero_runico'
-                    ? '#475569'
+                    : weaponId === 'maza_consagrada'
+                    ? '#B45309'
                     : '#D97706'
                 }
               />
@@ -777,8 +936,8 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
                 fill={
                   weaponId === 'martillo_del_osario'
                     ? '#F8FAFC'
-                    : weaponId === 'pico_de_minero_runico'
-                    ? '#94A3B8'
+                    : weaponId === 'maza_consagrada'
+                    ? '#FBBF24'
                     : '#FACC15'
                 }
               />
@@ -796,14 +955,247 @@ export const LaCriptaWeaponPixelIcon: React.FC<{
         weaponId === 'catalizador_esporas' ||
         weaponId === 'guantelete_mutageno') && (
         <g>
-          <rect x="7" y="5" width="18" height="15" fill="#134E4A" />
-          <rect x="9" y="7" width="14" height="11" fill="#14B8A6" />
-          <rect x="11" y="9" width="10" height="7" fill="#4ADE80" />
-          <rect x="13" y="10" width="4" height="3" fill="#FFFFFF" />
-          <rect x="6" y="4" width="20" height="2" fill="#F59E0B" />
-          <rect x="6" y="19" width="20" height="2" fill="#F59E0B" />
-          <rect x="12" y="21" width="8" height="6" fill="#78350F" />
-          <rect x="14" y="2" width="4" height="3" fill="#86EFAC" />
+          {weaponId === 'guantelete_mutageno' ? (
+            <>
+              {/* Brass & Glass Mutagen Injector Gauntlet with Twin Syringe Needles */}
+              <rect x="11" y="2" width="3" height="6" fill="#E2E8F0" />
+              <rect x="18" y="2" width="3" height="6" fill="#E2E8F0" />
+              <rect x="7" y="8" width="18" height="16" fill="#14532D" />
+              <rect x="9" y="10" width="14" height="12" fill="#22C55E" />
+              <rect x="11" y="12" width="10" height="7" fill="#86EFAC" />
+              <rect x="7" y="8" width="18" height="3" fill="#D97706" />
+              <rect x="8" y="23" width="16" height="5" fill="#78350F" />
+            </>
+          ) : weaponId === 'catalizador_esporas' ? (
+            <>
+              {/* Fungal Spore Censer-Catalyst with Glowing Violet & Emerald Spores */}
+              <rect x="8" y="6" width="16" height="13" fill="#3B0764" />
+              <rect x="10" y="8" width="12" height="9" fill="#A855F7" />
+              <rect x="12" y="10" width="8" height="5" fill="#4ADE80" />
+              <rect x="6" y="3" width="3" height="3" fill="#86EFAC" />
+              <rect x="23" y="4" width="3" height="3" fill="#C084FC" />
+              <rect x="14" y="19" width="4" height="10" fill="#166534" />
+            </>
+          ) : (
+            <>
+              <rect x="7" y="5" width="18" height="15" fill="#134E4A" />
+              <rect x="9" y="7" width="14" height="11" fill="#14B8A6" />
+              <rect x="11" y="9" width="10" height="7" fill="#4ADE80" />
+              <rect x="13" y="10" width="4" height="3" fill="#FFFFFF" />
+              <rect x="6" y="4" width="20" height="2" fill="#F59E0B" />
+              <rect x="6" y="19" width="20" height="2" fill="#F59E0B" />
+              <rect x="12" y="21" width="8" height="6" fill="#78350F" />
+              <rect x="14" y="2" width="4" height="3" fill="#86EFAC" />
+            </>
+          )}
+        </g>
+      )}
+
+      {/* 9. ARMAS DE BÁRBARO: GRAN HACHA BÁRBARA, MAZO COLOSAL ROMPECRÁNEOS, ESPADÓN DE FURIA SANGRIENTA */}
+      {weaponId === 'gran_hacha_barbara' && (
+        <g>
+          {/* Dark Pixel Silhouette Outline */}
+          <rect x="13" y="2" width="5" height="28" fill="#140C0C" />
+          {/* Heavy Iron-Shod Oak Shaft with Leather Wraps */}
+          <rect x="14" y="3" width="3" height="26" fill="#5C341D" />
+          <rect x="15" y="4" width="1" height="24" fill="#8A5230" />
+          <rect x="13" y="18" width="5" height="2" fill="#9E2A2B" />
+          <rect x="13" y="22" width="5" height="2" fill="#9E2A2B" />
+          {/* Colossal Asymmetric Bearded Executioner Blade (Left Wing) */}
+          <polygon points="3,4 14,6 14,17 4,21 2,12" fill="#1E242B" />
+          <polygon points="4,5 13,7 13,16 5,19 3,12" fill="#64748B" />
+          <rect x="4" y="6" width="3" height="12" fill="#CBD5E1" />
+          <rect x="3" y="7" width="2" height="9" fill="#F8FAFC" />
+          {/* Brutal Notch & Dried Blood Stain on Blade */}
+          <rect x="3" y="11" width="2" height="2" fill="#140C0C" />
+          <rect x="6" y="8" width="2" height="6" fill="#991B1B" />
+          <rect x="7" y="10" width="2" height="3" fill="#DC2626" />
+          {/* Back Counter-Spike & Bone Trophy Binding */}
+          <polygon points="17,8 26,6 24,12 17,14" fill="#475569" />
+          <rect x="21" y="7" width="4" height="2" fill="#E2E8F0" />
+          <rect x="12" y="7" width="7" height="5" fill="#78350F" />
+          <rect x="13" y="8" width="5" height="3" fill="#E7D8C1" />
+          <rect x="13" y="27" width="5" height="3" fill="#D97706" />
+        </g>
+      )}
+
+      {(weaponId === 'mazo_colosal_rompecraneos' ||
+        weaponId === 'maza_rompecraneos') && (
+        <g>
+          {/* Heavy Maul Head with Horned Bone & Iron Studs */}
+          <rect x="4" y="3" width="24" height="12" fill="#1C1917" />
+          <rect x="5" y="4" width="22" height="10" fill="#57534E" />
+          <rect x="7" y="5" width="18" height="8" fill="#78716C" />
+          {/* Bone Skull Faceplate & Iron Impact Spikes */}
+          <rect x="11" y="4" width="10" height="9" fill="#E7E5E4" />
+          <rect x="12" y="5" width="8" height="7" fill="#F5F5F4" />
+          <rect x="13" y="7" width="2" height="2" fill="#DC2626" />
+          <rect x="17" y="7" width="2" height="2" fill="#DC2626" />
+          <rect x="2" y="5" width="3" height="3" fill="#E2E8F0" />
+          <rect x="2" y="10" width="3" height="3" fill="#E2E8F0" />
+          <rect x="27" y="5" width="3" height="3" fill="#E2E8F0" />
+          <rect x="27" y="10" width="3" height="3" fill="#E2E8F0" />
+          {/* Shaft & Fur Trophy */}
+          <rect x="14" y="15" width="4" height="14" fill="#451A03" />
+          <rect x="15" y="15" width="2" height="14" fill="#78350F" />
+          <rect x="11" y="15" width="3" height="5" fill="#9A3412" />
+          <rect x="13" y="27" width="6" height="3" fill="#F59E0B" />
+        </g>
+      )}
+
+      {weaponId === 'espadon_furia_sangrienta' && (
+        <g>
+          {/* Massive Jagged Greatsword Blade with Glowing Crimson Fuller */}
+          <rect x="19" y="2" width="9" height="8" fill="#450A0A" />
+          <rect x="16" y="5" width="9" height="8" fill="#7F1D1D" />
+          <rect x="13" y="8" width="9" height="8" fill="#991B1B" />
+          <rect x="10" y="11" width="9" height="8" fill="#450A0A" />
+          {/* Serrated Steel Edges & Pulsing Blood Vein */}
+          <rect x="21" y="3" width="5" height="5" fill="#F87171" />
+          <rect x="23" y="4" width="3" height="3" fill="#FEF2F2" />
+          <rect x="18" y="7" width="4" height="4" fill="#EF4444" />
+          <rect x="15" y="10" width="4" height="4" fill="#DC2626" />
+          <rect x="12" y="13" width="3" height="3" fill="#F87171" />
+          {/* Wolf-Jaw & Bone Crossguard */}
+          <rect x="6" y="13" width="6" height="4" fill="#D6D3D1" />
+          <rect x="10" y="15" width="7" height="5" fill="#B45309" />
+          <rect x="15" y="19" width="5" height="4" fill="#D6D3D1" />
+          <rect x="12" y="16" width="3" height="3" fill="#EF4444" />
+          {/* Heavy Two-Handed Hilt */}
+          <rect x="5" y="20" width="5" height="5" fill="#451A03" />
+          <rect x="2" y="24" width="5" height="5" fill="#DC2626" />
+        </g>
+      )}
+
+      {/* 10. ARMAS DE BARDO: LAÚD DE RESONANCIA ARCANA, VIOLA DEL ECLIPSE, LIRA DEL VELO ASTRAL, CAMPANA DEL CORO UMBRÍO */}
+      {weaponId === 'laud_resonancia_arcana' && (
+        <g>
+          {/* Angled Pegbox & Fretted Neck */}
+          <rect x="21" y="2" width="6" height="4" fill="#B45309" />
+          <rect x="23" y="3" width="3" height="2" fill="#FDE047" />
+          <rect x="18" y="5" width="4" height="5" fill="#134E4A" />
+          <rect x="15" y="8" width="4" height="5" fill="#115E59" />
+          {/* Rounded Resonator Body (Dark Teal, Burgundy & Brass Ribs) */}
+          <rect x="4" y="12" width="15" height="15" fill="#1E1B4B" />
+          <rect x="5" y="13" width="13" height="13" fill="#134E4A" />
+          <rect x="6" y="14" width="11" height="11" fill="#0F766E" />
+          <rect x="5" y="12" width="13" height="2" fill="#F59E0B" />
+          <rect x="4" y="25" width="15" height="2" fill="#F59E0B" />
+          {/* Arcane Glowing Rose Soundhole & Luminous Strings */}
+          <rect x="9" y="16" width="5" height="5" fill="#042F2E" />
+          <rect x="10" y="17" width="3" height="3" fill="#38BDF8" />
+          <rect x="11" y="18" width="1" height="1" fill="#FFFFFF" />
+          <rect x="19" y="6" width="1" height="11" fill="#7DD3FC" />
+          <rect x="16" y="9" width="1" height="11" fill="#FDE047" />
+          <rect x="7" y="21" width="6" height="2" fill="#D97706" />
+        </g>
+      )}
+
+      {(weaponId === 'viola_del_eclipse' ||
+        weaponId === 'lira_del_velo_astral') && (
+        <g>
+          {/* Swan-Necked Celestial Brass / Eclipse Viola Frame */}
+          <rect x="5" y="5" width="4" height="18" fill="#D97706" />
+          <rect x="23" y="5" width="4" height="18" fill="#D97706" />
+          <rect x="6" y="6" width="2" height="16" fill="#FDE047" />
+          <rect x="24" y="6" width="2" height="16" fill="#FDE047" />
+          {/* Top Yoke & Bottom Soundbox */}
+          <rect x="7" y="4" width="18" height="3" fill="#F59E0B" />
+          <rect x="6" y="21" width="20" height="6" fill="#1E1B4B" />
+          <rect x="8" y="22" width="16" height="4" fill="#4C1D95" />
+          <rect x="13" y="23" width="6" height="2" fill="#38BDF8" />
+          {/* Glowing Starlight Strings & Central Astral Bow/Star */}
+          <rect x="11" y="7" width="1" height="14" fill="#7DD3FC" />
+          <rect x="14" y="7" width="1" height="14" fill="#E0F2FE" />
+          <rect x="17" y="7" width="1" height="14" fill="#FDE047" />
+          <rect x="20" y="7" width="1" height="14" fill="#C084FC" />
+          <rect x="4" y="12" width="24" height="2" fill="#FDE047" />
+          <rect x="15" y="10" width="2" height="6" fill="#FFFFFF" />
+        </g>
+      )}
+
+      {weaponId === 'campana_del_coro_umbrio' && (
+        <g>
+          {/* Ornate Occult Tuning-Bell & Resonator Scepter */}
+          <rect x="13" y="2" width="6" height="3" fill="#F59E0B" />
+          <polygon points="8,5 24,5 27,16 5,16" fill="#78350F" />
+          <polygon points="10,6 22,6 25,15 7,15" fill="#D97706" />
+          <polygon points="12,7 20,7 22,14 10,14" fill="#FBBF24" />
+          {/* Void Clapper & Sonic Wave Rings */}
+          <rect x="14" y="15" width="4" height="4" fill="#A855F7" />
+          <rect x="15" y="16" width="2" height="2" fill="#FFFFFF" />
+          <rect x="3" y="10" width="2" height="5" fill="#38BDF8" />
+          <rect x="27" y="10" width="2" height="5" fill="#38BDF8" />
+          {/* Handle */}
+          <rect x="14" y="19" width="4" height="10" fill="#1E1B4B" />
+          <rect x="15" y="19" width="2" height="10" fill="#0F766E" />
+          <rect x="12" y="27" width="8" height="2" fill="#F59E0B" />
+        </g>
+      )}
+
+      {/* 11. ARMAS DE NIGROMANTE: GUADAÑA DE HUESO, INCENSARIO DE ALMAS, CETRO DEL OSARIO */}
+      {weaponId === 'guadana_de_hueso' && (
+        <g>
+          {/* Curved Ossuary Bone Scythe Blade */}
+          <rect x="5" y="3" width="19" height="4" fill="#D6D3D1" />
+          <rect x="6" y="4" width="16" height="2" fill="#FAFAF9" />
+          <rect x="3" y="6" width="11" height="3" fill="#A8A29E" />
+          <rect x="2" y="9" width="5" height="5" fill="#34D399" />
+          <rect x="3" y="10" width="3" height="2" fill="#ECFDF5" />
+          {/* Necrotic Emerald Edge Glow */}
+          <rect x="6" y="7" width="13" height="2" fill="#10B981" />
+          {/* Skull Socket & Curved Spine Shaft */}
+          <rect x="19" y="3" width="6" height="6" fill="#E7E5E4" />
+          <rect x="21" y="5" width="2" height="2" fill="#10B981" />
+          <rect x="20" y="9" width="3" height="20" fill="#292524" />
+          <rect x="21" y="9" width="1" height="20" fill="#78716C" />
+          {/* Hanging Soul Lantern */}
+          <rect x="16" y="9" width="1" height="4" fill="#A8A29E" />
+          <rect x="14" y="13" width="5" height="6" fill="#064E3B" />
+          <rect x="15" y="14" width="3" height="4" fill="#34D399" />
+          <rect x="16" y="15" width="1" height="2" fill="#FFFFFF" />
+        </g>
+      )}
+
+      {weaponId === 'incensario_de_almas' && (
+        <g>
+          {/* Top Grip Ring & Twin Hanging Chains */}
+          <rect x="13" y="2" width="6" height="3" fill="#D97706" />
+          <rect x="11" y="5" width="2" height="8" fill="#94A3B8" />
+          <rect x="19" y="5" width="2" height="8" fill="#94A3B8" />
+          {/* Ritual Skull Thurible / Soul Censer */}
+          <polygon points="7,13 25,13 22,25 10,25" fill="#1F2937" />
+          <rect x="9" y="14" width="14" height="9" fill="#374151" />
+          <rect x="7" y="13" width="18" height="2" fill="#F59E0B" />
+          <rect x="10" y="24" width="12" height="3" fill="#F59E0B" />
+          {/* Glowing Emerald & Violet Soul-Fire Billowing Out */}
+          <rect x="11" y="16" width="10" height="5" fill="#10B981" />
+          <rect x="13" y="17" width="6" height="3" fill="#A7F3D0" />
+          <rect x="8" y="8" width="3" height="4" fill="#34D399" />
+          <rect x="21" y="7" width="3" height="4" fill="#A855F7" />
+          <rect x="15" y="8" width="3" height="4" fill="#6EE7B7" />
+        </g>
+      )}
+
+      {weaponId === 'cetro_del_osario' && (
+        <g>
+          {/* Crowned Lich-Skull & Ribcage Scepter Head */}
+          <rect x="10" y="2" width="12" height="3" fill="#F59E0B" />
+          <rect x="12" y="1" width="2" height="2" fill="#FDE047" />
+          <rect x="18" y="1" width="2" height="2" fill="#FDE047" />
+          <rect x="9" y="5" width="14" height="9" fill="#E7E5E4" />
+          <rect x="10" y="6" width="12" height="7" fill="#FAFAF9" />
+          {/* Glowing Emerald Eye Sockets & Soul Core */}
+          <rect x="11" y="8" width="3" height="3" fill="#064E3B" />
+          <rect x="18" y="8" width="3" height="3" fill="#064E3B" />
+          <rect x="12" y="9" width="2" height="2" fill="#34D399" />
+          <rect x="18" y="9" width="2" height="2" fill="#34D399" />
+          {/* Ribcage Collar & Bone Shaft */}
+          <rect x="8" y="14" width="16" height="3" fill="#A8A29E" />
+          <rect x="13" y="15" width="6" height="3" fill="#A855F7" />
+          <rect x="14" y="18" width="4" height="11" fill="#44403C" />
+          <rect x="15" y="18" width="2" height="11" fill="#D6D3D1" />
+          <rect x="13" y="27" width="6" height="2" fill="#10B981" />
         </g>
       )}
     </svg>
@@ -1315,6 +1707,12 @@ export const LaCriptaShopShelvesPanel: React.FC<{
                     <LaCriptaItemPixelIcon itemId={slot.itemId} size={28} />
                   ) : slot.kind === 'WEAPON_RUNE' && slot.weaponRuneId ? (
                     <LaCriptaWeaponRunePixelIcon runeId={slot.weaponRuneId} size={28} />
+                  ) : slot.kind === 'WEAPON' && slot.weaponId ? (
+                    <LaCriptaWeaponPixelIcon weaponId={slot.weaponId} size={28} />
+                  ) : slot.kind === 'ARMOR' && slot.armorId ? (
+                    <LaCriptaArmorPixelIcon armorId={slot.armorId} size={28} />
+                  ) : slot.kind === 'ACCESSORY' && slot.accessoryId ? (
+                    <LaCriptaAccessoryPixelIcon accessoryId={slot.accessoryId} size={28} />
                   ) : (
                     <div
                       className="w-7 h-7 flex items-center justify-center border font-cripta-pixel text-xs font-bold"
@@ -1324,13 +1722,7 @@ export const LaCriptaShopShelvesPanel: React.FC<{
                         color: info.color,
                       }}
                     >
-                      {slot.kind === 'WEAPON'
-                        ? '⚔'
-                        : slot.kind === 'ARMOR'
-                        ? '🛡'
-                        : slot.kind === 'ACCESSORY'
-                        ? '◈'
-                        : '⚒'}
+                      ⚒
                     </div>
                   )}
 
@@ -1432,6 +1824,15 @@ export const LaCriptaShopShelvesPanel: React.FC<{
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2.5">
                   {activeItemDef && <LaCriptaItemPixelIcon itemId={activeItemDef.id} size={28} />}
+                  {activeWeaponDef && (
+                    <LaCriptaWeaponPixelIcon weaponId={activeWeaponDef.id} size={32} />
+                  )}
+                  {activeArmorDef && (
+                    <LaCriptaArmorPixelIcon armorId={activeArmorDef.id} size={28} />
+                  )}
+                  {activeAccDef && (
+                    <LaCriptaAccessoryPixelIcon accessoryId={activeAccDef.id} size={28} />
+                  )}
                   {activeRuneDef && (
                     <LaCriptaWeaponRunePixelIcon runeId={activeRuneDef.id} size={28} />
                   )}

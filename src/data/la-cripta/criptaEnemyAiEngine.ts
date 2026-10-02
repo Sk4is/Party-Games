@@ -1741,13 +1741,39 @@ export function refreshEnemyIntentPreview(
     enemy.memory = createInitialEnemyMemory();
   }
 
-  // If currently charging a telegraphed attack, show the explicit telegraph!
+  const livingPlayers = players.filter((p) => p.isConnected && !p.isDead && p.hp > 0);
+
+  // If currently charging a telegraphed attack, show the explicit telegraph without clearing it!
   if (enemy.memory.preparedAbilityId && enemy.preparedTelegraphLabel) {
     enemy.intent = 'CATACLISMO';
     enemy.intentCategory = 'TELEGRAPH';
     enemy.intentValue = Math.round(enemy.attack * 1.25);
+    if (enemy.memory.preparedTargetIds && enemy.memory.preparedTargetIds.length > 0) {
+      enemy.lastTargetedPlayerIds = [...enemy.memory.preparedTargetIds];
+    } else if (
+      livingPlayers.length > 0 &&
+      (!enemy.lastTargetedPlayerIds || enemy.lastTargetedPlayerIds.length === 0)
+    ) {
+      enemy.lastTargetedPlayerIds = [livingPlayers[0].id];
+    }
     return;
   }
+
+  const previewEnemyClone: CriptaRoomEnemy = {
+    ...enemy,
+    memory: {
+      ...enemy.memory,
+      timesTargetedPlayer: { ...enemy.memory.timesTargetedPlayer },
+      recentDamageByPlayer: { ...enemy.memory.recentDamageByPlayer },
+      abilityCooldowns: { ...enemy.memory.abilityCooldowns },
+      abilityChargesUsed: { ...enemy.memory.abilityChargesUsed },
+      preparedTargetIds: [...(enemy.memory.preparedTargetIds || [])],
+    },
+  };
+  const previewDecision =
+    livingPlayers.length > 0
+      ? chooseEnemyTacticalAction(previewEnemyClone, room, players, {}, seed)
+      : null;
 
   const hpRatio = enemy.hp / Math.max(1, enemy.maxHp);
   const livingEnemies = room.enemies.filter((e) => e.hp > 0);
@@ -1761,6 +1787,7 @@ export function refreshEnemyIntentPreview(
     enemy.intent = 'CURACIÓN';
     enemy.intentCategory = 'HEAL';
     enemy.intentValue = Math.max(14, Math.round(enemy.attack * 1.4));
+    enemy.lastTargetedPlayerIds = [];
     return;
   }
 
@@ -1773,6 +1800,7 @@ export function refreshEnemyIntentPreview(
     enemy.intent = 'PROTECCIÓN';
     enemy.intentCategory = 'DEFEND';
     enemy.intentValue = enemy.attack;
+    enemy.lastTargetedPlayerIds = [];
     return;
   }
 
@@ -1780,7 +1808,17 @@ export function refreshEnemyIntentPreview(
     enemy.intent = 'DEFENSA';
     enemy.intentCategory = 'DEFEND';
     enemy.intentValue = enemy.attack;
+    enemy.lastTargetedPlayerIds = [];
     return;
+  }
+
+  if (previewDecision && previewDecision.targetPlayers.length > 0) {
+    enemy.lastTargetedPlayerIds = previewDecision.targetPlayers.map((p) => p.id);
+    if (previewDecision.ability?.name) {
+      enemy.abilityName = previewDecision.ability.name;
+    }
+  } else if (livingPlayers.length > 0) {
+    enemy.lastTargetedPlayerIds = [livingPlayers[0].id];
   }
 
   const turn = (room.combatTurn || 1) + 1;

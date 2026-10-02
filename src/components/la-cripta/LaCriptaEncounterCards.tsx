@@ -458,6 +458,8 @@ export interface LaCriptaPlayableCardProps {
   cooldownLabel?: string;
   tooltipDescription?: string;
   tooltipFooter?: string;
+  comparisonBadge?: string | null;
+  comparisonTone?: 'upgrade' | 'downgrade' | 'neutral';
   theme?: CriptaCardVisualTheme;
   accentColor?: 'crimson' | 'cyan' | 'amber' | 'purple' | 'emerald' | 'slate';
   artKind?: CriptaCardArtKind;
@@ -504,6 +506,8 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   cooldownLabel,
   tooltipDescription,
   tooltipFooter,
+  comparisonBadge,
+  comparisonTone = 'neutral',
   theme,
   accentColor,
   artKind = 'SWORD_SLASH',
@@ -530,6 +534,15 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   const resolvedPrimary = effectPrimary || footerBadge || categoryLabel;
   const resolvedSecondary = effectSecondary || summary;
   const isDisabled = disabled || turnLocked;
+  const isOnCooldown = Boolean(
+    resolvedTopRight &&
+      (resolvedTopRight.startsWith('⏱') ||
+        resolvedTopRight.startsWith('CD:') ||
+        resolvedTopRight === 'USADA' ||
+        resolvedTopRight === 'EJECUTADO')
+  );
+  const isReadyLabel =
+    resolvedTopRight === 'LISTA' || resolvedTopRight === 'SIEMPRE LISTA';
 
   const handleCardClick = () => {
     if (isDisabled) return;
@@ -543,9 +556,11 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
       type="button"
       disabled={isDisabled}
       onClick={handleCardClick}
-      className={`group relative w-[164px] sm:w-[178px] xl:w-[190px] h-[252px] sm:h-[264px] shrink-0 border-2 flex flex-col justify-between text-left transition-all duration-150 select-none ${
-        isDisabled
-          ? 'opacity-45 grayscale-[30%] cursor-not-allowed'
+      className={`group relative w-[142px] sm:w-[152px] lg:w-[144px] xl:w-[154px] 2xl:w-[170px] h-[clamp(218px,28.5dvh,262px)] shrink-0 border-2 flex flex-col justify-between text-left transition-all duration-150 select-none ${
+        isOnCooldown
+          ? 'opacity-60 saturate-50 cursor-not-allowed'
+          : isDisabled
+          ? 'opacity-50 grayscale-[25%] cursor-not-allowed'
           : commitFlash
           ? '-translate-y-2.5 scale-[1.06] ring-2 ring-[#FFD166] cursor-pointer z-30'
           : selected
@@ -554,7 +569,12 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
       }`}
       style={{
         backgroundColor: pal.bg,
-        borderColor: commitFlash || selected ? '#FFD166' : pal.border,
+        borderColor:
+          commitFlash || selected
+            ? '#FFD166'
+            : isOnCooldown
+            ? '#524364'
+            : pal.border,
         boxShadow:
           commitFlash || selected
             ? `0 14px 32px rgba(0,0,0,0.95), 0 0 24px #FFD16688, inset 0 0 18px ${pal.glow}`
@@ -570,31 +590,39 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
         </div>
       )}
 
-      {/* 1. Fixed Top Cost Badge & Cooldown/Risk Bar (26px) */}
+      {/* 1. Fixed Top Cost Badge & Cooldown/Ready Bar (22px) */}
       <div
-        className="w-full h-[26px] px-2 border-b flex items-center justify-between gap-1 shrink-0"
+        className="w-full h-[22px] px-1.5 border-b flex items-center justify-between gap-1 shrink-0"
         style={{
           backgroundColor: pal.headerBg,
           borderColor: `${pal.border}66`,
         }}
       >
         <span
-          className="px-1.5 py-0.5 font-cripta-mono text-[9px] font-extrabold tracking-wider uppercase shrink-0"
+          className="px-1.5 py-0.5 font-cripta-mono text-[8.5px] font-extrabold tracking-wider uppercase shrink-0"
           style={{
             backgroundColor: pal.badgeBg,
             color: pal.badgeText,
           }}
         >
-          {turnLocked ? 'RESOLVIENDO...' : costLabel}
+          {turnLocked ? 'EN CURSO' : costLabel}
         </span>
 
         {resolvedTopRight ? (
-          <span className="font-cripta-pixel text-[8px] font-bold text-[#FFD166] uppercase truncate">
+          <span
+            className={`px-1 py-0.2 font-cripta-mono text-[8px] font-extrabold uppercase truncate ${
+              isOnCooldown
+                ? 'bg-[#2A1C12] border border-[#E7A54A]/70 text-[#FFD166]'
+                : isReadyLabel
+                ? 'text-[#8EE6AE]'
+                : 'text-[#FFD166]'
+            }`}
+          >
             {resolvedTopRight}
           </span>
         ) : (
           <span
-            className="font-cripta-pixel text-[8px] uppercase tracking-widest truncate"
+            className="font-cripta-pixel text-[7.5px] uppercase tracking-wider truncate"
             style={{ color: pal.accentText }}
           >
             {categoryLabel}
@@ -602,22 +630,22 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
         )}
       </div>
 
-      {/* 2. Fixed Category + Title Block (42px) */}
-      <div className="h-[42px] px-2 pt-1 pb-0.5 text-center shrink-0 flex flex-col justify-center overflow-hidden">
+      {/* 2. Title + Short Tag Block */}
+      <div className="min-h-[38px] px-1.5 pt-1 pb-0.5 text-center shrink-0 flex flex-col justify-center">
+        <div className="font-cripta-display text-[11px] sm:text-xs font-black text-[#F4EBD9] uppercase tracking-wide leading-[1.12] line-clamp-2 flex items-center justify-center">
+          {title}
+        </div>
         <div
-          className="font-cripta-pixel text-[8px] uppercase tracking-widest truncate leading-none mb-0.5"
+          className="font-cripta-pixel text-[7.5px] uppercase tracking-wider truncate leading-tight mt-0.5"
           style={{ color: pal.accentText }}
         >
           {categoryLabel}
         </div>
-        <div className="font-cripta-display text-xs sm:text-[13px] font-black text-[#F4EBD9] uppercase tracking-wide leading-tight line-clamp-2 flex items-center justify-center">
-          {title}
-        </div>
       </div>
 
-      {/* 3. STRICT NORMALIZED PIXEL-ART ILLUSTRATION FRAME (90px / 96px — Never compresses or stretches!) */}
+      {/* 3. STRICT NORMALIZED PIXEL-ART ILLUSTRATION FRAME */}
       <div
-        className="mx-2 h-[88px] sm:h-[94px] shrink-0 border flex items-center justify-center relative overflow-hidden"
+        className="mx-1.5 h-[clamp(64px,9.2dvh,80px)] shrink-0 border flex items-center justify-center relative overflow-hidden"
         style={{
           backgroundColor: pal.artBg,
           borderColor: `${pal.border}55`,
@@ -640,6 +668,38 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
           )}
         </div>
 
+        {/* Subtle Hover/Touch Info Indicator when Tooltip Exists */}
+        {tooltipDescription && (
+          <span
+            className="pointer-events-none absolute top-1 right-1 z-20 w-3.5 h-3.5 bg-[#0D0915]/85 border border-[#4A3B5C] text-[7.5px] font-cripta-mono font-bold text-[#D8C6A0]/80 group-hover:border-[#FFD166] group-hover:text-[#FFD166] flex items-center justify-center"
+            aria-hidden="true"
+          >
+            i
+          </span>
+        )}
+
+        {/* Cooldown Subdued Overlay Pill inside Art Frame */}
+        {isOnCooldown && !comparisonBadge && voterBadges.length === 0 && (
+          <div className="pointer-events-none absolute inset-x-1 bottom-1 z-20 px-1.5 py-0.5 bg-[#120C1C]/95 border border-[#E7A54A]/80 text-center font-cripta-mono text-[8px] font-black text-[#FFD166] uppercase tracking-wider shadow-md">
+            {resolvedTopRight}
+          </div>
+        )}
+
+        {/* Equipment Comparison Overlay Pill at bottom of art frame when comparisonBadge is provided */}
+        {comparisonBadge && voterBadges.length === 0 && (
+          <div
+            className={`pointer-events-none absolute inset-x-1 bottom-1 z-20 px-1.5 py-0.5 border text-center font-cripta-mono text-[7.5px] font-bold uppercase truncate shadow-md ${
+              comparisonTone === 'upgrade'
+                ? 'bg-[#0C2216]/95 border-[#5EA87A] text-[#8EE6AE]'
+                : comparisonTone === 'downgrade'
+                ? 'bg-[#260E16]/95 border-[#C93B5B] text-[#FF8FA3]'
+                : 'bg-[#161024]/95 border-[#E7A54A] text-[#FFD166]'
+            }`}
+          >
+            {comparisonBadge}
+          </div>
+        )}
+
         {/* Multiplayer Voter Badges Overlay anchored inside bottom of art box so card layout never shifts */}
         {voterBadges.length > 0 && (
           <div className="pointer-events-none absolute inset-x-1 bottom-1 z-20 flex flex-wrap items-center justify-center gap-1">
@@ -656,23 +716,23 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
         )}
       </div>
 
-      {/* 4. Fixed Bottom Hierarchy: Headline Number -> Concise Copy -> Target/Status Footer */}
-      <div className="px-2 pt-1 pb-1.5 text-center flex-1 min-h-0 flex flex-col justify-between shrink-0 overflow-hidden">
-        <div className="flex flex-col items-center justify-center my-auto gap-0.5 overflow-hidden">
+      {/* 4. Bottom Hierarchy: Largest Gameplay Number -> Concise Special Property -> Class Mechanic / Cooldown Footer */}
+      <div className="px-1.5 pt-1 pb-1.5 text-center flex-1 min-h-0 flex flex-col justify-between">
+        <div className="flex flex-col items-center justify-center my-auto gap-0.5">
           {headlineValue && (
-            <div className="font-cripta-mono text-[11px] sm:text-xs font-black text-[#FFD166] tracking-wide uppercase leading-none truncate max-w-full">
+            <div className="font-cripta-mono text-xs sm:text-[13px] font-black text-[#FFD166] tracking-wide uppercase leading-none max-w-full drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)]">
               {headlineValue}
             </div>
           )}
           {resolvedSecondary && (
-            <div className="font-cripta-pixel text-[8px] sm:text-[9px] text-[#E8DFCE]/90 leading-snug line-clamp-2 flex items-center justify-center">
+            <div className="font-cripta-pixel text-[8px] sm:text-[8.5px] font-bold text-[#F4EBD9]/95 leading-[1.2] line-clamp-2 flex items-center justify-center">
               {resolvedSecondary}
             </div>
           )}
         </div>
         <div
-          className="pt-1 border-t border-[#2A1F38]/80 font-cripta-mono text-[8px] sm:text-[9px] font-extrabold tracking-wider uppercase leading-none truncate shrink-0"
-          style={{ color: pal.accentText }}
+          className="pt-1 border-t border-[#2A1F38]/80 font-cripta-mono text-[8px] font-extrabold tracking-wider uppercase leading-tight truncate shrink-0"
+          style={{ color: isOnCooldown ? '#FFD166' : pal.accentText }}
         >
           {resolvedPrimary}
         </div>
@@ -696,6 +756,924 @@ export const LaCriptaPlayableCard: React.FC<LaCriptaPlayableCardProps> = ({
   }
 
   return cardElement;
+};
+
+// ============================================================================
+// CENTRALIZED COMBAT CARD ART REGISTRY (Sections 5, 6, 7, 8)
+// Every playable character card, weapon attack, weapon special, and guard
+// references an explicit artKey with bespoke La Cripta pixel-art illustration.
+// ============================================================================
+
+export type CriptaCombatCardArtKey =
+  // Guard / Defense
+  | 'common_iron_guard'
+  // Caballero
+  | 'knight_iron_wall'
+  | 'knight_shield_bash'
+  // Mago
+  | 'mage_astral_fire'
+  | 'mage_mirror_veil'
+  // Pícaro
+  | 'rogue_backstab'
+  | 'rogue_smoke_veil'
+  // Cazador
+  | 'hunter_prey_mark'
+  | 'hunter_silver_volley'
+  // Clérigo
+  | 'cleric_reliquary_light'
+  | 'cleric_dawn_judgment'
+  // Alquimista
+  | 'alchemist_vital_elixir'
+  | 'alchemist_vitriol_flask'
+  // Bárbaro
+  | 'barbarian_brutal_cleave'
+  | 'barbarian_war_cry'
+  | 'barbarian_bonebreaker'
+  // Bardo
+  | 'bard_dissonant_chord'
+  | 'bard_valor_ballad'
+  | 'bard_eclipse_coda'
+  // Nigromante
+  | 'necromancer_soul_drain'
+  | 'necromancer_bone_pact'
+  | 'necromancer_corpse_explosion'
+  // Weapon Basic Attacks (by equipped weapon family)
+  | 'weapon_attack_sword'
+  | 'weapon_attack_axe'
+  | 'weapon_attack_mace'
+  | 'weapon_attack_dagger'
+  | 'weapon_attack_bow'
+  | 'weapon_attack_crossbow'
+  | 'weapon_attack_staff'
+  | 'weapon_attack_alchemy'
+  | 'weapon_attack_instrument'
+  | 'weapon_attack_scythe'
+  | 'weapon_attack_halberd'
+  | 'weapon_attack_pickaxe'
+  | 'weapon_attack_tome'
+  // Weapon Special Techniques (by equipped weapon family)
+  | 'weapon_special_sword'
+  | 'weapon_special_axe'
+  | 'weapon_special_mace'
+  | 'weapon_special_dagger'
+  | 'weapon_special_bow'
+  | 'weapon_special_crossbow'
+  | 'weapon_special_staff'
+  | 'weapon_special_alchemy'
+  | 'weapon_special_instrument'
+  | 'weapon_special_scythe'
+  | 'weapon_special_halberd'
+  | 'weapon_special_pickaxe'
+  | 'weapon_special_tome';
+
+export const combatCardArtRegistry: Record<
+  CriptaCombatCardArtKey,
+  {
+    artKey: CriptaCombatCardArtKey;
+    label: string;
+    renderSvg: () => React.ReactNode;
+  }
+> = {
+  common_iron_guard: {
+    artKey: 'common_iron_guard',
+    label: 'Guardia de Hierro',
+    renderSvg: () => (
+      <g>
+        {/* Heraldic Steel Heater Shield + Counter-Strike Gleam */}
+        <rect x="9" y="3" width="18" height="14" fill="#1F3A42" />
+        <rect x="11" y="4" width="14" height="12" fill="#467A82" />
+        <rect x="12" y="16" width="12" height="4" fill="#1F3A42" />
+        <rect x="14" y="16" width="8" height="3" fill="#69A8A5" />
+        <rect x="15" y="20" width="6" height="3" fill="#1F3A42" />
+        <rect x="17" y="4" width="2" height="16" fill="#FFD166" />
+        <rect x="11" y="9" width="14" height="2" fill="#FFD166" />
+        <rect x="16" y="8" width="4" height="4" fill="#FFF3C4" />
+        {/* Ward Sparks */}
+        <rect x="5" y="7" width="2" height="6" fill="#8EE6AE" />
+        <rect x="29" y="7" width="2" height="6" fill="#8EE6AE" />
+        <rect x="6" y="4" width="2" height="2" fill="#FFD166" />
+        <rect x="28" y="4" width="2" height="2" fill="#FFD166" />
+      </g>
+    ),
+  },
+  knight_iron_wall: {
+    artKey: 'knight_iron_wall',
+    label: 'Muro de Hierro',
+    renderSvg: () => (
+      <g>
+        {/* Towering Fortress Pavise Shield + Dual Bastion Wings */}
+        <rect x="4" y="6" width="6" height="15" fill="#2A3E48" />
+        <rect x="26" y="6" width="6" height="15" fill="#2A3E48" />
+        <rect x="5" y="8" width="4" height="11" fill="#69A8A5" />
+        <rect x="27" y="8" width="4" height="11" fill="#69A8A5" />
+        <rect x="10" y="2" width="16" height="21" fill="#324B52" />
+        <rect x="12" y="4" width="12" height="17" fill="#78B7BB" />
+        <rect x="17" y="3" width="2" height="19" fill="#FFD166" />
+        <rect x="12" y="10" width="12" height="3" fill="#E7A54A" />
+        <rect x="15" y="8" width="6" height="7" fill="#FFF3C4" />
+        <rect x="2" y="21" width="32" height="2" fill="#E7A54A" />
+      </g>
+    ),
+  },
+  knight_shield_bash: {
+    artKey: 'knight_shield_bash',
+    label: 'Embate de Pavés',
+    renderSvg: () => (
+      <g>
+        {/* Heavy Spiked Pavise Ramming Forward + Armor Shatter Shards */}
+        <rect x="7" y="4" width="14" height="18" fill="#324B52" />
+        <rect x="9" y="6" width="10" height="14" fill="#69A8A5" />
+        <rect x="13" y="6" width="3" height="14" fill="#E7A54A" />
+        <rect x="19" y="10" width="6" height="6" fill="#FFD166" />
+        <rect x="23" y="11" width="5" height="4" fill="#FFF3C4" />
+        {/* Compression Shockwave & Broken Armor Shards */}
+        <rect x="26" y="4" width="3" height="5" fill="#FF7A33" />
+        <rect x="28" y="9" width="4" height="8" fill="#FFD166" />
+        <rect x="26" y="17" width="3" height="5" fill="#FF7A33" />
+        <rect x="31" y="6" width="3" height="3" fill="#C93B5B" />
+        <rect x="31" y="17" width="3" height="3" fill="#C93B5B" />
+      </g>
+    ),
+  },
+  mage_astral_fire: {
+    artKey: 'mage_astral_fire',
+    label: 'Fuego Astral',
+    renderSvg: () => (
+      <g>
+        {/* Twin Astral Meteor Comets + Violet-Gold Starburst */}
+        <rect x="5" y="4" width="6" height="4" fill="#9B72CF" />
+        <rect x="9" y="6" width="8" height="6" fill="#E0AAFF" />
+        <rect x="14" y="8" width="12" height="10" fill="#C77DFF" />
+        <rect x="16" y="10" width="8" height="6" fill="#FFD166" />
+        <rect x="18" y="11" width="4" height="4" fill="#FFFFFF" />
+        {/* Flame Tongues & Star Runes */}
+        <rect x="24" y="5" width="6" height="3" fill="#FF7A33" />
+        <rect x="26" y="14" width="6" height="3" fill="#FF4D6D" />
+        <rect x="19" y="3" width="2" height="4" fill="#FFD166" />
+        <rect x="19" y="19" width="2" height="4" fill="#FFD166" />
+        <rect x="7" y="17" width="4" height="4" fill="#FF7A33" />
+      </g>
+    ),
+  },
+  mage_mirror_veil: {
+    artKey: 'mage_mirror_veil',
+    label: 'Convergencia Astral',
+    renderSvg: () => (
+      <g>
+        {/* Prismatic Mirror Dome + Orbiting Astral Crystals */}
+        <rect x="11" y="3" width="14" height="2" fill="#67E8F9" />
+        <rect x="8" y="5" width="3" height="15" fill="#67E8F9" />
+        <rect x="25" y="5" width="3" height="15" fill="#67E8F9" />
+        <rect x="11" y="20" width="14" height="2" fill="#67E8F9" />
+        <rect x="11" y="5" width="14" height="15" fill="#2E1065" />
+        <rect x="14" y="7" width="8" height="11" fill="#9B72CF" />
+        <rect x="16" y="9" width="4" height="7" fill="#ECFEFF" />
+        {/* Orbiting Star Motes */}
+        <rect x="4" y="11" width="3" height="3" fill="#FFD166" />
+        <rect x="29" y="11" width="3" height="3" fill="#FFD166" />
+        <rect x="17" y="1" width="2" height="2" fill="#FFF3C4" />
+      </g>
+    ),
+  },
+  rogue_backstab: {
+    artKey: 'rogue_backstab',
+    label: 'Remate en Penumbra',
+    renderSvg: () => (
+      <g>
+        {/* Twin Shadow Kris Daggers Crossing in Lethal Crimson X-Slash */}
+        <rect x="5" y="4" width="5" height="3" fill="#C93B5B" />
+        <rect x="9" y="7" width="6" height="3" fill="#FF4D6D" />
+        <rect x="14" y="10" width="8" height="4" fill="#FFF3C4" />
+        <rect x="21" y="14" width="6" height="3" fill="#FF4D6D" />
+        <rect x="26" y="17" width="5" height="3" fill="#C93B5B" />
+        {/* Second Crossing Blade */}
+        <rect x="26" y="4" width="4" height="3" fill="#CBD5E1" />
+        <rect x="21" y="7" width="5" height="3" fill="#E2E8F0" />
+        <rect x="10" y="14" width="5" height="3" fill="#94A3B8" />
+        <rect x="6" y="17" width="4" height="4" fill="#E7A54A" />
+        {/* Blood Drops */}
+        <rect x="17" y="4" width="2" height="3" fill="#E11D48" />
+        <rect x="17" y="19" width="2" height="4" fill="#E11D48" />
+      </g>
+    ),
+  },
+  rogue_smoke_veil: {
+    artKey: 'rogue_smoke_veil',
+    label: 'Velo de Humo y Apertura',
+    renderSvg: () => (
+      <g>
+        {/* Alchemical Smoke Bomb + Emerald-Violet Stealth Cloud + Poison Needles */}
+        <rect x="8" y="11" width="20" height="9" fill="#2E1B3B" />
+        <rect x="6" y="14" width="24" height="7" fill="#1F2937" />
+        <rect x="11" y="7" width="14" height="7" fill="#374151" />
+        {/* Toxic Emerald & Shadow Plumes */}
+        <rect x="9" y="9" width="6" height="5" fill="#4ADE80" />
+        <rect x="21" y="10" width="6" height="5" fill="#A855F7" />
+        <rect x="15" y="5" width="6" height="6" fill="#6EE7B7" />
+        {/* Hidden Twin Darts */}
+        <rect x="4" y="5" width="6" height="2" fill="#E2E8F0" />
+        <rect x="26" y="5" width="6" height="2" fill="#4ADE80" />
+        <rect x="17" y="14" width="2" height="4" fill="#FFD166" />
+      </g>
+    ),
+  },
+  hunter_prey_mark: {
+    artKey: 'hunter_prey_mark',
+    label: 'Marca de Cazador',
+    renderSvg: () => (
+      <g>
+        {/* Predator Crosshair Reticle + Piercing Tracer Bolt */}
+        <rect x="11" y="3" width="14" height="2" fill="#FF4D6D" />
+        <rect x="11" y="21" width="14" height="2" fill="#FF4D6D" />
+        <rect x="8" y="6" width="2" height="14" fill="#FF4D6D" />
+        <rect x="26" y="6" width="2" height="14" fill="#FF4D6D" />
+        {/* Crosshair Ticks */}
+        <rect x="17" y="1" width="2" height="6" fill="#FFD166" />
+        <rect x="17" y="19" width="2" height="6" fill="#FFD166" />
+        <rect x="4" y="12" width="6" height="2" fill="#FFD166" />
+        <rect x="26" y="12" width="6" height="2" fill="#FFD166" />
+        {/* Bullseye Core & Arrowhead */}
+        <rect x="14" y="9" width="8" height="8" fill="#881337" />
+        <rect x="16" y="11" width="4" height="4" fill="#FFF3C4" />
+        <rect x="12" y="12" width="12" height="2" fill="#4ADE80" />
+      </g>
+    ),
+  },
+  hunter_silver_volley: {
+    artKey: 'hunter_silver_volley',
+    label: 'Salva de Acecho',
+    renderSvg: () => (
+      <g>
+        {/* Triple Silver Arbalest Bolts Raining Downward */}
+        {/* Bolt 1 (Left) */}
+        <rect x="6" y="3" width="2" height="11" fill="#94A3B8" />
+        <rect x="5" y="13" width="4" height="4" fill="#E2E8F0" />
+        <rect x="6" y="17" width="2" height="3" fill="#FFFFFF" />
+        {/* Bolt 2 (Center Lead) */}
+        <rect x="17" y="2" width="2" height="13" fill="#E7A54A" />
+        <rect x="15" y="14" width="6" height="5" fill="#FFF3C4" />
+        <rect x="17" y="19" width="2" height="4" fill="#FFFFFF" />
+        <rect x="15" y="2" width="6" height="2" fill="#5EA87A" />
+        {/* Bolt 3 (Right) */}
+        <rect x="28" y="3" width="2" height="11" fill="#94A3B8" />
+        <rect x="27" y="13" width="4" height="4" fill="#E2E8F0" />
+        <rect x="28" y="17" width="2" height="3" fill="#FFFFFF" />
+        {/* Wind Streaks */}
+        <rect x="11" y="6" width="2" height="8" fill="#67E8F9" opacity="0.75" />
+        <rect x="23" y="6" width="2" height="8" fill="#67E8F9" opacity="0.75" />
+      </g>
+    ),
+  },
+  cleric_reliquary_light: {
+    artKey: 'cleric_reliquary_light',
+    label: 'Luz del Relicario',
+    renderSvg: () => (
+      <g>
+        {/* Sacred Golden Reliquary Lantern + Healing Crosses */}
+        <rect x="15" y="2" width="6" height="2" fill="#E7A54A" />
+        <rect x="12" y="5" width="12" height="14" fill="#B45309" />
+        <rect x="14" y="7" width="8" height="10" fill="#FFD166" />
+        <rect x="16" y="8" width="4" height="8" fill="#FFFFFF" />
+        <rect x="10" y="19" width="16" height="3" fill="#E7A54A" />
+        {/* Emerald & Gold Restoration Crosses */}
+        <rect x="5" y="7" width="2" height="6" fill="#4ADE80" />
+        <rect x="3" y="9" width="6" height="2" fill="#4ADE80" />
+        <rect x="29" y="7" width="2" height="6" fill="#4ADE80" />
+        <rect x="27" y="9" width="6" height="2" fill="#4ADE80" />
+      </g>
+    ),
+  },
+  cleric_dawn_judgment: {
+    artKey: 'cleric_dawn_judgment',
+    label: 'Juicio del Alba',
+    renderSvg: () => (
+      <g>
+        {/* Descending Pillar of Solar Fire + Winged Halo */}
+        <rect x="6" y="4" width="24" height="3" fill="#E7A54A" />
+        <rect x="10" y="2" width="16" height="3" fill="#FFD166" />
+        <rect x="13" y="5" width="10" height="18" fill="#F59E0B" />
+        <rect x="15" y="5" width="6" height="18" fill="#FEF08A" />
+        <rect x="17" y="5" width="2" height="18" fill="#FFFFFF" />
+        {/* Ground Sunburst Impact */}
+        <rect x="8" y="20" width="20" height="3" fill="#FFD166" />
+        <rect x="5" y="17" width="4" height="3" fill="#FF7A33" />
+        <rect x="27" y="17" width="4" height="3" fill="#FF7A33" />
+      </g>
+    ),
+  },
+  alchemist_vital_elixir: {
+    artKey: 'alchemist_vital_elixir',
+    label: 'Elixir Transmutado',
+    renderSvg: () => (
+      <g>
+        {/* Ornate Panacea Alembic Flask + Rising Emerald Vitality Crosses */}
+        <rect x="15" y="2" width="6" height="3" fill="#E7A54A" />
+        <rect x="16" y="5" width="4" height="4" fill="#CBD5E1" />
+        <rect x="11" y="9" width="14" height="13" fill="#064E3B" />
+        <rect x="13" y="11" width="10" height="9" fill="#10B981" />
+        <rect x="15" y="13" width="6" height="6" fill="#A7F3D0" />
+        <rect x="17" y="12" width="2" height="6" fill="#FFFFFF" />
+        <rect x="15" y="14" width="6" height="2" fill="#FFFFFF" />
+        {/* Rising Vapor & Gold Catalyst */}
+        <rect x="6" y="6" width="3" height="3" fill="#4ADE80" />
+        <rect x="27" y="6" width="3" height="3" fill="#FFD166" />
+        <rect x="5" y="14" width="3" height="3" fill="#6EE7B7" />
+        <rect x="28" y="14" width="3" height="3" fill="#6EE7B7" />
+      </g>
+    ),
+  },
+  alchemist_vitriol_flask: {
+    artKey: 'alchemist_vitriol_flask',
+    label: 'Reacción de Vitriolo',
+    renderSvg: () => (
+      <g>
+        {/* Shattering Acid Vial + Volatile Green/Orange Explosion */}
+        <rect x="12" y="7" width="12" height="12" fill="#15803D" />
+        <rect x="14" y="9" width="8" height="8" fill="#84CC16" />
+        <rect x="16" y="11" width="4" height="4" fill="#ECFCCB" />
+        {/* Corrosive Acid Splashes & Glass Shards */}
+        <rect x="6" y="4" width="4" height="4" fill="#A3E635" />
+        <rect x="26" y="4" width="4" height="4" fill="#FF7A33" />
+        <rect x="4" y="12" width="5" height="3" fill="#4ADE80" />
+        <rect x="27" y="12" width="5" height="3" fill="#4ADE80" />
+        <rect x="8" y="19" width="20" height="3" fill="#65A30D" />
+        <rect x="11" y="21" width="14" height="2" fill="#BEF264" />
+      </g>
+    ),
+  },
+  barbarian_brutal_cleave: {
+    artKey: 'barbarian_brutal_cleave',
+    label: 'Hachazo Brutal',
+    renderSvg: () => (
+      <g>
+        {/* Double-Bitted Barbaric Greataxe + Crimson Fury Cleave Arc */}
+        <rect x="4" y="14" width="28" height="4" fill="#C93B5B" />
+        <rect x="6" y="16" width="24" height="3" fill="#FF7A33" />
+        <rect x="9" y="17" width="18" height="2" fill="#FFD166" />
+        {/* Greataxe Head & Shaft */}
+        <rect x="17" y="3" width="3" height="19" fill="#78350F" />
+        <rect x="9" y="4" width="8" height="10" fill="#94A3B8" />
+        <rect x="20" y="4" width="8" height="10" fill="#CBD5E1" />
+        <rect x="7" y="5" width="3" height="8" fill="#F8FAFC" />
+        <rect x="27" y="5" width="3" height="8" fill="#E11D48" />
+      </g>
+    ),
+  },
+  barbarian_war_cry: {
+    artKey: 'barbarian_war_cry',
+    label: 'Grito de Guerra y Sangre',
+    renderSvg: () => (
+      <g>
+        {/* Horned Berserker Crest + Concentric Fury Shockwaves */}
+        <rect x="3" y="6" width="3" height="14" fill="#FF4D6D" />
+        <rect x="30" y="6" width="3" height="14" fill="#FF4D6D" />
+        <rect x="7" y="4" width="2" height="18" fill="#FF7A33" />
+        <rect x="27" y="4" width="2" height="18" fill="#FF7A33" />
+        {/* Horned Skull / Helm Core */}
+        <rect x="10" y="4" width="3" height="5" fill="#D8C6A0" />
+        <rect x="23" y="4" width="3" height="5" fill="#D8C6A0" />
+        <rect x="12" y="7" width="12" height="12" fill="#B91C1C" />
+        <rect x="14" y="9" width="8" height="8" fill="#FFD166" />
+        <rect x="15" y="11" width="2" height="2" fill="#FFFFFF" />
+        <rect x="19" y="11" width="2" height="2" fill="#FFFFFF" />
+        <rect x="15" y="15" width="6" height="3" fill="#450A0A" />
+      </g>
+    ),
+  },
+  barbarian_bonebreaker: {
+    artKey: 'barbarian_bonebreaker',
+    label: 'Quebrantahuesos',
+    renderSvg: () => (
+      <g>
+        {/* Colossal Iron Maul Crushing Skull & Stone Ground */}
+        <rect x="17" y="1" width="2" height="10" fill="#78350F" />
+        <rect x="10" y="5" width="16" height="8" fill="#475569" />
+        <rect x="12" y="6" width="12" height="6" fill="#94A3B8" />
+        <rect x="14" y="11" width="8" height="2" fill="#FF7A33" />
+        {/* Cracked Skull & Magma Ground Fissure */}
+        <rect x="13" y="14" width="10" height="6" fill="#E2E8F0" />
+        <rect x="17" y="14" width="2" height="6" fill="#C93B5B" />
+        <rect x="4" y="20" width="28" height="3" fill="#E11D48" />
+        <rect x="8" y="21" width="20" height="2" fill="#FFD166" />
+        <rect x="5" y="14" width="4" height="3" fill="#FFD166" />
+        <rect x="27" y="14" width="4" height="3" fill="#FFD166" />
+      </g>
+    ),
+  },
+  bard_dissonant_chord: {
+    artKey: 'bard_dissonant_chord',
+    label: 'Acorde Disonante',
+    renderSvg: () => (
+      <g>
+        {/* Arcane Lute Resonator + Jagged Sonic Shockwave Rings */}
+        <rect x="5" y="11" width="10" height="8" fill="#B45309" />
+        <rect x="7" y="13" width="6" height="4" fill="#F59E0B" />
+        <rect x="15" y="9" width="8" height="3" fill="#78350F" />
+        {/* Dissonant Sonic Waves & Eighth Notes */}
+        <rect x="22" y="4" width="2" height="18" fill="#C084FC" />
+        <rect x="26" y="6" width="2" height="14" fill="#F43F5E" />
+        <rect x="30" y="8" width="2" height="10" fill="#FFD166" />
+        <rect x="14" y="3" width="4" height="4" fill="#2DD4BF" />
+        <rect x="17" y="1" width="2" height="5" fill="#2DD4BF" />
+      </g>
+    ),
+  },
+  bard_valor_ballad: {
+    artKey: 'bard_valor_ballad',
+    label: 'Balada de Tempo y Valor',
+    renderSvg: () => (
+      <g>
+        {/* Golden Harmonic Lyre + Rising Teal & Gold Musical Notes */}
+        <rect x="12" y="6" width="3" height="13" fill="#F59E0B" />
+        <rect x="21" y="6" width="3" height="13" fill="#F59E0B" />
+        <rect x="12" y="18" width="12" height="3" fill="#FFD166" />
+        <rect x="16" y="7" width="1" height="11" fill="#67E8F9" />
+        <rect x="18" y="7" width="1" height="11" fill="#FFF3C4" />
+        <rect x="20" y="7" width="1" height="11" fill="#67E8F9" />
+        {/* Musical Notes */}
+        <rect x="5" y="9" width="4" height="3" fill="#2DD4BF" />
+        <rect x="8" y="4" width="2" height="6" fill="#2DD4BF" />
+        <rect x="27" y="10" width="4" height="3" fill="#FFD166" />
+        <rect x="30" y="5" width="2" height="6" fill="#FFD166" />
+      </g>
+    ),
+  },
+  bard_eclipse_coda: {
+    artKey: 'bard_eclipse_coda',
+    label: 'Coda del Eclipse',
+    renderSvg: () => (
+      <g>
+        {/* Solar-Lunar Eclipse Corona + Harmonic Staff Lines */}
+        <rect x="3" y="9" width="30" height="1" fill="#2DD4BF" />
+        <rect x="3" y="13" width="30" height="1" fill="#FFD166" />
+        <rect x="3" y="17" width="30" height="1" fill="#C084FC" />
+        {/* Eclipse Sun/Moon Core */}
+        <rect x="11" y="5" width="14" height="16" fill="#F59E0B" />
+        <rect x="13" y="7" width="10" height="12" fill="#1E1B4B" />
+        <rect x="20" y="8" width="3" height="10" fill="#FEF08A" />
+        {/* Exploding Tempo Stars */}
+        <rect x="6" y="4" width="3" height="3" fill="#67E8F9" />
+        <rect x="27" y="4" width="3" height="3" fill="#FFD166" />
+        <rect x="6" y="19" width="3" height="3" fill="#FFD166" />
+        <rect x="27" y="19" width="3" height="3" fill="#67E8F9" />
+      </g>
+    ),
+  },
+  necromancer_soul_drain: {
+    artKey: 'necromancer_soul_drain',
+    label: 'Drenaje de Almas',
+    renderSvg: () => (
+      <g>
+        {/* Spectral Bone Claw Siphoning Cyan-Crimson Soul Essence */}
+        <rect x="5" y="6" width="8" height="3" fill="#E2E8F0" />
+        <rect x="5" y="11" width="9" height="3" fill="#E2E8F0" />
+        <rect x="5" y="16" width="8" height="3" fill="#E2E8F0" />
+        {/* Soul Essence Stream & Orb */}
+        <rect x="14" y="10" width="8" height="4" fill="#A855F7" />
+        <rect x="16" y="11" width="6" height="2" fill="#4ADE80" />
+        <rect x="22" y="6" width="9" height="12" fill="#68D391" />
+        <rect x="24" y="8" width="5" height="8" fill="#ECFEFF" />
+        <rect x="25" y="10" width="3" height="4" fill="#C93B5B" />
+      </g>
+    ),
+  },
+  necromancer_bone_pact: {
+    artKey: 'necromancer_bone_pact',
+    label: 'Pacto de Hueso y Ceniza',
+    renderSvg: () => (
+      <g>
+        {/* Ritual Ossuary Ribcage Shield + Crimson Blood Sacrifice Drop */}
+        <rect x="13" y="4" width="10" height="8" fill="#E2E8F0" />
+        <rect x="15" y="6" width="2" height="2" fill="#9333EA" />
+        <rect x="19" y="6" width="2" height="2" fill="#9333EA" />
+        {/* Bone Ribs Wrapping Around Party */}
+        <rect x="8" y="13" width="20" height="2" fill="#CBD5E1" />
+        <rect x="10" y="17" width="16" height="2" fill="#CBD5E1" />
+        <rect x="17" y="12" width="2" height="10" fill="#F8FAFC" />
+        {/* Blood Drop & Soul Flames */}
+        <rect x="17" y="1" width="2" height="3" fill="#E11D48" />
+        <rect x="5" y="8" width="3" height="6" fill="#68D391" />
+        <rect x="28" y="8" width="3" height="6" fill="#68D391" />
+      </g>
+    ),
+  },
+  necromancer_corpse_explosion: {
+    artKey: 'necromancer_corpse_explosion',
+    label: 'Detonación Sepulcral',
+    renderSvg: () => (
+      <g>
+        {/* Erupting Ossuary Skull + Necrotic Emerald & Violet Shockwave */}
+        <rect x="9" y="5" width="18" height="16" fill="#581C87" />
+        <rect x="12" y="7" width="12" height="11" fill="#4ADE80" />
+        <rect x="14" y="9" width="8" height="7" fill="#F8FAFC" />
+        <rect x="15" y="11" width="2" height="2" fill="#1E1B4B" />
+        <rect x="19" y="11" width="2" height="2" fill="#1E1B4B" />
+        {/* Flying Bone Shards */}
+        <rect x="4" y="3" width="4" height="3" fill="#E2E8F0" />
+        <rect x="28" y="3" width="4" height="3" fill="#E2E8F0" />
+        <rect x="3" y="17" width="5" height="3" fill="#A855F7" />
+        <rect x="28" y="17" width="5" height="3" fill="#A855F7" />
+        <rect x="16" y="1" width="4" height="4" fill="#86EFAC" />
+      </g>
+    ),
+  },
+  // Weapon Attack & Special Action Overlays
+  weapon_attack_sword: {
+    artKey: 'weapon_attack_sword',
+    label: 'Tajo de Espada',
+    renderSvg: () => (
+      <g>
+        <rect x="4" y="18" width="8" height="2" fill="#C93B5B" />
+        <rect x="10" y="14" width="10" height="2" fill="#FF4D6D" />
+        <rect x="18" y="9" width="10" height="2" fill="#FFD166" />
+        <rect x="24" y="5" width="8" height="2" fill="#FFF3C4" />
+      </g>
+    ),
+  },
+  weapon_attack_axe: {
+    artKey: 'weapon_attack_axe',
+    label: 'Hachazo Desgarrador',
+    renderSvg: () => (
+      <g>
+        <rect x="4" y="6" width="28" height="3" fill="#FF7A33" />
+        <rect x="8" y="17" width="20" height="2" fill="#C93B5B" />
+      </g>
+    ),
+  },
+  weapon_attack_mace: {
+    artKey: 'weapon_attack_mace',
+    label: 'Golpe Contundente',
+    renderSvg: () => (
+      <g>
+        <rect x="6" y="19" width="24" height="3" fill="#E7A54A" />
+        <rect x="4" y="14" width="4" height="4" fill="#FFD166" />
+        <rect x="28" y="14" width="4" height="4" fill="#FFD166" />
+      </g>
+    ),
+  },
+  weapon_attack_dagger: {
+    artKey: 'weapon_attack_dagger',
+    label: 'Punzón Rápido',
+    renderSvg: () => (
+      <g>
+        <rect x="4" y="12" width="28" height="2" fill="#FF4D6D" />
+        <rect x="26" y="9" width="4" height="8" fill="#FFF3C4" />
+      </g>
+    ),
+  },
+  weapon_attack_bow: {
+    artKey: 'weapon_attack_bow',
+    label: 'Disparo de Arco',
+    renderSvg: () => (
+      <g>
+        <rect x="3" y="12" width="30" height="2" fill="#8EE6AE" />
+        <rect x="27" y="9" width="5" height="8" fill="#FFF3C4" />
+      </g>
+    ),
+  },
+  weapon_attack_crossbow: {
+    artKey: 'weapon_attack_crossbow',
+    label: 'Virote Pesado',
+    renderSvg: () => (
+      <g>
+        <rect x="3" y="11" width="30" height="3" fill="#FFD166" />
+        <rect x="26" y="8" width="6" height="9" fill="#FF7A33" />
+      </g>
+    ),
+  },
+  weapon_attack_staff: {
+    artKey: 'weapon_attack_staff',
+    label: 'Descarga de Báculo',
+    renderSvg: () => (
+      <g>
+        <rect x="5" y="5" width="4" height="4" fill="#C084FC" />
+        <rect x="27" y="5" width="4" height="4" fill="#67E8F9" />
+        <rect x="5" y="17" width="4" height="4" fill="#67E8F9" />
+        <rect x="27" y="17" width="4" height="4" fill="#C084FC" />
+      </g>
+    ),
+  },
+  weapon_attack_alchemy: {
+    artKey: 'weapon_attack_alchemy',
+    label: 'Disparo Alquímico',
+    renderSvg: () => (
+      <g>
+        <rect x="4" y="7" width="4" height="4" fill="#4ADE80" />
+        <rect x="28" y="7" width="4" height="4" fill="#A3E635" />
+        <rect x="6" y="18" width="24" height="2" fill="#10B981" />
+      </g>
+    ),
+  },
+  weapon_attack_instrument: {
+    artKey: 'weapon_attack_instrument',
+    label: 'Pulso Armónico',
+    renderSvg: () => (
+      <g>
+        <rect x="4" y="8" width="3" height="10" fill="#2DD4BF" />
+        <rect x="29" y="8" width="3" height="10" fill="#FFD166" />
+      </g>
+    ),
+  },
+  weapon_attack_scythe: {
+    artKey: 'weapon_attack_scythe',
+    label: 'Corte de Guadaña',
+    renderSvg: () => (
+      <g>
+        <rect x="4" y="5" width="28" height="2" fill="#A855F7" />
+        <rect x="6" y="19" width="24" height="2" fill="#4ADE80" />
+      </g>
+    ),
+  },
+  weapon_attack_halberd: {
+    artKey: 'weapon_attack_halberd',
+    label: 'Estocada de Alabarda',
+    renderSvg: () => (
+      <g>
+        <rect x="3" y="12" width="30" height="2" fill="#FFD166" />
+        <rect x="25" y="6" width="6" height="14" fill="#F8FAFC" />
+      </g>
+    ),
+  },
+  weapon_attack_pickaxe: {
+    artKey: 'weapon_attack_pickaxe',
+    label: 'Impacto de Pico',
+    renderSvg: () => (
+      <g>
+        <rect x="6" y="18" width="24" height="3" fill="#38BDF8" />
+        <rect x="16" y="2" width="4" height="6" fill="#FFD166" />
+      </g>
+    ),
+  },
+  weapon_attack_tome: {
+    artKey: 'weapon_attack_tome',
+    label: 'Salmo Arcano',
+    renderSvg: () => (
+      <g>
+        <rect x="4" y="4" width="4" height="18" fill="#FFD166" />
+        <rect x="28" y="4" width="4" height="18" fill="#C084FC" />
+      </g>
+    ),
+  },
+  weapon_special_sword: {
+    artKey: 'weapon_special_sword',
+    label: 'Técnica de Espada',
+    renderSvg: () => (
+      <g>
+        <rect x="2" y="9" width="32" height="3" fill="#FFD166" />
+        <rect x="5" y="15" width="26" height="2" fill="#FF4D6D" />
+        <rect x="16" y="2" width="4" height="22" fill="#FFF3C4" opacity="0.7" />
+      </g>
+    ),
+  },
+  weapon_special_axe: {
+    artKey: 'weapon_special_axe',
+    label: 'Técnica de Hacha',
+    renderSvg: () => (
+      <g>
+        <rect x="2" y="6" width="32" height="4" fill="#FF7A33" />
+        <rect x="4" y="16" width="28" height="3" fill="#FFD166" />
+      </g>
+    ),
+  },
+  weapon_special_mace: {
+    artKey: 'weapon_special_mace',
+    label: 'Técnica de Maza',
+    renderSvg: () => (
+      <g>
+        <rect x="15" y="1" width="6" height="24" fill="#FFD166" opacity="0.75" />
+        <rect x="4" y="18" width="28" height="4" fill="#FFF3C4" />
+      </g>
+    ),
+  },
+  weapon_special_dagger: {
+    artKey: 'weapon_special_dagger',
+    label: 'Técnica de Dagas',
+    renderSvg: () => (
+      <g>
+        <rect x="4" y="5" width="28" height="2" fill="#FF4D6D" />
+        <rect x="4" y="19" width="28" height="2" fill="#4ADE80" />
+        <rect x="16" y="2" width="4" height="22" fill="#FFD166" opacity="0.65" />
+      </g>
+    ),
+  },
+  weapon_special_bow: {
+    artKey: 'weapon_special_bow',
+    label: 'Lluvia de Flechas',
+    renderSvg: () => (
+      <g>
+        <rect x="5" y="3" width="2" height="20" fill="#8EE6AE" />
+        <rect x="17" y="1" width="2" height="24" fill="#FFD166" />
+        <rect x="29" y="3" width="2" height="20" fill="#8EE6AE" />
+      </g>
+    ),
+  },
+  weapon_special_crossbow: {
+    artKey: 'weapon_special_crossbow',
+    label: 'Andanada de Asedio',
+    renderSvg: () => (
+      <g>
+        <rect x="2" y="8" width="32" height="3" fill="#FF7A33" />
+        <rect x="2" y="15" width="32" height="3" fill="#FFD166" />
+      </g>
+    ),
+  },
+  weapon_special_staff: {
+    artKey: 'weapon_special_staff',
+    label: 'Cadena Arcana',
+    renderSvg: () => (
+      <g>
+        <rect x="3" y="4" width="30" height="2" fill="#C084FC" />
+        <rect x="3" y="20" width="30" height="2" fill="#67E8F9" />
+        <rect x="3" y="6" width="2" height="14" fill="#FFD166" />
+        <rect x="31" y="6" width="2" height="14" fill="#FFD166" />
+      </g>
+    ),
+  },
+  weapon_special_alchemy: {
+    artKey: 'weapon_special_alchemy',
+    label: 'Frasco Explosivo',
+    renderSvg: () => (
+      <g>
+        <rect x="3" y="4" width="6" height="6" fill="#4ADE80" />
+        <rect x="27" y="4" width="6" height="6" fill="#FF7A33" />
+        <rect x="4" y="18" width="28" height="4" fill="#84CC16" />
+      </g>
+    ),
+  },
+  weapon_special_instrument: {
+    artKey: 'weapon_special_instrument',
+    label: 'Sinfonía Resonante',
+    renderSvg: () => (
+      <g>
+        <rect x="2" y="6" width="32" height="2" fill="#2DD4BF" />
+        <rect x="2" y="18" width="32" height="2" fill="#FFD166" />
+      </g>
+    ),
+  },
+  weapon_special_scythe: {
+    artKey: 'weapon_special_scythe',
+    label: 'Siega de Almas',
+    renderSvg: () => (
+      <g>
+        <rect x="2" y="4" width="32" height="3" fill="#9333EA" />
+        <rect x="4" y="19" width="28" height="3" fill="#4ADE80" />
+      </g>
+    ),
+  },
+  weapon_special_halberd: {
+    artKey: 'weapon_special_halberd',
+    label: 'Barrido del Bastión',
+    renderSvg: () => (
+      <g>
+        <rect x="2" y="4" width="32" height="3" fill="#FFD166" />
+        <rect x="4" y="19" width="28" height="3" fill="#69A8A5" />
+      </g>
+    ),
+  },
+  weapon_special_pickaxe: {
+    artKey: 'weapon_special_pickaxe',
+    label: 'Golpe Sísmico',
+    renderSvg: () => (
+      <g>
+        <rect x="2" y="18" width="32" height="4" fill="#F59E0B" />
+        <rect x="8" y="4" width="4" height="6" fill="#38BDF8" />
+        <rect x="24" y="4" width="4" height="6" fill="#38BDF8" />
+      </g>
+    ),
+  },
+  weapon_special_tome: {
+    artKey: 'weapon_special_tome',
+    label: 'Milagro del Códice',
+    renderSvg: () => (
+      <g>
+        <rect x="3" y="3" width="30" height="2" fill="#FFD166" />
+        <rect x="3" y="21" width="30" height="2" fill="#FFD166" />
+      </g>
+    ),
+  },
+};
+
+export function resolveWeaponCombatArtKey(
+  weaponId?: CriptaWeaponId,
+  mode: 'ATTACK' | 'SPECIAL' | boolean = 'ATTACK',
+  _fallbackDamageType?: string
+): CriptaCombatCardArtKey {
+  const isSpecial = mode === 'SPECIAL' || mode === true;
+  const prefix = isSpecial ? 'weapon_special_' : 'weapon_attack_';
+  switch (weaponId) {
+    case 'hacha_forja_infernal':
+    case 'gran_hacha_barbara':
+      return `${prefix}axe` as CriptaCombatCardArtKey;
+    case 'maza_consagrada':
+    case 'martillo_del_juicio':
+    case 'mazo_colosal_rompecraneos':
+    case 'simbolo_del_alba':
+      return `${prefix}mace` as CriptaCombatCardArtKey;
+    case 'dagas_melladas':
+    case 'hojas_colmillo_venenoso':
+    case 'estoque_carmesi':
+    case 'dagas_sombra_nocturna':
+      return `${prefix}dagger` as CriptaCombatCardArtKey;
+    case 'arco_cazador':
+    case 'arco_de_espinas':
+      return `${prefix}bow` as CriptaCombatCardArtKey;
+    case 'ballesta_de_asedio':
+    case 'canon_de_azufre':
+      return `${prefix}crossbow` as CriptaCombatCardArtKey;
+    case 'baston_ceniza':
+    case 'vara_de_cristal_astral':
+    case 'cetro_del_eclipse':
+      return `${prefix}staff` as CriptaCombatCardArtKey;
+    case 'lanzador_alquimico':
+    case 'catalizador_esporas':
+    case 'guantelete_mutageno':
+      return `${prefix}alchemy` as CriptaCombatCardArtKey;
+    case 'laud_resonancia_arcana':
+    case 'viola_del_eclipse':
+      return `${prefix}instrument` as CriptaCombatCardArtKey;
+    case 'guadana_de_hueso':
+    case 'guadana_del_verdugo':
+      return `${prefix}scythe` as CriptaCombatCardArtKey;
+    case 'alabarda_del_juramento':
+      return `${prefix}halberd` as CriptaCombatCardArtKey;
+    case 'pico_de_minero_runico':
+      return `${prefix}pickaxe` as CriptaCombatCardArtKey;
+    case 'grimorio_prohibido_arma':
+    case 'grimorio_sepulcral':
+    case 'relicario_serafin':
+      return `${prefix}tome` as CriptaCombatCardArtKey;
+    case 'espada_oxidada':
+    case 'espada_del_sepulcro':
+    case 'espadon_del_rey_hundido':
+    case 'espada_bastarda_real':
+    default:
+      return `${prefix}sword` as CriptaCombatCardArtKey;
+  }
+}
+
+export const LaCriptaCombatCardArtwork: React.FC<{
+  cardId: string;
+  artKey?: string;
+  weaponId?: CriptaWeaponId;
+  upgradeLevel?: number;
+  isWeaponSpecial?: boolean;
+}> = ({ cardId, artKey, weaponId, upgradeLevel = 1, isWeaponSpecial = false }) => {
+  const resolvedKey = (artKey ||
+    (weaponId
+      ? resolveWeaponCombatArtKey(weaponId, isWeaponSpecial ? 'SPECIAL' : 'ATTACK')
+      : 'common_iron_guard')) as CriptaCombatCardArtKey;
+
+  const entry = combatCardArtRegistry[resolvedKey];
+
+  if (!entry && import.meta.env.DEV) {
+    console.warn(
+      '[La Cripta] Missing combat card artwork:',
+      cardId,
+      artKey
+    );
+  }
+
+  // When the action comes from an equipped weapon, show the actual equipped weapon sprite
+  // paired with its distinct attack/special action effect so weapon identity is always preserved!
+  if (weaponId) {
+    return (
+      <div className="relative flex items-center justify-center w-full h-full">
+        {entry && (
+          <svg
+            viewBox="0 0 36 26"
+            shapeRendering="crispEdges"
+            className={`pointer-events-none absolute inset-0 w-full h-full select-none ${
+              isWeaponSpecial ? 'opacity-95' : 'opacity-70'
+            }`}
+          >
+            {entry.renderSvg()}
+          </svg>
+        )}
+        <div
+          className={`relative z-10 flex items-center justify-center ${
+            isWeaponSpecial ? 'scale-110 -rotate-6' : ''
+          }`}
+        >
+          <LaCriptaWeaponPixelIcon
+            weaponId={weaponId}
+            upgradeLevel={upgradeLevel}
+            size={56}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const safeEntry = entry || combatCardArtRegistry.common_iron_guard;
+  return (
+    <svg
+      viewBox="0 0 36 26"
+      shapeRendering="crispEdges"
+      className="w-full h-full max-w-[116px] max-h-[80px] select-none drop-shadow-[0_4px_10px_rgba(0,0,0,0.85)]"
+    >
+      {safeEntry.renderSvg()}
+    </svg>
+  );
 };
 
 export const LaCriptaCardPixelIllustration: React.FC<{

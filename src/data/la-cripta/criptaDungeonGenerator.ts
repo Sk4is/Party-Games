@@ -1004,6 +1004,21 @@ function buildRoomMinigameForRoom(
   recentFamilies: CriptaMinigameFamilyId[]
 ): CriptaRoomMinigameState | undefined {
   if (
+    roomType === 'EVENT' &&
+    !recentFamilies.includes('CURSED_ROULETTE') &&
+    rng() < 0.42
+  ) {
+    recentFamilies.push('CURSED_ROULETTE');
+    return createAuthoritativeMinigameState(
+      'CURSED_ROULETTE',
+      dungeonId,
+      roomIndex,
+      rng,
+      droppedWeaponId
+    );
+  }
+
+  if (
     roomType === 'PUZZLE' ||
     roomType === 'MINIGAME' ||
     roomType === 'TRAP'
@@ -1266,8 +1281,7 @@ export function generateProceduralDungeon(
       title:
         rType === 'MINIBOSS' || rType === 'BOSS'
           ? minibossArena.arenaTitle
-          : (rType === 'PUZZLE' || rType === 'MINIGAME' || rType === 'TRAP') &&
-            minigame?.title
+          : minigame?.title
           ? minigame.title
           : rType === 'EVENT' && encounterSubject?.name
           ? encounterSubject.name
@@ -1275,8 +1289,7 @@ export function generateProceduralDungeon(
       subtitle:
         rType === 'MINIBOSS' || rType === 'BOSS'
           ? `${minibossArena.arenaSubtitle} · CUSTODIO: ${minibossEnemyName.toUpperCase()}`
-          : (rType === 'PUZZLE' || rType === 'MINIGAME' || rType === 'TRAP') &&
-            minigame?.subtitle
+          : minigame?.subtitle
           ? minigame.subtitle
           : rType === 'EVENT' && encounterSubject?.roleSubtitle
           ? encounterSubject.roleSubtitle
@@ -1288,6 +1301,8 @@ export function generateProceduralDungeon(
           ? `${minibossArena.arenaTitle}: ${minibossEnemyName} aguarda en el santuario final de ${dungeon.name}. Derrotadlo para sellar esta puerta.`
           : rType === 'BOSS'
           ? `La cámara final de ${dungeon.name} tiembla ante la presencia de su guardián supremo.`
+          : minigame?.instructions
+          ? minigame.instructions
           : rType === 'EVENT' && encounterSubject?.dialogueQuote
           ? `${encounterSubject.name}: ${encounterSubject.dialogueQuote}`
           : `Sala ${idx + 1} de ${dungeon.name} (${dungeon.environmentModifiers.join(' · ')}).`,
@@ -1296,7 +1311,7 @@ export function generateProceduralDungeon(
       encounterSubject,
       interactiveObjects,
       enemies,
-      options,
+      options: minigame ? [] : options,
       groundDrops: [],
       shopInventory,
       shopSlots: shopInventory,

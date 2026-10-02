@@ -40,20 +40,25 @@ export const LaCriptaMinigameStageArt: React.FC<LaCriptaMinigameStageArtProps> =
       : 'RUNIC_MEMORY');
 
   const flavor = getBiomeMinigameFlavor(dungeon.id);
-  const [wheelAngle, setWheelAngle] = useState<number>(
+  const wheelDomRef = useRef<HTMLDivElement | null>(null);
+  const needleDomRef = useRef<HTMLDivElement | null>(null);
+  const currentAngleRef = useRef<number>(
     minigame.rouletteLandingAngleDeg || 0
   );
   const [pulsePhase, setPulsePhase] = useState<number>(50);
   const [activeFlashStep, setActiveFlashStep] = useState<number>(-1);
   const lastTickSectorRef = useRef<number>(-1);
 
-  // 1. 60 FPS Roulette Deceleration Animation when rouletteSpinStartedAt changes
+  // 1. 60 FPS Roulette Deceleration Animation via direct DOM transform (0 React state re-renders per frame)
   useEffect(() => {
     if (family !== 'CURSED_ROULETTE') return;
     const targetAngle = minigame.rouletteLandingAngleDeg ?? 0;
     const spinStartedAt = minigame.rouletteSpinStartedAt;
     if (!spinStartedAt) {
-      setWheelAngle(targetAngle);
+      currentAngleRef.current = targetAngle;
+      if (wheelDomRef.current) {
+        wheelDomRef.current.style.transform = `rotate(${targetAngle}deg)`;
+      }
       return;
     }
 
@@ -70,17 +75,32 @@ export const LaCriptaMinigameStageArt: React.FC<LaCriptaMinigameStageArtProps> =
       // Smooth cubic-out deceleration curve (60 FPS)
       const easeOut = 1 - Math.pow(1 - t, 3.4);
       const currentDeg = startAngle + (targetAngle - startAngle) * easeOut;
-      setWheelAngle(currentDeg);
+      currentAngleRef.current = currentDeg;
+
+      if (wheelDomRef.current) {
+        wheelDomRef.current.style.transform = `rotate(${currentDeg.toFixed(2)}deg)`;
+      }
 
       const currentSectorTick = Math.floor(currentDeg / degPerSector);
       if (currentSectorTick !== lastTickSectorRef.current && t < 0.98) {
         lastTickSectorRef.current = currentSectorTick;
         laCriptaAudio.playRouletteTick();
+        if (needleDomRef.current) {
+          needleDomRef.current.style.transform = 'translateX(-50%) rotate(-14deg)';
+          window.setTimeout(() => {
+            if (needleDomRef.current) {
+              needleDomRef.current.style.transform = 'translateX(-50%) rotate(0deg)';
+            }
+          }, 55);
+        }
       }
 
       if (t < 1) {
         rafId = window.requestAnimationFrame(animateWheel);
       } else {
+        if (wheelDomRef.current) {
+          wheelDomRef.current.style.transform = `rotate(${targetAngle}deg)`;
+        }
         const landedIdx = minigame.rouletteLandedSectorIndex ?? 0;
         const landedSec = minigame.rouletteSectors?.[landedIdx];
         laCriptaAudio.playRouletteResult(Boolean(landedSec?.isPositive));
@@ -148,7 +168,7 @@ export const LaCriptaMinigameStageArt: React.FC<LaCriptaMinigameStageArtProps> =
           ? isSuccess
             ? '✦ MECANISMO RESUELTO CON ÉXITO ✦'
             : '✦ MECANISMO ACTIVADO CON PENALIZACIÓN ✦'
-          : `✦ ${CRIPTA_MINIGAME_REGISTRY[family]?.categoryLabel || 'DESAFÍO ACTIVO'} ✦`}
+          : `✦ ${CRIPTA_MINIGAME_REGISTRY[family]?.categoryLabel || 'DESAFÍO ACTIVO'} · ${flavor.biomeTitlePrefix} ✦`}
       </div>
 
       {/* =====================================================================
@@ -156,21 +176,27 @@ export const LaCriptaMinigameStageArt: React.FC<LaCriptaMinigameStageArtProps> =
           ===================================================================== */}
       {family === 'CURSED_ROULETTE' && (
         <div className="relative w-56 h-56 flex items-center justify-center">
-          {/* Top Golden Pointer Needle */}
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center">
+          {/* Top Golden Pointer Needle with 60fps tick deflection */}
+          <div
+            ref={needleDomRef}
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center transition-transform duration-75 origin-top"
+          >
             <svg width="24" height="24" viewBox="0 0 16 16" shapeRendering="crispEdges">
               <rect x="6" y="1" width="4" height="3" fill="#E7A54A" />
               <rect x="5" y="4" width="6" height="4" fill="#FFD166" />
               <rect x="6" y="8" width="4" height="4" fill="#FFF3C4" />
-              <rect x="7" y="12" width="2" height="3" fill="#FF4D6D" />
+              <rect x="7" y="12" width="2" height="3" fill={flavor.accentColor} />
             </svg>
           </div>
 
           {/* 60 FPS GPU-Accelerated Rotating Wheel */}
           <div
-            className="w-52 h-52 rounded-full border-4 border-[#E7A54A] bg-[#0F0A18] shadow-[0_0_36px_rgba(231,165,74,0.35)] relative overflow-hidden"
+            ref={wheelDomRef}
+            className="w-52 h-52 rounded-full border-4 bg-[#0F0A18] relative overflow-hidden"
             style={{
-              transform: `rotate(${wheelAngle}deg)`,
+              borderColor: flavor.accentColor || '#E7A54A',
+              boxShadow: `0 0 36px ${flavor.accentColor || '#E7A54A'}55`,
+              transform: `rotate(${currentAngleRef.current}deg)`,
               willChange: 'transform',
             }}
           >
@@ -194,7 +220,7 @@ export const LaCriptaMinigameStageArt: React.FC<LaCriptaMinigameStageArtProps> =
                     <path
                       d={`M 50 50 L ${x1} ${y1} A 50 50 0 0 1 ${x2} ${y2} Z`}
                       fill={idx % 2 === 0 ? '#181124' : '#231834'}
-                      stroke="#E7A54A"
+                      stroke={flavor.accentColor || '#E7A54A'}
                       strokeWidth="0.8"
                     />
                     <circle
@@ -202,7 +228,7 @@ export const LaCriptaMinigameStageArt: React.FC<LaCriptaMinigameStageArtProps> =
                       cy={labelY}
                       r="5.5"
                       fill={sec.color}
-                      opacity="0.9"
+                      opacity="0.92"
                     />
                   </g>
                 );
@@ -215,7 +241,7 @@ export const LaCriptaMinigameStageArt: React.FC<LaCriptaMinigameStageArtProps> =
                 stroke="#FFD166"
                 strokeWidth="2"
               />
-              <circle cx="50" cy="50" r="5" fill="#E7A54A" />
+              <circle cx="50" cy="50" r="5" fill={flavor.accentColor || '#E7A54A'} />
             </svg>
           </div>
         </div>
@@ -455,11 +481,12 @@ export interface LaCriptaMinigameControlBoardProps {
   partyGold: number;
   iAmDead: boolean;
   onPuzzleInput: (actionCode: number) => void;
+  onPresentationBusyChange?: (busy: boolean) => void;
 }
 
 /**
  * Right-side Interactive Control Board for all 10 Minigame Families.
- * Fits cleanly with ZERO vertical scroll.
+ * Sequences Roulette spins and Puzzle mistake consequences before revealing results.
  */
 export const LaCriptaMinigameControlBoard: React.FC<
   LaCriptaMinigameControlBoardProps
@@ -469,6 +496,7 @@ export const LaCriptaMinigameControlBoard: React.FC<
   partyGold,
   iAmDead,
   onPuzzleInput,
+  onPresentationBusyChange,
 }) => {
   const family: CriptaMinigameFamilyId =
     minigame.family ||
@@ -481,19 +509,81 @@ export const LaCriptaMinigameControlBoard: React.FC<
       : 'RUNIC_MEMORY');
 
   const flavor = getBiomeMinigameFlavor(dungeon.id);
-  const attemptsLeft = Math.max(
-    0,
-    (minigame.maxMistakes ?? 2) - (minigame.mistakes ?? 0)
-  );
+  const maxMistakes = minigame.maxMistakes ?? 3;
+  const mistakes = minigame.mistakes ?? 0;
+  const attemptsLeft = Math.max(0, maxMistakes - mistakes);
+  const heartsDisplay =
+    '♥'.repeat(attemptsLeft) + '♡'.repeat(Math.max(0, maxMistakes - attemptsLeft));
+
   const [pulseTick, setPulseTick] = useState(0);
 
+  // Roulette Spin Suspense Gate (Sections 34-39 & 58):
+  // Never reveal the landed sector or claim buttons until the 2600ms wheel spin finishes!
+  const [isWheelSpinning, setIsWheelSpinning] = useState(false);
+  const lastSpinTimestampRef = useRef<number | undefined>(undefined);
+
   useEffect(() => {
-    if (family !== 'ECLIPSE_PULSE' || minigame.completed) return;
+    if (family !== 'CURSED_ROULETTE') return;
+    const spinTs = minigame.rouletteSpinStartedAt;
+    if (spinTs && spinTs !== lastSpinTimestampRef.current) {
+      lastSpinTimestampRef.current = spinTs;
+      setIsWheelSpinning(true);
+      onPresentationBusyChange?.(true);
+      const timer = window.setTimeout(() => {
+        setIsWheelSpinning(false);
+        onPresentationBusyChange?.(false);
+      }, 2650);
+      return () => {
+        window.clearTimeout(timer);
+      };
+    }
+  }, [family, minigame.rouletteSpinStartedAt, onPresentationBusyChange]);
+
+  // Sequenced Puzzle Failure Consequence State (Sections 40-44 & 57):
+  // Step 1: Wrong rune flashes red + mechanism shakes
+  // Step 2: Consequence banner reveals HP/Gold/Curse penalty
+  // Step 3: Attempts update & puzzle unlocks for retry
+  const prevMistakesRef = useRef<number>(mistakes);
+  const [puzzleFailPhase, setPuzzleFailPhase] = useState<
+    'NONE' | 'FLASH_WRONG' | 'PENALTY_REVEAL'
+  >('NONE');
+  const [lastWrongInputCode, setLastWrongInputCode] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (mistakes > prevMistakesRef.current) {
+      prevMistakesRef.current = mistakes;
+      setPuzzleFailPhase('FLASH_WRONG');
+      onPresentationBusyChange?.(true);
+      laCriptaAudio.playRouletteResult(false);
+      const t1 = window.setTimeout(() => {
+        setPuzzleFailPhase('PENALTY_REVEAL');
+      }, 450);
+      const t2 = window.setTimeout(() => {
+        setPuzzleFailPhase('NONE');
+        setLastWrongInputCode(null);
+        onPresentationBusyChange?.(false);
+      }, 1750);
+      return () => {
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+      };
+    }
+    prevMistakesRef.current = mistakes;
+  }, [mistakes, onPresentationBusyChange]);
+
+  useEffect(() => {
+    return () => {
+      onPresentationBusyChange?.(false);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (family !== 'ECLIPSE_PULSE' || minigame.completed || puzzleFailPhase !== 'NONE') return;
     const id = window.setInterval(() => {
       setPulseTick((t) => (t + 1) % 40);
     }, 55);
     return () => window.clearInterval(id);
-  }, [family, minigame.completed]);
+  }, [family, minigame.completed, puzzleFailPhase]);
 
   const rawPhase = pulseTick <= 20 ? pulseTick : 40 - pulseTick;
   const needlePct = Math.round(4 + (rawPhase / 20) * 92);
@@ -502,13 +592,32 @@ export const LaCriptaMinigameControlBoard: React.FC<
   const inSweetSpot = needlePct >= sweetStart && needlePct <= sweetEnd;
 
   const triggerAction = (code: number) => {
-    if (iAmDead) return;
+    if (iAmDead || isWheelSpinning || puzzleFailPhase !== 'NONE') return;
+    if (family === 'CURSED_ROULETTE' && (code === 0 || code === 2)) {
+      setIsWheelSpinning(true);
+      onPresentationBusyChange?.(true);
+    } else {
+      setLastWrongInputCode(code);
+    }
     laCriptaAudio.playMechanismRotate();
     onPuzzleInput(code);
   };
 
+  const landedRouletteSector =
+    !isWheelSpinning &&
+    typeof minigame.rouletteLandedSectorIndex === 'number' &&
+    minigame.rouletteSectors
+      ? minigame.rouletteSectors[minigame.rouletteLandedSectorIndex]
+      : null;
+
   return (
-    <div className="w-full max-w-3xl bg-[#110C1B]/95 border-2 border-[#E7A54A]/85 p-3.5 sm:p-4 flex flex-col items-center gap-3 shadow-[0_0_28px_rgba(0,0,0,0.85)]">
+    <div
+      className={`w-full max-w-3xl bg-[#110C1B]/95 border-2 p-3.5 sm:p-4 flex flex-col items-center gap-3 shadow-[0_0_28px_rgba(0,0,0,0.85)] transition-all duration-300 ${
+        puzzleFailPhase !== 'NONE'
+          ? 'border-[#E03E52] shadow-[0_0_32px_rgba(224,62,82,0.65)] animate-[criptaHitShake_0.42s_ease-in-out]'
+          : 'border-[#E7A54A]/85'
+      }`}
+    >
       {/* Header Strip */}
       <div className="w-full flex flex-wrap items-center justify-between gap-2 border-b border-[#2E223D] pb-2">
         <div>
@@ -530,9 +639,17 @@ export const LaCriptaMinigameControlBoard: React.FC<
               compact
             />
           )}
-          <div className="px-2.5 py-1 bg-[#1D142B] border border-[#4A3B5C] text-[9px] font-cripta-pixel text-[#E8DFCE]">
-            INTENTOS: {attemptsLeft}
-          </div>
+          {family !== 'CURSED_ROULETTE' && (
+            <div
+              className={`px-2.5 py-1 border text-[10px] font-cripta-pixel font-bold tracking-wider ${
+                mistakes > 0
+                  ? 'bg-[#36111D] border-[#E03E52] text-[#FCA5A5]'
+                  : 'bg-[#1D142B] border-[#4A3B5C] text-[#F87171]'
+              }`}
+            >
+              INTENTOS: {heartsDisplay}
+            </div>
+          )}
         </div>
       </div>
 
@@ -540,6 +657,45 @@ export const LaCriptaMinigameControlBoard: React.FC<
       <p className="text-[11px] font-cripta-pixel text-[#D8C6A0] text-center leading-relaxed">
         {minigame.instructions}
       </p>
+
+      {/* SEQUENCED PUZZLE FAILURE CONSEQUENCE BANNER (Sections 40-44 & 57) */}
+      {puzzleFailPhase !== 'NONE' && (
+        <div className="w-full border-2 border-[#E03E52] bg-gradient-to-r from-[#3B1019] via-[#2A0B14] to-[#3B1019] p-3 text-center shadow-[0_0_24px_rgba(224,62,82,0.5)] animate-[criptaBannerSlideIn_0.22s_cubic-bezier(0.2,0.9,0.3,1)]">
+          <div className="text-[10px] font-cripta-pixel font-bold uppercase tracking-[0.18em] text-[#FCA5A5]">
+            {puzzleFailPhase === 'FLASH_WRONG'
+              ? '⚠ ¡SECUENCIA RÚNICA INCORRECTA!'
+              : `⚡ ${minigame.lastPenaltyDetail?.title || 'TRAMPA RÚNICA ACTIVADA'}`}
+          </div>
+          {puzzleFailPhase === 'PENALTY_REVEAL' && (
+            <>
+              <div className="text-xs font-cripta-pixel text-[#FDE8E8] mt-1">
+                {minigame.lastPenaltyDetail?.description ||
+                  'El mecanismo rechaza la acción y descarga una penalización sobre el grupo.'}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                {minigame.lastPenaltyDetail?.hpLost && (
+                  <span className="px-2.5 py-0.5 bg-[#E03E52]/30 border border-[#E03E52] text-[10px] font-cripta-pixel font-bold text-[#FCA5A5]">
+                    -{minigame.lastPenaltyDetail.hpLost} PV
+                  </span>
+                )}
+                {minigame.lastPenaltyDetail?.goldLost && (
+                  <span className="px-2.5 py-0.5 bg-[#E7A54A]/25 border border-[#E7A54A] text-[10px] font-cripta-pixel font-bold text-[#FDE047]">
+                    -{minigame.lastPenaltyDetail.goldLost} ORO
+                  </span>
+                )}
+                {minigame.lastPenaltyDetail?.statusApplied && (
+                  <span className="px-2.5 py-0.5 bg-[#9B72CF]/30 border border-[#9B72CF] text-[10px] font-cripta-pixel font-bold text-[#E9D8FD]">
+                    +{minigame.lastPenaltyDetail.statusApplied}
+                  </span>
+                )}
+                <span className="px-2.5 py-0.5 bg-black/45 border border-white/20 text-[10px] font-cripta-pixel font-bold text-[#F5EFE6]">
+                  INTENTOS: {heartsDisplay}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* =====================================================================
           1. RUNIC_MEMORY (6 Runic Pedestals)
@@ -564,14 +720,18 @@ export const LaCriptaMinigameControlBoard: React.FC<
                   minigame.currentStep || 0
                 ] === rIdx;
               const alreadyPressed = (minigame.playerInputs || []).includes(rIdx);
+              const isWrongFlash =
+                puzzleFailPhase !== 'NONE' && lastWrongInputCode === rIdx;
               return (
                 <button
                   key={rIdx}
                   type="button"
-                  disabled={iAmDead}
+                  disabled={iAmDead || puzzleFailPhase !== 'NONE'}
                   onClick={() => triggerAction(rIdx)}
                   className={`p-2.5 border-2 flex flex-col items-center gap-1 cursor-pointer transition-all ${
-                    alreadyPressed
+                    isWrongFlash
+                      ? 'bg-[#45121E] border-[#E03E52] text-[#FCA5A5] scale-95 shadow-[0_0_20px_rgba(224,62,82,0.85)]'
+                      : alreadyPressed
                       ? 'bg-[#13291E] border-[#5EA87A] text-[#8EE6AE]'
                       : expectedNow
                       ? 'bg-[#221638] hover:bg-[#2E1E4A] border-[#FFD166] text-[#F5EFE6] shadow-[0_0_12px_rgba(255,209,102,0.3)]'
@@ -595,19 +755,21 @@ export const LaCriptaMinigameControlBoard: React.FC<
       )}
 
       {/* =====================================================================
-          2. CURSED_ROULETTE (Spin Wheel / Claim / Reroll)
+          2. CURSED_ROULETTE (Spin Wheel -> Wait for Stop -> Reveal -> Claim)
           ===================================================================== */}
       {family === 'CURSED_ROULETTE' && (
         <div className="w-full flex flex-col items-center gap-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 w-full">
             {(minigame.rouletteSectors || []).map((sec, idx) => {
-              const isLanded = minigame.rouletteLandedSectorIndex === idx;
+              // NEVER highlight the landed sector while the wheel is still spinning!
+              const isLanded =
+                !isWheelSpinning && minigame.rouletteLandedSectorIndex === idx;
               return (
                 <div
                   key={sec.id}
                   className={`px-2 py-1.5 border text-center transition-all ${
                     isLanded
-                      ? 'bg-[#2A1C12] border-[#FFD166] text-[#FFD166] shadow-[0_0_12px_rgba(255,209,102,0.4)] scale-105'
+                      ? 'bg-[#2A1C12] border-[#FFD166] text-[#FFD166] shadow-[0_0_16px_rgba(255,209,102,0.55)] scale-105 ring-1 ring-[#FFF3C4]'
                       : sec.isPositive
                       ? 'bg-[#141E19] border-[#3B7A54] text-[#8EE6AE]'
                       : 'bg-[#21111A] border-[#8F263D] text-[#FF8FA3]'
@@ -621,8 +783,30 @@ export const LaCriptaMinigameControlBoard: React.FC<
             })}
           </div>
 
+          {/* Revealed Outcome Banner ONLY after wheel stops */}
+          {landedRouletteSector && (
+            <div
+              className={`w-full px-3.5 py-2.5 border-2 text-center animate-[criptaBannerSlideIn_0.25s_cubic-bezier(0.2,0.9,0.3,1)] ${
+                landedRouletteSector.isPositive
+                  ? 'bg-[#13291E]/95 border-[#5EA87A] text-[#8EE6AE]'
+                  : 'bg-[#2E111B]/95 border-[#E03E52] text-[#FCA5A5]'
+              }`}
+            >
+              <div className="text-[10px] font-cripta-pixel font-bold uppercase tracking-widest text-[#FFD166]">
+                ✦ VEREDICTO DE LA RUEDA: {landedRouletteSector.label} ✦
+              </div>
+              <div className="text-xs font-cripta-pixel mt-0.5 text-[#F5EFE6]">
+                {landedRouletteSector.description}
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {(minigame.rouletteSpinCount || 0) === 0 ? (
+            {isWheelSpinning ? (
+              <div className="px-6 py-2.5 bg-[#1D142B] border-2 border-[#E7A54A] text-[#FFD166] font-cripta-pixel text-xs font-bold uppercase tracking-wider animate-pulse">
+                🎡 GIRANDO LA RUEDA DEL DESTINO...
+              </div>
+            ) : (minigame.rouletteSpinCount || 0) === 0 ? (
               <button
                 type="button"
                 disabled={iAmDead}
@@ -637,9 +821,9 @@ export const LaCriptaMinigameControlBoard: React.FC<
                   type="button"
                   disabled={iAmDead}
                   onClick={() => triggerAction(1)}
-                  className="px-5 py-2 bg-[#163022] hover:bg-[#1F422F] border-2 border-[#5EA87A] text-[#8EE6AE] font-cripta-pixel text-xs font-bold uppercase tracking-wider cursor-pointer"
+                  className="px-5 py-2 bg-[#163022] hover:bg-[#1F422F] border-2 border-[#5EA87A] text-[#8EE6AE] font-cripta-pixel text-xs font-bold uppercase tracking-wider cursor-pointer shadow-[0_0_16px_rgba(94,168,122,0.35)]"
                 >
-                  ✓ ACEPTAR DESTINO Y RECLAMAR
+                  ✓ ACEPTAR DESTINO Y CONTINUAR
                 </button>
                 {minigame.rouletteCanReroll && (
                   <button

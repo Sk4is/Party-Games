@@ -193,9 +193,19 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
   const activeSceneId: CriptaSceneId = useMemo(() => {
     if (!expeditionState) return 'ENTRY';
     if (expeditionState.phase === 'LOBBY') return 'LOBBY';
-    if (expeditionState.phase === 'RUN_VICTORY') return 'RUN_VICTORY';
+    if (
+      expeditionState.phase === 'RUN_VICTORY' ||
+      expeditionState.phase === 'FINAL_BOSS_VICTORY'
+    ) {
+      return 'RUN_VICTORY';
+    }
     if (expeditionState.phase === 'FINAL_BOSS_COMBAT') return 'FINAL_BOSS_COMBAT';
-    if (expeditionState.phase === 'FINAL_BOSS_ENTRANCE') return 'FINAL_BOSS_ENTRANCE';
+    if (
+      expeditionState.phase === 'FINAL_BOSS_ENTRANCE' ||
+      expeditionState.phase === 'FINAL_BOSS_DOOR_READY'
+    ) {
+      return 'FINAL_BOSS_ENTRANCE';
+    }
     if (expeditionState.phase === 'RETURNING_TO_DOORS') return 'RETURNING_TO_DOORS';
     if (
       expeditionState.phase === 'DUNGEON' ||
@@ -254,13 +264,17 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
     activeGoldBurst,
     playerAnimationStates,
     enemyAnimStates,
+    enemyLifecycleStates,
     presentedEnemyHp,
     presentedPlayerHp,
     dyingEnemies,
     hideGroundDropsDuringDeath,
+    presentedExpeditionDefeated,
     playerCardImpacts,
     activeRelicRevealId,
     showBossPhaseTransition,
+    activeActingEnemyId,
+    activeTargetedPlayerIdsDuringPresentation,
   } = useLaCriptaPresentationQueue(expeditionState);
 
   // Unified Contextual Side Panel State (only ONE panel open at a time)
@@ -310,12 +324,14 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
   const isFullViewportGame = Boolean(
     expeditionState &&
       expeditionState.phase !== 'LOBBY' &&
-      expeditionState.phase !== 'RUN_VICTORY'
+      expeditionState.phase !== 'RUN_VICTORY' &&
+      expeditionState.phase !== 'FINAL_BOSS_VICTORY'
   );
 
   const activeAtmosphereDungeon = useMemo(() => {
     if (!expeditionState) return CRIPTA_DUNGEONS_REGISTRY.catacumbas_del_rey;
     if (
+      expeditionState.phase === 'FINAL_BOSS_DOOR_READY' ||
       expeditionState.phase === 'FINAL_BOSS_ENTRANCE' ||
       expeditionState.phase === 'FINAL_BOSS_COMBAT'
     ) {
@@ -373,7 +389,7 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
   return (
     <div
       onPointerMove={handlePointerMove}
-      className={`relative w-full bg-[#06080D] text-[#D9D0BC] flex flex-col justify-between overflow-x-hidden selection:bg-[#E7A54A] selection:text-[#0B0A0E] ${
+      className={`gameScreen relative w-full bg-[#06080D] text-[#D9D0BC] flex flex-col justify-between overflow-x-hidden selection:bg-[#E7A54A] selection:text-[#0B0A0E] ${
         isFullViewportGame
           ? 'h-[100dvh] max-h-[100dvh] overflow-hidden'
           : 'min-h-screen'
@@ -476,20 +492,23 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
         />
       )}
 
-      {expeditionState && expeditionState.phase === 'RUN_VICTORY' && (
-        <LaCriptaRunVictoryScreen
-          expeditionState={expeditionState}
-          currentPlayerId={playerId}
-          onNewExpedition={startExpedition}
-          onReturnToLobby={returnToLobby}
-        />
-      )}
+      {expeditionState &&
+        (expeditionState.phase === 'RUN_VICTORY' ||
+          expeditionState.phase === 'FINAL_BOSS_VICTORY') && (
+          <LaCriptaRunVictoryScreen
+            expeditionState={expeditionState}
+            currentPlayerId={playerId}
+            onNewExpedition={startExpedition}
+            onReturnToLobby={returnToLobby}
+          />
+        )}
 
       {expeditionState &&
         (expeditionState.phase === 'THREE_DOORS' ||
           expeditionState.phase === 'RETURNING_TO_DOORS' ||
           expeditionState.phase === 'ENTERING_DUNGEON' ||
           expeditionState.phase === 'DOOR_OPENING' ||
+          expeditionState.phase === 'FINAL_BOSS_DOOR_READY' ||
           expeditionState.phase === 'FINAL_BOSS_ENTRANCE' ||
           expeditionState.phase === 'FINAL_BOSS_COMBAT' ||
           expeditionState.phase === 'DUNGEON' ||
@@ -499,12 +518,18 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
             currentPlayerId={playerId}
             activeVisualEvents={activeVisualEvents}
             enemyAnimStates={enemyAnimStates}
+            enemyLifecycleStates={enemyLifecycleStates}
             isPresentingSequence={isPresentingSequence}
             presentationBannerText={presentationBannerText}
             hitStopActive={hitStopActive}
             presentedEnemyHp={presentedEnemyHp}
             dyingEnemies={dyingEnemies}
             hideGroundDropsDuringDeath={hideGroundDropsDuringDeath}
+            presentedExpeditionDefeated={presentedExpeditionDefeated}
+            activeActingEnemyId={activeActingEnemyId}
+            activeTargetedPlayerIdsDuringPresentation={
+              activeTargetedPlayerIdsDuringPresentation
+            }
             onVoteDoor={voteDoor}
             onVoteFinalBossDoor={voteFinalBossDoor}
             onRetryDungeonInit={retryDungeonInit}
@@ -555,6 +580,9 @@ export const LaCriptaGame: React.FC<LaCriptaGameProps> = ({
           onInspectPlayer={handleInspectPlayer}
           inspectedPlayerId={
             contextualPanelMode === 'PLAYER_INSPECTION' ? inspectedPlayerId : null
+          }
+          activeTargetedPlayerIdsDuringPresentation={
+            activeTargetedPlayerIdsDuringPresentation
           }
         />
       )}
