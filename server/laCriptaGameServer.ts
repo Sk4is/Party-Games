@@ -23,7 +23,9 @@ import {
   CRIPTA_DUNGEONS_REGISTRY,
   normalizeCriptaCharacterId,
   selectThreeDistinctDungeons,
+  LA_CRIPTA_SCHEMA_VERSION,
 } from '../src/data/la-cripta/criptaCatalog';
+
 import {
   generateProceduralDungeon,
 } from '../src/data/la-cripta/criptaDungeonGenerator';
@@ -206,7 +208,11 @@ export class LaCriptaServer {
     this.wss.on('connection', (ws: WebSocket) => {
       this.handleConnection(ws);
     });
+    console.log(
+      `[LaCripta] Character registry loaded: ${ALL_CRIPTA_CHARACTER_IDS.length} (schema v${LA_CRIPTA_SCHEMA_VERSION})`
+    );
   }
+
 
   private handleConnection(ws: WebSocket) {
     ws.on('message', (data: string) => {
@@ -779,9 +785,17 @@ export class LaCriptaServer {
 
         const charId = normalizeCriptaCharacterId(msg.characterId);
         if (!charId || !ALL_CRIPTA_CHARACTER_IDS.includes(charId)) {
+          console.warn(
+            `[LaCripta] Invalid characterId requested: ${JSON.stringify(msg.characterId)} | Available: ${ALL_CRIPTA_CHARACTER_IDS.join(', ')}`
+          );
           this.sendError(ws, 'Ese aventurero no existe en La Cripta.');
           return;
         }
+
+        console.log(
+          `[LaCripta] Character selected: ${charId.toUpperCase()} by player ${player.name} (${player.id})`
+        );
+
 
         // Authoritative exclusivity check: no two players can occupy the same character
         const occupiedByOther = room.players.find(

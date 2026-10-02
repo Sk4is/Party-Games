@@ -28,28 +28,29 @@ export const CRIPTA_CURSOR_COLORS: { id: string; label: string; hex: string }[] 
   { id: 'verdant_moss', label: 'Musgo de Cripta', hex: '#5EA87A' },
 ];
 
-export const ALL_CRIPTA_CHARACTER_IDS: CriptaCharacterId[] = [
-  'caballero',
-  'mago',
-  'picaro',
-  'cazador',
-  'clerigo',
-  'alquimista',
-  'barbaro',
-  'bardo',
-  'nigromante',
-];
+import {
+  ALL_CRIPTA_CHARACTER_IDS,
+  ALL_CRIPTA_UPPERCASE_IDS,
+  normalizeCriptaCharacterId,
+  LA_CRIPTA_SCHEMA_VERSION,
+  CRIPTA_CHARACTER_DISPLAY_NAMES,
+  CRIPTA_CHARACTER_ALIASES,
+  toCanonicalUppercaseId,
+  assertCharacterRegistryCompleteness,
+} from './criptaCharacterContract';
 
-export function normalizeCriptaCharacterId(raw: unknown): CriptaCharacterId | null {
-  if (!raw || typeof raw !== 'string') return null;
-  const clean = raw.trim().toLowerCase();
-  if (clean === 'bruja') return 'mago';
-  if (clean === 'cazadora') return 'cazador';
-  if ((ALL_CRIPTA_CHARACTER_IDS as string[]).includes(clean)) {
-    return clean as CriptaCharacterId;
-  }
-  return null;
-}
+export {
+  ALL_CRIPTA_CHARACTER_IDS,
+  ALL_CRIPTA_UPPERCASE_IDS,
+  normalizeCriptaCharacterId,
+  LA_CRIPTA_SCHEMA_VERSION,
+  CRIPTA_CHARACTER_DISPLAY_NAMES,
+  CRIPTA_CHARACTER_ALIASES,
+  toCanonicalUppercaseId,
+  assertCharacterRegistryCompleteness,
+};
+
+
 
 export const CRIPTA_CHARACTERS_CATALOG: Record<CriptaCharacterId, CriptaCharacterDefinition> = {
   caballero: {
@@ -1691,3 +1692,7 @@ export function generatePhase1ArrivalNodes(dungeonId: CriptaDungeonId): CriptaRo
     },
   ];
 }
+
+// Development assertion for contract consistency
+assertCharacterRegistryCompleteness(CRIPTA_CHARACTERS_CATALOG);
+

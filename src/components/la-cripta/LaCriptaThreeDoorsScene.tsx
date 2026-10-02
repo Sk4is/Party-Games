@@ -27,7 +27,9 @@ import {
 import {
   CRIPTA_CHARACTERS_CATALOG,
   CRIPTA_DUNGEONS_REGISTRY,
+  normalizeCriptaCharacterId,
 } from '../../data/la-cripta/criptaCatalog';
+
 import {
   CRIPTA_ITEMS_REGISTRY,
   CRIPTA_RELICS_REGISTRY,
@@ -1438,9 +1440,10 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                   {/* Fallen Party Portraits Strip */}
                   <div className="w-full flex flex-wrap items-center justify-center gap-2.5 py-1">
                     {expeditionState.players
-                      .filter((p) => p.isConnected)
+                      .filter((p) => p.isConnected && p.characterId)
                       .map((p) => {
-                        const cId = (p.characterId || 'caballero') as CriptaCharacterId;
+                        const cId = normalizeCriptaCharacterId(p.characterId);
+                        if (!cId) return null;
                         const cDef = CRIPTA_CHARACTERS_CATALOG[cId];
                         return (
                           <div
@@ -1469,6 +1472,7 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         );
                       })}
                   </div>
+
 
                   {/* Expedition Summary Metrics: Mazmorra, Sala, Enemigos Derrotados, Oro Obtenido */}
                   <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
@@ -1651,17 +1655,18 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                         ☠ HAS CAÍDO EN COMBATE · MODO ESPECTADOR
                       </div>
                       <div className="flex items-center gap-3">
-                        {me && (
+                        {me && me.characterId && (
                           <div className="grayscale contrast-125">
                             <LaCriptaPixelSprite
                               characterId={
-                                (me.characterId || 'caballero') as CriptaCharacterId
+                                normalizeCriptaCharacterId(me.characterId) || me.characterId
                               }
                               animationState="debuff"
                               size="sm"
                             />
                           </div>
                         )}
+
                         <div className="text-left">
                           <div className="text-sm font-cripta-display font-black text-[#F5EFE6] uppercase">
                             {me?.name || 'Aventurero'} — 0 / {me?.maxHp || 0} PV

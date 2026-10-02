@@ -16,6 +16,11 @@ import { CantinaServer } from './server/cantinaGameServer';
 import { FortunariumServer } from './server/fortunariumGameServer';
 import { LaCriptaServer } from './server/laCriptaGameServer';
 import { roomRegistry } from './server/roomRegistry';
+import {
+  ALL_CRIPTA_CHARACTER_IDS,
+  LA_CRIPTA_SCHEMA_VERSION,
+} from './src/data/la-cripta/criptaCatalog';
+
 
 dotenv.config();
 
@@ -139,8 +144,12 @@ app.get(['/health', '/api/health'], (req, res) => {
     uptime: process.uptime(),
     dictionaryWordsCount: spanishDictionarySet?.size || 0,
     hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    laCriptaSchemaVersion: LA_CRIPTA_SCHEMA_VERSION,
+    laCriptaCharactersCount: ALL_CRIPTA_CHARACTER_IDS.length,
+    laCriptaCharacters: ALL_CRIPTA_CHARACTER_IDS,
   });
 });
+
 
 // Real Spanish Word & Sequence Validation Endpoint
 app.post('/api/validate-word', async (req, res) => {

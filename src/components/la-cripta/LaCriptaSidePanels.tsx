@@ -13,7 +13,9 @@ import {
 import {
   CRIPTA_CHARACTERS_CATALOG,
   CRIPTA_DUNGEONS_REGISTRY,
+  normalizeCriptaCharacterId,
 } from '../../data/la-cripta/criptaCatalog';
+
 import {
   CRIPTA_ITEMS_REGISTRY,
   CRIPTA_RELICS_REGISTRY,
@@ -563,10 +565,8 @@ export const LaCriptaContextualSidePanel: React.FC<
         {mode === 'PLAYER_INSPECTION' && inspectedPlayer && (
           <>
             {(() => {
-              const charId =
-                inspectedPlayer.characterId ||
-                inspectedPlayer.selectedCharacterId ||
-                'caballero';
+              const rawId = inspectedPlayer.characterId || inspectedPlayer.selectedCharacterId;
+              const charId = (rawId ? normalizeCriptaCharacterId(rawId) : null) || 'caballero';
               const charDef = CRIPTA_CHARACTERS_CATALOG[charId];
               const effStats = computePlayerEffectiveStats(inspectedPlayer);
               const eqWeapon = getEquippedWeaponForPlayer(inspectedPlayer);

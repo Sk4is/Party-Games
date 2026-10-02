@@ -651,7 +651,7 @@ export function generateShopInventoryForRoom(
       name: 'Hacha de la Forja Infernal',
       rarity: 'RARA',
       description: '7–9 DAÑO (ATQ) · Aplica Quemadura · Técnica: Hendidura Ígnea.',
-      classes: ['caballero', 'cazador'],
+      classes: ['caballero', 'cazador', 'barbaro'],
       price: 76,
     },
     {
@@ -659,7 +659,7 @@ export function generateShopInventoryForRoom(
       name: 'Alabarda del Juramento',
       rarity: 'LEGENDARIA',
       description: '8–12 DAÑO (ATQ) · +3 ATQ, +2 DEF · Técnica: Barrido del Bastión (Área + Escudo).',
-      classes: ['caballero'],
+      classes: ['caballero', 'barbaro'],
       price: 96,
     },
     {
@@ -667,7 +667,7 @@ export function generateShopInventoryForRoom(
       name: 'Vara de Cristal Astral',
       rarity: 'POCO COMÚN',
       description: '5–8 DAÑO (MAG) · +1 MAG, +8% Crítico · Técnica: Rayo Prismático.',
-      classes: ['mago', 'clerigo'],
+      classes: ['mago', 'clerigo', 'bardo'],
       price: 58,
     },
     {
@@ -675,7 +675,7 @@ export function generateShopInventoryForRoom(
       name: 'Códice de las Sombras',
       rarity: 'RARA',
       description: '6–9 DAÑO (MAG) · +2 MAG · Técnica: Tormenta del Vacío (Área).',
-      classes: ['mago', 'alquimista'],
+      classes: ['mago', 'alquimista', 'nigromante'],
       price: 80,
     },
     {
@@ -683,7 +683,7 @@ export function generateShopInventoryForRoom(
       name: 'Cetro del Eclipse Abisal',
       rarity: 'LEGENDARIA',
       description: '8–11 DAÑO (MAG) · +3 MAG, +12% Crítico · Técnica: Supernova del Umbral.',
-      classes: ['mago'],
+      classes: ['mago', 'nigromante'],
       price: 98,
     },
     {
@@ -691,7 +691,7 @@ export function generateShopInventoryForRoom(
       name: 'Hojas Colmillo Venenoso',
       rarity: 'POCO COMÚN',
       description: '5–7 DAÑO (ATQ) · +12% Crítico, aplica Veneno · Técnica: Doble Colmillo.',
-      classes: ['picaro'],
+      classes: ['picaro', 'bardo'],
       price: 58,
     },
     {
@@ -699,7 +699,7 @@ export function generateShopInventoryForRoom(
       name: 'Estoque Carmesí',
       rarity: 'RARA',
       description: '7–10 DAÑO (ATQ) · +2 ATQ, +18% Crítico · Técnica: Estocada Imperial (Perfora DEF).',
-      classes: ['picaro'],
+      classes: ['picaro', 'bardo'],
       price: 84,
     },
     {
@@ -707,7 +707,7 @@ export function generateShopInventoryForRoom(
       name: 'Guadaña de Sombra Real',
       rarity: 'LEGENDARIA',
       description: '9–12 DAÑO (ATQ) · +3 ATQ, +20% Crítico · Técnica: Cosecha de Sombras.',
-      classes: ['picaro', 'cazador'],
+      classes: ['picaro', 'cazador', 'nigromante'],
       price: 98,
     },
     {
@@ -739,7 +739,7 @@ export function generateShopInventoryForRoom(
       name: 'Martillo del Juicio Consagrado',
       rarity: 'POCO COMÚN',
       description: '6–8 DAÑO (MAG) · +2 DEF, +25% vs No-Muertos · Técnica: Sentencia de Luz.',
-      classes: ['clerigo', 'caballero'],
+      classes: ['clerigo', 'caballero', 'barbaro'],
       price: 62,
     },
     {
@@ -747,7 +747,7 @@ export function generateShopInventoryForRoom(
       name: 'Cetro del Alba Sagrada',
       rarity: 'RARA',
       description: '6–8 DAÑO (MAG) · +2 MAG, +25% Curación · Técnica: Luz del Alba (Daño + Cura).',
-      classes: ['clerigo'],
+      classes: ['clerigo', 'bardo'],
       price: 76,
     },
     {
@@ -779,9 +779,58 @@ export function generateShopInventoryForRoom(
       name: 'Pico de Minero Rúnico',
       rarity: 'POCO COMÚN',
       description: '6–8 DAÑO (ATQ) · +1 ATQ, +1 DEF · Técnica: Golpe Sísmico (Rompe armadura).',
-      classes: ['caballero', 'cazador', 'alquimista'],
+      classes: ['caballero', 'cazador', 'alquimista', 'barbaro'],
       price: 52,
     },
+    {
+      id: 'gran_hacha_barbara',
+      name: 'Gran Hacha Bárbara',
+      rarity: 'POCO COMÚN',
+      description: '6–8 DAÑO (ATQ) · +1 ATQ · Técnica: Hendidura Sangrienta (+25 Furia).',
+      classes: ['barbaro'],
+      price: 56,
+    },
+    {
+      id: 'mazo_colosal_rompecraneos',
+      name: 'Mazo Colosal Rompecráneos',
+      rarity: 'RARA',
+      description: '8–11 DAÑO (ATQ) · +2 ATQ, rompe 4 Armadura · Técnica: Aplastamiento Brutal.',
+      classes: ['barbaro', 'caballero'],
+      price: 82,
+    },
+    {
+      id: 'laud_resonancia_arcana',
+      name: 'Laúd de Resonancia Arcana',
+      rarity: 'POCO COMÚN',
+      description: '5–7 DAÑO (MAG) · +1 MAG, +1 AGI · Técnica: Acorde de Tempo (+1 Compás).',
+      classes: ['bardo'],
+      price: 56,
+    },
+    {
+      id: 'viola_del_eclipse',
+      name: 'Viola del Eclipse Astral',
+      rarity: 'RARA',
+      description: '7–9 DAÑO (MAG) · +2 MAG, +12% Crítico · Técnica: Serenata de la Sombra.',
+      classes: ['bardo'],
+      price: 80,
+    },
+    {
+      id: 'guadana_de_hueso',
+      name: 'Guadaña de Hueso Ancestral',
+      rarity: 'POCO COMÚN',
+      description: '5–8 DAÑO (MAG) · +1 MAG, drena 3 PV · Técnica: Cosecha Sombría (+2 Esencia).',
+      classes: ['nigromante'],
+      price: 58,
+    },
+    {
+      id: 'grimorio_sepulcral',
+      name: 'Grimorio Sepulcral',
+      rarity: 'RARA',
+      description: '7–10 DAÑO (MAG) · +2 MAG, aplica Maldición · Técnica: Festín Cadavérico.',
+      classes: ['nigromante'],
+      price: 82,
+    },
+
   ];
 
   const unownedWeaponPool = shopWeaponPool.filter(

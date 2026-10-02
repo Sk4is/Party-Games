@@ -1,13 +1,20 @@
-export type CriptaCharacterId =
-  | 'caballero'
-  | 'mago'
-  | 'picaro'
-  | 'cazador'
-  | 'clerigo'
-  | 'alquimista'
-  | 'barbaro'
-  | 'bardo'
-  | 'nigromante';
+import type {
+  CriptaCharacterId,
+  CriptaCanonicalUppercaseId,
+} from '../data/la-cripta/criptaCharacterContract';
+
+export type {
+  CriptaCharacterId,
+  CriptaCanonicalUppercaseId,
+};
+
+export {
+  ALL_CRIPTA_CHARACTER_IDS,
+  ALL_CRIPTA_UPPERCASE_IDS,
+  LA_CRIPTA_SCHEMA_VERSION,
+} from '../data/la-cripta/criptaCharacterContract';
+
+
 
 export type CriptaClassResourceKind =
   | 'GUARDIA'

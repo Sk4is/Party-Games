@@ -19,7 +19,8 @@ import type {
   CriptaWeaponRuneDefinition,
   CriptaWeaponRuneId,
 } from '../../types/laCripta';
-import { CRIPTA_CHARACTERS_CATALOG } from './criptaCatalog';
+import { CRIPTA_CHARACTERS_CATALOG, normalizeCriptaCharacterId } from './criptaCatalog';
+
 import { playerHasStatus } from './criptaStatusEffects';
 import { playerHasRelic } from './criptaItemsAndRelics';
 
@@ -1336,7 +1337,8 @@ export function getEquippedWeaponForPlayer(player: CriptaPlayer): {
   effectiveOnHitStatus?: CriptaStatusEffectType;
   effectiveOnCritStatus?: CriptaStatusEffectType;
 } {
-  const charId = player.characterId || player.selectedCharacterId || 'caballero';
+  const rawCharId = player.characterId || player.selectedCharacterId;
+  const charId = (rawCharId ? normalizeCriptaCharacterId(rawCharId) : null) || 'caballero';
   const fallbackId = STARTER_WEAPON_BY_CLASS[charId] || 'espada_oxidada';
   const weaponId = player.equippedWeaponId || fallbackId;
   const weapon = CRIPTA_WEAPONS_REGISTRY[weaponId] || CRIPTA_WEAPONS_REGISTRY[fallbackId];
@@ -1436,7 +1438,8 @@ export function computePlayerEffectiveStats(player: CriptaPlayer): {
   potionBoostPct: number;
   healBoostPct: number;
 } {
-  const charId = player.characterId || player.selectedCharacterId || 'caballero';
+  const rawCharId = player.characterId || player.selectedCharacterId;
+  const charId = (rawCharId ? normalizeCriptaCharacterId(rawCharId) : null) || 'caballero';
   const charDef = CRIPTA_CHARACTERS_CATALOG[charId];
   const eqWeapon = getEquippedWeaponForPlayer(player);
   const armorDef = player.equippedArmorId ? CRIPTA_ARMORS_REGISTRY[player.equippedArmorId] : null;
@@ -2007,7 +2010,8 @@ export function getWeaponVsEnemyMatchupSummary(
   deltaPct: number;
 } {
   const eq = getEquippedWeaponForPlayer(player);
-  const charId = player.characterId || player.selectedCharacterId || 'caballero';
+  const rawCharId = player.characterId || player.selectedCharacterId;
+  const charId = (rawCharId ? normalizeCriptaCharacterId(rawCharId) : null) || 'caballero';
   const profile = getEnemyWeaknessAndResistanceProfile(enemy);
 
   const activeTags = new Set<CriptaDamageType>();
@@ -2160,7 +2164,8 @@ export function estimatePlayerActionDamage(
 } {
   const eq = getEquippedWeaponForPlayer(player);
   const stats = computePlayerEffectiveStats(player);
-  const charId = player.characterId || player.selectedCharacterId || 'caballero';
+  const rawCharId = player.characterId || player.selectedCharacterId;
+  const charId = (rawCharId ? normalizeCriptaCharacterId(rawCharId) : null) || 'caballero';
   const charDef = CRIPTA_CHARACTERS_CATALOG[charId];
   const dmgMeta = CRIPTA_DAMAGE_TYPE_META[eq.activeDamageType] || CRIPTA_DAMAGE_TYPE_META.FISICO;
   const selectedAbility =

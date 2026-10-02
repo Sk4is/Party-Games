@@ -11,6 +11,12 @@ import {
   CriptaWeaponRuneId,
 } from '../types/laCripta';
 import {
+  ALL_CRIPTA_CHARACTER_IDS,
+  normalizeCriptaCharacterId,
+  LA_CRIPTA_SCHEMA_VERSION,
+} from '../data/la-cripta/criptaCatalog';
+
+import {
   createOnlineRoom,
   validateJoinOnlineRoom,
   PlayerProfile,
@@ -87,6 +93,15 @@ export function useLaCriptaSocket({
   const lastCursorSentAtRef = useRef<number>(0);
   const latestStateVersionRef = useRef<number>(0);
   const lockedExpeditionIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log(
+        `[LaCripta] Character contract - client characters: ${ALL_CRIPTA_CHARACTER_IDS.length} (schema v${LA_CRIPTA_SCHEMA_VERSION})`
+      );
+    }
+  }, []);
+
   const reconnectAttemptsRef = useRef<number>(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -559,10 +574,17 @@ export function useLaCriptaSocket({
 
   const selectCharacter = useCallback(
     (characterId: CriptaCharacterId | null) => {
-      sendMessage({ type: 'SELECT_CHARACTER', characterId });
+      const normalized = characterId ? normalizeCriptaCharacterId(characterId) : null;
+      if (import.meta.env.DEV && normalized) {
+        console.log(
+          `[LaCripta] Character contract - selected: ${normalized.toUpperCase()} (raw input: ${characterId})`
+        );
+      }
+      sendMessage({ type: 'SELECT_CHARACTER', characterId: normalized });
     },
     [sendMessage]
   );
+
 
   const setCursorColor = useCallback(
     (color: string) => {

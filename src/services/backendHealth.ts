@@ -6,8 +6,10 @@
  */
 
 import { getApiUrl } from '../config/network';
+import { LA_CRIPTA_SCHEMA_VERSION } from '../data/la-cripta/criptaCatalog';
 
 export interface BackendConnectionState {
+
   isOverlayVisible: boolean;
   statusTitle: string;
   subText: string;
@@ -114,8 +116,24 @@ class BackendHealthService {
 
       if (res.ok) {
         this.lastHealthyTimestamp = Date.now();
+        res
+          .json()
+          .then((data) => {
+            if (data?.laCriptaSchemaVersion !== undefined) {
+              if (
+                typeof data.laCriptaSchemaVersion === 'number' &&
+                data.laCriptaSchemaVersion < LA_CRIPTA_SCHEMA_VERSION
+              ) {
+                console.warn(
+                  `[LaCripta] Production backend version mismatch! Remote server schema is v${data.laCriptaSchemaVersion} (${data.laCriptaCharactersCount || 6} characters), but client requires schema v${LA_CRIPTA_SCHEMA_VERSION} (9 characters). Please redeploy the Render Web Service with latest backend build.`
+                );
+              }
+            }
+          })
+          .catch(() => {});
         return true;
       }
+
       return false;
     } catch {
       return false;
