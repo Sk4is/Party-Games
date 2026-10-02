@@ -9,6 +9,7 @@ import {
 import { resolveEnemyVisualBlueprint } from '../../data/la-cripta/criptaBiomeBestiary';
 import { LaCriptaUniqueBiomeSpriteSvg } from './LaCriptaUniqueBiomeSpriteRenderer';
 import { ENEMY_VISUAL_REGISTRY } from './bestiary/LaCriptaBestiaryRegistry';
+import { getResolvedEnemyVisualMeta } from './bestiary/LaCriptaBestiaryShared';
 
 const PRIMARY_AUTHORED_RIG_OWNER_SLUGS = new Set<string>([
   'guardian_de_la_cripta',
@@ -1598,21 +1599,51 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
     statusAppliedFlash,
   ]);
 
-  // Compute responsive display size with multi-enemy depth & relative creature scale (Requirement 4)
+  // Compute responsive display size with real size classes & exact source aspect ratio (Requirements 1-6, 21-26, 30)
   const registryEntry = ENEMY_VISUAL_REGISTRY[uniqueBlueprint.id];
-  const authoredScale =
-    registryEntry?.scaleMultiplier ?? uniqueBlueprint.scaleFactor ?? 1.24;
-  const baseUnitPx = enemy.isFinalBoss
-    ? 176
-    : enemy.isMiniboss || enemy.isBoss
-    ? 172
-    : 182;
-  const crowdFactor =
-    totalVisibleEnemies >= 3 ? 0.78 : totalVisibleEnemies === 2 ? 0.9 : 1.0;
+  const visualMeta = useMemo(
+    () =>
+      getResolvedEnemyVisualMeta(
+        uniqueBlueprint.id,
+        uniqueBlueprint,
+        registryEntry
+      ),
+    [uniqueBlueprint, registryEntry]
+  );
+
+  const isColossalOrHuge =
+    visualMeta.visualScaleClass === 'COLOSSAL' ||
+    visualMeta.visualScaleClass === 'HUGE';
+
+  // Base MEDIUM height in the combat arena (single enemy gets +14% extra presence; 2-enemy keeps strong hierarchy)
+  const arenaMediumHeightPx =
+    totalVisibleEnemies >= 3
+      ? isColossalOrHuge
+        ? 156
+        : 138
+      : totalVisibleEnemies === 2
+      ? isColossalOrHuge
+        ? 172
+        : 162
+      : 184;
+
   const depthScale =
-    totalVisibleEnemies > 1 && enemyIndex % 2 === 1 ? 0.94 : 1.0;
-  const computedSizePx = Math.round(
-    (customSizePx || baseUnitPx * authoredScale * crowdFactor) * depthScale
+    totalVisibleEnemies > 1 && enemyIndex % 2 === 1 && !isColossalOrHuge
+      ? 0.95
+      : 1.0;
+
+  // If customSizePx is supplied (e.g., inspection modal), scale proportionally while respecting size hierarchy
+  const effectiveBaseHeight = customSizePx
+    ? Math.min(240, customSizePx * Math.min(1.25, visualMeta.visualScale))
+    : arenaMediumHeightPx *
+      visualMeta.visualScale *
+      visualMeta.visualHeightBias *
+      depthScale;
+
+  const computedHeightPx = Math.max(84, Math.round(effectiveBaseHeight));
+  const computedWidthPx = Math.max(
+    84,
+    Math.round(computedHeightPx * visualMeta.spriteAspectRatio)
   );
 
   const pal = def.palette;
@@ -1634,22 +1665,70 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
         const relX = (e.clientX - rect.left) / Math.max(1, rect.width) - 0.5;
         setCursorLookX(relX < -0.12 ? -1 : relX > 0.12 ? 1 : 0);
       }}
-      className="relative inline-flex items-center justify-center select-none"
+      className="relative inline-flex items-end justify-center select-none"
+      data-visual-scale-class={visualMeta.visualScaleClass}
+      data-visual-scale={visualMeta.visualScale}
+      data-sprite-aspect-ratio={visualMeta.spriteAspectRatio}
       style={{
-        width: `${computedSizePx}px`,
-        height: `${computedSizePx}px`,
+        width: `${computedWidthPx}px`,
+        height: `${computedHeightPx}px`,
       }}
     >
+      {/* Direct 1:1 Aspect-Ratio-True Authored Pixel Sprite (never nested inside a square 64x64 viewBox!) */}
+      {useUniqueBiomeRig && (
+        <div
+          className={`w-full h-full flex items-end justify-center drop-shadow-[0_14px_24px_rgba(0,0,0,0.95)] ${
+            pose.hitFlash ? 'brightness-150 contrast-125' : ''
+          } ${
+            totalVisibleEnemies > 1 && enemyIndex % 2 === 1 ? 'brightness-90' : ''
+          }`}
+          style={
+            pose.isDeadCollapsed
+              ? {
+                  transformOrigin: '50% 92%',
+                  transform: `translateY(${Math.round(
+                    Math.min(1, deathProgress * 1.35) * 10
+                  )}px) rotate(${Math.round(
+                    Math.min(1, deathProgress * 1.4) * 14
+                  )}deg) scale(${
+                    1 - Math.max(0, (deathProgress - 0.35) * 0.35)
+                  })`,
+                  opacity: Math.max(
+                    0.06,
+                    1 - Math.max(0, (deathProgress - 0.25) / 0.75)
+                  ),
+                  filter:
+                    deathProgress < 0.22
+                      ? 'brightness(2.1) contrast(1.4)'
+                      : deathProgress < 0.55
+                      ? 'brightness(1.3) saturate(0.6)'
+                      : 'grayscale(0.85) brightness(0.7)',
+                }
+              : {
+                  transform: `translateX(${Math.round(pose.torsoX * 1.5)}px)`,
+                }
+          }
+        >
+          <LaCriptaUniqueBiomeSpriteSvg
+            blueprint={uniqueBlueprint}
+            torsoY={pose.torsoY}
+            headY={pose.headY}
+            armL={pose.propY}
+            armR={pose.weaponY}
+            wingSpread={pose.breathPhase}
+            pulse={pose.secondaryPhase % 2 === 0}
+          />
+        </div>
+      )}
+
+      {/* Overlay SVG strictly for target floor reticle, hit sparks, status particles & death shatter */}
       <svg
-        width={computedSizePx}
-        height={computedSizePx}
+        width={computedWidthPx}
+        height={computedHeightPx}
         viewBox="0 0 64 64"
+        preserveAspectRatio="xMidYMax meet"
         shapeRendering="crispEdges"
-        className={`block select-none overflow-visible drop-shadow-[0_14px_24px_rgba(0,0,0,0.95)] ${
-          pose.hitFlash ? 'brightness-150 contrast-125' : ''
-        } ${
-          totalVisibleEnemies > 1 && enemyIndex % 2 === 1 ? 'brightness-90' : ''
-        }`}
+        className="pointer-events-none absolute inset-0 block select-none overflow-visible"
       >
         {/* ===================================================================
             LAYER 1: GROUND ANCHOR SHADOW, BIOME RIM UNDERLIGHT & TARGET RING
@@ -1734,19 +1813,7 @@ export const LaCriptaArticulatedCreatureSprite: React.FC<
               : undefined
           }
         >
-          {useUniqueBiomeRig ? (
-            <g transform={`translate(${pose.torsoX}, 0)`}>
-              <LaCriptaUniqueBiomeSpriteSvg
-                blueprint={uniqueBlueprint}
-                torsoY={pose.torsoY}
-                headY={pose.headY}
-                armL={pose.propY}
-                armR={pose.weaponY}
-                wingSpread={pose.breathPhase}
-                pulse={pose.secondaryPhase % 2 === 0}
-              />
-            </g>
-          ) : (
+          {useUniqueBiomeRig ? null : (
             renderArticulatedCreatureFamily(def, enemy, pose)
           )}
         </g>

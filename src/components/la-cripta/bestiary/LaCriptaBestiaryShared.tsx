@@ -1,8 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CriptaCreatureVisualBlueprint,
   CriptaUniqueCreatureModelId,
 } from '../../../data/la-cripta/criptaBiomeBestiary';
+
+export type EnemyVisualScaleClass =
+  | 'TINY'
+  | 'SMALL'
+  | 'MEDIUM'
+  | 'LARGE'
+  | 'HUGE'
+  | 'COLOSSAL';
 
 export type EnemyIdleAnimationType =
   | 'MUSHROOM_SQUASH'
@@ -19,7 +27,11 @@ export type EnemyIdleAnimationType =
   | 'GHOST_DRIFT'
   | 'CONSTRUCT_PISTON'
   | 'GOBLIN_CROUCH'
-  | 'COLOSSUS_BREATH';
+  | 'COLOSSUS_BREATH'
+  | 'JESTER_SWAY'
+  | 'BOOK_FLUTTER'
+  | 'MINER_HEAVE'
+  | 'FLAME_SPIRIT';
 
 export type EnemyParticleEffectType =
   | 'SPORES'
@@ -34,6 +46,9 @@ export type EnemyParticleEffectType =
   | 'FROST_CRYSTALS'
   | 'BLOOD_DROPS'
   | 'LIGHTNING_SPARKS'
+  | 'COLOSSUS_DUST'
+  | 'STEAM_EMBERS'
+  | 'FROST_BREATH'
   | 'NONE';
 
 export interface AuthoredEnemyVisualDefinition {
@@ -43,9 +58,9 @@ export interface AuthoredEnemyVisualDefinition {
    * Each character maps to the creature's palette:
    *  '.' or ' ' = transparent
    *  '#' = dark pixel outline / deep recess
-   *  '1' = primary creature color
-   *  '2' = secondary / shadow color
-   *  '3' = highlight / accent color
+   *  '1' = primary creature color (mid-tone)
+   *  '2' = secondary / deep shadow color (dark torso / under-armor)
+   *  '3' = highlight / rim edge accent color
    *  '4' = metal / chitin / wood / structural color
    *  '5' = eye glow / magical core color
    *  '6' = bone / ivory / fang / reflection white (#F1F5F9)
@@ -57,18 +72,589 @@ export interface AuthoredEnemyVisualDefinition {
   idleType: EnemyIdleAnimationType;
   effectType: EnemyParticleEffectType;
   /**
-   * Visual size multiplier relative to standard arena slot (e.g. 0.90 for rat, 1.25 for normal, 1.45 for large, 1.75 for miniboss, 2.20 for final boss)
+   * Legacy / base scale multiplier
    */
   scaleMultiplier: number;
   /**
-   * Width of ground shadow beneath feet/paws/body in 64x60 canvas units
+   * Width of ground shadow beneath feet/paws/body in logical pixel units
    */
   groundShadowWidth: number;
   /**
+   * Explicit visual size class (TINY, SMALL, MEDIUM, LARGE, HUGE, COLOSSAL)
+   */
+  visualScaleClass?: EnemyVisualScaleClass;
+  /**
+   * Hierarchical visual scale relative to MEDIUM (1.00):
+   * TINY: 0.72-0.78 | SMALL: 0.80-0.90 | MEDIUM: 1.00 | LARGE: 1.15-1.32 | HUGE: 1.42-1.64 | COLOSSAL: 1.80-2.10
+   */
+  visualScale?: number;
+  /**
+   * Vertical offset from the ground line in canvas pixel units (negative floats higher)
+   */
+  groundOffset?: number;
+  /**
+   * Proportional shadow width multiplier relative to MEDIUM humanoid
+   */
+  shadowWidth?: number;
+  /**
+   * Optional vertical presence bias for wide quadrupeds or towering skeletons
+   */
+  visualHeightBias?: number;
+  /**
    * True ONLY for supernatural entities whose concept is intentional fragmentation/levitation
-   * (e.g. Doble Fragmentado, Filo Cristalino, Fuego Fatuo, Esfera Armilar).
    */
   allowsSupernaturalFloat?: boolean;
+}
+
+export interface ResolvedEnemyVisualMetadata {
+  id: CriptaUniqueCreatureModelId;
+  visualScaleClass: EnemyVisualScaleClass;
+  visualScale: number;
+  groundOffset: number;
+  shadowWidth: number;
+  spriteAspectRatio: number;
+  visualHeightBias: number;
+  canvasWidthPx: number;
+  canvasHeightPx: number;
+  croppedWidthPx: number;
+  croppedHeightPx: number;
+}
+
+/**
+ * Explicit size class & scale overrides for specific creatures so size hierarchy
+ * comes from creature design rather than HP alone (Requirements 3, 4, 5, 27).
+ */
+const EXPLICIT_CREATURE_SCALE_OVERRIDES: Partial<
+  Record<
+    CriptaUniqueCreatureModelId,
+    {
+      visualScaleClass: EnemyVisualScaleClass;
+      visualScale: number;
+      shadowWidth: number;
+      groundOffset?: number;
+      visualHeightBias?: number;
+    }
+  >
+> = {
+  // TINY (0.72 - 0.78)
+  ALCANTARILLAS_RATA_PESTE: {
+    visualScaleClass: 'TINY',
+    visualScale: 0.74,
+    shadowWidth: 0.72,
+  },
+  JARDIN_MOSCA_CARRONERA: {
+    visualScaleClass: 'TINY',
+    visualScale: 0.75,
+    shadowWidth: 0.65,
+    groundOffset: -4,
+  },
+  COLMENA_ESCARABAJO_ACIDO: {
+    visualScaleClass: 'TINY',
+    visualScale: 0.78,
+    shadowWidth: 0.76,
+  },
+  ABISMO_LARVA_ESTELAR: {
+    visualScaleClass: 'TINY',
+    visualScale: 0.78,
+    shadowWidth: 0.78,
+  },
+
+  // SMALL (0.80 - 0.90)
+  MINAS_ARANUELO_FILON: {
+    visualScaleClass: 'SMALL',
+    visualScale: 0.82,
+    shadowWidth: 0.85,
+  },
+  BOSQUE_FUEGO_FATUO: {
+    visualScaleClass: 'SMALL',
+    visualScale: 0.82,
+    shadowWidth: 0.68,
+    groundOffset: -5,
+  },
+  BIBLIOTECA_GRIMORIO_ANIMADO: {
+    visualScaleClass: 'SMALL',
+    visualScale: 0.86,
+    shadowWidth: 0.74,
+    groundOffset: -4,
+  },
+  'CATACUMBAS_ ENJAMBRE_SEPULCRAL': {
+    visualScaleClass: 'SMALL',
+    visualScale: 0.84,
+    shadowWidth: 0.92,
+  },
+  MINAS_MURCIELAGO_SONICO: {
+    visualScaleClass: 'SMALL',
+    visualScale: 0.88,
+    shadowWidth: 0.78,
+    groundOffset: -4,
+  },
+  CRISTAL_FRAGMENTO_RESONANTE: {
+    visualScaleClass: 'SMALL',
+    visualScale: 0.86,
+    shadowWidth: 0.72,
+    groundOffset: -4,
+  },
+  HELADAS_TREPADOR_CARAMBANO: {
+    visualScaleClass: 'SMALL',
+    visualScale: 0.86,
+    shadowWidth: 0.88,
+  },
+  CIUDAD_ESCARABAJO_LAPISLAZULI: {
+    visualScaleClass: 'SMALL',
+    visualScale: 0.86,
+    shadowWidth: 0.88,
+  },
+  GIGANTES_MANO_DESENTERRADA: {
+    visualScaleClass: 'SMALL',
+    visualScale: 0.90,
+    shadowWidth: 0.95,
+  },
+
+  // MEDIUM (1.00 - 1.08)
+  MINAS_MINERO_DESCASCARADO: {
+    visualScaleClass: 'MEDIUM',
+    visualScale: 1.02,
+    shadowWidth: 1.0,
+  },
+  BIBLIOTECA_ESCRIBA_SIN_ROSTRO: {
+    visualScaleClass: 'MEDIUM',
+    visualScale: 1.02,
+    shadowWidth: 0.96,
+  },
+  ESPEJOS_BUfON_ILUSION: {
+    visualScaleClass: 'MEDIUM',
+    visualScale: 1.02,
+    shadowWidth: 0.98,
+  },
+  HELADAS_ESPECTRO_VENTISCA: {
+    visualScaleClass: 'MEDIUM',
+    visualScale: 1.04,
+    shadowWidth: 0.95,
+    groundOffset: -3,
+  },
+  SANGRE_FLAGELANTE_CALIZ: {
+    visualScaleClass: 'MEDIUM',
+    visualScale: 1.02,
+    shadowWidth: 1.0,
+  },
+  'SANGRE_ SIERVO_DESANGRADO': {
+    visualScaleClass: 'MEDIUM',
+    visualScale: 1.0,
+    shadowWidth: 0.96,
+  },
+  CATACUMBAS_ACOLITO_HUESO: {
+    visualScaleClass: 'MEDIUM',
+    visualScale: 1.0,
+    shadowWidth: 0.95,
+  },
+  JARDIN_HONGO_ERRANTE: {
+    visualScaleClass: 'MEDIUM',
+    visualScale: 1.0,
+    shadowWidth: 0.98,
+  },
+  ESPEJOS_DOBLE_FRAGMENTADO: {
+    visualScaleClass: 'MEDIUM',
+    visualScale: 1.04,
+    shadowWidth: 0.96,
+  },
+
+  // LARGE (1.15 - 1.32)
+  FORJA_HERRERO_CENIZA: {
+    visualScaleClass: 'LARGE',
+    visualScale: 1.16,
+    shadowWidth: 1.15,
+  },
+  BOSQUE_LOBO_NIEBLA: {
+    visualScaleClass: 'LARGE',
+    visualScale: 1.22,
+    shadowWidth: 1.38,
+    visualHeightBias: 1.04,
+  },
+  HELADAS_LOBO_ESCARCHA: {
+    visualScaleClass: 'LARGE',
+    visualScale: 1.28,
+    shadowWidth: 1.44,
+    visualHeightBias: 1.06,
+  },
+  FORJA_AUTOMA_ESCORIA: {
+    visualScaleClass: 'LARGE',
+    visualScale: 1.30,
+    shadowWidth: 1.32,
+    visualHeightBias: 1.05,
+  },
+  CATACUMBAS_GUARDIAN_CRIPTAS: {
+    visualScaleClass: 'LARGE',
+    visualScale: 1.18,
+    shadowWidth: 1.18,
+  },
+  TEMPLO_GUARDIAN_CORAL: {
+    visualScaleClass: 'LARGE',
+    visualScale: 1.24,
+    shadowWidth: 1.24,
+  },
+  BOSQUE_CIERVO_OSAMENTA: {
+    visualScaleClass: 'LARGE',
+    visualScale: 1.22,
+    shadowWidth: 1.34,
+  },
+  VERDUGO_SABUESO_CADENAS: {
+    visualScaleClass: 'LARGE',
+    visualScale: 1.20,
+    shadowWidth: 1.35,
+  },
+
+  // HUGE (1.42 - 1.64)
+  JARDIN_COLOSO_MICELIO: {
+    visualScaleClass: 'HUGE',
+    visualScale: 1.44,
+    shadowWidth: 1.38,
+  },
+  BOSQUE_ANCIANO_CORTEZA: {
+    visualScaleClass: 'HUGE',
+    visualScale: 1.44,
+    shadowWidth: 1.38,
+  },
+  ALCANTARILLAS_ABOMINACION_FANGO: {
+    visualScaleClass: 'HUGE',
+    visualScale: 1.42,
+    shadowWidth: 1.40,
+  },
+  HELADAS_TROLL_GLACIAR: {
+    visualScaleClass: 'HUGE',
+    visualScale: 1.45,
+    shadowWidth: 1.40,
+  },
+  GIGANTES_TITAN_DECAPITADO: {
+    visualScaleClass: 'HUGE',
+    visualScale: 1.54,
+    shadowWidth: 1.46,
+  },
+  GIGANTES_GUARDIAN_FOSA: {
+    visualScaleClass: 'HUGE',
+    visualScale: 1.46,
+    shadowWidth: 1.38,
+  },
+
+  // COLOSSAL (1.75 - 2.10) — Requirement 5: ESQUELETO COLOSAL MUST ACTUALLY BE COLOSSAL!
+  GIGANTES_ESQUELETO_COLOSAL: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.92,
+    shadowWidth: 1.68,
+    visualHeightBias: 1.08,
+  },
+  GIGANTES_COLOSO_FEMURES: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.85,
+    shadowWidth: 1.65,
+  },
+  GIGANTES_REY_OSARIO: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.90,
+    shadowWidth: 1.68,
+  },
+  FORJA_TITAN_CRISOL: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.82,
+    shadowWidth: 1.62,
+  },
+  TEMPLO_LEVIATAN_ALTAR: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.84,
+    shadowWidth: 1.65,
+  },
+  CRISTAL_COLOSO_PRISMATICO: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.82,
+    shadowWidth: 1.60,
+  },
+  HELADAS_BEHEMOTH_PERMAFROST: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.85,
+    shadowWidth: 1.68,
+  },
+  HELADAS_SENOR_ALUD: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.84,
+    shadowWidth: 1.64,
+  },
+  ABISMO_CORAZON_CRIPTAS: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.88,
+    shadowWidth: 1.66,
+  },
+  FINAL_BOSS_SOBERANO_P1: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.94,
+    shadowWidth: 1.72,
+  },
+  FINAL_BOSS_SOBERANO_P2: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 2.08,
+    shadowWidth: 1.85,
+  },
+  FINAL_BOSS_OSSUARY_KING_P1: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.96,
+    shadowWidth: 1.74,
+  },
+  FINAL_BOSS_OSSUARY_KING_P2: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 2.10,
+    shadowWidth: 1.88,
+  },
+  FINAL_BOSS_ASTRAL_LEVIATHAN_P1: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 1.94,
+    shadowWidth: 1.72,
+  },
+  FINAL_BOSS_ASTRAL_LEVIATHAN_P2: {
+    visualScaleClass: 'COLOSSAL',
+    visualScale: 2.08,
+    shadowWidth: 1.86,
+  },
+};
+
+/**
+ * Compiles a sprite's row matrix into a true 1:1 square-pixel matrix.
+ * For compact 11-20 row matrices that were authored with 2-character horizontal pairs,
+ * applies a pixel-art 2x vertical pass with diagonal corner beveling and directional
+ * material shading so sprites never appear vertically compressed ("squashed") and
+ * every rendered pixel is strictly 1:1 square.
+ */
+export function compileSquarePixelMatrix(visualDef: AuthoredEnemyVisualDefinition): {
+  rows: string[];
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  croppedWidth: number;
+  croppedHeight: number;
+} {
+  const rawRows = visualDef.rows || [];
+  if (rawRows.length === 0) {
+    return {
+      rows: ['.'],
+      minX: 0,
+      maxX: 0,
+      minY: 0,
+      maxY: 0,
+      croppedWidth: 1,
+      croppedHeight: 1,
+    };
+  }
+
+  const maxCol = Math.max(...rawRows.map((r) => r.length), 1);
+  const normalizedRaw = rawRows.map((r) => r.padEnd(maxCol, '.').replace(/ /g, '.'));
+
+  // If the sprite has < 22 rows, it was authored in 2:1 horizontal character pairs.
+  // Expand vertically with EPX / pixel-art diagonal beveling & top-down shading so
+  // its 1:1 square pixel aspect ratio has true anatomical height and +20% internal detail.
+  let finalRows: string[];
+  if (normalizedRaw.length < 22) {
+    const H = normalizedRaw.length;
+    const W = maxCol;
+    const at = (y: number, x: number): string => {
+      if (y < 0 || y >= H || x < 0 || x >= W) return '.';
+      return normalizedRaw[y][x] || '.';
+    };
+
+    const expanded: string[] = [];
+    for (let y = 0; y < H; y++) {
+      let rowA = '';
+      let rowB = '';
+      for (let x = 0; x < W; x++) {
+        const C = at(y, x);
+        const U = at(y - 1, x);
+        const D = at(y + 1, x);
+        const L = at(y, x - 1);
+        const R = at(y, x + 1);
+        const UL = at(y - 1, x - 1);
+        const UR = at(y - 1, x + 1);
+        const DL = at(y + 1, x - 1);
+        const DR = at(y + 1, x + 1);
+
+        let topPx = C;
+        let botPx = C;
+
+        if (C === '.') {
+          // Smooth 45-degree outer outline diagonals (eliminates 2-wide staircase blocks)
+          if (U === '#' && ((L === '#' && UL === '.') || (R === '#' && UR === '.'))) {
+            topPx = '#';
+          }
+          if (D === '#' && ((L === '#' && DL === '.') || (R === '#' && DR === '.'))) {
+            botPx = '#';
+          }
+        } else if (C === '1') {
+          // Natural material separation (Requirement 8 & 9):
+          // Top edge under outline catches subtle highlight; bottom edge above outline deepens into shadow
+          if (U === '#' && D === '1' && L !== '.' && R !== '.') {
+            topPx = '3';
+          } else if (D === '#' && U !== '#') {
+            botPx = '2';
+          }
+        } else if (C === '4') {
+          // Metallic / chitin edge specular & lower shadow
+          if (D === '#' && U === '4') {
+            botPx = '2';
+          }
+        }
+
+        rowA += topPx;
+        rowB += botPx;
+      }
+      expanded.push(rowA);
+      expanded.push(rowB);
+    }
+    finalRows = expanded;
+  } else {
+    finalRows = normalizedRaw;
+  }
+
+  let minX = maxCol;
+  let maxX = 0;
+  let minY = finalRows.length;
+  let maxY = 0;
+  let foundAny = false;
+
+  for (let y = 0; y < finalRows.length; y++) {
+    const r = finalRows[y];
+    for (let x = 0; x < r.length; x++) {
+      const ch = r[x];
+      if (ch !== '.' && ch !== ' ') {
+        foundAny = true;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (!foundAny) {
+    return {
+      rows: finalRows,
+      minX: 0,
+      maxX: maxCol - 1,
+      minY: 0,
+      maxY: finalRows.length - 1,
+      croppedWidth: maxCol,
+      croppedHeight: finalRows.length,
+    };
+  }
+
+  return {
+    rows: finalRows,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    croppedWidth: Math.max(1, maxX - minX + 1),
+    croppedHeight: Math.max(1, maxY - minY + 1),
+  };
+}
+
+/**
+ * Resolves the complete visual scale metadata for any enemy in the bestiary.
+ */
+export function getResolvedEnemyVisualMeta(
+  id: CriptaUniqueCreatureModelId,
+  blueprint?: CriptaCreatureVisualBlueprint,
+  visualDef?: AuthoredEnemyVisualDefinition
+): ResolvedEnemyVisualMetadata {
+  const explicit = EXPLICIT_CREATURE_SCALE_OVERRIDES[id];
+  const compiled = visualDef
+    ? compileSquarePixelMatrix(visualDef)
+    : {
+        croppedWidth: 28,
+        croppedHeight: 28,
+      };
+
+  // Determine size class & scale when not in explicit override table
+  let visualScaleClass: EnemyVisualScaleClass =
+    explicit?.visualScaleClass || visualDef?.visualScaleClass || 'MEDIUM';
+  let visualScale: number = explicit?.visualScale || visualDef?.visualScale || 1.0;
+
+  if (!explicit && !visualDef?.visualScaleClass) {
+    const mult = visualDef?.scaleMultiplier ?? blueprint?.scaleFactor ?? 1.24;
+    if (blueprint?.tier === 'FINAL_BOSS' || mult >= 1.82) {
+      visualScaleClass = 'COLOSSAL';
+      visualScale = 1.90;
+    } else if (blueprint?.tier === 'MINIBOSS' || mult >= 1.65) {
+      visualScaleClass = 'HUGE';
+      visualScale = 1.54;
+    } else if (mult >= 1.38) {
+      visualScaleClass = 'LARGE';
+      visualScale = 1.24;
+    } else if (mult <= 1.12) {
+      visualScaleClass = 'TINY';
+      visualScale = 0.76;
+    } else if (mult <= 1.21) {
+      visualScaleClass = 'SMALL';
+      visualScale = 0.86;
+    } else {
+      visualScaleClass = 'MEDIUM';
+      visualScale = 1.02;
+    }
+  }
+
+  const isQuadrupedOrWide =
+    visualDef?.idleType === 'WOLF_PROWL' ||
+    visualDef?.idleType === 'SERPENT_COIL' ||
+    compiled.croppedWidth > compiled.croppedHeight * 1.22;
+
+  const shadowWidth =
+    explicit?.shadowWidth ??
+    visualDef?.shadowWidth ??
+    (visualScaleClass === 'COLOSSAL'
+      ? 1.65
+      : visualScaleClass === 'HUGE'
+      ? 1.42
+      : isQuadrupedOrWide
+      ? 1.34
+      : visualScaleClass === 'LARGE'
+      ? 1.20
+      : visualScaleClass === 'SMALL'
+      ? 0.82
+      : visualScaleClass === 'TINY'
+      ? 0.70
+      : 1.0);
+
+  const groundOffset =
+    explicit?.groundOffset ??
+    visualDef?.groundOffset ??
+    (visualDef?.idleType === 'GHOST_DRIFT' ||
+    visualDef?.idleType === 'BAT_FLAP' ||
+    visualDef?.idleType === 'BOOK_FLUTTER' ||
+    visualDef?.idleType === 'FLAME_SPIRIT'
+      ? -3
+      : 0);
+
+  const visualHeightBias =
+    explicit?.visualHeightBias ??
+    visualDef?.visualHeightBias ??
+    (isQuadrupedOrWide ? 1.04 : 1.0);
+
+  // Compute tight 1:1 pixel canvas dimensions around the cropped creature
+  const padX = 4;
+  const padTop = 4;
+  const padBottom = 4;
+  const canvasWidthPx = Math.max(compiled.croppedWidth + padX * 2, 24);
+  const canvasHeightPx = Math.max(compiled.croppedHeight + padTop + padBottom, 24);
+  const spriteAspectRatio = Number((canvasWidthPx / canvasHeightPx).toFixed(4));
+
+  return {
+    id,
+    visualScaleClass,
+    visualScale,
+    groundOffset,
+    shadowWidth,
+    spriteAspectRatio,
+    visualHeightBias,
+    canvasWidthPx,
+    canvasHeightPx,
+    croppedWidthPx: compiled.croppedWidth,
+    croppedHeightPx: compiled.croppedHeight,
+  };
 }
 
 /**
@@ -98,7 +684,6 @@ export function auditEnemyVisualRegistry(
       continue;
     }
 
-    // Normalize rows to check for duplicate pixel art across any two enemy IDs
     const normalizedSig = def.rows.map((r) => r.trim()).join('\n');
     const existingOwner = signatureMap.get(normalizedSig);
     if (existingOwner && existingOwner !== id) {
@@ -112,7 +697,6 @@ export function auditEnemyVisualRegistry(
       signatureMap.set(normalizedSig, id);
     }
 
-    // Check for accidental blank horizontal gap rows inside non-supernatural creatures
     if (!def.allowsSupernaturalFloat) {
       let seenTop = false;
       let seenGapAfterTop = false;
@@ -140,8 +724,8 @@ export function auditEnemyVisualRegistry(
 
 /**
  * Renders a cohesive, grounded pixel-art sprite from `AuthoredEnemyVisualDefinition`.
- * Automatically scales pixel size so deliberate 32-bit pixel clusters are crisp and readable,
- * and applies anatomy-specific keyframe motion without detaching body parts.
+ * Uses a tight 1:1 square-pixel coordinate space (`canvasWidthPx` x `canvasHeightPx`)
+ * so that source aspect ratio === rendered aspect ratio with zero vertical squashing.
  */
 export const AuthoredEnemySpriteSvg: React.FC<{
   blueprint: CriptaCreatureVisualBlueprint;
@@ -157,14 +741,10 @@ export const AuthoredEnemySpriteSvg: React.FC<{
   blueprint,
   visualDef,
   torsoY,
-  headY,
-  armL,
-  armR,
   wingSpread,
   pulse,
   silhouetteBlackMode = false,
 }) => {
-  // Smooth 60 FPS timer solely for environmental particles (mist, spores, flames, mirror glints)
   const [particlePhase, setParticlePhase] = useState(0);
   useEffect(() => {
     let raf = 0;
@@ -177,7 +757,17 @@ export const AuthoredEnemySpriteSvg: React.FC<{
     return () => window.cancelAnimationFrame(raf);
   }, []);
 
-  if (!visualDef) {
+  const compiled = useMemo(
+    () => (visualDef ? compileSquarePixelMatrix(visualDef) : null),
+    [visualDef]
+  );
+
+  const meta = useMemo(
+    () => getResolvedEnemyVisualMeta(blueprint.id, blueprint, visualDef),
+    [blueprint, visualDef]
+  );
+
+  if (!visualDef || !compiled) {
     return (
       <svg viewBox="0 0 64 60" className="w-full h-full overflow-visible">
         <rect x="4" y="10" width="56" height="40" fill="#450A0A" stroke="#EF4444" strokeWidth="2" />
@@ -206,7 +796,7 @@ export const AuthoredEnemySpriteSvg: React.FC<{
         '9': '#000000',
       }
     : {
-        '#': '#07060B',
+        '#': '#06050A',
         '1': primary,
         '2': secondary,
         '3': highlight,
@@ -218,161 +808,225 @@ export const AuthoredEnemySpriteSvg: React.FC<{
         '9': '#F59E0B',
       };
 
-  const rows = visualDef.rows;
-  const rowCount = rows.length;
-  const colCount = Math.max(...rows.map((r) => r.length), 1);
+  const { rows, minX, minY, croppedWidth, croppedHeight } = compiled;
+  const { canvasWidthPx, canvasHeightPx, groundOffset } = meta;
 
-  // Deliberate pixel cluster sizing: ~1.35x to 1.65x per logical pixel so sprites fill the 64x60 canvas with crisp 32-bit presence
-  const pxSize = colCount <= 28 && rowCount <= 28 ? 1.65 : colCount <= 34 && rowCount <= 34 ? 1.45 : 1.25;
-  const renderedWidth = colCount * pxSize;
-  const renderedHeight = rowCount * pxSize;
+  // Ground anchor is near the bottom of the tight canvas
+  const groundY = canvasHeightPx - 3;
+  const baseOffsetX = Math.round((canvasWidthPx - croppedWidth) / 2);
+  const baseOffsetY = Math.round(groundY - croppedHeight + groundOffset * 0.5);
 
-  // Ground the bottom of the sprite directly on the floor plane (y = 55)
-  const groundY = 55;
-  const baseOffsetX = (64 - renderedWidth) / 2;
-  const baseOffsetY = groundY - renderedHeight;
-
-  // Stepped pixel-art idle animation per creature anatomy (Requirement 8 & 20)
+  // Creature-scale-aware idle animation (Requirement 19: small = light/fast, heavy = slow/weighted, colossal = very slow mass)
   let animOffsetX = 0;
   let animOffsetY = 0;
   let topHalfSquashY = 0;
+  let hatTipShiftX = 0;
+  let rightWeaponShiftY = 0;
 
   switch (visualDef.idleType) {
+    case 'COLOSSUS_BREATH': {
+      // Very slow, heavy mass breathing for Esqueleto Colosal & colossal titans (never bounces!)
+      const slowCycle = Math.sin(particlePhase * 1.35);
+      topHalfSquashY = slowCycle > 0.45 ? 1 : 0;
+      rightWeaponShiftY = slowCycle > 0.25 ? 1 : 0;
+      break;
+    }
+    case 'CONSTRUCT_PISTON': {
+      // Heavy mechanical piston cycle + furnace breath + subtle chassis vibration
+      const pistonCycle = Math.sin(particlePhase * 3.0);
+      topHalfSquashY = pistonCycle > 0.2 ? 1 : 0;
+      rightWeaponShiftY = pistonCycle < -0.2 ? 1 : 0;
+      animOffsetX = Math.round(Math.sin(particlePhase * 14) * 0.35);
+      break;
+    }
+    case 'JESTER_SWAY': {
+      // Dark fantasy jester: subtle shoulder movement, independent hat tips & bells, slight head tilt
+      const sway = Math.sin(particlePhase * 2.4);
+      hatTipShiftX = sway > 0.35 ? 1 : sway < -0.35 ? -1 : 0;
+      topHalfSquashY = Math.cos(particlePhase * 2.4) > 0.5 ? 1 : 0;
+      rightWeaponShiftY = sway > 0 ? -1 : 0;
+      break;
+    }
+    case 'BOOK_FLUTTER': {
+      // Levitating spellbook: gently hovers while pages/covers open & close by 1px
+      animOffsetY = Math.round(Math.sin(particlePhase * 3.4) * 1.5);
+      topHalfSquashY = pulse ? -1 : 0;
+      rightWeaponShiftY = wingSpread === 1 ? 1 : 0;
+      break;
+    }
+    case 'FLAME_SPIRIT': {
+      // Supernatural floating flame spirit: natural upward flame flicker & hover
+      animOffsetY = Math.round(Math.sin(particlePhase * 4.2) * 1.8);
+      animOffsetX = Math.round(Math.cos(particlePhase * 2.8) * 0.8);
+      hatTipShiftX = Math.sin(particlePhase * 6.5) > 0 ? 1 : -1;
+      break;
+    }
+    case 'MINER_HEAVE': {
+      // Exhausted possessed miner: heavy chest breath + pickaxe weight shift
+      topHalfSquashY = wingSpread === 2 ? 1 : 0;
+      rightWeaponShiftY = wingSpread === 2 ? 1 : 0;
+      break;
+    }
     case 'MUSHROOM_SQUASH':
-      // Cap gently compresses downward on breath step, body stays grounded
-      topHalfSquashY = wingSpread === 2 ? pxSize : 0;
+      topHalfSquashY = wingSpread === 2 ? 1 : 0;
       break;
     case 'WOLF_PROWL':
-      // Low stalking chest breath + subtle forward prowl shift
-      animOffsetX = wingSpread === 1 ? -pxSize * 0.5 : 0;
-      topHalfSquashY = wingSpread === 2 ? pxSize * 0.6 : 0;
+      // Predatory quadruped: low stalking chest breath + subtle forward prowl
+      animOffsetX = wingSpread === 1 ? -0.5 : 0;
+      topHalfSquashY = wingSpread === 2 ? 1 : 0;
       break;
     case 'RAT_SNIFF':
-      // Quick rodent nose/head twitch forward
-      animOffsetX = pulse ? -pxSize * 0.75 : 0;
+      animOffsetX = pulse ? -1 : 0;
       break;
     case 'SLIME_PULSE':
-      // Soft gelatinous squash & stretch anchored to floor
-      topHalfSquashY = wingSpread === 1 ? pxSize : wingSpread === 2 ? -pxSize * 0.5 : 0;
+      topHalfSquashY = wingSpread === 1 ? 1 : wingSpread === 2 ? -0.5 : 0;
       break;
     case 'BAT_FLAP':
-      // Flying mammal hovers and flaps wings
-      animOffsetY = (wingSpread - 1) * pxSize * 1.2 - 4;
+      animOffsetY = (wingSpread - 1) * 1.2;
       break;
     case 'GHOST_DRIFT':
-      // Continuous ethereal drift above ground
-      animOffsetY = Math.round(Math.sin(particlePhase * 3.2) * 2.5) - 3;
-      animOffsetX = Math.round(Math.cos(particlePhase * 2.1) * 1.2);
+      animOffsetY = Math.round(Math.sin(particlePhase * 3.0) * 1.6);
+      animOffsetX = Math.round(Math.cos(particlePhase * 2.0) * 0.8);
       break;
     case 'MIRROR_GLITCH':
-      // Occasional 1-pixel reflective displacement (Requirement 10)
-      animOffsetX = wingSpread === 2 && pulse ? pxSize : 0;
-      topHalfSquashY = wingSpread === 1 ? -pxSize * 0.5 : 0;
+      animOffsetX = wingSpread === 2 && pulse ? 1 : 0;
+      topHalfSquashY = wingSpread === 1 ? -0.5 : 0;
       break;
     case 'INSECT_SCUTTLE':
-      // Chitin scuttle shift left/right
-      animOffsetX = pulse ? pxSize * 0.6 : -pxSize * 0.6;
+      animOffsetX = pulse ? 0.6 : -0.6;
       break;
     case 'SERPENT_COIL':
-      // S-curve lateral sway
-      animOffsetX = (wingSpread - 1) * pxSize * 0.7;
+      animOffsetX = (wingSpread - 1) * 0.7;
       break;
     case 'HEAVY_KNIGHT_SHIFT':
-    case 'COLOSSUS_BREATH':
-      // Slow armored weight shift
-      topHalfSquashY = wingSpread === 2 ? pxSize * 0.6 : 0;
-      break;
     case 'SKELETON_SWAY':
     case 'SHAMAN_RITUAL':
     case 'GOBLIN_CROUCH':
-    case 'CONSTRUCT_PISTON':
     default:
-      topHalfSquashY = wingSpread === 2 ? pxSize * 0.6 : 0;
+      topHalfSquashY = wingSpread === 2 ? 1 : 0;
       break;
   }
 
-  // Add combat action lunge / hit recoil offsets from parent pose
   const totalOffsetX = baseOffsetX + animOffsetX;
-  const totalOffsetY = baseOffsetY + animOffsetY + torsoY * 0.6;
+  const totalOffsetY = baseOffsetY + animOffsetY + torsoY * 0.35;
 
-  // Build run-length encoded crisp pixel rects
   const rects: React.ReactNode[] = [];
-  const capSplitRow = Math.floor(rowCount * 0.48);
+  const capSplitRow = Math.floor(croppedHeight * 0.48);
+  const hatSplitRow = Math.floor(croppedHeight * 0.22);
+  const rightWeaponSplitCol = Math.floor(croppedWidth * 0.74);
 
-  for (let y = 0; y < rowCount; y++) {
-    const row = rows[y];
-    const rowShiftY = y < capSplitRow ? topHalfSquashY : 0;
-    // Subtle weapon/arm shift on outer columns during idle/attack while staying connected!
-    let x = 0;
-    while (x < row.length) {
-      const ch = row[x];
-      if (ch === '.' || ch === ' ') {
-        x++;
+  for (let cy = 0; cy < croppedHeight; cy++) {
+    const srcY = minY + cy;
+    const row = rows[srcY] || '';
+    const rowShiftY = cy < capSplitRow ? topHalfSquashY : 0;
+    const rowShiftX = cy < hatSplitRow ? hatTipShiftX : 0;
+
+    let cx = 0;
+    while (cx < croppedWidth) {
+      const srcX = minX + cx;
+      const ch = row[srcX];
+      if (!ch || ch === '.' || ch === ' ') {
+        cx++;
         continue;
       }
       const fill = palMap[ch];
       if (!fill) {
-        x++;
+        cx++;
         continue;
       }
       let run = 1;
-      while (x + run < row.length && row[x + run] === ch) {
+      while (cx + run < croppedWidth && row[minX + cx + run] === ch) {
         run++;
       }
+      const colWeaponShiftY = cx >= rightWeaponSplitCol ? rightWeaponShiftY : 0;
       rects.push(
         <rect
-          key={`${y}_${x}`}
-          x={Number((totalOffsetX + x * pxSize).toFixed(2))}
-          y={Number((totalOffsetY + y * pxSize + rowShiftY).toFixed(2))}
-          width={Number((run * pxSize + 0.08).toFixed(2))}
-          height={Number((pxSize + 0.08).toFixed(2))}
+          key={`${cy}_${cx}`}
+          x={Number((totalOffsetX + cx + rowShiftX).toFixed(2))}
+          y={Number((totalOffsetY + cy + rowShiftY + colWeaponShiftY).toFixed(2))}
+          width={Number((run + 0.06).toFixed(2))}
+          height={1.06}
           fill={fill}
         />
       );
-      x += run;
+      cx += run;
     }
   }
 
-  const shadowW = visualDef.groundShadowWidth || 40;
-  const shadowX = 32 - shadowW / 2;
+  // Floor shadow tailored to creature dimensions (Requirement 20)
+  const shadowSpan = Math.min(
+    canvasWidthPx - 2,
+    Math.max(10, Math.round(croppedWidth * 0.86 * Math.min(1.18, meta.shadowWidth)))
+  );
+  const shadowX = Number(((canvasWidthPx - shadowSpan) / 2).toFixed(2));
+  const shadowH = meta.visualScaleClass === 'COLOSSAL' ? 2.4 : meta.visualScaleClass === 'HUGE' ? 2.0 : 1.5;
 
   return (
     <svg
-      viewBox="0 0 64 60"
-      className="w-full h-full overflow-visible drop-shadow-[0_12px_20px_rgba(0,0,0,0.92)]"
+      viewBox={`0 0 ${canvasWidthPx} ${canvasHeightPx}`}
+      preserveAspectRatio="xMidYMax meet"
+      className="w-full h-full overflow-visible block select-none"
       style={{ imageRendering: 'pixelated' }}
       shapeRendering="crispEdges"
     >
-      {/* Grounding Shadow Plane (Requirement 19) */}
+      {/* Adaptive Grounding Shadow Plane (Requirement 20) */}
       {!silhouetteBlackMode && (
         <g>
-          <rect x={shadowX} y="55" width={shadowW} height="3" fill="#040307" opacity="0.82" />
-          <rect x={shadowX + 4} y="54" width={shadowW - 8} height="2" fill="#040307" opacity="0.55" />
-          {(blueprint.tier === 'MINIBOSS' || blueprint.tier === 'FINAL_BOSS') && (
+          <rect
+            x={shadowX}
+            y={groundY}
+            width={shadowSpan}
+            height={shadowH}
+            fill="#040307"
+            opacity={meta.visualScaleClass === 'COLOSSAL' ? 0.92 : 0.82}
+          />
+          <rect
+            x={shadowX + 2}
+            y={groundY - 0.8}
+            width={Math.max(4, shadowSpan - 4)}
+            height={shadowH}
+            fill="#07050C"
+            opacity="0.65"
+          />
+          {(meta.visualScaleClass === 'COLOSSAL' ||
+            blueprint.tier === 'MINIBOSS' ||
+            blueprint.tier === 'FINAL_BOSS') && (
             <rect
               x={shadowX + 2}
-              y="55"
-              width={shadowW - 4}
-              height="1.5"
+              y={groundY + 0.3}
+              width={Math.max(4, shadowSpan - 4)}
+              height="0.9"
               fill={highlight}
-              opacity={pulse ? 0.85 : 0.45}
+              opacity={pulse ? 0.75 : 0.38}
             />
           )}
         </g>
       )}
 
-      {/* 60 FPS Smooth Environmental / Anatomy Particle Effects Behind & Around Sprite (Requirement 7 & 21) */}
+      {/* Occasional Jester / Mirror Illusion Afterimage (Requirement 12) */}
+      {!silhouetteBlackMode &&
+        (visualDef.idleType === 'JESTER_SWAY' || visualDef.idleType === 'MIRROR_GLITCH') &&
+        Math.sin(particlePhase * 2.4) > 0.55 && (
+          <g transform="translate(-2.2, -0.5)" opacity="0.24">
+            {rects}
+          </g>
+        )}
+
+      {/* 60 FPS Smooth Environmental / Anatomy Particle Effects */}
       {!silhouetteBlackMode && (
         <EnemySmoothEffectsLayer
           effectType={visualDef.effectType}
           phase={particlePhase}
+          canvasW={canvasWidthPx}
+          canvasH={canvasHeightPx}
+          groundY={groundY}
           primary={primary}
           highlight={highlight}
           eyeGlow={eyeGlow}
         />
       )}
 
-      {/* Crisp Pixel-Art Creature Body */}
+      {/* Crisp 1:1 Square Pixel-Art Creature Body */}
       <g>{rects}</g>
     </svg>
   );
@@ -381,30 +1035,106 @@ export const AuthoredEnemySpriteSvg: React.FC<{
 const EnemySmoothEffectsLayer: React.FC<{
   effectType: EnemyParticleEffectType;
   phase: number;
+  canvasW: number;
+  canvasH: number;
+  groundY: number;
   primary: string;
   highlight: string;
   eyeGlow: string;
-}> = ({ effectType, phase, primary, highlight, eyeGlow }) => {
+}> = ({ effectType, phase, canvasW, canvasH, groundY, highlight, eyeGlow }) => {
   if (effectType === 'NONE') return null;
+  const cx = canvasW / 2;
+  const cy = canvasH / 2;
 
-  if (effectType === 'SPORES') {
-    // Gently rising toxic fungal spores around Hongo Errante & fungal creatures
+  if (effectType === 'COLOSSUS_DUST') {
+    // Slow falling bone/stone dust when colossal skeleton shifts its massive weight (Requirement 19)
     return (
       <g>
-        {[0, 1, 2, 3].map((i) => {
-          const p = (phase * 0.7 + i * 0.25) % 1;
-          const x = 16 + i * 10 + Math.sin(phase * 2 + i) * 3;
-          const y = 36 - p * 24;
-          const op = Math.sin(p * Math.PI) * 0.85;
+        {[0, 1, 2, 3, 4].map((i) => {
+          const p = (phase * 0.45 + i * 0.2) % 1;
+          const x = cx - 12 + i * 6 + Math.sin(phase * 1.2 + i) * 1.2;
+          const y = cy - 4 + p * (groundY - cy + 3);
           return (
             <rect
               key={i}
               x={x}
               y={y}
-              width="2"
-              height="2"
+              width="1.2"
+              height="1.2"
+              fill={i % 2 === 0 ? '#D8C6A0' : '#94A3B8'}
+              opacity={(1 - p) * 0.75}
+            />
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'STEAM_EMBERS') {
+    // Rising boiler steam puffs & forge embers from Autómata de Escoria's smokestacks (Requirement 14)
+    return (
+      <g>
+        {[0, 1, 2, 3].map((i) => {
+          const p = (phase * 0.95 + i * 0.25) % 1;
+          const stackX = i % 2 === 0 ? cx - 9 : cx + 7;
+          const x = stackX + Math.sin(phase * 3 + i) * 1.4;
+          const y = 8 - p * 6;
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={y}
+              width={i % 2 === 0 ? 1.8 : 1.2}
+              height={i % 2 === 0 ? 1.4 : 1.2}
+              fill={i % 2 === 0 ? '#CBD5E1' : '#FB923C'}
+              opacity={Math.sin(p * Math.PI) * 0.82}
+            />
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'FROST_BREATH') {
+    // Visible frozen breath cloud & frost crystals around Lobo de Escarcha's jaws & shoulders (Requirement 10)
+    return (
+      <g>
+        {[0, 1, 2, 3].map((i) => {
+          const p = (phase * 0.85 + i * 0.25) % 1;
+          const x = canvasW * 0.72 + p * 6 + (i % 2) * 1.5;
+          const y = canvasH * 0.38 + Math.sin(phase * 2.5 + i) * 1.5 - p * 2;
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={y}
+              width={i === 0 ? 2.2 : 1.3}
+              height="1.2"
+              fill={i % 2 === 0 ? '#E0F2FE' : '#38BDF8'}
+              opacity={(1 - p) * 0.8}
+            />
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'SPORES') {
+    return (
+      <g>
+        {[0, 1, 2, 3].map((i) => {
+          const p = (phase * 0.7 + i * 0.25) % 1;
+          const x = cx - 9 + i * 6 + Math.sin(phase * 2 + i) * 1.8;
+          const y = groundY - 6 - p * (canvasH * 0.55);
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={y}
+              width="1.3"
+              height="1.3"
               fill={i % 2 === 0 ? '#BEF264' : highlight}
-              opacity={op}
+              opacity={Math.sin(p * Math.PI) * 0.85}
             />
           );
         })}
@@ -413,20 +1143,19 @@ const EnemySmoothEffectsLayer: React.FC<{
   }
 
   if (effectType === 'MIST') {
-    // Continuous 60 FPS flowing mist trails around paws, back, and tail for Lobo de Niebla
     return (
       <g>
         {[0, 1, 2, 3].map((i) => {
-          const drift = Math.sin(phase * 2.2 + i * 1.4) * 5;
-          const yBase = i < 2 ? 51 + i * 2 : 34 + (i - 2) * 5;
-          const xBase = 12 + i * 8 + drift;
+          const drift = Math.sin(phase * 2.0 + i * 1.4) * 3.2;
+          const yBase = i < 2 ? groundY - 2 + i : cy + (i - 2) * 3;
+          const xBase = cx - 11 + i * 5 + drift;
           return (
             <rect
               key={i}
               x={xBase}
               y={yBase}
-              width={10 - (i % 2) * 3}
-              height="2"
+              width={6 - (i % 2) * 2}
+              height="1.2"
               fill={i % 2 === 0 ? '#67E8F9' : highlight}
               opacity={0.38 + Math.sin(phase * 3 + i) * 0.15}
             />
@@ -437,27 +1166,16 @@ const EnemySmoothEffectsLayer: React.FC<{
   }
 
   if (effectType === 'MIRROR_SHARDS') {
-    // Slowly rotating / orbiting mirror fragments with reflective shimmer for Doble Fragmentado
     return (
       <g>
         {[0, 1, 2].map((i) => {
-          const angle = phase * 1.8 + i * ((Math.PI * 2) / 3);
-          const ox = 32 + Math.cos(angle) * 19;
-          const oy = 26 + Math.sin(angle * 1.3) * 10;
+          const angle = phase * 1.6 + i * ((Math.PI * 2) / 3);
+          const ox = cx + Math.cos(angle) * (canvasW * 0.36);
+          const oy = cy + Math.sin(angle * 1.3) * (canvasH * 0.22);
           return (
             <g key={i}>
-              {/* Visible reflective light tether connecting fragment to mirror body */}
-              <line
-                x1={32}
-                y1={26}
-                x2={ox + 1.5}
-                y2={oy + 1.5}
-                stroke={highlight}
-                strokeWidth="0.6"
-                opacity="0.45"
-              />
-              <rect x={ox} y={oy} width="3" height="4" fill="#F1F5F9" opacity="0.9" />
-              <rect x={ox + 1} y={oy + 1} width="1.5" height="2" fill={eyeGlow} />
+              <rect x={ox} y={oy} width="1.6" height="2.2" fill="#F1F5F9" opacity="0.88" />
+              <rect x={ox + 0.4} y={oy + 0.4} width="0.9" height="1.2" fill={eyeGlow} />
             </g>
           );
         })}
@@ -466,7 +1184,6 @@ const EnemySmoothEffectsLayer: React.FC<{
   }
 
   if (effectType === 'SONIC_RINGS') {
-    // Expanding sonic echolocation waves for Murciélago Sónico
     const p1 = (phase * 1.4) % 1;
     const p2 = (phase * 1.4 + 0.5) % 1;
     return (
@@ -474,10 +1191,10 @@ const EnemySmoothEffectsLayer: React.FC<{
         {[p1, p2].map((p, idx) => (
           <rect
             key={idx}
-            x={32 - p * 14}
-            y={28 + p * 16}
-            width={p * 28}
-            height="1.5"
+            x={cx - p * 9}
+            y={cy + p * 8}
+            width={p * 18}
+            height="1"
             fill={eyeGlow}
             opacity={(1 - p) * 0.8}
           />
@@ -486,22 +1203,21 @@ const EnemySmoothEffectsLayer: React.FC<{
     );
   }
 
-  // Generic subtle 60 FPS ambient motes (SOUL_FLAME, EMBERS, BUBBLES, FROST_CRYSTALS, VOID_MOTES, etc.)
   return (
     <g>
       {[0, 1, 2].map((i) => {
         const p = (phase * 0.85 + i * 0.33) % 1;
-        const x = 18 + i * 13 + Math.cos(phase * 2.4 + i) * 2.5;
-        const y = 44 - p * 28;
+        const x = cx - 7 + i * 7 + Math.cos(phase * 2.4 + i) * 1.5;
+        const y = groundY - 5 - p * (canvasH * 0.55);
         return (
           <rect
             key={i}
             x={x}
             y={y}
-            width="2"
-            height="2"
+            width="1.3"
+            height="1.3"
             fill={i % 2 === 0 ? eyeGlow : highlight}
-            opacity={Math.sin(p * Math.PI) * 0.75}
+            opacity={Math.sin(p * Math.PI) * 0.78}
           />
         );
       })}

@@ -777,12 +777,12 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
 
             {/* CENTER OF LEFT STAGE: COMMANDING LARGE CREATURE / NPC / OBJECT ART */}
             <div
-              className={`relative z-20 flex-1 min-h-[180px] flex flex-col items-center justify-center my-1.5 transition-transform duration-75 ${
+              className={`relative z-20 flex-1 min-h-[260px] sm:min-h-[290px] flex flex-col items-center justify-end my-1 transition-transform duration-75 ${
                 hitStopActive ? 'scale-[1.02] brightness-125' : ''
               }`}
             >
               {visibleRoomEnemies.length > 0 ? (
-                <div className="w-full flex flex-wrap items-end justify-center gap-4 sm:gap-6">
+                <div className="w-full flex flex-nowrap items-end justify-center gap-3 sm:gap-5 px-1">
                   {visibleRoomEnemies.map((enemy, enemyIdx) => {
                     const presentedHpObj = presentedEnemyHp[enemy.id];
                     const displayedHp = Math.max(
@@ -828,16 +828,6 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                       .reverse()
                       .find((ev) => Boolean(ev.vfxStyle));
 
-                    // Dynamic commanding size based on enemy count and tier
-                    const spriteSize =
-                      visibleRoomEnemies.length === 1
-                        ? enemy.isBoss || enemy.isFinalBoss || enemy.isMiniboss
-                          ? 256
-                          : 232
-                        : visibleRoomEnemies.length === 2
-                        ? 176
-                        : 146;
-
                     return (
                       <div
                         key={enemy.id}
@@ -862,14 +852,15 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             }
                           }
                         }}
-                        className={`group relative flex flex-col items-center transition-all duration-300 outline-none ${
+                        style={{ transformOrigin: '50% 100%' }}
+                        className={`group relative flex flex-col items-center justify-end transition-all duration-300 outline-none ${
                           isDead
                             ? 'opacity-40 scale-90 translate-y-2 pointer-events-none'
                             : isActingNow
-                            ? '-translate-y-1.5 scale-[1.04] z-30 drop-shadow-[0_6px_14px_rgba(231,165,74,0.35)]'
+                            ? '-translate-y-1 z-30 drop-shadow-[0_6px_14px_rgba(231,165,74,0.35)]'
                             : isTargeted
-                            ? 'scale-105 cursor-pointer z-20'
-                            : 'opacity-85 hover:opacity-100 hover:scale-102 cursor-pointer z-10'
+                            ? 'cursor-pointer z-20'
+                            : 'opacity-90 hover:opacity-100 cursor-pointer z-10'
                         }`}
                       >
                         {/* Floating Damage / Status Numbers Above Creature */}
@@ -931,8 +922,8 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                           </div>
                         )}
 
-                        {/* Pixel Art Creature Stage Container */}
-                        <div className="relative flex items-center justify-center">
+                        {/* Pixel Art Creature Stage Container (Anchored to Floor Baseline, Grows Upward!) */}
+                        <div className="relative flex items-end justify-center">
                           {latestEnemyVfx?.vfxStyle && (
                             <LaCriptaCombatVfxOverlay
                               vfxStyle={latestEnemyVfx.vfxStyle}
@@ -960,16 +951,17 @@ export const LaCriptaThreeDoorsScene: React.FC<LaCriptaThreeDoorsSceneProps> = (
                             animState={animState}
                             totalVisibleEnemies={visibleRoomEnemies.length}
                             enemyIndex={enemyIdx}
-                            customSizePx={spriteSize}
                           />
                         </div>
 
-                        {/* Secondary mini HP bar when multiple enemies exist */}
+                        {/* Secondary mini HP bar when multiple enemies exist (Locked Baseline Alignment) */}
                         {visibleRoomEnemies.length > 1 && (
                           <div
-                            className={`mt-2 w-40 bg-[#0B0811]/95 border p-1.5 text-center transition-colors ${
+                            className={`mt-1.5 w-36 sm:w-40 min-h-[82px] flex flex-col justify-between bg-[#0B0811]/95 border p-1.5 text-center transition-colors ${
                               isActingNow
                                 ? 'border-[#FFD166] shadow-[0_0_14px_rgba(255,209,102,0.35)]'
+                                : isTargeted
+                                ? 'border-[#FF4D6D]'
                                 : 'border-[#3E2F4B]'
                             }`}
                           >
