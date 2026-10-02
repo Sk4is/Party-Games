@@ -446,11 +446,11 @@ export function compileSquarePixelMatrix(visualDef: AuthoredEnemyVisualDefinitio
   const maxCol = Math.max(...rawRows.map((r) => r.length), 1);
   const normalizedRaw = rawRows.map((r) => r.padEnd(maxCol, '.').replace(/ /g, '.'));
 
-  // If the sprite has < 22 rows, it was authored in 2:1 horizontal character pairs.
-  // Expand vertically with EPX / pixel-art diagonal beveling & top-down shading so
-  // its 1:1 square pixel aspect ratio has true anatomical height and +20% internal detail.
+  // If the sprite has <= 26 rows, it was authored in 2:1 character rows.
+  // Expand vertically into two 1:1 square scanlines with EPX diagonal beveling,
+  // multi-tone material highlights, eye glints, and cloth fold separations (+15-20% internal detail).
   let finalRows: string[];
-  if (normalizedRaw.length < 22) {
+  if (normalizedRaw.length <= 26) {
     const H = normalizedRaw.length;
     const W = maxCol;
     const at = (y: number, x: number): string => {
@@ -485,18 +485,66 @@ export function compileSquarePixelMatrix(visualDef: AuthoredEnemyVisualDefinitio
             botPx = '#';
           }
         } else if (C === '1') {
-          // Natural material separation (Requirement 8 & 9):
-          // Top edge under outline catches subtle highlight; bottom edge above outline deepens into shadow
-          if (U === '#' && D === '1' && L !== '.' && R !== '.') {
+          // Primary body / armor / robes:
+          // Top edge under outline catches directional rim highlight '3'
+          if ((U === '#' || U === '.') && D === '1') {
             topPx = '3';
-          } else if (D === '#' && U !== '#') {
+          }
+          // Underside catches occlusion shadow '2'
+          if ((D === '#' || D === '.') && U === '1') {
             botPx = '2';
           }
         } else if (C === '4') {
-          // Metallic / chitin edge specular & lower shadow
-          if (D === '#' && U === '4') {
+          // Metal / Chitin / Structural wood:
+          // Top edge catches highlight '3'
+          if (U === '#' || U === '.') {
+            topPx = '3';
+          }
+          // Bottom edge catches deep shadow '2'
+          if (D === '#' || D === '.') {
             botPx = '2';
           }
+          // Upper-left corner catches specular sparkle '6'
+          if ((U === '#' || U === '.') && (L === '#' || L === '.') && R === '4') {
+            topPx = '6';
+          }
+        } else if (C === '6') {
+          // Bone / Ivory / Fangs:
+          // Upper edge catches brilliant specular '6'
+          // Lower edge or deep socket/rib crevice catches aged bone shadow '1'
+          if (D === '#' && (U === '6' || U === '1')) {
+            botPx = '1';
+          }
+        } else if (C === '5') {
+          // Eye glow / magical core:
+          // Center / upper pixel gets white pupil catchlight '6' for a piercing living gaze
+          if ((L === '5' || R === '5' || U === '5' || D === '5') && (U === '#' || UL === '#')) {
+            topPx = '6';
+          }
+        } else if (C === '9') {
+          // Gold / Brass / Celestial runes:
+          // Top catches bright gold sheen '3'
+          if (U === '#' || U === '.') {
+            topPx = '3';
+          }
+          // Bottom catches deep bronze '2'
+          if (D === '#' || D === '.') {
+            botPx = '2';
+          }
+        } else if (C === '2') {
+          // Dark undergarment / deep shadow:
+          // Alternating cloth folds in wide drapery
+          if (L === '2' && R === '2' && U === '2' && x % 2 === 0) {
+            topPx = '1';
+          }
+        } else if (C === '8') {
+          // Toxic / spore: top luminescence '5', bottom shadow '2'
+          if (U === '#' || U === '.') topPx = '5';
+          if (D === '#' || D === '.') botPx = '2';
+        } else if (C === '7') {
+          // Crimson / blood: top catches '3', bottom catches '2'
+          if (U === '#' || U === '.') topPx = '3';
+          if (D === '#' || D === '.') botPx = '2';
         }
 
         rowA += topPx;
@@ -507,7 +555,44 @@ export function compileSquarePixelMatrix(visualDef: AuthoredEnemyVisualDefinitio
     }
     finalRows = expanded;
   } else {
-    finalRows = normalizedRaw;
+    // Dense 1:1 scanlines (e.g. Esqueleto Colosal, Autómata de Escoria):
+    // Apply the same high-detail shading pass directly across their native 1:1 pixels
+    const H = normalizedRaw.length;
+    const W = maxCol;
+    const at = (y: number, x: number): string => {
+      if (y < 0 || y >= H || x < 0 || x >= W) return '.';
+      return normalizedRaw[y][x] || '.';
+    };
+
+    const shaded: string[] = [];
+    for (let y = 0; y < H; y++) {
+      let row = '';
+      for (let x = 0; x < W; x++) {
+        const C = at(y, x);
+        const U = at(y - 1, x);
+        const D = at(y + 1, x);
+        const L = at(y, x - 1);
+        const R = at(y, x + 1);
+
+        let px = C;
+        if (C === '1') {
+          if (U === '#' && D === '1') px = '3';
+          else if (D === '#' && U === '1') px = '2';
+        } else if (C === '4') {
+          if (U === '#' && D === '4') px = '3';
+          else if (D === '#' && U === '4') px = '2';
+          if (U === '#' && L === '#' && R === '4' && D === '4') px = '6';
+        } else if (C === '6') {
+          if (D === '#' && U === '6') px = '1';
+        } else if (C === '9') {
+          if (U === '#' && D === '9') px = '3';
+          else if (D === '#' && U === '9') px = '2';
+        }
+        row += px;
+      }
+      shaded.push(row);
+    }
+    finalRows = shaded;
   }
 
   let minX = maxCol;
@@ -731,9 +816,9 @@ export const AuthoredEnemySpriteSvg: React.FC<{
   blueprint: CriptaCreatureVisualBlueprint;
   visualDef?: AuthoredEnemyVisualDefinition;
   torsoY: number;
-  headY: number;
-  armL: number;
-  armR: number;
+  headY?: number;
+  armL?: number;
+  armR?: number;
   wingSpread: number;
   pulse: boolean;
   silhouetteBlackMode?: boolean;
@@ -741,6 +826,9 @@ export const AuthoredEnemySpriteSvg: React.FC<{
   blueprint,
   visualDef,
   torsoY,
+  headY = 0,
+  armL = 0,
+  armR = 0,
   wingSpread,
   pulse,
   silhouetteBlackMode = false,
@@ -782,8 +870,12 @@ export const AuthoredEnemySpriteSvg: React.FC<{
   }
 
   const { primary, secondary, highlight, eyeGlow, metal } = blueprint.palette;
-  const palMap: Record<string, string> = silhouetteBlackMode
-    ? {
+  const isFinalBoss = blueprint.tier === 'FINAL_BOSS';
+  const isMiniboss = blueprint.tier === 'MINIBOSS';
+
+  const palMap: Record<string, string> = useMemo(() => {
+    if (silhouetteBlackMode) {
+      return {
         '#': '#000000',
         '1': '#000000',
         '2': '#000000',
@@ -794,19 +886,21 @@ export const AuthoredEnemySpriteSvg: React.FC<{
         '7': '#000000',
         '8': '#000000',
         '9': '#000000',
-      }
-    : {
-        '#': '#06050A',
-        '1': primary,
-        '2': secondary,
-        '3': highlight,
-        '4': metal,
-        '5': pulse ? '#FFFFFF' : eyeGlow,
-        '6': '#F1F5F9',
-        '7': '#E11D48',
-        '8': '#22C55E',
-        '9': '#F59E0B',
       };
+    }
+    return {
+      '#': '#06050A',
+      '1': primary,
+      '2': secondary,
+      '3': highlight,
+      '4': metal,
+      '5': pulse ? '#FFFFFF' : eyeGlow,
+      '6': '#F1F5F9',
+      '7': '#E11D48',
+      '8': '#22C55E',
+      '9': '#F59E0B',
+    };
+  }, [eyeGlow, highlight, metal, primary, pulse, secondary, silhouetteBlackMode]);
 
   const { rows, minX, minY, croppedWidth, croppedHeight } = compiled;
   const { canvasWidthPx, canvasHeightPx, groundOffset } = meta;
@@ -816,146 +910,243 @@ export const AuthoredEnemySpriteSvg: React.FC<{
   const baseOffsetX = Math.round((canvasWidthPx - croppedWidth) / 2);
   const baseOffsetY = Math.round(groundY - croppedHeight + groundOffset * 0.5);
 
-  // Creature-scale-aware idle animation (Requirement 19: small = light/fast, heavy = slow/weighted, colossal = very slow mass)
-  let animOffsetX = 0;
-  let animOffsetY = 0;
-  let topHalfSquashY = 0;
-  let hatTipShiftX = 0;
-  let rightWeaponShiftY = 0;
+  // =========================================================================
+  // 60 FPS SUBPIXEL CONTINUOUS MOTION CALCULATIONS (Requirement 19 & 60 FPS Polish)
+  // =========================================================================
+  let smoothTorsoY = 0;
+  let smoothTorsoScaleX = 1;
+  let smoothTorsoScaleY = 1;
+  let smoothHeadX = 0;
+  let smoothHeadY = 0;
+  let smoothHeadTilt = 0;
+  let smoothWeaponX = 0;
+  let smoothWeaponY = 0;
+  let smoothWeaponAngle = 0;
+  let smoothPropX = 0;
+  let smoothPropY = 0;
+  let smoothPropAngle = 0;
+  let smoothFloatY = 0;
+  let smoothFloatX = 0;
 
   switch (visualDef.idleType) {
     case 'COLOSSUS_BREATH': {
-      // Geological, monumental mass cadence for Esqueleto Colosal (60 FPS restrained ancient settle)
-      const slowMassCycle = Math.sin(particlePhase * 0.75); // ~0.75 rad/s: very slow deep cycle
-      // Skull micro-tilt (1px) over long subtle phases
-      hatTipShiftX = slowMassCycle > 0.65 ? 1 : slowMassCycle < -0.65 ? -1 : 0;
-      // Rib cage subtle 1px shift during deep expansion
-      topHalfSquashY = slowMassCycle > 0.5 ? 1 : 0;
-      // Massive ancient burial weapon slowly settling under its immense weight
-      rightWeaponShiftY = slowMassCycle > 0.2 ? 1 : 0;
+      // Monumental slow mass cadence (~0.75 rad/s: very deep ancient settle)
+      const slowCycle = Math.sin(particlePhase * 0.75);
+      smoothTorsoY = slowCycle * 0.75;
+      smoothTorsoScaleY = 1 + slowCycle * 0.015;
+      smoothTorsoScaleX = 1 - slowCycle * 0.01;
+      smoothHeadX = Math.sin(particlePhase * 0.38) * 0.5;
+      smoothHeadY = Math.cos(particlePhase * 0.75) * 0.4;
+      smoothHeadTilt = Math.sin(particlePhase * 0.38) * 0.6;
+      smoothWeaponY = Math.sin(particlePhase * 0.75 - 0.4) * 0.9;
+      smoothWeaponAngle = Math.sin(particlePhase * 0.38) * 0.4;
       break;
     }
     case 'CONSTRUCT_PISTON': {
-      // Heavy mechanical piston cycle + furnace breath + subtle chassis vibration
-      const pistonCycle = Math.sin(particlePhase * 3.0);
-      topHalfSquashY = pistonCycle > 0.2 ? 1 : 0;
-      rightWeaponShiftY = pistonCycle < -0.2 ? 1 : 0;
-      animOffsetX = Math.round(Math.sin(particlePhase * 14) * 0.35);
+      // Heavy mechanical piston cadence + furnace core tremor
+      const pistonCycle = Math.sin(particlePhase * 3.2);
+      smoothTorsoY = pistonCycle > 0.1 ? 0.8 : -0.3;
+      smoothTorsoScaleY = pistonCycle > 0.1 ? 0.98 : 1.02;
+      smoothWeaponY = pistonCycle < -0.1 ? 0.9 : -0.4;
+      smoothFloatX = Math.sin(particlePhase * 16) * 0.25; // chassis vibration
       break;
     }
     case 'JESTER_SWAY': {
-      // Dark fantasy jester: subtle shoulder movement, independent hat tips & bells, slight head tilt
+      // Sinister pendulum sway + independent bells & hat tips
       const sway = Math.sin(particlePhase * 2.4);
-      hatTipShiftX = sway > 0.35 ? 1 : sway < -0.35 ? -1 : 0;
-      topHalfSquashY = Math.cos(particlePhase * 2.4) > 0.5 ? 1 : 0;
-      rightWeaponShiftY = sway > 0 ? -1 : 0;
+      smoothTorsoY = Math.cos(particlePhase * 2.4) * 0.6;
+      smoothHeadX = sway * 1.2;
+      smoothHeadTilt = sway * 2.5;
+      smoothWeaponX = -sway * 0.8;
+      smoothWeaponAngle = -sway * 3.0;
+      smoothPropX = sway * 0.6;
       break;
     }
     case 'BOOK_FLUTTER': {
-      // Levitating spellbook: gently hovers while pages/covers open & close by 1px
-      animOffsetY = Math.round(Math.sin(particlePhase * 3.4) * 1.5);
-      topHalfSquashY = pulse ? -1 : 0;
-      rightWeaponShiftY = wingSpread === 1 ? 1 : 0;
+      // Weightless magical levitation drift + page undulating
+      smoothFloatY = Math.sin(particlePhase * 3.2) * 1.6;
+      smoothFloatX = Math.cos(particlePhase * 1.8) * 0.8;
+      smoothPropY = Math.sin(particlePhase * 5.0) * 0.8;
+      smoothWeaponY = Math.cos(particlePhase * 4.2) * 0.7;
       break;
     }
     case 'FLAME_SPIRIT': {
-      // Supernatural floating flame spirit: natural upward flame flicker & hover
-      animOffsetY = Math.round(Math.sin(particlePhase * 4.2) * 1.8);
-      animOffsetX = Math.round(Math.cos(particlePhase * 2.8) * 0.8);
-      hatTipShiftX = Math.sin(particlePhase * 6.5) > 0 ? 1 : -1;
+      // Supernatural flame flicker + hovering drift
+      smoothFloatY = Math.sin(particlePhase * 4.2) * 2.0;
+      smoothFloatX = Math.cos(particlePhase * 2.8) * 1.1;
+      smoothHeadTilt = Math.sin(particlePhase * 6.5) * 2.0;
+      smoothTorsoScaleY = 1 + Math.sin(particlePhase * 7.0) * 0.04;
       break;
     }
     case 'MINER_HEAVE': {
-      // Exhausted possessed miner: heavy chest breath + pickaxe weight shift
-      topHalfSquashY = wingSpread === 2 ? 1 : 0;
-      rightWeaponShiftY = wingSpread === 2 ? 1 : 0;
+      // Possessed exhausted miner heavy heave + pickaxe gravity
+      const heave = Math.sin(particlePhase * 2.0);
+      smoothTorsoY = heave * 1.0;
+      smoothTorsoScaleY = 1 + heave * 0.025;
+      smoothWeaponY = Math.sin(particlePhase * 2.0 - 0.5) * 1.2;
+      smoothHeadY = heave * 0.8;
       break;
     }
-    case 'MUSHROOM_SQUASH':
-      topHalfSquashY = wingSpread === 2 ? 1 : 0;
+    case 'MUSHROOM_SQUASH': {
+      // Spongy fungal cap squash & stretch
+      const capSquash = Math.sin(particlePhase * 2.6);
+      smoothTorsoY = capSquash * 0.7;
+      smoothTorsoScaleY = 1 + capSquash * 0.035;
+      smoothTorsoScaleX = 1 - capSquash * 0.025;
       break;
-    case 'WOLF_PROWL':
-      // Predatory quadruped: low stalking chest breath + subtle forward prowl
-      animOffsetX = wingSpread === 1 ? -0.5 : 0;
-      topHalfSquashY = wingSpread === 2 ? 1 : 0;
+    }
+    case 'WOLF_PROWL': {
+      // Low stalking chest respiration + subtle forward prowl
+      const prowl = Math.sin(particlePhase * 2.2);
+      smoothTorsoY = prowl * 0.7;
+      smoothFloatX = prowl * 0.6;
+      smoothHeadY = prowl * 0.8;
+      smoothHeadTilt = Math.sin(particlePhase * 1.8) * 1.2;
       break;
-    case 'RAT_SNIFF':
-      animOffsetX = pulse ? -1 : 0;
+    }
+    case 'RAT_SNIFF': {
+      // Rapid twitching snout sniff + whisker micro-movement
+      const sniff = Math.sin(particlePhase * 7.5);
+      smoothHeadX = sniff > 0.3 ? 0.7 : -0.3;
+      smoothHeadY = Math.cos(particlePhase * 7.5) * 0.5;
+      smoothPropX = Math.sin(particlePhase * 3.0) * 0.6;
       break;
-    case 'SLIME_PULSE':
-      topHalfSquashY = wingSpread === 1 ? 1 : wingSpread === 2 ? -0.5 : 0;
+    }
+    case 'SLIME_PULSE': {
+      // Viscous gelatinous breathing pulse
+      const pulseCycle = Math.sin(particlePhase * 2.8);
+      smoothTorsoScaleY = 1 + pulseCycle * 0.05;
+      smoothTorsoScaleX = 1 - pulseCycle * 0.04;
+      smoothTorsoY = -pulseCycle * 0.6;
       break;
-    case 'BAT_FLAP':
-      animOffsetY = (wingSpread - 1) * 1.2;
+    }
+    case 'BAT_FLAP': {
+      smoothFloatY = Math.sin(particlePhase * 5.2) * 1.8;
+      smoothTorsoScaleX = 1 + Math.sin(particlePhase * 5.2) * 0.06;
       break;
-    case 'GHOST_DRIFT':
-      animOffsetY = Math.round(Math.sin(particlePhase * 3.0) * 1.6);
-      animOffsetX = Math.round(Math.cos(particlePhase * 2.0) * 0.8);
+    }
+    case 'GHOST_DRIFT': {
+      // Ethereal floating on asynchronous Lissajous curves
+      smoothFloatY = Math.sin(particlePhase * 2.8) * 1.8;
+      smoothFloatX = Math.cos(particlePhase * 1.9) * 1.1;
+      smoothHeadTilt = Math.sin(particlePhase * 1.5) * 1.8;
       break;
-    case 'MIRROR_GLITCH':
-      animOffsetX = wingSpread === 2 && pulse ? 1 : 0;
-      topHalfSquashY = wingSpread === 1 ? -0.5 : 0;
+    }
+    case 'MIRROR_GLITCH': {
+      smoothFloatX = wingSpread === 2 && pulse ? 1.2 : 0;
+      smoothTorsoY = Math.sin(particlePhase * 2.4) * 0.6;
       break;
-    case 'INSECT_SCUTTLE':
-      animOffsetX = pulse ? 0.6 : -0.6;
+    }
+    case 'INSECT_SCUTTLE': {
+      // Rapid micro-scuttle + twitching antennae
+      const scuttle = Math.sin(particlePhase * 6.0);
+      smoothFloatX = scuttle * 0.6;
+      smoothHeadTilt = Math.sin(particlePhase * 8.0) * 1.4;
       break;
-    case 'SERPENT_COIL':
-      animOffsetX = (wingSpread - 1) * 0.7;
+    }
+    case 'SERPENT_COIL': {
+      smoothFloatX = Math.sin(particlePhase * 2.2) * 1.2;
+      smoothTorsoY = Math.cos(particlePhase * 2.2) * 0.6;
       break;
+    }
     case 'HEAVY_KNIGHT_SHIFT':
     case 'SKELETON_SWAY':
     case 'SHAMAN_RITUAL':
     case 'GOBLIN_CROUCH':
-    default:
-      topHalfSquashY = wingSpread === 2 ? 1 : 0;
+    default: {
+      const breath = Math.sin(particlePhase * 2.2);
+      smoothTorsoY = breath * 0.65;
+      smoothTorsoScaleY = 1 + breath * 0.015;
+      smoothHeadY = breath * 0.45;
+      smoothWeaponY = Math.sin(particlePhase * 2.2 - 0.3) * 0.7;
+      smoothWeaponAngle = Math.sin(particlePhase * 1.5) * 0.8;
+      smoothPropY = breath * 0.5;
       break;
-  }
-
-  const totalOffsetX = baseOffsetX + animOffsetX;
-  const totalOffsetY = baseOffsetY + animOffsetY + torsoY * 0.35;
-
-  const rects: React.ReactNode[] = [];
-  const capSplitRow = Math.floor(croppedHeight * 0.48);
-  const hatSplitRow = Math.floor(croppedHeight * 0.22);
-  const rightWeaponSplitCol = Math.floor(croppedWidth * 0.74);
-
-  for (let cy = 0; cy < croppedHeight; cy++) {
-    const srcY = minY + cy;
-    const row = rows[srcY] || '';
-    const rowShiftY = cy < capSplitRow ? topHalfSquashY : 0;
-    const rowShiftX = cy < hatSplitRow ? hatTipShiftX : 0;
-
-    let cx = 0;
-    while (cx < croppedWidth) {
-      const srcX = minX + cx;
-      const ch = row[srcX];
-      if (!ch || ch === '.' || ch === ' ') {
-        cx++;
-        continue;
-      }
-      const fill = palMap[ch];
-      if (!fill) {
-        cx++;
-        continue;
-      }
-      let run = 1;
-      while (cx + run < croppedWidth && row[minX + cx + run] === ch) {
-        run++;
-      }
-      const colWeaponShiftY = cx >= rightWeaponSplitCol ? rightWeaponShiftY : 0;
-      rects.push(
-        <rect
-          key={`${cy}_${cx}`}
-          x={Number((totalOffsetX + cx + rowShiftX).toFixed(2))}
-          y={Number((totalOffsetY + cy + rowShiftY + colWeaponShiftY).toFixed(2))}
-          width={Number((run + 0.06).toFixed(2))}
-          height={1.06}
-          fill={fill}
-        />
-      );
-      cx += run;
     }
   }
+
+  // Combat stage procedural offsets (from articulated pose props)
+  const combinedTorsoY = smoothTorsoY + torsoY * 0.35 + smoothFloatY;
+  const combinedTorsoX = smoothFloatX;
+  const combinedHeadX = smoothHeadX;
+  const combinedHeadY = smoothHeadY + headY * 0.4;
+  const combinedWeaponX = smoothWeaponX;
+  const combinedWeaponY = smoothWeaponY + armR * 0.5;
+  const combinedPropX = smoothPropX;
+  const combinedPropY = smoothPropY + armL * 0.5;
+
+  // =========================================================================
+  // SEMANTIC ANATOMICAL GROUP PARTITIONING (Stable Memoized Nodes)
+  // =========================================================================
+  const { lowerRects, torsoRects, headRects, weaponRects, propRects } = useMemo(() => {
+    const headSplitRow = Math.floor(croppedHeight * 0.28);
+    const torsoSplitRow = Math.floor(croppedHeight * 0.70);
+    const weaponSplitCol = Math.floor(croppedWidth * 0.72);
+    const propSplitCol = Math.floor(croppedWidth * 0.28);
+
+    const lower: React.ReactNode[] = [];
+    const torso: React.ReactNode[] = [];
+    const head: React.ReactNode[] = [];
+    const weapon: React.ReactNode[] = [];
+    const prop: React.ReactNode[] = [];
+
+    for (let cy = 0; cy < croppedHeight; cy++) {
+      const srcY = minY + cy;
+      const row = rows[srcY] || '';
+
+      let cx = 0;
+      while (cx < croppedWidth) {
+        const srcX = minX + cx;
+        const ch = row[srcX];
+        if (!ch || ch === '.' || ch === ' ') {
+          cx++;
+          continue;
+        }
+        const fill = palMap[ch];
+        if (!fill) {
+          cx++;
+          continue;
+        }
+        let run = 1;
+        while (cx + run < croppedWidth && row[minX + cx + run] === ch) {
+          run++;
+        }
+
+        const rectNode = (
+          <rect
+            key={`${cy}_${cx}`}
+            x={cx}
+            y={cy}
+            width={Number((run + 0.06).toFixed(2))}
+            height={1.06}
+            fill={fill}
+          />
+        );
+
+        if (cx >= weaponSplitCol && cy < torsoSplitRow) {
+          weapon.push(rectNode);
+        } else if (cx < propSplitCol && cy < torsoSplitRow) {
+          prop.push(rectNode);
+        } else if (cy < headSplitRow) {
+          head.push(rectNode);
+        } else if (cy < torsoSplitRow) {
+          torso.push(rectNode);
+        } else {
+          lower.push(rectNode);
+        }
+
+        cx += run;
+      }
+    }
+
+    return {
+      lowerRects: lower,
+      torsoRects: torso,
+      headRects: head,
+      weaponRects: weapon,
+      propRects: prop,
+    };
+  }, [croppedHeight, croppedWidth, minX, minY, palMap, rows]);
 
   // Floor shadow tailored to creature dimensions (Requirement 20)
   const shadowSpan = Math.min(
@@ -963,7 +1154,10 @@ export const AuthoredEnemySpriteSvg: React.FC<{
     Math.max(10, Math.round(croppedWidth * 0.86 * Math.min(1.18, meta.shadowWidth)))
   );
   const shadowX = Number(((canvasWidthPx - shadowSpan) / 2).toFixed(2));
-  const shadowH = meta.visualScaleClass === 'COLOSSAL' ? 2.4 : meta.visualScaleClass === 'HUGE' ? 2.0 : 1.5;
+  const shadowH =
+    meta.visualScaleClass === 'COLOSSAL' ? 2.4 : meta.visualScaleClass === 'HUGE' ? 2.0 : 1.5;
+
+  const cx = canvasWidthPx / 2;
 
   return (
     <svg
@@ -973,9 +1167,12 @@ export const AuthoredEnemySpriteSvg: React.FC<{
       style={{ imageRendering: 'pixelated' }}
       shapeRendering="crispEdges"
     >
-      {/* Adaptive Grounding Shadow Plane (Requirement 20) */}
+      {/* ===================================================================
+          LAYER 1: ADAPTIVE GROUND SHADOW & BOSS RESONANCE RITUAL SEAL
+          =================================================================== */}
       {!silhouetteBlackMode && (
         <g>
+          {/* Main Occlusion Shadow */}
           <rect
             x={shadowX}
             y={groundY}
@@ -992,31 +1189,61 @@ export const AuthoredEnemySpriteSvg: React.FC<{
             fill="#07050C"
             opacity="0.65"
           />
-          {(meta.visualScaleClass === 'COLOSSAL' ||
-            blueprint.tier === 'MINIBOSS' ||
-            blueprint.tier === 'FINAL_BOSS') && (
-            <rect
-              x={shadowX + 2}
-              y={groundY + 0.3}
-              width={Math.max(4, shadowSpan - 4)}
-              height="0.9"
-              fill={highlight}
-              opacity={pulse ? 0.75 : 0.38}
-            />
+
+          {/* MINIBOSS & BOSS Ground Aura Halo */}
+          {(isMiniboss || isFinalBoss) && (
+            <g>
+              <rect
+                x={shadowX - 2}
+                y={groundY + 0.3}
+                width={shadowSpan + 4}
+                height="0.9"
+                fill={highlight}
+                opacity={pulse ? 0.8 : 0.4}
+              />
+              <rect
+                x={shadowX + 4}
+                y={groundY + 0.6}
+                width={Math.max(4, shadowSpan - 8)}
+                height="0.6"
+                fill={isFinalBoss ? '#F59E0B' : eyeGlow}
+                opacity={0.65}
+              />
+            </g>
+          )}
+
+          {/* FINAL BOSS Resonant Runic Seal Array */}
+          {isFinalBoss && (
+            <g opacity={0.75 + Math.sin(particlePhase * 3.0) * 0.2}>
+              {/* Outer Runic Floor Brackets */}
+              <rect x={cx - shadowSpan * 0.58} y={groundY - 1.2} width="2" height="3" fill="#F59E0B" />
+              <rect x={cx + shadowSpan * 0.58 - 2} y={groundY - 1.2} width="2" height="3" fill="#F59E0B" />
+              <rect x={cx - 3} y={groundY + 1.2} width="6" height="0.8" fill="#EF4444" />
+              {/* Rotating Rune Sparks */}
+              {[0, 1, 2, 3].map((idx) => {
+                const angle = particlePhase * 1.5 + idx * (Math.PI / 2);
+                const rx = cx + Math.cos(angle) * (shadowSpan * 0.52);
+                const ry = groundY + Math.sin(angle) * 1.6;
+                return (
+                  <rect
+                    key={idx}
+                    x={rx - 0.6}
+                    y={ry - 0.6}
+                    width="1.2"
+                    height="1.2"
+                    fill={idx % 2 === 0 ? '#FDE047' : '#EF4444'}
+                    opacity="0.85"
+                  />
+                );
+              })}
+            </g>
           )}
         </g>
       )}
 
-      {/* Occasional Jester / Mirror Illusion Afterimage (Requirement 12) */}
-      {!silhouetteBlackMode &&
-        (visualDef.idleType === 'JESTER_SWAY' || visualDef.idleType === 'MIRROR_GLITCH') &&
-        Math.sin(particlePhase * 2.4) > 0.55 && (
-          <g transform="translate(-2.2, -0.5)" opacity="0.24">
-            {rects}
-          </g>
-        )}
-
-      {/* 60 FPS Smooth Environmental / Anatomy Particle Effects */}
+      {/* ===================================================================
+          LAYER 2: 60 FPS SMOOTH ENVIRONMENTAL / BIOME PARTICLE EFFECTS
+          =================================================================== */}
       {!silhouetteBlackMode && (
         <EnemySmoothEffectsLayer
           effectType={visualDef.effectType}
@@ -1030,8 +1257,49 @@ export const AuthoredEnemySpriteSvg: React.FC<{
         />
       )}
 
-      {/* Crisp 1:1 Square Pixel-Art Creature Body */}
-      <g>{rects}</g>
+      {/* ===================================================================
+          LAYER 3: ARTICULATED 60 FPS CREATURE PIXEL MATRIX
+          =================================================================== */}
+      <g transform={`translate(${baseOffsetX}, ${baseOffsetY})`}>
+        {/* 1. Base / Lower Legs / Roots / Pedestal (Firmly Anchored to Ground) */}
+        <g>{lowerRects}</g>
+
+        {/* 2. Mid Torso / Carapace / Chest / Wings (Smooth 60 FPS Respiration) */}
+        <g
+          transform={`translate(${combinedTorsoX.toFixed(2)}, ${combinedTorsoY.toFixed(
+            2
+          )}) scale(${smoothTorsoScaleX.toFixed(3)}, ${smoothTorsoScaleY.toFixed(3)})`}
+        >
+          {torsoRects}
+
+          {/* 3. Head / Cranium / Crown / Horns (Smooth Secondary Motion & Gaze Tilt) */}
+          <g
+            transform={`translate(${combinedHeadX.toFixed(2)}, ${combinedHeadY.toFixed(
+              2
+            )}) rotate(${smoothHeadTilt.toFixed(2)})`}
+          >
+            {headRects}
+          </g>
+
+          {/* 4. Left Prop / Shield / Lantern / Key Ring */}
+          <g
+            transform={`translate(${combinedPropX.toFixed(2)}, ${combinedPropY.toFixed(
+              2
+            )}) rotate(${smoothPropAngle.toFixed(2)})`}
+          >
+            {propRects}
+          </g>
+        </g>
+
+        {/* 5. Right Weapon / Halberd / Mace / Scepter (Inertial Weight Settle) */}
+        <g
+          transform={`translate(${combinedWeaponX.toFixed(2)}, ${combinedWeaponY.toFixed(
+            2
+          )}) rotate(${smoothWeaponAngle.toFixed(2)})`}
+        >
+          {weaponRects}
+        </g>
+      </g>
     </svg>
   );
 };
@@ -1051,7 +1319,7 @@ const EnemySmoothEffectsLayer: React.FC<{
   const cy = canvasH / 2;
 
   if (effectType === 'COLOSSUS_DUST') {
-    // Slow falling bone/stone dust + periodic floor dust puff when massive frame settles (Requirement 10)
+    // Slow falling bone/stone dust + floor dust puff when massive frame settles (Requirement 10)
     const floorPuffPhase = (phase * 0.25) % 1; // triggers every ~4s
     const showFloorPuff = floorPuffPhase < 0.28;
     return (
@@ -1110,7 +1378,7 @@ const EnemySmoothEffectsLayer: React.FC<{
   }
 
   if (effectType === 'FROST_BREATH') {
-    // Visible frozen breath cloud & frost crystals around Lobo de Escarcha's jaws & shoulders (Requirement 10)
+    // Visible frozen breath cloud & frost crystals around jaws & shoulders
     return (
       <g>
         {[0, 1, 2, 3].map((i) => {
@@ -1134,12 +1402,13 @@ const EnemySmoothEffectsLayer: React.FC<{
   }
 
   if (effectType === 'SPORES') {
+    // Toxic fungal spores drifting in buoyant upward spirals
     return (
       <g>
-        {[0, 1, 2, 3].map((i) => {
-          const p = (phase * 0.7 + i * 0.25) % 1;
-          const x = cx - 9 + i * 6 + Math.sin(phase * 2 + i) * 1.8;
-          const y = groundY - 6 - p * (canvasH * 0.55);
+        {[0, 1, 2, 3, 4].map((i) => {
+          const p = (phase * 0.7 + i * 0.2) % 1;
+          const x = cx - 10 + i * 5 + Math.sin(phase * 2.2 + i * 1.2) * 2.2;
+          const y = groundY - 4 - p * (canvasH * 0.65);
           return (
             <rect
               key={i}
@@ -1157,10 +1426,11 @@ const EnemySmoothEffectsLayer: React.FC<{
   }
 
   if (effectType === 'MIST') {
+    // Whispering forest fog drifting horizontally across floor & shoulders
     return (
       <g>
         {[0, 1, 2, 3].map((i) => {
-          const drift = Math.sin(phase * 2.0 + i * 1.4) * 3.2;
+          const drift = Math.sin(phase * 1.8 + i * 1.4) * 3.6;
           const yBase = i < 2 ? groundY - 2 + i : cy + (i - 2) * 3;
           const xBase = cx - 11 + i * 5 + drift;
           return (
@@ -1175,6 +1445,173 @@ const EnemySmoothEffectsLayer: React.FC<{
             />
           );
         })}
+      </g>
+    );
+  }
+
+  if (effectType === 'SOUL_FLAME') {
+    // Ghostly spectral wisps rising with luminous cyan and white core
+    return (
+      <g>
+        {[0, 1, 2, 3].map((i) => {
+          const p = (phase * 0.9 + i * 0.25) % 1;
+          const x = cx - 8 + i * 5 + Math.sin(phase * 3.2 + i * 2) * 1.8;
+          const y = groundY - 4 - p * (canvasH * 0.58);
+          return (
+            <g key={i} opacity={Math.sin(p * Math.PI) * 0.9}>
+              <rect x={x - 0.4} y={y - 0.4} width="1.8" height="2.2" fill={eyeGlow} />
+              <rect x={x} y={y} width="1.0" height="1.4" fill="#FFFFFF" />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'EMBERS') {
+    // Glowing forge embers leaping upward on hot convective air currents
+    return (
+      <g>
+        {[0, 1, 2, 3, 4].map((i) => {
+          const p = (phase * 1.1 + i * 0.2) % 1;
+          const x = cx - 9 + i * 4.5 + Math.sin(phase * 4 + i) * 1.6;
+          const y = groundY - 3 - p * (canvasH * 0.7);
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={y}
+              width={i === 0 ? 1.6 : 1.1}
+              height={i === 0 ? 1.6 : 1.1}
+              fill={i % 2 === 0 ? '#FB923C' : '#E11D48'}
+              opacity={Math.sin(p * Math.PI) * 0.88}
+            />
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'BUBBLES') {
+    // Rising sewer slime toxic bubbles popping at their apex
+    return (
+      <g>
+        {[0, 1, 2, 3].map((i) => {
+          const p = (phase * 0.8 + i * 0.25) % 1;
+          const x = cx - 8 + i * 5 + Math.cos(phase * 2 + i) * 1.2;
+          const y = groundY - 2 - p * (canvasH * 0.48);
+          return (
+            <g key={i} opacity={p < 0.9 ? 0.85 : (1 - p) * 8.5}>
+              <rect x={x - 0.5} y={y - 0.5} width="2.0" height="2.0" fill="#22C55E" opacity="0.6" />
+              <rect x={x} y={y} width="1.0" height="1.0" fill="#BEF264" />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'VOID_MOTES') {
+    // Orbiting celestial dark-matter motes for Eclipse Astrologers & Abyssal entities
+    return (
+      <g>
+        {[0, 1, 2, 3].map((i) => {
+          const angle = phase * 1.8 + i * (Math.PI / 2);
+          const ox = cx + Math.cos(angle) * (canvasW * 0.38);
+          const oy = cy + Math.sin(angle * 1.4) * (canvasH * 0.25);
+          return (
+            <g key={i}>
+              <rect x={ox - 0.5} y={oy - 0.5} width="2.2" height="2.2" fill="#1E1B4B" opacity="0.9" />
+              <rect x={ox} y={oy} width="1.2" height="1.2" fill={i % 2 === 0 ? '#F59E0B' : '#38BDF8'} />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'SAND_DUST') {
+    // Ancient desert tomb dust blowing in horizontal gusts
+    return (
+      <g>
+        {[0, 1, 2, 3].map((i) => {
+          const p = (phase * 0.9 + i * 0.25) % 1;
+          const x = canvasW * 0.15 + p * (canvasW * 0.7);
+          const y = groundY - 2 - Math.sin(p * Math.PI) * 5 + (i % 2) * 1.5;
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={y}
+              width={i % 2 === 0 ? 2.4 : 1.4}
+              height="1.0"
+              fill="#D97706"
+              opacity={Math.sin(p * Math.PI) * 0.75}
+            />
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'FROST_CRYSTALS') {
+    // Glinting hexagonal snow crystals drifting downward
+    return (
+      <g>
+        {[0, 1, 2, 3].map((i) => {
+          const p = (phase * 0.6 + i * 0.25) % 1;
+          const x = cx - 10 + i * 6 + Math.sin(phase * 2.0 + i) * 1.8;
+          const y = 6 + p * (groundY - 8);
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={y}
+              width="1.4"
+              height="1.4"
+              fill={i % 2 === 0 ? '#FFFFFF' : '#7DD3FC'}
+              opacity={Math.sin(p * Math.PI) * 0.85}
+            />
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'BLOOD_DROPS') {
+    // Crimson blood droplets dripping from weapons / spikes to the floor
+    return (
+      <g>
+        {[0, 1, 2].map((i) => {
+          const p = (phase * 1.2 + i * 0.33) % 1;
+          const x = cx + 8 - i * 5;
+          const y = cy + p * (groundY - cy);
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={y}
+              width="1.2"
+              height={p > 0.8 ? '0.8' : '1.8'}
+              fill="#E11D48"
+              opacity={p > 0.92 ? (1 - p) * 12.5 : 0.9}
+            />
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (effectType === 'LIGHTNING_SPARKS') {
+    // Crackling jagged electrical arcs between conductors
+    const sparkVisible = Math.sin(phase * 14) > 0.35;
+    if (!sparkVisible) return null;
+    return (
+      <g fill="#FDE047" opacity="0.9">
+        <rect x={cx - 7} y={cy - 6} width="1.6" height="1.6" />
+        <rect x={cx - 5} y={cy - 8} width="1.4" height="2.0" />
+        <rect x={cx + 6} y={cy - 5} width="1.8" height="1.4" />
+        <rect x={cx + 8} y={cy - 7} width="1.2" height="2.2" />
       </g>
     );
   }
