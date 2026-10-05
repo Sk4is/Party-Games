@@ -127,7 +127,7 @@ export const ElectricalCircuitMinigame: React.FC<ElectricalCircuitMinigameProps>
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 font-mono select-none">
       {/* Industrial Substation Metal Housing */}
-      <div className="relative w-full max-w-2xl bg-[#090d14] border-4 border-[#334155] rounded-none shadow-[0_0_80px_rgba(0,0,0,0.9)] p-5 text-slate-100 flex flex-col justify-between overflow-hidden">
+      <div className="relative w-full max-w-2xl bg-[#090d14] border-4 border-[#334155] rounded-none shadow-[0_0_80px_rgba(0,0,0,0.9)] p-5 text-slate-100 flex flex-col justify-between overflow-hidden dp-machine-open">
         {/* Corner Hex Screws */}
         <div className="absolute top-2 left-2 w-3 h-3 bg-[#475569] border border-[#1e293b] rounded-full flex items-center justify-center text-[7px] text-[#0f172a] font-black">
           +

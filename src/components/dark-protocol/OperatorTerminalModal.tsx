@@ -55,7 +55,7 @@ export const OperatorTerminalModal: React.FC<OperatorTerminalModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-3 sm:p-4 font-mono select-none">
       {/* Heavy Steel Technical Workstation Chassis */}
-      <div className="relative w-full max-w-5xl bg-[#060a12] border-4 border-[#334155] p-4 sm:p-5 text-slate-100 flex flex-col justify-between shadow-[0_0_90px_rgba(6,182,212,0.18)] max-h-[94vh] overflow-hidden">
+      <div className="relative w-full max-w-5xl bg-[#060a12] border-4 border-[#334155] p-4 sm:p-5 text-slate-100 flex flex-col justify-between shadow-[0_0_90px_rgba(6,182,212,0.18)] max-h-[94vh] overflow-hidden dp-terminal-open">
         {/* Metal Corner Screws */}
         <div className="absolute top-2 left-2 w-2.5 h-2.5 bg-[#475569] border border-[#1e293b] flex items-center justify-center text-[7px] text-[#0f172a] font-black">+</div>
         <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-[#475569] border border-[#1e293b] flex items-center justify-center text-[7px] text-[#0f172a] font-black">+</div>

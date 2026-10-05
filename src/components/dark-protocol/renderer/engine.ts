@@ -201,12 +201,20 @@ export class DarkProtocolCanvasEngine {
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
       e.preventDefault();
     }
+
+    const state = this.getState();
+    const canMove = state.inputContext === 'WORLD' || state.inputContext === 'INFORMATIONAL';
+
+    // Strictly disable physical world inputs when any machine/terminal modal is open
+    if (!canMove) {
+      return;
+    }
+
     this.keys[e.code] = true;
     this.keys[e.key.toLowerCase()] = true;
 
     // Flashlight toggle on F
     if (e.code === 'KeyF' || e.key.toLowerCase() === 'f') {
-      const state = this.getState();
       if (state.activeRole === 'EXPLORADOR' && !state.explorer.isHiding) {
         darkProtocolAudio.playFlashlightClick();
         this.updateState((prev) => ({
@@ -240,9 +248,11 @@ export class DarkProtocolCanvasEngine {
     this.worldMouseX = this.mouseX + this.cameraX;
     this.worldMouseY = this.mouseY;
 
-    // Flashlight direction follows mouse
+    // Flashlight direction follows mouse only when movement/world input is allowed
     const state = this.getState();
-    if (state.activeRole === 'EXPLORADOR') {
+    const canAim = state.inputContext === 'WORLD' || state.inputContext === 'INFORMATIONAL';
+
+    if (canAim && state.activeRole === 'EXPLORADOR') {
       const charX = state.explorer.x;
       const charY = 440;
       const dx = this.worldMouseX - charX;
@@ -336,6 +346,58 @@ export class DarkProtocolCanvasEngine {
     this.animFrameId = requestAnimationFrame(this.loop);
   };
 
+  private spawnSparks(y: number) {
+    const currentRoom = FACILITY_ROOMS[this.getState().activeRoom] || FACILITY_ROOMS.control_room;
+    for (let i = 0; i < 14; i++) {
+      this.particles.push({
+        x: Math.random() * currentRoom.width,
+        y: y + (Math.random() - 0.5) * 30,
+        vx: (Math.random() - 0.5) * 180,
+        vy: -Math.random() * 120,
+        size: 2 + Math.random() * 2.5,
+        alpha: 1,
+        maxLife: 0.35 + Math.random() * 0.3,
+        life: 0,
+        color: '#fef08a',
+        type: 'spark',
+      });
+    }
+  }
+
+  public getSectorFailureFactor(sector: string): {
+    strobe: number;
+    inFailureSequence: boolean;
+    emergencyReady: boolean;
+  } {
+    const timer = this.sabotageTimers[sector];
+    if (timer === undefined || timer <= 0) {
+      return { strobe: 1.0, inFailureSequence: false, emergencyReady: true };
+    }
+
+    // 1.8s staged failure breakdown sequence:
+    // 1.8 - 1.4s: STUTTER (rapid erratic flicker)
+    if (timer > 1.4) {
+      const strobe = Math.random() > 0.35 ? 0.95 : 0.15;
+      return { strobe, inFailureSequence: true, emergencyReady: false };
+    }
+    // 1.4 - 1.0s: BROWNOUT (dim low-voltage glow)
+    if (timer > 1.0) {
+      const strobe = Math.random() > 0.6 ? 0.45 : 0.05;
+      return { strobe, inFailureSequence: true, emergencyReady: false };
+    }
+    // 1.0 - 0.5s: VIOLENT BURST / ARCING
+    if (timer > 0.5) {
+      const strobe = Math.random() > 0.75 ? 1.0 : 0.0;
+      return { strobe, inFailureSequence: true, emergencyReady: false };
+    }
+    // 0.5 - 0.15s: TOTAL BLACKOUT
+    if (timer > 0.15) {
+      return { strobe: 0.0, inFailureSequence: true, emergencyReady: false };
+    }
+    // 0.15 - 0.0s: EMERGENCY RELAY CLICKS ON
+    return { strobe: 0.0, inFailureSequence: true, emergencyReady: true };
+  }
+
   // =========================================================================
   // UPDATE / SIMULATION STEP
   // =========================================================================
@@ -351,6 +413,40 @@ export class DarkProtocolCanvasEngine {
       this.transitionCooldownTimer = Math.max(0, this.transitionCooldownTimer - dt);
     }
 
+    // Check sector power changes and trigger staged failure sequence
+    for (const [sector, circuit] of Object.entries(state.circuits)) {
+      const isNowPowered = circuit.powered;
+      const wasPowered = this.prevSectorPowered[sector] ?? true;
+      if (wasPowered && !isNowPowered) {
+        // Start 1.8s physical failure breakdown sequence!
+        this.sabotageTimers[sector] = 1.8;
+        darkProtocolAudio.playLightBuzz();
+      }
+      this.prevSectorPowered[sector] = isNowPowered;
+    }
+
+    // Advance sabotage failure timers and trigger synchronized sound hooks
+    for (const sector of Object.keys(this.sabotageTimers)) {
+      if (this.sabotageTimers[sector] > 0) {
+        const prevT = this.sabotageTimers[sector];
+        this.sabotageTimers[sector] = Math.max(0, this.sabotageTimers[sector] - dt);
+        const curT = this.sabotageTimers[sector];
+
+        if (prevT > 1.3 && curT <= 1.3) {
+          darkProtocolAudio.playLightBuzz();
+          this.spawnSparks(currentRoom.floorY - 140);
+        } else if (prevT > 0.9 && curT <= 0.9) {
+          darkProtocolAudio.playRelayClick();
+        } else if (prevT > 0.4 && curT <= 0.4) {
+          darkProtocolAudio.playPowerDownHum();
+        } else if (prevT > 0 && curT <= 0) {
+          darkProtocolAudio.playRelayClick();
+        }
+      }
+    }
+
+    const canMove = state.inputContext === 'WORLD' || state.inputContext === 'INFORMATIONAL';
+
     // 1. Move character if role has physical avatar
     let characterX = 0;
     let isMoving = false;
@@ -358,94 +454,120 @@ export class DarkProtocolCanvasEngine {
 
     if (activeRole === 'EXPLORADOR' && !state.explorer.isHiding) {
       characterX = state.explorer.x;
-      const left = this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft'];
-      const right = this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight'];
-      isRunning = Boolean(this.keys['ShiftLeft'] || this.keys['ShiftRight']);
 
-      // Character trait speed modifier
-      const charData = getCharacterById(state.selectedCharacterId);
-      const speedMult = charData.stats.speed / 75; // Baseline normalized
-
-      const speed = (isRunning ? 230 : 140) * speedMult;
-      const accel = 1300;
-      const friction = 950;
-
-      if (left && !right) {
-        this.playerVx = Math.max(this.playerVx - accel * dt, -speed);
-        isMoving = true;
-      } else if (right && !left) {
-        this.playerVx = Math.min(this.playerVx + accel * dt, speed);
-        isMoving = true;
+      if (!canMove) {
+        // Strictly frozen at machine when physical modal is open
+        this.playerVx = 0;
+        if (state.explorer.animState !== 'WORKING') {
+          this.updateState((prev) => ({
+            ...prev,
+            explorer: { ...prev.explorer, animState: 'WORKING' },
+          }));
+        }
       } else {
-        if (this.playerVx > 0) {
-          this.playerVx = Math.max(0, this.playerVx - friction * dt);
-        } else if (this.playerVx < 0) {
-          this.playerVx = Math.min(0, this.playerVx + friction * dt);
+        const left = this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft'];
+        const right = this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight'];
+        isRunning = Boolean(this.keys['ShiftLeft'] || this.keys['ShiftRight']);
+
+        // Character trait speed modifier
+        const charData = getCharacterById(state.selectedCharacterId);
+        const speedMult = charData.stats.speed / 75; // Baseline normalized
+
+        const speed = (isRunning ? 230 : 140) * speedMult;
+        const accel = 1300;
+        const friction = 950;
+
+        if (left && !right) {
+          this.playerVx = Math.max(this.playerVx - accel * dt, -speed);
+          isMoving = true;
+        } else if (right && !left) {
+          this.playerVx = Math.min(this.playerVx + accel * dt, speed);
+          isMoving = true;
+        } else {
+          if (this.playerVx > 0) {
+            this.playerVx = Math.max(0, this.playerVx - friction * dt);
+          } else if (this.playerVx < 0) {
+            this.playerVx = Math.min(0, this.playerVx + friction * dt);
+          }
         }
-      }
 
-      characterX += this.playerVx * dt;
-      characterX = Math.max(45, Math.min(characterX, currentRoom.width - 45));
+        characterX += this.playerVx * dt;
+        characterX = Math.max(45, Math.min(characterX, currentRoom.width - 45));
 
-      // Footstep audio cadence
-      if (isMoving && Math.abs(this.playerVx) > 30) {
-        this.footstepTimer += dt;
-        const stepCadence = isRunning ? 0.26 : 0.40;
-        if (this.footstepTimer >= stepCadence) {
-          this.footstepTimer = 0;
-          darkProtocolAudio.playFootstep(isRunning);
+        // Footstep audio cadence
+        if (isMoving && Math.abs(this.playerVx) > 30) {
+          this.footstepTimer += dt;
+          const stepCadence = isRunning ? 0.26 : 0.40;
+          if (this.footstepTimer >= stepCadence) {
+            this.footstepTimer = 0;
+            darkProtocolAudio.playFootstep(isRunning);
+          }
         }
+
+        const facing = this.playerVx < -5 ? 'left' : this.playerVx > 5 ? 'right' : state.explorer.facing;
+        const currentAnim = isMoving
+          ? isRunning
+            ? state.explorer.flashlightOn
+              ? 'RUN_FLASHLIGHT'
+              : 'RUN'
+            : state.explorer.flashlightOn
+            ? 'WALK_FLASHLIGHT'
+            : 'WALK'
+          : state.explorer.flashlightOn
+          ? 'IDLE_FLASHLIGHT'
+          : 'IDLE';
+
+        this.updateState((prev) => ({
+          ...prev,
+          explorer: {
+            ...prev.explorer,
+            x: characterX,
+            facing,
+            animState: currentAnim,
+          },
+        }));
       }
-
-      const facing = this.playerVx < -5 ? 'left' : this.playerVx > 5 ? 'right' : state.explorer.facing;
-      const currentAnim = isMoving ? (isRunning ? 'RUN' : 'WALK') : 'IDLE';
-
-      this.updateState((prev) => ({
-        ...prev,
-        explorer: {
-          ...prev.explorer,
-          x: characterX,
-          facing,
-          animState: currentAnim,
-        },
-      }));
     } else if (activeRole === 'OPERADOR') {
       characterX = state.operator.x;
-      const left = this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft'];
-      const right = this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight'];
-      const speed = 130;
-
-      if (left && !right) {
-        this.playerVx = -speed;
-        isMoving = true;
-      } else if (right && !left) {
-        this.playerVx = speed;
-        isMoving = true;
-      } else {
+      if (!canMove) {
         this.playerVx = 0;
-      }
+      } else {
+        const left = this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft'];
+        const right = this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight'];
+        const speed = 130;
 
-      characterX += this.playerVx * dt;
-      characterX = Math.max(60, Math.min(characterX, currentRoom.width - 60));
-
-      if (isMoving) {
-        this.footstepTimer += dt;
-        if (this.footstepTimer >= 0.45) {
-          this.footstepTimer = 0;
-          darkProtocolAudio.playFootstep(false);
+        if (left && !right) {
+          this.playerVx = -speed;
+          isMoving = true;
+        } else if (right && !left) {
+          this.playerVx = speed;
+          isMoving = true;
+        } else {
+          this.playerVx = 0;
         }
+
+        characterX += this.playerVx * dt;
+        characterX = Math.max(60, Math.min(characterX, currentRoom.width - 60));
+
+        if (isMoving) {
+          this.footstepTimer += dt;
+          if (this.footstepTimer >= 0.45) {
+            this.footstepTimer = 0;
+            darkProtocolAudio.playFootstep(false);
+          }
+        }
+
+        const facing = this.playerVx < 0 ? 'left' : this.playerVx > 0 ? 'right' : state.operator.facing;
+
+        this.updateState((prev) => ({
+          ...prev,
+          operator: {
+            ...prev.operator,
+            x: characterX,
+            facing,
+          },
+        }));
       }
-
-      const facing = this.playerVx < 0 ? 'left' : this.playerVx > 0 ? 'right' : state.operator.facing;
-
-      this.updateState((prev) => ({
-        ...prev,
-        operator: {
-          ...prev.operator,
-          x: characterX,
-          facing,
-        },
-      }));
     } else if (activeRole === 'ENTE' && state.entity.isManifested) {
       characterX = state.entity.x;
       const left = this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft'];
@@ -712,20 +834,30 @@ export class DarkProtocolCanvasEngine {
             actionVerb = state.electricalPuzzleSolved ? 'CIRCUITO OK' : 'REPARAR CIRCUITO';
           } else if (obj.id === 'lab_pressure_valves') {
             actionVerb = state.valvesState.stabilized ? 'PRESIÓN OK' : 'REGULAR VÁLVULAS';
-          } else if (obj.id === 'maint_radio_station') {
+          } else if (obj.id === 'comms_frequency_radio') {
             actionVerb = state.frequencyState.aligned ? 'FRECUENCIA OK' : 'SINTONIZAR SOCORRO';
-          } else if (obj.id === 'gen_coop_keypad') {
+          } else if (obj.id === 'archive_records_terminal') {
+            actionVerb = state.coopSolved ? 'ARCHIVOS CONSULTADOS' : 'CONSULTAR CÓDIGOS';
+          } else if (obj.id === 'infirmary_med_station') {
+            actionVerb = state.explorer.health === 'SANO' ? 'BOTIQUÍN LISTO' : 'TRATAR HERIDAS';
+          } else if (obj.id === 'maint_steam_purge') {
+            actionVerb = 'PURGAR VÁLVULA';
+          } else if (obj.id === 'gen_turbine_console') {
+            actionVerb = 'IGNICIÓN TURBINA';
+          } else if (obj.id === 'evacuation_keypad') {
             actionVerb = state.coopSolved ? 'CLAVE VALIDADA' : 'INTRODUCIR CLAVE';
-          } else if (obj.id === 'gen_escape_console') {
+          } else if (obj.id === 'evacuation_blast_gate') {
             actionVerb = state.escapeUnlocked ? 'ACTIVAR EVACUACIÓN' : 'BLOQUEADA (SIN CLAVE)';
           } else if (obj.id === 'terminal_cctv_station') {
             actionVerb = 'MONITOR CCTV';
-          } else if (obj.id === 'terminal_electric_station') {
-            actionVerb = 'TABLERO ELÉCTRICO';
           } else if (obj.id === 'terminal_map_station') {
             actionVerb = 'PLANO TÁCTICO';
-          } else if (obj.id === 'terminal_comms_station') {
-            actionVerb = 'MATRIZ DE CIFRADO';
+          } else if (obj.id === 'control_status_board') {
+            actionVerb = 'DIAGNÓSTICO RED';
+          } else if (obj.id === 'security_network_router') {
+            actionVerb = 'CONMUTADOR RED';
+          } else if (obj.id === 'security_door_override') {
+            actionVerb = 'ESCLUSAS SEGURIDAD';
           }
 
           closestTarget = {
@@ -956,12 +1088,15 @@ export class DarkProtocolCanvasEngine {
     const extRight = w + 2500;
     const extWidth = extRight - extLeft;
 
+    const failureState = this.getSectorFailureFactor(room.sector);
+    const effectivePowered = isPowered && (!failureState.inFailureSequence || failureState.strobe > 0.35);
+
     // Back wall base color
-    ctx.fillStyle = isPowered ? '#0b111e' : '#030508';
+    ctx.fillStyle = effectivePowered ? '#0b111e' : '#030508';
     ctx.fillRect(extLeft, 0, extWidth, h);
 
     // Industrial wall panels & seams across the extended space
-    ctx.strokeStyle = isPowered ? '#141d2f' : '#070b12';
+    ctx.strokeStyle = effectivePowered ? '#141d2f' : '#070b12';
     ctx.lineWidth = 2;
     for (let x = extLeft; x <= extRight; x += 120) {
       ctx.beginPath();
@@ -969,25 +1104,25 @@ export class DarkProtocolCanvasEngine {
       ctx.lineTo(x, room.floorY);
       ctx.stroke();
 
-      ctx.fillStyle = isPowered ? '#1e293b' : '#0a0f18';
+      ctx.fillStyle = effectivePowered ? '#1e293b' : '#0a0f18';
       ctx.fillRect(x - 2, 80, 4, 4);
       ctx.fillRect(x - 2, 220, 4, 4);
       ctx.fillRect(x - 2, 360, 4, 4);
     }
 
     // Concrete floor & hazard stripe extending seamlessly
-    ctx.fillStyle = isPowered ? '#1e293b' : '#0d131d';
+    ctx.fillStyle = effectivePowered ? '#1e293b' : '#0d131d';
     ctx.fillRect(extLeft, room.floorY, extWidth, h - room.floorY);
 
-    ctx.fillStyle = isPowered ? '#b45309' : '#451a03';
+    ctx.fillStyle = effectivePowered ? '#b45309' : '#451a03';
     ctx.fillRect(extLeft, room.floorY - 6, extWidth, 6);
 
     // Ceiling industrial girders
-    ctx.fillStyle = isPowered ? '#0f172a' : '#050811';
+    ctx.fillStyle = effectivePowered ? '#0f172a' : '#050811';
     ctx.fillRect(extLeft, 0, extWidth, 40);
 
     // Overhead Cable bundles across the room
-    ctx.strokeStyle = isPowered ? '#334155' : '#111827';
+    ctx.strokeStyle = effectivePowered ? '#334155' : '#111827';
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(0, 25);
@@ -1003,7 +1138,7 @@ export class DarkProtocolCanvasEngine {
     ctx.fill();
 
     ctx.rotate(this.fanAngle);
-    ctx.fillStyle = isPowered ? '#475569' : '#1e293b';
+    ctx.fillStyle = effectivePowered ? '#475569' : '#1e293b';
     for (let b = 0; b < 4; b++) {
       ctx.rotate(Math.PI / 2);
       ctx.fillRect(-3, -18, 6, 36);
@@ -1016,96 +1151,406 @@ export class DarkProtocolCanvasEngine {
     const floorY = room.floorY;
 
     if (room.id === 'control_room') {
-      const terminals = [
-        { x: 280, label: 'CCTV ARRAY', icon: '📹' },
-        { x: 500, label: 'RED ELÉCTRICA', icon: '⚡' },
-        { x: 740, label: 'PLANO TÁCTICO', icon: '🗺️' },
-        { x: 960, label: 'COMUNICACIONES', icon: '📡' },
-      ];
-
-      for (const t of terminals) {
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(t.x - 45, floorY - 90, 90, 90);
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(t.x - 40, floorY - 85, 80, 50);
-
-        if (isPowered) {
-          ctx.fillStyle = '#0284c7';
-          ctx.fillRect(t.x - 36, floorY - 82, 72, 44);
-          ctx.strokeStyle = '#38bdf8';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          for (let sx = 0; sx < 68; sx += 6) {
-            const sy = Math.sin(this.animTimer * 4 + sx * 0.2) * 8;
-            if (sx === 0) ctx.moveTo(t.x - 34 + sx, floorY - 60 + sy);
-            else ctx.lineTo(t.x - 34 + sx, floorY - 60 + sy);
-          }
-          ctx.stroke();
-        } else {
-          ctx.fillStyle = '#050c18';
-          ctx.fillRect(t.x - 36, floorY - 82, 72, 44);
-        }
-
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '10px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(t.label, t.x, floorY - 18);
-      }
-    } else if (room.id === 'laboratory') {
+      // Station 1: CCTV Array (x: 340)
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(295, floorY - 110, 90, 110);
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(300, floorY - 140, 70, 140);
-      ctx.fillStyle = isPowered ? 'rgba(16, 185, 129, 0.45)' : 'rgba(5, 40, 25, 0.3)';
-      ctx.fillRect(308, floorY - 130, 54, 120);
+      ctx.fillRect(302, floorY - 102, 76, 56);
+      if (isPowered) {
+        ctx.fillStyle = '#0284c7';
+        ctx.fillRect(306, floorY - 98, 68, 48);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let sx = 0; sx < 64; sx += 8) {
+          const sy = Math.sin(this.animTimer * 5 + sx * 0.3) * 6;
+          if (sx === 0) ctx.moveTo(308 + sx, floorY - 74 + sy);
+          else ctx.lineTo(308 + sx, floorY - 74 + sy);
+        }
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = '#030712';
+        ctx.fillRect(306, floorY - 98, 68, 48);
+      }
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('CCTV ARRAY', 340, floorY - 26);
+      ctx.fillText('[E] MONITOR', 340, floorY - 12);
 
+      // Station 2: Bunker Tactical Map (x: 700)
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(650, floorY - 95, 100, 95);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(658, floorY - 88, 84, 52);
+      if (isPowered) {
+        ctx.fillStyle = '#042f2e';
+        ctx.fillRect(662, floorY - 84, 76, 44);
+        ctx.strokeStyle = '#2dd4bf';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(668, floorY - 78, 22, 14);
+        ctx.strokeRect(694, floorY - 78, 22, 14);
+        ctx.strokeRect(682, floorY - 60, 24, 14);
+      }
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('PLANO TÁCTICO', 700, floorY - 22);
+      ctx.fillText('[E] MAPA', 700, floorY - 10);
+
+      // Station 3: Network Diagnosis Board (x: 1000)
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(955, floorY - 105, 90, 105);
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(962, floorY - 98, 76, 75);
+      // Status LEDs
+      const sectors = [
+        { label: 'SEC-A', powered: Boolean(this.getState().circuits['sector_a']?.powered), y: -85 },
+        { label: 'SEC-B', powered: Boolean(this.getState().circuits['sector_b']?.powered), y: -68 },
+        { label: 'SEC-C', powered: Boolean(this.getState().circuits['sector_c']?.powered), y: -51 },
+      ];
+      for (const s of sectors) {
+        ctx.fillStyle = s.powered ? '#10b981' : '#ef4444';
+        ctx.beginPath();
+        ctx.arc(975, floorY + s.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(s.label + (s.powered ? ' [OK]' : ' [FAIL]'), 985, floorY + s.y + 3);
+      }
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('DIAGNÓSTICO', 1000, floorY - 10);
+
+    } else if (room.id === 'security') {
+      // Station 1: Network Router Rack (x: 380)
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(335, floorY - 145, 90, 145);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(338, floorY - 142, 84, 140);
+      for (let slot = 0; slot < 5; slot++) {
+        const sy = floorY - 132 + slot * 24;
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(344, sy, 72, 18);
+        for (let led = 0; led < 4; led++) {
+          const blink = isPowered && ((slot + led + Math.floor(this.animTimer * 6)) % 3 === 0);
+          ctx.fillStyle = blink ? '#22c55e' : '#eab308';
+          ctx.fillRect(348 + led * 7, sy + 6, 3, 5);
+        }
+      }
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('ROUTER CCTV', 380, floorY - 148);
+
+      // Station 2: Security Lock Bypass (x: 860)
       ctx.fillStyle = '#334155';
-      ctx.fillRect(1000, floorY - 110, 100, 110);
+      ctx.fillRect(820, floorY - 110, 80, 110);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(828, floorY - 100, 64, 45);
+      ctx.fillStyle = isPowered ? '#ef4444' : '#7f1d1d';
+      ctx.fillRect(845, floorY - 88, 30, 20); // Emergency lockout switch
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(825, floorY - 105, 70, 70);
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('ESCLUSAS', 860, floorY - 30);
+
+    } else if (room.id === 'archive') {
+      // Tape server racks & classified archive terminal (x: 560)
+      // Reel-to-reel server racks on left and right
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(460, floorY - 150, 70, 150);
+      ctx.fillRect(630, floorY - 150, 70, 150);
+      for (const rx of [475, 645]) {
+        for (let reel = 0; reel < 2; reel++) {
+          const ry = floorY - 130 + reel * 55;
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.arc(rx + 20, ry + 20, 18, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = isPowered ? '#94a3b8' : '#334155';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          // Spinning reel hub
+          ctx.save();
+          ctx.translate(rx + 20, ry + 20);
+          if (isPowered) ctx.rotate(this.animTimer * (reel === 0 ? 3 : -2));
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.beginPath();
+          ctx.moveTo(-14, 0);
+          ctx.lineTo(14, 0);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // Center CRT Terminal (x: 560)
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(525, floorY - 105, 70, 105);
+      ctx.fillStyle = '#022c22';
+      ctx.fillRect(532, floorY - 98, 56, 46);
+      if (isPowered) {
+        ctx.fillStyle = '#22c55e';
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('REC-03', 560, floorY - 80);
+        ctx.fillText('CLAVE', 560, floorY - 68);
+      }
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('ARCHIVO CLAVE', 560, floorY - 20);
+
+    } else if (room.id === 'laboratory') {
+      // Cryo pod on left (x: 300)
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(270, floorY - 155, 65, 155);
+      ctx.fillStyle = isPowered ? 'rgba(16, 185, 129, 0.45)' : 'rgba(5, 40, 25, 0.3)';
+      ctx.fillRect(278, floorY - 145, 49, 135);
+      // Floating bubble particles inside cryo chamber
+      if (isPowered) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        for (let b = 0; b < 4; b++) {
+          const by = floorY - 30 - ((this.animTimer * 30 + b * 28) % 110);
+          const bx = 286 + (b * 9);
+          ctx.fillRect(bx, by, 3, 3);
+        }
+      }
+
+      // Valve Station (x: 920)
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(870, floorY - 120, 100, 120);
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(874, floorY - 116, 92, 112);
+      // 3 Brass Pressure Gauges
       for (let i = 0; i < 3; i++) {
-        const gx = 1020 + i * 30;
+        const gx = 890 + i * 30;
+        const gy = floorY - 85;
         ctx.fillStyle = '#020617';
         ctx.beginPath();
-        ctx.arc(gx, floorY - 80, 10, 0, Math.PI * 2);
+        ctx.arc(gx, gy, 11, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = isPowered ? '#06b6d4' : '#1e293b';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Needle
+        ctx.save();
+        ctx.translate(gx, gy);
+        const needleAngle = isPowered ? Math.sin(this.animTimer * 2 + i * 1.5) * 1.2 : -1.2;
+        ctx.rotate(needleAngle);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -9);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('VÁLVULAS CRYO', 920, floorY - 30);
+      ctx.fillText('(OBJ 2)', 920, floorY - 16);
+
+    } else if (room.id === 'infirmary') {
+      // First aid medical station (x: 620)
+      // Crash cart & heart monitor
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(580, floorY - 95, 80, 95);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(590, floorY - 88, 60, 42);
+      // EKG Heartbeat waveform line
+      if (isPowered) {
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let x = 0; x < 54; x += 3) {
+          let yOffset = 0;
+          const phase = (x + this.animTimer * 60) % 54;
+          if (phase > 22 && phase < 26) yOffset = -14;
+          else if (phase >= 26 && phase < 30) yOffset = 10;
+          if (x === 0) ctx.moveTo(593 + x, floorY - 67 + yOffset);
+          else ctx.lineTo(593 + x, floorY - 67 + yOffset);
+        }
         ctx.stroke();
       }
-    } else if (room.id === 'generators') {
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(400, floorY - 160, 220, 160);
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(405, floorY - 155, 210, 150);
-
+      // Medical Red Cross emblem
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(615, floorY - 35, 10, 24);
+      ctx.fillRect(608, floorY - 28, 24, 10);
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(1130, floorY - 150, 100, 150);
-      ctx.strokeStyle = isPowered ? '#f97316' : '#334155';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(1135, floorY - 145, 90, 145);
-      ctx.fillStyle = isPowered ? '#ea580c' : '#475569';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('TRIAGE', 620, floorY - 6);
+
+    } else if (room.id === 'communications') {
+      // Radio frequency station (x: 680)
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(625, floorY - 135, 110, 135);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(629, floorY - 131, 102, 127);
+      // Oscilloscope screen
+      ctx.fillStyle = '#022c22';
+      ctx.fillRect(640, floorY - 120, 80, 50);
+      if (isPowered) {
+        ctx.strokeStyle = '#4ade80';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let sx = 0; sx < 74; sx += 4) {
+          const sy = Math.sin(this.animTimer * 10 + sx * 0.25) * 14;
+          if (sx === 0) ctx.moveTo(643 + sx, floorY - 95 + sy);
+          else ctx.lineTo(643 + sx, floorY - 95 + sy);
+        }
+        ctx.stroke();
+      }
+      // Tuning dial knob
+      ctx.fillStyle = '#475569';
       ctx.beginPath();
-      ctx.arc(1180, floorY - 75, 22, 0, Math.PI * 2);
+      ctx.arc(680, floorY - 45, 16, 0, Math.PI * 2);
       ctx.fill();
-    } else if (room.id === 'maintenance') {
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(420, floorY - 110, 80, 110);
-      ctx.fillStyle = isPowered ? '#15803d' : '#052e16';
-      ctx.fillRect(430, floorY - 95, 60, 45);
-      ctx.strokeStyle = '#94a3b8';
+      ctx.strokeStyle = '#cbd5e1';
       ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(460, floorY - 110);
-      ctx.lineTo(460, floorY - 160);
       ctx.stroke();
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('RADIO SOS (OBJ 3)', 680, floorY - 14);
+
     } else if (room.id === 'electrical_room') {
+      // Main High-Voltage Substation (x: 820)
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(840, floorY - 130, 90, 130);
+      ctx.fillRect(765, floorY - 145, 110, 145);
       ctx.strokeStyle = isPowered ? '#38bdf8' : '#e11d48';
       ctx.lineWidth = 3;
-      ctx.strokeRect(845, floorY - 125, 80, 120);
-
+      ctx.strokeRect(770, floorY - 140, 100, 135);
+      // Ceramic Fuse Banks
+      for (let f = 0; f < 3; f++) {
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(785 + f * 24, floorY - 125, 14, 38);
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(785 + f * 24, floorY - 128, 14, 5);
+        ctx.fillRect(785 + f * 24, floorY - 90, 14, 5);
+      }
+      // High Voltage Warning Stencil
       ctx.fillStyle = '#fbbf24';
-      ctx.font = '24px sans-serif';
+      ctx.font = '22px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('⚡', 885, floorY - 70);
+      ctx.fillText('⚡', 820, floorY - 45);
+      ctx.font = '9px monospace';
+      ctx.fillText('380V SUBESTACIÓN', 820, floorY - 20);
+
+    } else if (room.id === 'maintenance') {
+      // Steam valve purge station (x: 620)
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(575, floorY - 120, 90, 120);
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 4;
+      // Main steam piping
+      ctx.beginPath();
+      ctx.moveTo(620, 0);
+      ctx.lineTo(620, floorY - 70);
+      ctx.lineTo(650, floorY - 70);
+      ctx.stroke();
+      // Rotary Wheel Valve
+      ctx.save();
+      ctx.translate(620, floorY - 70);
+      ctx.rotate(this.animTimer * 1.5);
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0, Math.PI * 2);
+      ctx.moveTo(-16, 0); ctx.lineTo(16, 0);
+      ctx.moveTo(0, -16); ctx.lineTo(0, 16);
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('PURGA VAPOR', 620, floorY - 20);
+
+    } else if (room.id === 'generators') {
+      // Giant Industrial Combustion Turbine (x: 600)
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(490, floorY - 165, 220, 165);
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(495, floorY - 160, 210, 155);
+      // Large Flywheel rotor
+      ctx.save();
+      ctx.translate(600, floorY - 85);
+      if (isPowered) ctx.rotate(this.animTimer * 8);
+      ctx.strokeStyle = isPowered ? '#f59e0b' : '#334155';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(0, 0, 45, 0, Math.PI * 2);
+      ctx.stroke();
+      for (let s = 0; s < 6; s++) {
+        ctx.rotate(Math.PI / 3);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(45, 0);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('TURBINA DE COMBUSTIÓN', 600, floorY - 18);
+
+    } else if (room.id === 'evacuation') {
+      // Station 1: Armored 4-digit code authorization keypad (x: 650)
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(615, floorY - 110, 70, 110);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(618, floorY - 107, 64, 104);
+      // Illuminated LCD code display
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(625, floorY - 98, 50, 24);
+      ctx.fillStyle = this.getState().coopSolved ? '#22c55e' : '#f59e0b';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(this.getState().coopSolved ? 'OK' : '****', 650, floorY - 82);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '8px monospace';
+      ctx.fillText('TECLADO', 650, floorY - 45);
+      ctx.fillText('(OBJ 5)', 650, floorY - 32);
+
+      // Station 2: Final Hydraulic Blast Gate (x: 1050)
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(990, floorY - 190, 120, 190);
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(995, floorY - 185, 110, 185);
+      // Hazard diagonal stripes
+      ctx.fillStyle = '#eab308';
+      for (let stripe = 0; stripe < 8; stripe++) {
+        ctx.beginPath();
+        ctx.moveTo(995 + stripe * 14, floorY);
+        ctx.lineTo(1015 + stripe * 14, floorY);
+        ctx.lineTo(1005 + stripe * 14, floorY - 20);
+        ctx.lineTo(985 + stripe * 14, floorY - 20);
+        ctx.fill();
+      }
+      // Red Rotary Beacon
+      const beaconOn = Math.floor(this.animTimer * 4) % 2 === 0;
+      ctx.fillStyle = beaconOn ? '#ef4444' : '#7f1d1d';
+      ctx.beginPath();
+      ctx.arc(1050, floorY - 198, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('COMPUERTA EXTERIOR', 1050, floorY - 150);
+      ctx.fillText(this.getState().escapeUnlocked ? '[ABIERTA]' : '[CERRADA]', 1050, floorY - 135);
     }
   }
 
@@ -1180,8 +1625,14 @@ export class DarkProtocolCanvasEngine {
 
   /**
    * ANIMATED PIXEL-ART CHARACTERS
-   * Renders the 4 distinct characters with stride kinematics, breathing,
-   * flashlight holding, and damage states.
+   * Full articulated skeletal/pixel kinematics:
+   * - Alternating leg strides with foot contact and lift
+   * - Idle breathing cycle (torso/chest expand, feet strictly planted)
+   * - Running forward lean and energetic stride
+   * - Front arm dynamically holding & aiming the steel flashlight toward mouse
+   * - Working/interacting machine poses
+   * - Distinct silhouette and equipment per character
+   * - Demonic manifested Entity with void tendrils and crimson eyes
    */
   private renderCharacters(state: DarkProtocolGameState, currentRoom: RoomZone) {
     const ctx = this.ctx;
@@ -1195,94 +1646,280 @@ export class DarkProtocolCanvasEngine {
       const facing = state.explorer.facing;
       const animState = state.explorer.animState || 'IDLE';
 
-      // Animation calculations
-      const isWalking = animState === 'WALK';
-      const isRunning = animState === 'RUN';
+      const isWalking = animState === 'WALK' || animState === 'WALK_FLASHLIGHT';
+      const isRunning = animState === 'RUN' || animState === 'RUN_FLASHLIGHT';
+      const isWorking = animState === 'WORKING' || animState === 'INTERACT';
       const isDowned = state.explorer.health === 'AGONIZANDO' || state.explorer.health === 'MUERTO';
+      const isMoving = isWalking || isRunning;
 
-      const strideFreq = isRunning ? 16 : 10;
-      const strideAmp = isRunning ? 9 : isWalking ? 6 : 0;
-      const walkCycle = Math.sin(this.animTimer * strideFreq) * strideAmp;
-      const breathBob = Math.sin(this.animTimer * 3) * 1.5;
+      // Kinematic calculations
+      const breathBob = isMoving ? 0 : Math.sin(this.animTimer * 2.6) * 1.6;
+      const breathChest = isMoving ? 0 : Math.sin(this.animTimer * 2.6) * 0.8;
+
+      let strideAngle = 0;
+      let kneeFlex = 0;
+      let torsoLean = 0;
+      let walkBob = 0;
+
+      if (isRunning) {
+        strideAngle = Math.sin(this.animTimer * 15) * 0.52;
+        kneeFlex = Math.abs(Math.cos(this.animTimer * 15)) * 0.35;
+        torsoLean = 0.12; // Forward lean
+        walkBob = Math.abs(Math.sin(this.animTimer * 15)) * 2.5;
+      } else if (isWalking) {
+        strideAngle = Math.sin(this.animTimer * 9) * 0.36;
+        kneeFlex = Math.abs(Math.cos(this.animTimer * 9)) * 0.22;
+        walkBob = Math.abs(Math.sin(this.animTimer * 9)) * 1.5;
+      }
 
       ctx.save();
       ctx.translate(x, y);
       if (facing === 'left') ctx.scale(-1, 1);
 
-      // Contact shadow
+      // Contact shadow on floor
       ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
       ctx.beginPath();
-      ctx.ellipse(0, 0, 18, 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, isRunning ? 22 : 18, 5, 0, 0, Math.PI * 2);
       ctx.fill();
 
       if (isDowned) {
-        // Agonizing / Downed crawling pose
-        ctx.fillStyle = char.secondaryColor;
-        ctx.fillRect(-22, -14, 40, 12);
-        ctx.fillStyle = char.primaryColor;
-        ctx.fillRect(-10, -22, 22, 14);
+        // Agonizing crawling pose on the floor
+        const crawlBob = Math.sin(this.animTimer * 2) * 1.5;
         ctx.fillStyle = '#0f172a';
-        ctx.fillRect(10, -26, 12, 12);
+        ctx.fillRect(-22, -12, 14, 8); // Legs trailing
+        ctx.fillStyle = char.primaryColor;
+        ctx.fillRect(-10, -18 + crawlBob, 22, 14); // Torso
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(10, -22 + crawlBob, 12, 12); // Head
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(16, -18 + crawlBob, 5, 3); // Visor alert
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(18, -10 + crawlBob, 12, 5); // Outstretched arm
       } else {
-        // Legs & Boots
+        // =====================================================================
+        // BACK ARM (swings counter to front leg)
+        // =====================================================================
+        const backArmAngle = isWorking
+          ? -0.6 + Math.sin(this.animTimer * 6) * 0.08
+          : isRunning
+          ? -Math.sin(this.animTimer * 15) * 0.6
+          : isWalking
+          ? -Math.sin(this.animTimer * 9) * 0.4
+          : 0.1;
+
+        ctx.save();
+        ctx.translate(-4, -38 + breathBob - walkBob);
+        ctx.rotate(backArmAngle);
+        ctx.fillStyle = char.secondaryColor || '#1e293b';
+        ctx.fillRect(-3, 0, 6, 11); // Upper arm
         ctx.fillStyle = '#0f172a';
-        ctx.fillRect(-10, -22 + walkCycle, 8, 22 - walkCycle);
-        ctx.fillRect(2, -22 - walkCycle, 8, 22 + walkCycle);
+        ctx.fillRect(-2.5, 9, 5, 10); // Forearm
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(-2.5, 17, 5, 4); // Hand / Glove
+        ctx.restore();
 
-        // Torso / Character Suit
+        // =====================================================================
+        // LEGS & BOOTS (Articulated Kinematics)
+        // =====================================================================
+        if (!isMoving) {
+          // Idle: Feet firmly planted on the floor
+          // Back leg
+          ctx.fillStyle = '#090d16';
+          ctx.fillRect(-9, -23, 7, 15); // Thigh & shin
+          ctx.fillStyle = '#020617';
+          ctx.fillRect(-11, -8, 10, 8); // Heavy boot
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(-11, -3, 10, 3); // Boot sole
+
+          // Front leg
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(2, -23, 7, 15);
+          ctx.fillStyle = '#020617';
+          ctx.fillRect(0, -8, 10, 8);
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(0, -3, 10, 3);
+        } else {
+          // Walking/Running: Alternating leg strides
+          // Back Leg (strideAngle)
+          ctx.save();
+          ctx.translate(-3, -23);
+          ctx.rotate(strideAngle);
+          ctx.fillStyle = '#090d16';
+          ctx.fillRect(-3, 0, 6, 12); // Thigh
+          ctx.translate(0, 10);
+          ctx.rotate(kneeFlex);
+          ctx.fillRect(-3, 0, 6, 11); // Shin
+          ctx.fillStyle = '#020617';
+          ctx.fillRect(-3, 7, 9, 7); // Boot
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(-3, 12, 9, 2); // Sole
+          ctx.restore();
+
+          // Front Leg (-strideAngle)
+          ctx.save();
+          ctx.translate(3, -23);
+          ctx.rotate(-strideAngle);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(-3, 0, 6, 12);
+          ctx.translate(0, 10);
+          ctx.rotate(-kneeFlex * 0.5);
+          ctx.fillRect(-3, 0, 6, 11);
+          ctx.fillStyle = '#020617';
+          ctx.fillRect(-3, 7, 9, 7);
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(-3, 12, 9, 2);
+          ctx.restore();
+        }
+
+        // =====================================================================
+        // TORSO & UPPER BODY (Chest, Suit, Harness)
+        // =====================================================================
+        ctx.save();
+        ctx.translate(0, -breathBob + walkBob);
+        if (torsoLean > 0) ctx.rotate(torsoLean);
+
+        // Base protective jumpsuit
         ctx.fillStyle = char.primaryColor;
-        ctx.fillRect(-12, -48 + breathBob, 24, 28);
+        ctx.fillRect(-11 - breathChest / 2, -48, 22 + breathChest, 27);
 
-        // Character-specific silhouette details
+        // Character-specific pixel accessories
         if (char.id === 'mara_velasco') {
-          // Toolbelt & Harness
+          // Mechanic: Heavy leather toolbelt & wrench holster
           ctx.fillStyle = '#78350f';
-          ctx.fillRect(-13, -28 + breathBob, 26, 6);
+          ctx.fillRect(-12, -27, 24, 5);
           ctx.fillStyle = '#d97706';
-          ctx.fillRect(8, -26 + breathBob, 4, 10); // Wrench
+          ctx.fillRect(8, -25, 4, 11); // Steel pipe wrench
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(7, -19, 6, 3); // Wrench jaw
+          ctx.fillStyle = '#451a03';
+          ctx.fillRect(-9, -46, 18, 5); // Suspenders
         } else if (char.id === 'hector_gaona') {
-          // Labcoat lapels & Cryo flask
+          // Doctor: Crisp white labcoat lapels & cold cryo container
           ctx.fillStyle = '#f8fafc';
-          ctx.fillRect(-10, -48 + breathBob, 8, 24);
-          ctx.fillRect(2, -48 + breathBob, 8, 24);
+          ctx.fillRect(-10, -48, 7, 25);
+          ctx.fillRect(3, -48, 7, 25);
           ctx.fillStyle = '#06b6d4';
-          ctx.fillRect(-15, -42 + breathBob, 4, 14);
+          ctx.fillRect(-14, -42, 4, 13); // Cryo vial
+          ctx.fillStyle = '#a5f3fc';
+          ctx.fillRect(-14, -40, 4, 2); // Glow indicator
         } else if (char.id === 'valeria_cruz') {
-          // Tactical plate carrier & Crimson epaulettes
+          // Guard: Reinforced ballistic plate carrier & crimson military epaulettes
           ctx.fillStyle = '#1e1b4b';
-          ctx.fillRect(-11, -47 + breathBob, 22, 22);
+          ctx.fillRect(-10, -47, 20, 20);
+          ctx.fillStyle = '#312e81';
+          ctx.fillRect(-8, -45, 16, 15); // Ceramic plate
           ctx.fillStyle = '#e11d48';
-          ctx.fillRect(-13, -48 + breathBob, 5, 6);
-          ctx.fillRect(8, -48 + breathBob, 5, 6);
+          ctx.fillRect(-13, -48, 5, 5); // Left epaulette
+          ctx.fillRect(8, -48, 5, 5); // Right epaulette
         } else if (char.id === 'sergio_prada') {
-          // Radio pack & antenna
+          // Tech: Communications harness & radio backpack with tall antenna
           ctx.fillStyle = '#064e3b';
-          ctx.fillRect(-16, -46 + breathBob, 6, 20);
-          ctx.strokeStyle = '#94a3b8';
+          ctx.fillRect(-15, -46, 6, 21); // Radio pack
+          ctx.strokeStyle = '#cbd5e1';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.moveTo(-13, -46 + breathBob);
-          ctx.lineTo(-13, -68 + breathBob);
+          ctx.moveTo(-12, -46);
+          // Antenna sways gently with movement
+          const antennaSway = isMoving ? Math.sin(this.animTimer * 12) * 3 : 0;
+          ctx.lineTo(-12 + antennaSway, -68);
           ctx.stroke();
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(-13 + antennaSway, -70, 3, 3); // LED tip
         }
 
-        // Head / Helmet / Face
+        // =====================================================================
+        // HEAD, HELMET & VISOR
+        // =====================================================================
+        // Neck
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(-4, -51, 8, 4);
+
+        // Helmet / Head
         ctx.fillStyle = '#334155';
-        ctx.fillRect(-9, -62 + breathBob, 18, 15);
-        // Visor / Eye slit
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(2, -58 + breathBob, 7, 6);
+        ctx.fillRect(-9, -64, 18, 15);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(-10, -62, 2, 10); // Brow protection
 
-        // Lantern in hand
-        ctx.fillStyle = '#64748b';
-        ctx.fillRect(10, -32 + breathBob, 6, 10);
-        if (state.explorer.flashlightOn) {
-          ctx.fillStyle = '#fef08a';
-          ctx.fillRect(14, -30 + breathBob, 4, 6);
+        // Visor / Optics
+        if (char.id === 'mara_velasco') {
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillRect(2, -59, 7, 5); // Golden welder shield
+        } else if (char.id === 'hector_gaona') {
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(1, -59, 4, 4); // Optical loupe
+          ctx.fillRect(6, -59, 4, 4);
+        } else if (char.id === 'valeria_cruz') {
+          ctx.fillStyle = '#e11d48';
+          ctx.fillRect(2, -59, 7, 4); // Crimson tactical visor
+        } else {
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(2, -59, 7, 5); // Blue HUD visor
+          ctx.fillStyle = '#065f46';
+          ctx.fillRect(-8, -58, 3, 5); // Headset earcup
+          ctx.fillRect(-6, -55, 6, 2); // Boom mic
         }
+
+        // =====================================================================
+        // FRONT ARM & HELD FLASHLIGHT / WORKING POSE
+        // =====================================================================
+        let frontArmAngle = isRunning
+          ? Math.sin(this.animTimer * 15) * 0.6
+          : isWalking
+          ? Math.sin(this.animTimer * 9) * 0.4
+          : -0.05;
+
+        if (isWorking) {
+          // Reaching toward machine faceplate, hands actively manipulating knobs
+          frontArmAngle = -0.75 + Math.sin(this.animTimer * 6) * 0.08;
+        } else if (state.explorer.flashlightOn) {
+          // Front arm aims toward mouse cursor
+          let targetAngle = state.explorer.flashlightAngle;
+          if (facing === 'left') {
+            targetAngle = Math.PI - targetAngle;
+            if (targetAngle > Math.PI) targetAngle -= Math.PI * 2;
+          }
+          frontArmAngle = Math.max(-1.1, Math.min(0.9, targetAngle));
+        }
+
+        ctx.save();
+        ctx.translate(4, -38);
+        ctx.rotate(frontArmAngle);
+
+        // Shoulder & Upper Arm
+        ctx.fillStyle = char.primaryColor;
+        ctx.fillRect(-3, 0, 6, 10);
+        // Forearm
+        ctx.fillStyle = char.secondaryColor || '#1e293b';
+        ctx.fillRect(-2.5, 8, 5, 9);
+        // Hand / Glove
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(-3, 15, 6, 5);
+
+        // Steel Flashlight held in hand
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(0, 13, 14, 5); // Metal barrel
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(3, 12, 4, 7); // Grip knurling
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(12, 11, 4, 9); // Bezel reflector
+
+        if (state.explorer.flashlightOn) {
+          // Glowing lens cap
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(16, 12, 2, 7);
+          ctx.fillStyle = 'rgba(254, 240, 138, 0.7)';
+          ctx.fillRect(17, 10, 3, 11);
+        } else {
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(16, 12, 2, 7);
+        }
+
+        ctx.restore(); // Front arm
+
+        ctx.restore(); // Torso
       }
 
-      ctx.restore();
+      ctx.restore(); // Character
     }
 
     // 2. Render Operator if in current room (Control Room)
@@ -1300,20 +1937,35 @@ export class DarkProtocolCanvasEngine {
       ctx.ellipse(0, 0, 16, 5, 0, 0, Math.PI * 2);
       ctx.fill();
 
+      // Boots
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(-8, -20, 6, 20);
-      ctx.fillRect(2, -20, 6, 20);
+      ctx.fillRect(-8, -8, 7, 8);
+      ctx.fillRect(1, -8, 7, 8);
+      ctx.fillRect(-7, -22, 5, 15);
+      ctx.fillRect(2, -22, 5, 15);
 
+      // White Labcoat
       ctx.fillStyle = '#f1f5f9';
-      ctx.fillRect(-10, -46, 20, 28);
+      ctx.fillRect(-10, -48, 20, 28);
       ctx.fillStyle = '#0284c7';
-      ctx.fillRect(2, -40, 4, 6);
+      ctx.fillRect(2, -42, 4, 7); // Operator ID badge
 
+      // Arms & console clipboard
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(-12, -44, 4, 16);
+      ctx.fillRect(8, -44, 4, 16);
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(2, -36, 10, 12); // Tactical tablet
+
+      // Head & Operator Headset
       ctx.fillStyle = '#fbcfe8';
-      ctx.fillRect(-8, -60, 16, 16);
+      ctx.fillRect(-7, -62, 14, 14); // Face
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(-8, -64, 16, 5); // Hair
       ctx.fillStyle = '#0284c7';
-      ctx.fillRect(-10, -62, 20, 4);
-      ctx.fillRect(-10, -56, 4, 8);
+      ctx.fillRect(-9, -65, 18, 3); // Headband
+      ctx.fillRect(-9, -58, 3, 6); // Left earcup
+      ctx.fillRect(-7, -54, 7, 2); // Mic boom
 
       ctx.restore();
     }
@@ -1321,49 +1973,91 @@ export class DarkProtocolCanvasEngine {
     // 3. Render Manifested Entity if in current room
     if (state.entity.isManifested && state.entity.room === currentRoom.id) {
       const x = state.entity.x;
-      const y = floorY - 12 + Math.sin(this.animTimer * 5) * 8;
+      const levitate = Math.sin(this.animTimer * 4) * 8;
+      const y = floorY - 18 + levitate;
       const animState = state.entity.animState || 'IDLE';
 
       ctx.save();
       ctx.translate(x, y);
 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      // Deep Shadow floor portal
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
       ctx.beginPath();
-      ctx.ellipse(0, 12, 26, 7, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 18 - levitate, 28, 7, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Void tendrils & amorphous silhouette
-      ctx.fillStyle = '#08010f';
+      // Pulsing Abyssal Core
+      ctx.fillStyle = '#05010a';
       ctx.beginPath();
-      ctx.moveTo(-18, 0);
-      ctx.quadraticCurveTo(-28, -32, -15, -68);
-      ctx.quadraticCurveTo(0, -82, 15, -68);
-      ctx.quadraticCurveTo(28, -32, 18, 0);
+      ctx.arc(0, -38, 26, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Purple void nebula
+      const corePulse = 0.5 + Math.sin(this.animTimer * 6) * 0.25;
+      ctx.fillStyle = `rgba(147, 51, 234, ${corePulse})`;
+      ctx.beginPath();
+      ctx.arc(0, -38, 18, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 6 Procedural Undulating Void Tendrils
+      ctx.strokeStyle = '#05010a';
+      ctx.lineWidth = 4;
+      for (let t = 0; t < 6; t++) {
+        const tAngle = (t / 6) * Math.PI * 2;
+        const wave = Math.sin(this.animTimer * 7 + t * 1.2) * 12;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(tAngle) * 18, -38 + Math.sin(tAngle) * 18);
+        ctx.quadraticCurveTo(
+          Math.cos(tAngle) * 36 + wave,
+          -38 + Math.sin(tAngle) * 36 - wave,
+          Math.cos(tAngle) * 48 + wave * 1.5,
+          -38 + Math.sin(tAngle) * 48
+        );
+        ctx.stroke();
+      }
+
+      // Obsidian Horned Skull
+      ctx.fillStyle = '#020005';
+      ctx.beginPath();
+      ctx.moveTo(-12, -45);
+      ctx.lineTo(-18, -68); // Left horn
+      ctx.lineTo(-7, -55);
+      ctx.lineTo(0, -62);
+      ctx.lineTo(7, -55);
+      ctx.lineTo(18, -68); // Right horn
+      ctx.lineTo(12, -45);
       ctx.closePath();
       ctx.fill();
 
-      // Glowing crimson eyes
-      const eyeFlicker = 0.8 + Math.random() * 0.2;
+      // Glowing Crimson Eyes
+      const eyeFlicker = 0.85 + Math.random() * 0.15;
       ctx.fillStyle = `rgba(239, 68, 68, ${eyeFlicker})`;
-      ctx.fillRect(-7, -56, 5, 4);
-      ctx.fillRect(2, -56, 5, 4);
+      ctx.fillRect(-7, -46, 5, 3);
+      ctx.fillRect(2, -46, 5, 3);
 
-      // Attack tendril lash
+      // Violet distortion shockwave aura
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, -38, 36 + Math.sin(this.animTimer * 8) * 5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Attack lashing claws
       if (animState === 'ATTACK') {
         ctx.strokeStyle = '#ef4444';
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.moveTo(10, -40);
-        ctx.lineTo(45, -45);
-        ctx.lineTo(60, -35);
+        ctx.moveTo(15, -40);
+        ctx.lineTo(55, -48);
+        ctx.lineTo(75, -35);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(35, -40, 25, -0.6, 0.6);
         ctx.stroke();
       }
-
-      ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, -38, 38 + Math.sin(this.animTimer * 8) * 4, 0, Math.PI * 2);
-      ctx.stroke();
 
       ctx.restore();
     }
@@ -1400,22 +2094,28 @@ export class DarkProtocolCanvasEngine {
     lCtx.globalCompositeOperation = 'lighter';
     lCtx.translate(-Math.floor(this.cameraX), 0);
 
+    const failureState = this.getSectorFailureFactor(room.sector);
+
     for (const light of FACILITY_LIGHTS) {
       if (light.room === room.id) {
         let active = true;
         if (light.circuitId === 'emergency') {
-          active = !isPowered || (light.flicker && Math.sin(this.animTimer * 6) > -0.2);
+          active = (!isPowered && failureState.emergencyReady) || (light.flicker && Math.sin(this.animTimer * 6) > -0.2);
         } else if (light.circuitId && light.circuitId !== 'permanent') {
-          active = Boolean(state.circuits[light.circuitId]?.powered);
+          active = Boolean(state.circuits[light.circuitId]?.powered) || failureState.inFailureSequence;
         }
 
         if (!active) continue;
 
-        const flickerMultiplier = light.flicker
+        let flickerMultiplier = light.flicker
           ? 0.75 + Math.sin(this.animTimer * 14 + light.x) * 0.25
           : 1.0;
 
-        const radius = light.radius * flickerMultiplier;
+        if (failureState.inFailureSequence && light.circuitId !== 'emergency') {
+          flickerMultiplier *= failureState.strobe;
+        }
+
+        const radius = light.radius * Math.max(0.05, flickerMultiplier);
         const grad = lCtx.createRadialGradient(
           light.x,
           light.y,
@@ -1436,7 +2136,7 @@ export class DarkProtocolCanvasEngine {
       }
     }
 
-    // Directional Flashlight Cone
+    // Directional Flashlight Cone (originates physically from the hand-held flashlight lens!)
     if (
       state.explorer.room === room.id &&
       !state.explorer.isHiding &&
@@ -1447,9 +2147,22 @@ export class DarkProtocolCanvasEngine {
       const coneHalfAngle = isHector ? 0.52 : 0.38;
       const coneLength = isHector ? 430 : 390;
 
-      const handX = state.explorer.x + (state.explorer.facing === 'right' ? 14 : -14);
-      const handY = 440;
-      const angle = state.explorer.flashlightAngle;
+      const charFacing = state.explorer.facing;
+      const breathBob = Math.sin(this.animTimer * 2.6) * 1.6;
+      const shoulderX = state.explorer.x + (charFacing === 'right' ? 4 : -4);
+      const shoulderY = room.floorY - 38 + breathBob;
+
+      let targetAngle = state.explorer.flashlightAngle;
+      if (charFacing === 'left') {
+        targetAngle = Math.PI - targetAngle;
+        if (targetAngle > Math.PI) targetAngle -= Math.PI * 2;
+      }
+      const clampedAngle = Math.max(-1.1, Math.min(0.9, targetAngle));
+      const effectiveAim = charFacing === 'right' ? clampedAngle : Math.PI - clampedAngle;
+
+      const handX = shoulderX + Math.cos(effectiveAim) * 18;
+      const handY = shoulderY + Math.sin(effectiveAim) * 18;
+      const angle = effectiveAim;
 
       const grad = lCtx.createRadialGradient(
         handX,

@@ -58,7 +58,7 @@ export const ArchiveTerminalModal: React.FC<ArchiveTerminalModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 font-mono select-none">
       {/* Heavy Steel Technical Terminal Chassis */}
-      <div className="relative w-full max-w-2xl bg-[#070b14] border-4 border-[#334155] p-5 text-slate-100 flex flex-col justify-between shadow-[0_0_80px_rgba(6,182,212,0.18)]">
+      <div className="relative w-full max-w-2xl bg-[#070b14] border-4 border-[#334155] p-5 text-slate-100 flex flex-col justify-between shadow-[0_0_80px_rgba(6,182,212,0.18)] dp-terminal-open">
         {/* Metal Corner Screws */}
         <div className="absolute top-2 left-2 w-2.5 h-2.5 bg-[#475569] border border-[#1e293b] flex items-center justify-center text-[7px] text-[#0f172a] font-black">+</div>
         <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-[#475569] border border-[#1e293b] flex items-center justify-center text-[7px] text-[#0f172a] font-black">+</div>

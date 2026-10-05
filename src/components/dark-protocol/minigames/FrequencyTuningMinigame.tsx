@@ -177,7 +177,7 @@ export const FrequencyTuningMinigame: React.FC<FrequencyTuningMinigameProps> = (
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 font-mono select-none">
       {/* Heavy Steel Radio Receiver Chassis */}
-      <div className="relative w-full max-w-2xl bg-[#080d14] border-4 border-[#334155] p-5 text-slate-100 flex flex-col justify-between shadow-[0_0_90px_rgba(6,182,212,0.18)]">
+      <div className="relative w-full max-w-2xl bg-[#080d14] border-4 border-[#334155] p-5 text-slate-100 flex flex-col justify-between shadow-[0_0_90px_rgba(6,182,212,0.18)] dp-machine-open">
         {/* Top Header */}
         <div className="border-b-2 border-[#1e293b] pb-3 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -189,7 +189,7 @@ export const FrequencyTuningMinigame: React.FC<FrequencyTuningMinigameProps> = (
                 RECEPTOR DE RADIOENLACE // FRECUENCIA DE SOCORRO
               </div>
               <div className="text-[10px] text-emerald-400">
-                MANTENIMIENTO SECTOR C &bull; ANTENA DE LARGO ALCANCE
+                COMUNICACIONES SECTOR B &bull; TRANSMISOR DE ONDA CORTA SOS
               </div>
             </div>
           </div>
@@ -207,7 +207,7 @@ export const FrequencyTuningMinigame: React.FC<FrequencyTuningMinigameProps> = (
               type="button"
               onClick={onClose}
               className="p-1.5 bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 text-xs font-bold transition-colors cursor-pointer"
-              title="Volver a mantenimiento [ESC]"
+              title="Volver a comunicaciones [ESC]"
             >
               <X className="w-4 h-4" />
             </button>

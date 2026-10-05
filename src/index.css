@@ -103,6 +103,25 @@ body,
     font-family: "JetBrains Mono", monospace;
     font-variant-numeric: tabular-nums;
   }
+  .dp-font-display {
+    font-family: "Silkscreen", "Courier Prime", monospace;
+    letter-spacing: 0.06em;
+  }
+  .dp-font-ui {
+    font-family: "Silkscreen", "Courier Prime", monospace;
+    letter-spacing: 0.04em;
+  }
+  .dp-font-data {
+    font-family: "JetBrains Mono", "Courier Prime", monospace;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .dp-font-small {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
   .pixel-panel {
     background-color: #070a12;
     border: 2px solid #1e293b;
@@ -172,6 +191,71 @@ body,
   background: linear-gradient(135deg, #181512 0%, #0d0a08 50%, #201309 100%);
   border-color: #442211 !important;
   box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.9), 0 0 10px rgba(120, 50, 10, 0.2);
+}
+
+/* Dark Protocol Authentic Retro-Industrial UI Transitions */
+@keyframes dp-terminal-open {
+  0% {
+    opacity: 0;
+    clip-path: inset(50% 0 50% 0);
+    filter: brightness(2.5) saturate(0.2);
+  }
+  45% {
+    opacity: 0.9;
+    clip-path: inset(40% 0 40% 0);
+    filter: brightness(1.8);
+  }
+  75% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    filter: brightness(1.15);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    filter: brightness(1);
+  }
+}
+
+@keyframes dp-machine-open {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: contrast(1.3) brightness(1.4);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-2px);
+    filter: contrast(1.1) brightness(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: contrast(1) brightness(1);
+  }
+}
+
+@keyframes dp-panel-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.dp-terminal-open {
+  animation: dp-terminal-open 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.dp-machine-open {
+  animation: dp-machine-open 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.dp-panel-slide-in {
+  animation: dp-panel-slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* 3D Card Flip styles for La Peor Respuesta */

@@ -32,7 +32,9 @@ export type ObjectiveStatus =
   | 'LOCALIZADO'
   | 'ACTIVO'
   | 'COMPLETADO'
-  | 'FALLIDO';
+  | 'FALLIDO'
+  | 'PENDIENTE'
+  | 'BLOQUEADO';
 
 export type MinigameStatus = 'NOT_STARTED' | 'ACTIVE' | 'SUCCESS' | 'FAILURE';
 
@@ -350,10 +352,3 @@ export interface DarkProtocolGameState {
     type: 'alarm' | 'sabotage' | 'detection' | 'repair';
   }>;
 }
-
-export type ActiveMinigameType =
-  | 'electrical_circuit'
-  | 'frequency_tuning'
-  | 'pressure_valves'
-  | 'coop_field'
-  | null;

@@ -85,7 +85,7 @@ export const PressureValvesMinigame: React.FC<PressureValvesMinigameProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 font-mono select-none">
       {/* Industrial Cryogenic Console Chassis */}
       <div
-        className={`relative w-full max-w-2xl bg-[#080d14] border-4 border-[#334155] p-5 text-slate-100 flex flex-col justify-between shadow-[0_0_90px_rgba(6,182,212,0.15)] ${
+        className={`relative w-full max-w-2xl bg-[#080d14] border-4 border-[#334155] p-5 text-slate-100 flex flex-col justify-between shadow-[0_0_90px_rgba(6,182,212,0.15)] dp-machine-open ${
           isCritical ? 'animate-pulse' : ''
         }`}
       >

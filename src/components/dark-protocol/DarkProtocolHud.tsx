@@ -86,8 +86,7 @@ export const DarkProtocolHud: React.FC<DarkProtocolHudProps> = ({
               } animate-pulse`}
             />
             <span
-              className="text-white tracking-widest uppercase font-black"
-              style={{ fontFamily: "'Silkscreen', monospace" }}
+              className="text-white tracking-widest uppercase font-black dp-font-display"
             >
               [{state.activeRole}]
             </span>
@@ -95,14 +94,14 @@ export const DarkProtocolHud: React.FC<DarkProtocolHudProps> = ({
 
           {/* Current Room & Sector Power Status */}
           <div className="px-3 py-1 bg-slate-950/95 border-2 border-slate-700 shadow-md flex items-center gap-2 text-xs">
-            <span className="font-bold text-white tracking-wide uppercase">
+            <span className="font-bold text-white tracking-wide uppercase dp-font-ui">
               {room.name}
             </span>
-            <span className="text-[10px] text-slate-400">
+            <span className="text-[10px] text-slate-400 dp-font-data">
               // {state.circuits[room.sector]?.name.split(':')[0]}
             </span>
             <span
-              className={`text-[9px] px-1.5 py-0.5 border font-black uppercase ${
+              className={`text-[9px] px-1.5 py-0.5 border font-black uppercase dp-font-display ${
                 isPowered
                   ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50'
                   : 'bg-rose-950 text-rose-300 border-rose-500/50 animate-pulse'
@@ -216,15 +215,14 @@ export const DarkProtocolHud: React.FC<DarkProtocolHudProps> = ({
           Non-blocking compact side drawer with technical rows
           ===================================================================== */}
       {showObjectives && (
-        <div className="pointer-events-auto absolute right-3 top-16 w-80 sm:w-96 bg-[#040810]/95 border-2 border-cyan-500/50 p-3.5 text-xs shadow-[0_0_40px_rgba(0,0,0,0.85)] z-30 transition-transform duration-200 animate-in slide-in-from-right">
+        <div className="pointer-events-auto absolute right-3 top-16 w-80 sm:w-96 bg-[#040810]/95 border-2 border-cyan-500/50 p-3.5 text-xs shadow-[0_0_40px_rgba(0,0,0,0.85)] z-30 dp-panel-slide-in">
           <div className="flex items-center justify-between border-b-2 border-cyan-500/30 pb-2 mb-2.5">
             <span
-              className="font-bold text-white tracking-wider flex items-center gap-1.5 uppercase"
-              style={{ fontFamily: "'Silkscreen', monospace" }}
+              className="font-bold text-white tracking-wider flex items-center gap-1.5 uppercase dp-font-display"
             >
               <ListTodo className="w-4 h-4 text-cyan-400" /> PROTOCOLO DE INCIDENCIAS
             </span>
-            <span className="text-[10px] font-black text-cyan-400">
+            <span className="text-[10px] font-black text-cyan-400 dp-font-data">
               {completedCount} / {state.objectives.length} HECHO
             </span>
           </div>
@@ -246,38 +244,44 @@ export const DarkProtocolHud: React.FC<DarkProtocolHudProps> = ({
                       ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
                       : obj.status === 'ACTIVO'
                       ? 'bg-cyan-950/40 border-cyan-400 text-cyan-100 shadow-[0_0_10px_rgba(6,182,212,0.15)]'
+                      : obj.status === 'BLOQUEADO'
+                      ? 'bg-[#0a0508] border-rose-950 text-slate-500'
                       : 'bg-[#080d16] border-[#1e293b] text-slate-300'
                   }`}
                 >
                   <div className="flex items-center justify-between font-bold text-[11px] mb-0.5">
-                    <span className="flex items-center gap-1.5 truncate">
-                      <span className="text-cyan-400 font-mono font-black">0{obj.number}.</span>
+                    <span className="flex items-center gap-1.5 truncate dp-font-ui">
+                      <span className="text-cyan-400 dp-font-data font-black">0{obj.number}.</span>
                       <span className="truncate">{obj.title}</span>
                     </span>
 
                     {obj.completed ? (
-                      <span className="text-[8px] px-1 py-0.2 bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-black">
+                      <span className="text-[8px] px-1 py-0.2 bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-black dp-font-display">
                         [X] RESUELTO
                       </span>
                     ) : obj.status === 'ACTIVO' ? (
-                      <span className="text-[8px] px-1 py-0.2 bg-amber-950 text-amber-300 border border-amber-500/40 font-bold animate-pulse">
+                      <span className="text-[8px] px-1 py-0.2 bg-amber-950 text-amber-300 border border-amber-500/40 font-bold animate-pulse dp-font-display">
                         ● ACTIVO
                       </span>
+                    ) : obj.status === 'BLOQUEADO' ? (
+                      <span className="text-[8px] px-1 py-0.2 bg-rose-950 text-rose-400 border border-rose-900 dp-font-display">
+                        ✕ BLOQUEADO
+                      </span>
                     ) : (
-                      <span className="text-[8px] px-1 py-0.2 bg-slate-900 text-slate-500 border border-slate-700">
+                      <span className="text-[8px] px-1 py-0.2 bg-slate-900 text-slate-400 border border-slate-700 dp-font-display">
                         ○ {obj.status}
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between text-[9px] text-slate-400 font-mono">
+                  <div className="flex items-center justify-between text-[9px] text-slate-400 dp-font-data">
                     <span>SALA: <strong className="text-white">{roomDef?.name || obj.room}</strong></span>
-                    <span className="text-cyan-400/80">{isSelected ? 'OCULTAR DETALLE' : 'VER DETALLE'}</span>
+                    <span className="text-cyan-400/80">{isSelected ? 'OCULTAR GUÍA' : 'VER GUÍA'}</span>
                   </div>
 
                   {/* Concise Hint Drawer on click (NEVER launches navigation!) */}
                   {isSelected && (
-                    <div className="mt-2 pt-1.5 border-t border-white/10 text-[10px] text-slate-300 leading-snug">
+                    <div className="mt-2 pt-1.5 border-t border-white/10 text-[10px] text-slate-300 leading-snug dp-font-data">
                       <p>{obj.description}</p>
                       <div className="mt-1 text-[9px] text-amber-400 italic">
                         &bull; Desplázate físicamente hasta la sala e interactúa con la consola correspondiente usando [E].
@@ -289,7 +293,7 @@ export const DarkProtocolHud: React.FC<DarkProtocolHudProps> = ({
             })}
           </div>
 
-          <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-[9px] text-slate-500">
+          <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-[9px] text-slate-500 dp-font-data">
             <span>Puedes moverte (A/D) mientras este registro está abierto</span>
           </div>
         </div>

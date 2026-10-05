@@ -209,7 +209,18 @@ export function renderLiveCctvFeed(
     const sx = state.explorer.x;
     const sy = room.floorY;
     const facing = state.explorer.facing;
-    const walkBob = Math.sin(animTimer * 10) * 4;
+    const animState = state.explorer.animState || 'IDLE';
+
+    const isWalking = animState === 'WALK' || animState === 'WALK_FLASHLIGHT';
+    const isRunning = animState === 'RUN' || animState === 'RUN_FLASHLIGHT';
+    const isMoving = isWalking || isRunning;
+
+    const breathBob = isMoving ? 0 : Math.sin(animTimer * 2.6) * 1.5;
+    const strideCycle = isRunning
+      ? Math.sin(animTimer * 15) * 0.5
+      : isWalking
+      ? Math.sin(animTimer * 9) * 0.35
+      : 0;
 
     ctx.save();
     ctx.translate(sx, sy);
@@ -218,35 +229,111 @@ export function renderLiveCctvFeed(
     // Contact shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.beginPath();
-    ctx.ellipse(0, 0, 16, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, isRunning ? 20 : 16, 4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Legs
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(-8, -20, 6, 20);
-    ctx.fillRect(2, -20, 6, 20);
+    // Legs (articulated)
+    if (!isMoving) {
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-8, -22, 6, 14);
+      ctx.fillRect(2, -22, 6, 14);
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(-10, -8, 8, 8);
+      ctx.fillRect(0, -8, 8, 8);
+    } else {
+      ctx.save();
+      ctx.translate(-3, -22);
+      ctx.rotate(strideCycle);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-3, 0, 6, 14);
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(-3, 10, 8, 6);
+      ctx.restore();
 
-    // Suit
+      ctx.save();
+      ctx.translate(3, -22);
+      ctx.rotate(-strideCycle);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-3, 0, 6, 14);
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(-3, 10, 8, 6);
+      ctx.restore();
+    }
+
+    // Torso / Suit
     ctx.fillStyle = char.primaryColor;
-    ctx.fillRect(-11, -46 + walkBob * 0.4, 22, 26);
+    ctx.fillRect(-11, -48 + breathBob, 22, 26);
 
-    // Head
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(-8, -60 + walkBob * 0.4, 16, 14);
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(2, -56 + walkBob * 0.4, 6, 5);
-
-    // Visible flashlight beam in CCTV
-    if (state.explorer.flashlightOn) {
-      ctx.fillStyle = '#fef08a';
-      ctx.fillRect(10, -32 + walkBob * 0.4, 5, 8);
-      ctx.fillStyle = 'rgba(254, 240, 138, 0.25)';
+    // Distinct character silhouette in CCTV
+    if (char.id === 'mara_velasco') {
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(-12, -28 + breathBob, 24, 5);
+      ctx.fillStyle = '#d97706';
+      ctx.fillRect(7, -26 + breathBob, 4, 9);
+    } else if (char.id === 'hector_gaona') {
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(-10, -48 + breathBob, 7, 24);
+      ctx.fillRect(3, -48 + breathBob, 7, 24);
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillRect(-14, -42 + breathBob, 4, 12);
+    } else if (char.id === 'valeria_cruz') {
+      ctx.fillStyle = '#1e1b4b';
+      ctx.fillRect(-10, -47 + breathBob, 20, 18);
+      ctx.fillStyle = '#e11d48';
+      ctx.fillRect(-12, -48 + breathBob, 4, 5);
+      ctx.fillRect(8, -48 + breathBob, 4, 5);
+    } else {
+      ctx.fillStyle = '#064e3b';
+      ctx.fillRect(-14, -46 + breathBob, 5, 18);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(12, -30);
-      ctx.lineTo(160, -80);
-      ctx.lineTo(160, 40);
+      ctx.moveTo(-11, -46 + breathBob);
+      ctx.lineTo(-11, -66 + breathBob);
+      ctx.stroke();
+    }
+
+    // Head & Helmet
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(-8, -62 + breathBob, 16, 14);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(2, -58 + breathBob, 6, 5);
+
+    // Visible flashlight held in hand + beam in CCTV
+    if (state.explorer.flashlightOn) {
+      let targetAngle = state.explorer.flashlightAngle;
+      if (facing === 'left') {
+        targetAngle = Math.PI - targetAngle;
+        if (targetAngle > Math.PI) targetAngle -= Math.PI * 2;
+      }
+      const clampedAngle = Math.max(-1.0, Math.min(0.8, targetAngle));
+
+      ctx.save();
+      ctx.translate(4, -38 + breathBob);
+      ctx.rotate(clampedAngle);
+
+      // Arm & Flashlight
+      ctx.fillStyle = char.primaryColor;
+      ctx.fillRect(-2, 0, 5, 9);
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(0, 8, 12, 4);
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(12, 7, 2, 6);
+
+      // Flashlight cone in CCTV
+      ctx.fillStyle = 'rgba(254, 240, 138, 0.22)';
+      ctx.beginPath();
+      ctx.moveTo(14, 10);
+      ctx.lineTo(240, -50);
+      ctx.lineTo(240, 70);
       ctx.closePath();
       ctx.fill();
+
+      ctx.restore();
+    } else {
+      // Resting arm
+      ctx.fillStyle = char.primaryColor;
+      ctx.fillRect(2, -38 + breathBob, 4, 14);
     }
 
     ctx.restore();
@@ -287,6 +374,8 @@ export function renderLiveCctvFeed(
 
     ctx.fillStyle = '#fbcfe8';
     ctx.fillRect(-7, -60, 14, 14);
+    ctx.fillStyle = '#0284c7';
+    ctx.fillRect(-8, -62, 16, 3);
 
     ctx.restore();
 
@@ -305,28 +394,70 @@ export function renderLiveCctvFeed(
 
   if (state.entity.isManifested && state.entity.room === room.id) {
     const ex = state.entity.x;
-    const ey = room.floorY - 12 + Math.sin(animTimer * 5) * 6;
+    const ey = room.floorY - 16 + Math.sin(animTimer * 4) * 7;
 
     ctx.save();
     ctx.translate(ex, ey);
 
+    // Deep Shadow floor portal
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.beginPath();
+    ctx.ellipse(0, 16, 26, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     // Pulsing shadowy demonic form
     ctx.fillStyle = '#05010a';
     ctx.beginPath();
-    ctx.arc(0, -35, 32, 0, Math.PI * 2);
+    ctx.arc(0, -35, 28, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Purple void nebula core
+    ctx.fillStyle = 'rgba(147, 51, 234, 0.55)';
+    ctx.beginPath();
+    ctx.arc(0, -35, 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tendrils
+    ctx.strokeStyle = '#05010a';
+    ctx.lineWidth = 3;
+    for (let t = 0; t < 6; t++) {
+      const tAngle = (t / 6) * Math.PI * 2;
+      const wave = Math.sin(animTimer * 7 + t) * 10;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(tAngle) * 16, -35 + Math.sin(tAngle) * 16);
+      ctx.quadraticCurveTo(
+        Math.cos(tAngle) * 32 + wave,
+        -35 + Math.sin(tAngle) * 32 - wave,
+        Math.cos(tAngle) * 44 + wave,
+        -35 + Math.sin(tAngle) * 44
+      );
+      ctx.stroke();
+    }
+
+    // Horned Skull
+    ctx.fillStyle = '#020005';
+    ctx.beginPath();
+    ctx.moveTo(-10, -42);
+    ctx.lineTo(-16, -62);
+    ctx.lineTo(-6, -50);
+    ctx.lineTo(0, -56);
+    ctx.lineTo(6, -50);
+    ctx.lineTo(16, -62);
+    ctx.lineTo(10, -42);
+    ctx.closePath();
     ctx.fill();
 
     // Purple distorted aura
     ctx.strokeStyle = 'rgba(168, 85, 247, 0.6)';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(0, -35, 36 + Math.sin(animTimer * 8) * 4, 0, Math.PI * 2);
+    ctx.arc(0, -35, 34 + Math.sin(animTimer * 8) * 4, 0, Math.PI * 2);
     ctx.stroke();
 
     // Crimson glowing eyes
     ctx.fillStyle = '#ef4444';
-    ctx.fillRect(-8, -42, 5, 4);
-    ctx.fillRect(3, -42, 5, 4);
+    ctx.fillRect(-6, -42, 4, 3);
+    ctx.fillRect(2, -42, 4, 3);
 
     ctx.restore();
 

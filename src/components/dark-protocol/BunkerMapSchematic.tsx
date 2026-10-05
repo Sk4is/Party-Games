@@ -87,6 +87,7 @@ const BLUEPRINT_ROOMS: RoomBlueprintDef[] = [
   {
     id: 'laboratory',
     name: 'LABORATORIO',
+    shortCode: 'LAB-05',
     sector: 'sector_b',
     x: 37,
     y: 35,
@@ -98,6 +99,7 @@ const BLUEPRINT_ROOMS: RoomBlueprintDef[] = [
   {
     id: 'infirmary',
     name: 'ENFERMERÍA',
+    shortCode: 'MED-06',
     sector: 'sector_b',
     x: 68,
     y: 35,
@@ -111,7 +113,7 @@ const BLUEPRINT_ROOMS: RoomBlueprintDef[] = [
   {
     id: 'electrical_room',
     name: 'SALA ELÉCTRICA',
-    shortCode: 'PWR-05',
+    shortCode: 'PWR-07',
     sector: 'sector_c',
     x: 6,
     y: 64,
@@ -123,7 +125,7 @@ const BLUEPRINT_ROOMS: RoomBlueprintDef[] = [
   {
     id: 'maintenance',
     name: 'MANTENIMIENTO',
-    shortCode: 'MNT-06',
+    shortCode: 'MNT-08',
     sector: 'sector_c',
     x: 37,
     y: 64,
@@ -135,6 +137,7 @@ const BLUEPRINT_ROOMS: RoomBlueprintDef[] = [
   {
     id: 'generators',
     name: 'GENERADORES',
+    shortCode: 'GEN-09',
     sector: 'sector_c',
     x: 68,
     y: 64,
@@ -148,6 +151,7 @@ const BLUEPRINT_ROOMS: RoomBlueprintDef[] = [
   {
     id: 'evacuation',
     name: 'ACCESO / EVACUACIÓN',
+    shortCode: 'EVAC-10',
     sector: 'sector_c',
     x: 37,
     y: 91,

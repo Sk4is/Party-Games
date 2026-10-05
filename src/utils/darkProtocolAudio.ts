@@ -316,6 +316,63 @@ class DarkProtocolAudioEngine {
     } catch {}
   }
 
+  public playLightBuzz() {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(80, this.ctx.currentTime + 0.18);
+
+      gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.18);
+
+      osc.connect(gain);
+      if (this.masterGain) gain.connect(this.masterGain);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.18);
+    } catch {}
+  }
+
+  public playRelayClick() {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.06);
+
+      gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.06);
+
+      osc.connect(gain);
+      if (this.masterGain) gain.connect(this.masterGain);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.06);
+    } catch {}
+  }
+
+  public playPowerDownHum() {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(25, this.ctx.currentTime + 0.8);
+
+      gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.8);
+
+      osc.connect(gain);
+      if (this.masterGain) gain.connect(this.masterGain);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.8);
+    } catch {}
+  }
+
   public destroy() {
     this.stopAlarmLoop();
     if (this.humOsc) {
