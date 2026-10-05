@@ -9,8 +9,10 @@ export type HealthState = 'SANO' | 'HERIDO' | 'AGONIZANDO' | 'MUERTO';
 
 export type DoorState =
   | 'CLOSED'
-  | 'OPENING'
+  | 'OPENING_STAGE_1'
   | 'OPEN'
+  | 'CLOSING_STAGE_1'
+  | 'OPENING'
   | 'CLOSING'
   | 'LOCKED'
   | 'UNPOWERED'
@@ -96,13 +98,34 @@ export interface LightSource {
 export interface RoomZone {
   id: string;
   name: string;
+  shortCode?: string;
   sector: CircuitId;
+  background: string;
   width: number;
   height: number;
   floorY: number;
   ambientColor: string;
   emergencyColor: string;
   description: string;
+}
+
+export interface InteractiveProp {
+  id: string;
+  room: string;
+  asset: string;
+  type: 'locker' | 'table' | 'vent' | 'valve' | 'camera' | 'door' | 'evac_door';
+  x: number;
+  y: number;
+  scale: number;
+  flipX?: boolean;
+  anchorX: number;
+  anchorY: number;
+  name: string;
+  actionText: string;
+  state?: string;
+  linkedSpotId?: string;
+  linkedDoorId?: string;
+  linkedObjectId?: string;
 }
 
 export interface FacilityConnection {
@@ -159,6 +182,7 @@ export type CharacterAnimState =
   | 'RUN_FLASHLIGHT'
   | 'INTERACT'
   | 'WORKING'
+  | 'CROUCH'
   | 'HIDE_ENTER'
   | 'HIDE_IDLE'
   | 'HIDE_EXIT'
