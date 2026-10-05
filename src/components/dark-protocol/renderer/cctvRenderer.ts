@@ -13,8 +13,9 @@ import {
 import { getCharacterById } from '../../../data/darkProtocol/characters';
 
 /**
- * High-performance, authentic live CCTV renderer.
- * Renders the real game world from camera perspective directly onto any canvas!
+ * Authentic live CCTV renderer.
+ * Renders the real shared game world across all 10 rooms from camera perspective.
+ * All physical actors (Survivor, Operator, manifested Entity) appear inside camera FOV!
  */
 export function renderLiveCctvFeed(
   canvas: HTMLCanvasElement,
@@ -36,7 +37,7 @@ export function renderLiveCctvFeed(
   const w = canvas.width;
   const h = canvas.height;
 
-  // 1. OFFLINE / UNPOWERED: Real animated TV static noise
+  // 1. OFFLINE / UNPOWERED: TV static noise & warning
   if (!isOnline && !isInterference) {
     ctx.fillStyle = '#030508';
     ctx.fillRect(0, 0, w, h);
@@ -70,29 +71,31 @@ export function renderLiveCctvFeed(
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px monospace';
     ctx.fillText(cam.name.toUpperCase(), w / 2, h / 2 + 12);
-    ctx.fillText(`SECTOR ${cam.circuitId.replace('sector_', '').toUpperCase()} DESCONECTADO`, w / 2, h / 2 + 28);
+    ctx.fillText(
+      `SECTOR ${cam.circuitId.replace('sector_', '').toUpperCase()} DESCONECTADO`,
+      w / 2,
+      h / 2 + 28
+    );
     return;
   }
 
-  // 2. LIVE CAMERA VIEW: RENDER REAL WORLD
+  // 2. LIVE CAMERA VIEW: RENDER REAL SHARED WORLD
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 
-  // Calculate scaling & camera frustum
-  const scale = h / 600; // Room height reference 600
+  const scale = h / 600;
   ctx.scale(scale, scale);
 
-  // Position camera viewpoint centered on the camera's location
   const viewWidthInRoom = w / scale;
   let camOffset = cam.x - viewWidthInRoom / 2;
   camOffset = Math.max(0, Math.min(camOffset, room.width - viewWidthInRoom));
   ctx.translate(-camOffset, 0);
 
-  // Base Room Wall
+  // Background Wall
   ctx.fillStyle = isPowered ? '#080d17' : '#030508';
   ctx.fillRect(0, 0, room.width, 600);
 
-  // Wall panels
+  // Wall structural ribs
   ctx.strokeStyle = isPowered ? '#111a2c' : '#060a12';
   ctx.lineWidth = 2;
   for (let x = 0; x < room.width; x += 100) {
@@ -112,35 +115,69 @@ export function renderLiveCctvFeed(
   ctx.fillStyle = '#0c121e';
   ctx.fillRect(0, 0, room.width, 35);
 
-  // Draw Room Machines / Props
+  // 10 PHYSICAL ROOM SPECIFIC PROPS
   if (room.id === 'control_room') {
-    const terminals = [280, 500, 740, 960];
+    const terminals = [340, 700, 1000];
     for (const tx of terminals) {
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(tx - 40, room.floorY - 80, 80, 80);
       ctx.fillStyle = isPowered ? '#0284c7' : '#040b17';
       ctx.fillRect(tx - 34, room.floorY - 74, 68, 40);
     }
-  } else if (room.id === 'generators') {
+  } else if (room.id === 'security') {
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(400, room.floorY - 150, 200, 150);
-    ctx.fillStyle = isPowered ? '#f97316' : '#334155';
-    ctx.beginPath();
-    ctx.arc(1180, room.floorY - 70, 20, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (room.id === 'laboratory') {
-    ctx.fillStyle = isPowered ? 'rgba(16, 185, 129, 0.4)' : '#071f18';
-    ctx.fillRect(308, room.floorY - 120, 50, 110);
+    ctx.fillRect(380 - 45, room.floorY - 110, 90, 110);
+    ctx.fillStyle = isPowered ? '#38bdf8' : '#0f172a';
+    ctx.fillRect(380 - 35, room.floorY - 95, 70, 45);
+  } else if (room.id === 'archive') {
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(560 - 40, room.floorY - 90, 80, 90);
+    ctx.fillStyle = isPowered ? '#fbbf24' : '#0f172a';
+    ctx.fillRect(560 - 32, room.floorY - 82, 64, 40);
     ctx.fillStyle = '#334155';
-    ctx.fillRect(1000, room.floorY - 100, 90, 100);
+    ctx.fillRect(880 - 45, room.floorY - 100, 90, 100);
+  } else if (room.id === 'laboratory') {
+    ctx.fillStyle = isPowered ? 'rgba(16, 185, 129, 0.45)' : '#071f18';
+    ctx.fillRect(420 - 35, room.floorY - 120, 70, 110);
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(920 - 45, room.floorY - 100, 90, 100);
+  } else if (room.id === 'infirmary') {
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(620 - 40, room.floorY - 85, 80, 85);
+    ctx.fillStyle = isPowered ? '#22c55e' : '#0f172a';
+    ctx.fillRect(620 - 30, room.floorY - 75, 60, 35);
+  } else if (room.id === 'communications') {
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(680 - 50, room.floorY - 95, 100, 95);
+    ctx.fillStyle = isPowered ? '#38bdf8' : '#0f172a';
+    ctx.fillRect(680 - 40, room.floorY - 85, 80, 40);
   } else if (room.id === 'electrical_room') {
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(450, room.floorY - 140, 180, 140);
-    ctx.fillStyle = '#f59e0b';
-    ctx.fillRect(470, room.floorY - 120, 140, 4);
+    ctx.fillRect(820 - 55, room.floorY - 130, 110, 130);
+    ctx.fillStyle = isPowered ? '#38bdf8' : '#0f172a';
+    ctx.fillRect(820 - 45, room.floorY - 110, 90, 50);
+  } else if (room.id === 'maintenance') {
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(620 - 45, room.floorY - 100, 90, 100);
+    ctx.fillStyle = '#ca8a04';
+    ctx.beginPath();
+    ctx.arc(620, room.floorY - 60, 22, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (room.id === 'generators') {
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(600 - 90, room.floorY - 140, 180, 140);
+    ctx.fillStyle = isPowered ? '#f97316' : '#334155';
+    ctx.beginPath();
+    ctx.arc(600, room.floorY - 70, 35, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (room.id === 'evacuation') {
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(1050 - 40, room.floorY - 140, 80, 140);
+    ctx.fillStyle = state.escapeUnlocked ? '#10b981' : '#dc2626';
+    ctx.fillRect(1050 - 30, room.floorY - 130, 60, 130);
   }
 
-  // Draw Hiding Spots
+  // Draw Hiding Spots in room
   for (const spot of HIDING_SPOTS) {
     if (spot.room === room.id) {
       ctx.fillStyle = '#1e293b';
@@ -151,7 +188,7 @@ export function renderLiveCctvFeed(
     }
   }
 
-  // Draw Doors
+  // Draw Doors in room
   for (const door of Object.values(state.doors)) {
     if (door.fromRoom === room.id) {
       const isDoorLocked = door.lockedByEntity;
@@ -162,7 +199,7 @@ export function renderLiveCctvFeed(
     }
   }
 
-  // Draw Survivor if in this room!
+  // 1. SURVIVOR RENDERING IN CCTV (if in this room and not hiding)
   let survivorDetected = false;
   let survivorScreenX = 0;
   let survivorScreenY = 0;
@@ -178,7 +215,7 @@ export function renderLiveCctvFeed(
     ctx.translate(sx, sy);
     if (facing === 'left') ctx.scale(-1, 1);
 
-    // Shadow
+    // Contact shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.beginPath();
     ctx.ellipse(0, 0, 16, 4, 0, 0, Math.PI * 2);
@@ -199,7 +236,7 @@ export function renderLiveCctvFeed(
     ctx.fillStyle = '#38bdf8';
     ctx.fillRect(2, -56 + walkBob * 0.4, 6, 5);
 
-    // Flashlight beam in CCTV
+    // Visible flashlight beam in CCTV
     if (state.explorer.flashlightOn) {
       ctx.fillStyle = '#fef08a';
       ctx.fillRect(10, -32 + walkBob * 0.4, 5, 8);
@@ -214,7 +251,6 @@ export function renderLiveCctvFeed(
 
     ctx.restore();
 
-    // Check if in camera FOV
     const distToCam = Math.abs(sx - cam.x);
     if (distToCam <= cam.range) {
       survivorDetected = true;
@@ -223,108 +259,153 @@ export function renderLiveCctvFeed(
     }
   }
 
-  // Draw Manifested Entity if in this room!
+  // 2. OPERATOR RENDERING IN CCTV (if physically in this room)
+  let operatorDetected = false;
+  let operatorScreenX = 0;
+  let operatorScreenY = 0;
+
+  if (state.operator.room === room.id) {
+    const ox = state.operator.x;
+    const oy = room.floorY;
+
+    ctx.save();
+    ctx.translate(ox, oy);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 15, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-7, -20, 6, 20);
+    ctx.fillRect(1, -20, 6, 20);
+
+    ctx.fillStyle = '#f1f5f9';
+    ctx.fillRect(-9, -46, 18, 26);
+    ctx.fillStyle = '#0284c7';
+    ctx.fillRect(1, -40, 4, 6);
+
+    ctx.fillStyle = '#fbcfe8';
+    ctx.fillRect(-7, -60, 14, 14);
+
+    ctx.restore();
+
+    const distToCam = Math.abs(ox - cam.x);
+    if (distToCam <= cam.range) {
+      operatorDetected = true;
+      operatorScreenX = (ox - camOffset) * scale;
+      operatorScreenY = (oy - 70) * scale;
+    }
+  }
+
+  // 3. MANIFESTED ENTITY RENDERING IN CCTV (visible when inside camera FOV!)
   let entityDetected = false;
   let entityScreenX = 0;
   let entityScreenY = 0;
 
   if (state.entity.isManifested && state.entity.room === room.id) {
     const ex = state.entity.x;
-    const ey = room.floorY - 10 + Math.sin(animTimer * 5) * 6;
+    const ey = room.floorY - 12 + Math.sin(animTimer * 5) * 6;
 
     ctx.save();
     ctx.translate(ex, ey);
 
+    // Pulsing shadowy demonic form
     ctx.fillStyle = '#05010a';
     ctx.beginPath();
-    ctx.arc(0, -35, 30, 0, Math.PI * 2);
+    ctx.arc(0, -35, 32, 0, Math.PI * 2);
     ctx.fill();
 
-    // Glowing red eyes
+    // Purple distorted aura
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.6)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, -35, 36 + Math.sin(animTimer * 8) * 4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Crimson glowing eyes
     ctx.fillStyle = '#ef4444';
-    ctx.fillRect(-6, -42, 4, 3);
-    ctx.fillRect(2, -42, 4, 3);
+    ctx.fillRect(-8, -42, 5, 4);
+    ctx.fillRect(3, -42, 5, 4);
 
     ctx.restore();
 
-    entityDetected = true;
-    entityScreenX = (ex - camOffset) * scale;
-    entityScreenY = (ey - 70) * scale;
+    const distToCam = Math.abs(ex - cam.x);
+    if (distToCam <= cam.range) {
+      entityDetected = true;
+      entityScreenX = (ex - camOffset) * scale;
+      entityScreenY = (ey - 70) * scale;
+    }
   }
 
   ctx.restore();
 
-  // 3. OVERLAYS: SCANLINES, NOISE, OSD
+  // 4. OVERLAYS: SCANLINES, NOISE, OSD & DETECTION RETICLES
   ctx.save();
 
-  // Subtle surveillance tint (greenish-cyan)
-  ctx.fillStyle = 'rgba(6, 182, 212, 0.04)';
+  // Subtle surveillance tint (cyan/green phosphor)
+  ctx.fillStyle = isPowered ? 'rgba(6, 182, 212, 0.04)' : 'rgba(239, 68, 68, 0.06)';
   ctx.fillRect(0, 0, w, h);
 
-  // Interference Glitch Bands (if sabotaged)
-  if (isInterference) {
-    ctx.fillStyle = 'rgba(234, 179, 8, 0.18)';
-    for (let i = 0; i < 5; i++) {
-      const gy = (Math.sin(animTimer * 8 + i * 2) * 0.5 + 0.5) * h;
-      ctx.fillRect(0, gy, w, 12);
-    }
-  }
-
-  // CRT Scanlines
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+  // Scanlines
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
   for (let y = 0; y < h; y += 3) {
     ctx.fillRect(0, y, w, 1);
   }
 
   // Vignette
-  const vGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.35, w / 2, h / 2, w * 0.7);
-  vGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vGrad.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
-  ctx.fillStyle = vGrad;
+  const grad = ctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, h * 0.85);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
-  // Motion Detection Bounding Box (Survivor)
-  if (survivorDetected && survivorScreenX > 0 && survivorScreenX < w) {
-    ctx.strokeStyle = '#22d3ee';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(survivorScreenX - 20, survivorScreenY, 40, 65);
-    ctx.fillStyle = '#22d3ee';
-    ctx.font = 'bold 9px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('OBJETIVO: SUJETO', survivorScreenX, survivorScreenY - 4);
-  }
-
-  // Motion Detection Bounding Box (Entity)
-  if (entityDetected && entityScreenX > 0 && entityScreenX < w) {
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(entityScreenX - 25, entityScreenY, 50, 75);
-    ctx.fillStyle = '#ef4444';
-    ctx.font = 'bold 9px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('¡¡ANOMALÍA HOSTIL!!', entityScreenX, entityScreenY - 4);
-  }
-
-  // Header OSD
-  ctx.fillStyle = '#10b981';
-  ctx.font = 'bold 10px monospace';
+  // HUD OSD
+  ctx.fillStyle = '#38bdf8';
+  ctx.font = 'bold 11px monospace';
   ctx.textAlign = 'left';
-  const recDot = Math.sin(animTimer * 4) > 0;
-  ctx.fillText(`${recDot ? '●' : ' '} REC [${cam.id.toUpperCase()}]`, 12, 18);
+  ctx.fillText(`REC ● ${cam.name.toUpperCase()}`, 12, 20);
 
   ctx.textAlign = 'right';
   const now = new Date();
-  const timeStr = now.toTimeString().split(' ')[0];
-  ctx.fillText(`2026-10-05 ${timeStr}`, w - 12, 18);
+  const timeStr = now.toTimeString().split(' ')[0] + '.' + Math.floor(now.getMilliseconds() / 100);
+  ctx.fillText(`CANAL ${cam.id.toUpperCase()} // ${timeStr}`, w - 12, 20);
 
-  // Footer OSD
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#38bdf8';
-  ctx.fillText(`${room.name} // SECTOR ${room.sector.replace('sector_', '').toUpperCase()}`, 12, h - 12);
+  // Target brackets for detected Survivor
+  if (survivorDetected) {
+    ctx.strokeStyle = '#22d3ee';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(survivorScreenX - 16, survivorScreenY - 10, 32, 60);
 
-  ctx.textAlign = 'right';
-  ctx.fillStyle = isInterference ? '#f59e0b' : '#10b981';
-  ctx.fillText(isInterference ? 'SEÑAL: INTERFERENCIA' : 'SEÑAL: ÓPTIMA (30 FPS)', w - 12, h - 12);
+    ctx.fillStyle = '#22d3ee';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('MARA [EXPLORADORA]', survivorScreenX, survivorScreenY - 16);
+  }
+
+  // Target brackets for Operator
+  if (operatorDetected) {
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(operatorScreenX - 16, operatorScreenY - 10, 32, 60);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('OPERADOR', operatorScreenX, operatorScreenY - 16);
+  }
+
+  // Target warning for manifested Entity!
+  if (entityDetected) {
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(entityScreenX - 25, entityScreenY - 15, 50, 70);
+
+    ctx.fillStyle = '#ef4444';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('! MOVIMIENTO ANÓMALO !', entityScreenX, entityScreenY - 22);
+  }
 
   ctx.restore();
 }

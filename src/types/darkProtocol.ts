@@ -148,6 +148,39 @@ export interface CameraDefinition {
   state: CameraState;
 }
 
+export type CharacterAnimState =
+  | 'IDLE'
+  | 'IDLE_FLASHLIGHT'
+  | 'WALK'
+  | 'WALK_FLASHLIGHT'
+  | 'RUN'
+  | 'RUN_FLASHLIGHT'
+  | 'INTERACT'
+  | 'WORKING'
+  | 'HIDE_ENTER'
+  | 'HIDE_IDLE'
+  | 'HIDE_EXIT'
+  | 'HURT'
+  | 'DOWNED';
+
+export type EntityAnimState =
+  | 'MANIFEST'
+  | 'IDLE'
+  | 'MOVE'
+  | 'HUNT'
+  | 'SEARCH'
+  | 'ATTACK'
+  | 'DEMATERIALIZE';
+
+export type ActiveMinigameType =
+  | 'electrical_circuit'
+  | 'frequency_tuning'
+  | 'pressure_valves'
+  | 'coop_field'
+  | 'archive_records'
+  | 'infirmary_treatment'
+  | null;
+
 export interface InteractableObject {
   id: string;
   type:
@@ -162,7 +195,11 @@ export interface InteractableObject {
     | 'terminal_comms'
     | 'generator_switch'
     | 'escape_console'
-    | 'door_switch';
+    | 'door_switch'
+    | 'archive_terminal'
+    | 'infirmary_station'
+    | 'security_router'
+    | 'turbine_switch';
   room: string;
   x: number;
   y: number;
@@ -184,10 +221,45 @@ export interface Objective {
   completed: boolean;
 }
 
+export type InputContext =
+  | 'WORLD'
+  | 'INFORMATIONAL'
+  | 'PHYSICAL_MODAL'
+  | 'TERMINAL'
+  | 'MINIGAME'
+  | 'ENTITY_NETWORK'
+  | 'DEBUG';
+
+export type TrackingAccuracy = 'HIGH' | 'APPROXIMATE' | 'STALE' | 'LOST';
+
+export interface PlayerTrackingData {
+  playerId: string;
+  displayName: string;
+  characterName: string;
+  role: DarkProtocolRole;
+  roomId: string;
+  normalizedRoomPosition: number; // 0.0 to 1.0 within room width
+  trackingTimestamp: number;
+  trackingAccuracy: TrackingAccuracy;
+}
+
+export interface SurvivorTrackingSnapshot {
+  playerId: string;
+  displayName: string;
+  characterName: string;
+  role: DarkProtocolRole;
+  approximateRoomId: string;
+  approximateNormalizedX: number; // 0.0 to 1.0 (perturbed / quantized)
+  snapshotTimestamp: number;
+  status: 'CURRENT' | 'STALE' | 'LOST' | 'INTERFERENCE';
+}
+
 export interface DarkProtocolGameState {
   activeRole: DarkProtocolRole;
   activeRoom: string;
   selectedCharacterId: string;
+  inputContext: InputContext;
+  currentInteractionTarget: string | null;
 
   explorer: {
     room: string;
@@ -200,7 +272,7 @@ export interface DarkProtocolGameState {
     hidingSpotId: string | null;
     hideTimeRemaining: number;
     reentryCooldowns: Record<string, number>;
-    animState: 'IDLE' | 'WALK' | 'RUN' | 'INTERACT' | 'HIDE_ENTER' | 'HIDE_IDLE' | 'HIDE_EXIT' | 'HURT' | 'DOWNED';
+    animState: CharacterAnimState;
     transitionCooldown: number; // seconds after passing a door
   };
 
@@ -221,7 +293,17 @@ export interface DarkProtocolGameState {
     facing: 'left' | 'right';
     selectedCctvCameraId: string | null;
     sabotageCooldowns: Record<string, number>;
-    animState: 'IDLE' | 'MOVE' | 'ATTACK' | 'SEARCH' | 'MANIFEST' | 'DEMATERIALIZE';
+    animState: EntityAnimState;
+  };
+
+  // Player Tracking Architecture (supports Operator tactical map & future multiplayer)
+  players: Record<string, PlayerTrackingData>;
+
+  // Entity Intelligence 15-second snapshot tracking (no continuous wallhack)
+  entityTracking: {
+    lastSnapshotTimestamp: number;
+    refreshIntervalMs: number; // 15000 ms
+    snapshots: Record<string, SurvivorTrackingSnapshot>;
   };
 
   circuits: {

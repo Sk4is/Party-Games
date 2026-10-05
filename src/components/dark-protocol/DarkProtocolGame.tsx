@@ -30,6 +30,8 @@ import { ElectricalCircuitMinigame } from './minigames/ElectricalCircuitMinigame
 import { FrequencyTuningMinigame } from './minigames/FrequencyTuningMinigame';
 import { PressureValvesMinigame } from './minigames/PressureValvesMinigame';
 import { CooperativeKeypadMinigame } from './minigames/CooperativeKeypadMinigame';
+import { ArchiveTerminalModal } from './ArchiveTerminalModal';
+import { InfirmaryStationModal } from './InfirmaryStationModal';
 import {
   RendererDebugOptions,
   DarkProtocolCanvasEngine,
@@ -52,8 +54,42 @@ export const DarkProtocolGame: React.FC<DarkProtocolGameProps> = ({ onBackToMenu
   // Active minigames or operator station modals
   const [activeMinigame, setActiveMinigame] = useState<ActiveMinigameType>(null);
   const [activeOperatorStation, setActiveOperatorStation] = useState<
-    'cctv' | 'electric' | 'map' | 'comms' | null
+    'cctv' | 'map' | 'status' | null
   >(null);
+
+  const openPhysicalModal = (type: ActiveMinigameType) => {
+    setActiveMinigame(type);
+    setState((prev) => ({
+      ...prev,
+      inputContext: 'PHYSICAL_MODAL',
+      explorer: { ...prev.explorer, animState: 'WORKING' },
+    }));
+  };
+
+  const closePhysicalModal = () => {
+    setActiveMinigame(null);
+    setState((prev) => ({
+      ...prev,
+      inputContext: 'WORLD',
+      explorer: { ...prev.explorer, animState: 'IDLE' },
+    }));
+  };
+
+  const openOperatorStation = (station: 'cctv' | 'map' | 'status') => {
+    setActiveOperatorStation(station);
+    setState((prev) => ({
+      ...prev,
+      inputContext: 'PHYSICAL_MODAL',
+    }));
+  };
+
+  const closeOperatorStation = () => {
+    setActiveOperatorStation(null);
+    setState((prev) => ({
+      ...prev,
+      inputContext: 'WORLD',
+    }));
+  };
 
   // Debug options
   const [debugOptions, setDebugOptions] = useState<RendererDebugOptions>({
@@ -221,34 +257,137 @@ export const DarkProtocolGame: React.FC<DarkProtocolGameProps> = ({ onBackToMenu
     }));
   };
 
+  // Global Escape key listener to close physical modals and unlock movement
+  useEffect(() => {
+    const handleGlobalEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (activeMinigame) {
+          closePhysicalModal();
+        } else if (activeOperatorStation) {
+          closeOperatorStation();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalEsc);
+    return () => window.removeEventListener('keydown', handleGlobalEsc);
+  }, [activeMinigame, activeOperatorStation]);
+
   const handleOpenMinigame = (objId: string) => {
+    // Strictly physical room routing
     if (objId === 'electrical_main_panel') {
-      setActiveMinigame('electrical_circuit');
-    } else if (objId === 'maint_radio_station') {
-      setActiveMinigame('frequency_tuning');
+      openPhysicalModal('electrical_circuit');
     } else if (objId === 'lab_pressure_valves') {
-      setActiveMinigame('pressure_valves');
-    } else if (objId === 'gen_coop_keypad') {
-      setActiveMinigame('coop_field');
-    } else if (objId === 'gen_escape_console') {
+      openPhysicalModal('pressure_valves');
+    } else if (objId === 'comms_frequency_radio') {
+      openPhysicalModal('frequency_tuning');
+    } else if (objId === 'archive_records_terminal') {
+      openPhysicalModal('archive_records');
+    } else if (objId === 'infirmary_med_station') {
+      openPhysicalModal('infirmary_treatment');
+    } else if (objId === 'evacuation_keypad') {
+      openPhysicalModal('coop_field');
+    } else if (objId === 'evacuation_blast_gate') {
       if (state.escapeUnlocked) {
-        // Complete escape!
         darkProtocolAudio.playMinigameSuccess();
         setState((prev) => ({
           ...prev,
           escapeCompleted: true,
+          objectives: prev.objectives.map((o) =>
+            o.id === 'obj_escape_protocol' ? { ...o, completed: true, status: 'COMPLETADO' } : o
+          ),
+          alerts: [
+            {
+              id: 'escape_success_' + Date.now(),
+              text: '¡SUPERVIVIENTES EVACUADOS CON ÉXITO! La compuerta exterior se ha cerrado tras ellos.',
+              room: 'evacuation',
+              time: Date.now(),
+              type: 'repair',
+            },
+            ...prev.alerts.slice(0, 8),
+          ],
         }));
       } else {
         darkProtocolAudio.playMinigameFail();
+        setState((prev) => ({
+          ...prev,
+          alerts: [
+            {
+              id: 'escape_locked_' + Date.now(),
+              text: 'ERROR: La compuerta exterior permanece bloqueada. Se requiere autorización previa en el teclado blindado.',
+              room: 'evacuation',
+              time: Date.now(),
+              type: 'alarm',
+            },
+            ...prev.alerts.slice(0, 8),
+          ],
+        }));
       }
     } else if (objId === 'terminal_cctv_station') {
-      setActiveOperatorStation('cctv');
-    } else if (objId === 'terminal_electric_station') {
-      setActiveOperatorStation('electric');
+      openOperatorStation('cctv');
     } else if (objId === 'terminal_map_station') {
-      setActiveOperatorStation('map');
-    } else if (objId === 'terminal_comms_station') {
-      setActiveOperatorStation('comms');
+      openOperatorStation('map');
+    } else if (objId === 'control_status_board') {
+      openOperatorStation('status');
+    } else if (objId === 'security_network_router') {
+      darkProtocolAudio.playSwitchClick();
+      setState((prev) => ({
+        ...prev,
+        alerts: [
+          {
+            id: 'router_ping_' + Date.now(),
+            text: '[SEGURIDAD] Matriz de enrutamiento CCTV operativa. Todas las cámaras transmiten señal.',
+            room: 'security',
+            time: Date.now(),
+            type: 'repair',
+          },
+          ...prev.alerts.slice(0, 8),
+        ],
+      }));
+    } else if (objId === 'security_door_override') {
+      darkProtocolAudio.playSwitchClick();
+      setState((prev) => ({
+        ...prev,
+        alerts: [
+          {
+            id: 'door_override_' + Date.now(),
+            text: '[SEGURIDAD] Cerrojos neumáticos de esclusas desbloqueados manualmente.',
+            room: 'security',
+            time: Date.now(),
+            type: 'repair',
+          },
+          ...prev.alerts.slice(0, 8),
+        ],
+      }));
+    } else if (objId === 'maint_steam_purge') {
+      darkProtocolAudio.playSwitchClick();
+      setState((prev) => ({
+        ...prev,
+        alerts: [
+          {
+            id: 'steam_purge_' + Date.now(),
+            text: '[MANTENIMIENTO] Purga de vapor ejecutada. Presión de la galería normalizada.',
+            room: 'maintenance',
+            time: Date.now(),
+            type: 'repair',
+          },
+          ...prev.alerts.slice(0, 8),
+        ],
+      }));
+    } else if (objId === 'gen_turbine_console') {
+      darkProtocolAudio.playSwitchClick();
+      setState((prev) => ({
+        ...prev,
+        alerts: [
+          {
+            id: 'turbine_ping_' + Date.now(),
+            text: '[GENERADORES] Turbina principal en modo de reserva acústica activa.',
+            room: 'generators',
+            time: Date.now(),
+            type: 'repair',
+          },
+          ...prev.alerts.slice(0, 8),
+        ],
+      }));
     }
   };
 
@@ -480,7 +619,7 @@ export const DarkProtocolGame: React.FC<DarkProtocolGameProps> = ({ onBackToMenu
           station={activeOperatorStation}
           state={state}
           onUpdateState={setState}
-          onClose={() => setActiveOperatorStation(null)}
+          onClose={closeOperatorStation}
         />
       )}
 
@@ -497,7 +636,7 @@ export const DarkProtocolGame: React.FC<DarkProtocolGameProps> = ({ onBackToMenu
               },
             }));
           }}
-          onClose={() => setActiveMinigame(null)}
+          onClose={closePhysicalModal}
         />
       )}
 
@@ -505,7 +644,7 @@ export const DarkProtocolGame: React.FC<DarkProtocolGameProps> = ({ onBackToMenu
       {activeMinigame === 'pressure_valves' && (
         <PressureValvesMinigame
           onSuccess={handleValvesSuccess}
-          onClose={() => setActiveMinigame(null)}
+          onClose={closePhysicalModal}
         />
       )}
 
@@ -513,7 +652,7 @@ export const DarkProtocolGame: React.FC<DarkProtocolGameProps> = ({ onBackToMenu
       {activeMinigame === 'frequency_tuning' && (
         <FrequencyTuningMinigame
           onSuccess={handleFrequencySuccess}
-          onClose={() => setActiveMinigame(null)}
+          onClose={closePhysicalModal}
         />
       )}
 
@@ -522,7 +661,25 @@ export const DarkProtocolGame: React.FC<DarkProtocolGameProps> = ({ onBackToMenu
         <CooperativeKeypadMinigame
           correctCode={state.coopCode}
           onSuccess={handleCoopSuccess}
-          onClose={() => setActiveMinigame(null)}
+          onClose={closePhysicalModal}
+        />
+      )}
+
+      {/* Physical Terminal: Archive Records */}
+      {activeMinigame === 'archive_records' && (
+        <ArchiveTerminalModal
+          state={state}
+          onUpdateState={setState}
+          onClose={closePhysicalModal}
+        />
+      )}
+
+      {/* Physical Terminal: Infirmary Treatment */}
+      {activeMinigame === 'infirmary_treatment' && (
+        <InfirmaryStationModal
+          state={state}
+          onUpdateState={setState}
+          onClose={closePhysicalModal}
         />
       )}
 

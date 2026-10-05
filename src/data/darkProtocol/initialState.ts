@@ -18,7 +18,7 @@ export const INITIAL_OBJECTIVES: Objective[] = [
     number: 1,
     title: 'Restablecer Sector Eléctrico (Sector C)',
     description:
-      'Ve a la Sala Eléctrica y reconfigura los fusibles quemados en el cuadro principal para devolver la energía a la subestación.',
+      'Ve físicamente a la Sala Eléctrica y reconfigura los fusibles quemados en el cuadro principal para devolver la energía a la subestación.',
     room: 'electrical_room',
     status: 'ACTIVO',
     completed: false,
@@ -30,7 +30,7 @@ export const INITIAL_OBJECTIVES: Objective[] = [
     description:
       'Dirígete al Laboratorio y calibra las tres válvulas maestras para llevar los niveles de presión a la zona verde de seguridad.',
     room: 'laboratory',
-    status: 'DESCONOCIDO',
+    status: 'PENDIENTE',
     completed: false,
   },
   {
@@ -38,19 +38,29 @@ export const INITIAL_OBJECTIVES: Objective[] = [
     number: 3,
     title: 'Sintonizar Frecuencia de Emergencia',
     description:
-      'En la estación de radio de Mantenimiento, sincroniza la onda portadora con la frecuencia de socorro exterior.',
-    room: 'maintenance',
-    status: 'DESCONOCIDO',
+      'En la sala de Comunicaciones, calibra el osciloscopio de onda corta y sincroniza la frecuencia con la señal exterior.',
+    room: 'communications',
+    status: 'PENDIENTE',
+    completed: false,
+  },
+  {
+    id: 'obj_archive_records',
+    number: 4,
+    title: 'Obtener Clave de Evacuación en Archivo',
+    description:
+      'Accede a la terminal de Archivo para consultar el registro clasificado y recuperar el código de 4 dígitos de la compuerta exterior.',
+    room: 'archive',
+    status: 'PENDIENTE',
     completed: false,
   },
   {
     id: 'obj_escape_protocol',
-    number: 4,
-    title: 'Desbloquear Protocolo de Evacuación',
+    number: 5,
+    title: 'Desbloquear Acceso de Evacuación',
     description:
-      'Coordínate con el Operador para descifrar la clave de 4 dígitos en Generadores y activa la compuerta de escape exterior.',
-    room: 'generators',
-    status: 'DESCONOCIDO',
+      'Avanza a la sala de Acceso / Evacuación, teclea el código en el panel blindado y acciona la compuerta estanca exterior.',
+    room: 'evacuation',
+    status: 'BLOQUEADO',
     completed: false,
   },
 ];
@@ -66,10 +76,13 @@ export function generateRandomCode(): string {
 }
 
 export function createInitialGameState(characterId: string = 'mara_velasco'): DarkProtocolGameState {
+  const now = Date.now();
   return {
     activeRole: 'EXPLORADOR',
     activeRoom: 'control_room',
     selectedCharacterId: characterId,
+    inputContext: 'WORLD',
+    currentInteractionTarget: null,
 
     explorer: {
       room: 'control_room',
@@ -106,10 +119,52 @@ export function createInitialGameState(characterId: string = 'mara_velasco'): Da
       animState: 'IDLE',
     },
 
+    // Player Tracking Data (Explorer & Operator in facility)
+    players: {
+      player_explorer: {
+        playerId: 'player_explorer',
+        displayName: 'Jugador 1',
+        characterName: 'Mara Velasco',
+        role: 'EXPLORADOR',
+        roomId: 'control_room',
+        normalizedRoomPosition: 350 / 1300,
+        trackingTimestamp: now,
+        trackingAccuracy: 'HIGH',
+      },
+      player_operator: {
+        playerId: 'player_operator',
+        displayName: 'Operador Enlace',
+        characterName: 'Técnico de Control',
+        role: 'OPERADOR',
+        roomId: 'control_room',
+        normalizedRoomPosition: 620 / 1300,
+        trackingTimestamp: now,
+        trackingAccuracy: 'HIGH',
+      },
+    },
+
+    // Entity Intelligence 15-second snapshot tracking (no continuous wallhack)
+    entityTracking: {
+      lastSnapshotTimestamp: now,
+      refreshIntervalMs: 15000,
+      snapshots: {
+        player_explorer: {
+          playerId: 'player_explorer',
+          displayName: 'Jugador 1',
+          characterName: 'Mara Velasco',
+          role: 'EXPLORADOR',
+          approximateRoomId: 'control_room',
+          approximateNormalizedX: 0.28,
+          snapshotTimestamp: now,
+          status: 'CURRENT',
+        },
+      },
+    },
+
     circuits: {
-      sector_a: { powered: true, name: 'Sector A: Mando y Seguridad' },
-      sector_b: { powered: true, name: 'Sector B: Laboratorio' },
-      sector_c: { powered: false, name: 'Sector C: Generación y Mantenimiento' },
+      sector_a: { powered: true, name: 'Sector A: Mando, Seguridad y Archivo' },
+      sector_b: { powered: true, name: 'Sector B: Laboratorio, Enfermería y Comunicaciones' },
+      sector_c: { powered: false, name: 'Sector C: Eléctrica, Mantenimiento y Evacuación' },
     },
 
     doors: JSON.parse(JSON.stringify(INITIAL_DOORS)),

@@ -95,6 +95,19 @@ body,
     font-family: "JetBrains Mono", monospace;
     font-variant-numeric: tabular-nums;
   }
+  .font-dark-pixel {
+    font-family: "Silkscreen", "Courier Prime", monospace;
+    letter-spacing: 0.05em;
+  }
+  .font-dark-mono {
+    font-family: "JetBrains Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .pixel-panel {
+    background-color: #070a12;
+    border: 2px solid #1e293b;
+    box-shadow: inset 1px 1px 0px rgba(255, 255, 255, 0.08), inset -1px -1px 0px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
   .pixelated-art {
     image-rendering: pixelated;
     image-rendering: crisp-edges;

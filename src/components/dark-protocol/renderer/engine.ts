@@ -93,6 +93,13 @@ export class DarkProtocolCanvasEngine {
   private onRoomChange: (newRoom: string, targetX: number, facing: 'left' | 'right') => void;
   private onOpenMinigame: (minigameId: string) => void;
 
+  private sabotageTimers: Record<string, number> = {};
+  private prevSectorPowered: Record<string, boolean> = {
+    sector_a: true,
+    sector_b: true,
+    sector_c: false,
+  };
+
   public debugOptions: RendererDebugOptions = {
     showInteractionZones: false,
     showCameraFOV: false,

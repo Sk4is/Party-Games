@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { X, Lock, CheckCircle2, AlertTriangle, KeySquare } from 'lucide-react';
+import { X, Lock, CheckCircle2, AlertTriangle, KeySquare, ShieldAlert } from 'lucide-react';
 import { darkProtocolAudio } from '../../../utils/darkProtocolAudio';
 
 interface CooperativeKeypadMinigameProps {
@@ -37,12 +37,12 @@ export const CooperativeKeypadMinigame: React.FC<CooperativeKeypadMinigameProps>
           onSuccess();
         }, 1200);
       } else {
-        setErrorMsg('CÓDIGO DE AUTORIZACIÓN INCORRECTO');
+        setErrorMsg('ERROR: SECUENCIA INVÁLIDA');
         darkProtocolAudio.playMinigameFail();
         setTimeout(() => {
           setEnteredCode('');
           setErrorMsg(null);
-        }, 1200);
+        }, 1300);
       }
     }
   };
@@ -55,94 +55,155 @@ export const CooperativeKeypadMinigame: React.FC<CooperativeKeypadMinigameProps>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-md rounded-2xl bg-[#0b0e14] border border-orange-500/30 shadow-[0_0_50px_rgba(249,115,22,0.18)] p-6 text-slate-100 font-mono">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-orange-950 border border-orange-500/40 flex items-center justify-center text-orange-400">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 font-mono select-none">
+      {/* Industrial Keypad Chassis */}
+      <div className="relative w-full max-w-md bg-[#0c1017] border-4 border-[#334155] p-5 text-slate-100 flex flex-col justify-between shadow-[0_0_80px_rgba(0,0,0,0.9)]">
+        {/* Metal Corner Screws */}
+        <div className="absolute top-2 left-2 w-2.5 h-2.5 bg-[#475569] border border-[#1e293b] flex items-center justify-center text-[7px] text-[#0f172a] font-black">+</div>
+        <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-[#475569] border border-[#1e293b] flex items-center justify-center text-[7px] text-[#0f172a] font-black">+</div>
+        <div className="absolute bottom-2 left-2 w-2.5 h-2.5 bg-[#475569] border border-[#1e293b] flex items-center justify-center text-[7px] text-[#0f172a] font-black">+</div>
+        <div className="absolute bottom-2 right-2 w-2.5 h-2.5 bg-[#475569] border border-[#1e293b] flex items-center justify-center text-[7px] text-[#0f172a] font-black">+</div>
+
+        {/* Hazard Caution Tape Header Strip */}
+        <div className="w-full h-3 mb-3 border-y border-amber-600/60 bg-[repeating-linear-gradient(45deg,#b45309,#b45309_10px,#1e293b_10px,#1e293b_20px)]" />
+
+        {/* Header Bar */}
+        <div className="border-b-2 border-[#1e293b] pb-3 mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-950 border border-amber-500/50 text-amber-400">
               <KeySquare className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white tracking-wider">
-                PANEL DE AUTORIZACIÓN // CAMPO
-              </h3>
-              <p className="text-xs text-orange-400/80">
+              <div className="text-[11px] font-bold text-amber-400 tracking-widest uppercase flex items-center gap-2">
+                <span>TERMINAL DE AUTORIZACIÓN DE ESCAPE</span>
+                <span className="text-[9px] px-1 bg-amber-950 text-amber-300 border border-amber-500/40">
+                  MOD-44
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-400">
                 Introduce el código de 4 dígitos proporcionado por el Operador
-              </p>
+              </div>
             </div>
           </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 hover:text-white border border-[#475569] transition-colors cursor-pointer"
+            title="Cerrar panel"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Display Screen */}
-        <div className="bg-[#04060a] border border-white/10 rounded-xl p-4 text-center mb-5">
-          <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">
-            SECUENCIA DE SEGURIDAD
+        {/* VFD Amber Digital Screen */}
+        <div className="relative bg-[#05070a] border-2 border-[#1e293b] p-4 text-center mb-5 overflow-hidden">
+          {/* Subtle phosphor raster lines */}
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(245,158,11,0.03)_50%,rgba(0,0,0,0.5)_50%)] bg-[length:100%_4px] pointer-events-none" />
+
+          <div className="flex items-center justify-between text-[10px] text-amber-500/70 uppercase tracking-widest mb-2 border-b border-amber-500/20 pb-1 font-bold">
+            <span>SECUENCIA COMPUERTA EXTERIOR</span>
+            <span>{solved ? 'ESTADO: CONCEDIDO' : 'ESTADO: BLOQUEO'}</span>
           </div>
+
+          {/* 4-Digit Display */}
           <div className="flex justify-center gap-3 my-2">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="w-12 h-14 rounded-lg bg-slate-900 border border-orange-500/30 flex items-center justify-center text-2xl font-black text-orange-400 shadow-inner"
-              >
-                {enteredCode[i] || '_'}
-              </div>
-            ))}
+            {[0, 1, 2, 3].map((i) => {
+              const char = enteredCode[i];
+              return (
+                <div
+                  key={i}
+                  className={`w-14 h-16 bg-[#090d14] border-2 flex items-center justify-center text-3xl font-black transition-all ${
+                    solved
+                      ? 'border-emerald-500 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]'
+                      : errorMsg
+                      ? 'border-rose-500 text-rose-400 animate-pulse'
+                      : char
+                      ? 'border-amber-400 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                      : 'border-[#1e293b] text-slate-700'
+                  }`}
+                  style={{ fontFamily: "'Silkscreen', monospace" }}
+                >
+                  {char || '_'}
+                </div>
+              );
+            })}
           </div>
 
-          {errorMsg && (
-            <div className="text-xs text-rose-400 font-bold mt-2 flex items-center justify-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {solved && (
-            <div className="text-xs text-emerald-400 font-bold mt-2 flex items-center justify-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>¡CÓDIGO ACEPTADO! PROTOCOLO DE EVACUACIÓN DESBLOQUEADO</span>
-            </div>
-          )}
+          {/* Status Message */}
+          <div className="min-h-[22px] flex items-center justify-center mt-2 text-xs font-bold">
+            {solved ? (
+              <span className="text-emerald-400 flex items-center gap-1.5 animate-pulse">
+                <CheckCircle2 className="w-4 h-4" /> CÓDIGO CORRECTO // PROTOCOLO DE DESBLOQUEO ACTIVO
+              </span>
+            ) : errorMsg ? (
+              <span className="text-rose-400 flex items-center gap-1.5 animate-shake">
+                <AlertTriangle className="w-4 h-4" /> {errorMsg}
+              </span>
+            ) : (
+              <span className="text-slate-500 text-[10px] tracking-wide">
+                ESPERANDO TRANSMISIÓN DEL OPERADOR (SALA DE CONTROL)
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Numeric Keypad */}
-        <div className="grid grid-cols-3 gap-2.5 max-w-[280px] mx-auto mb-5">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '#'].map((k) => (
+        {/* Industrial Mechanical Keypad Grid */}
+        <div className="grid grid-cols-3 gap-2.5 p-3 bg-[#080c14] border-2 border-[#1e293b]">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
             <button
-              key={k}
+              key={digit}
               type="button"
-              disabled={solved || (k === '#' && true)}
-              onClick={() => {
-                if (k === 'C') handleClear();
-                else if (k !== '#') handleDigit(k);
-              }}
-              className="h-12 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 border border-white/10 hover:border-orange-500/50 text-white font-black text-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              disabled={solved || enteredCode.length >= 4}
+              onClick={() => handleDigit(digit)}
+              className="h-13 bg-[#1e293b] hover:bg-[#334155] active:bg-[#0f172a] active:translate-y-0.5 border-b-4 border-[#0f172a] hover:border-[#1e293b] text-slate-200 hover:text-amber-300 text-xl font-black transition-all flex items-center justify-center shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ fontFamily: "'Silkscreen', monospace" }}
             >
-              {k}
+              {digit}
             </button>
           ))}
+
+          {/* Bottom row: Clear, 0, Key */}
+          <button
+            type="button"
+            disabled={solved || enteredCode.length === 0}
+            onClick={handleClear}
+            className="h-13 bg-rose-950/70 hover:bg-rose-900 border-b-4 border-rose-950 text-rose-300 hover:text-white text-xs font-bold tracking-wider transition-all flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            BORRAR
+          </button>
+
+          <button
+            type="button"
+            disabled={solved || enteredCode.length >= 4}
+            onClick={() => handleDigit('0')}
+            className="h-13 bg-[#1e293b] hover:bg-[#334155] active:bg-[#0f172a] active:translate-y-0.5 border-b-4 border-[#0f172a] hover:border-[#1e293b] text-slate-200 hover:text-amber-300 text-xl font-black transition-all flex items-center justify-center shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ fontFamily: "'Silkscreen', monospace" }}
+          >
+            0
+          </button>
+
+          <button
+            type="button"
+            disabled={true}
+            className="h-13 bg-[#0f172a] border-b-4 border-[#020617] text-slate-600 text-xs font-mono flex items-center justify-center cursor-not-allowed"
+          >
+            <Lock className="w-4 h-4 text-slate-600" />
+          </button>
         </div>
 
-        {/* Cooperative info notice */}
-        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 text-[10px] text-slate-400 text-center mb-4">
-          💡 En este modo de prueba, pulsa <span className="text-amber-300 font-bold">F2</span> para cambiar al rol de <span className="text-amber-300 font-bold">Operador</span>, acércate a la Terminal de Comunicaciones en la Sala de Control para leer la clave, y pulsa <span className="text-amber-300 font-bold">F1</span> para volver a introducirla.
-        </div>
+        {/* Hazard Caution Tape Footer Strip */}
+        <div className="w-full h-3 mt-3 border-y border-amber-600/60 bg-[repeating-linear-gradient(-45deg,#b45309,#b45309_10px,#1e293b_10px,#1e293b_20px)]" />
 
-        {/* Footer */}
-        <div className="flex justify-end">
+        {/* Bottom Status / Tip */}
+        <div className="mt-3 flex items-center justify-between text-[10px] text-slate-400">
+          <span>COMPUERTA DE EVACUACIÓN: TURBINA 03</span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
+            className="text-amber-400 hover:underline uppercase font-bold cursor-pointer"
           >
-            VOLVER AL GENERADOR [ESC]
+            Cerrar terminal [ESC]
           </button>
         </div>
       </div>
