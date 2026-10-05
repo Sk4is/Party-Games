@@ -19,6 +19,7 @@ import { EntreToposGame } from './components/entre-topos/EntreToposGame';
 import { CantinaGame } from './components/cantina/CantinaGame';
 import { FortunariumGame } from './components/fortunarium/FortunariumGame';
 import { LaCriptaGame } from './components/la-cripta/LaCriptaGame';
+import { DarkProtocolGame } from './components/dark-protocol/DarkProtocolGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 import { sessionRecovery } from './services/sessionRecovery';
 import { BackendConnectingModal } from './components/common/BackendConnectingModal';
@@ -35,6 +36,7 @@ type AppView =
   | 'CANTINA'
   | 'FORTUNARIUM'
   | 'LA_CRIPTA'
+  | 'DARK_PROTOCOL'
   | 'BOMBA_LOCAL_SETUP'
   | 'BOMBA_LOCAL_GAME'
   | 'LPR_LOCAL_SETUP'
@@ -73,6 +75,9 @@ export default function App() {
       if ((activeSession.gameType as string) === 'la-cripta') {
         return 'LA_CRIPTA';
       }
+      if ((activeSession.gameType as string) === 'dark-protocol') {
+        return 'DARK_PROTOCOL';
+      }
     }
 
     if (typeof window !== 'undefined') {
@@ -90,6 +95,7 @@ export default function App() {
       if (game === 'la_cantina_del_farol' || game === 'la-cantina-del-farol') return 'CANTINA';
       if (game === 'fortunarium') return 'FORTUNARIUM';
       if (game === 'la-cripta') return 'LA_CRIPTA';
+      if (game === 'dark-protocol') return 'DARK_PROTOCOL';
       if (room) {
         return 'PINTURILLO';
       }
@@ -130,6 +136,8 @@ export default function App() {
       setCurrentView('FORTUNARIUM');
     } else if (gameId === 'la-cripta') {
       setCurrentView('LA_CRIPTA');
+    } else if (gameId === 'dark-protocol') {
+      setCurrentView('DARK_PROTOCOL');
     }
   };
 
@@ -263,6 +271,11 @@ export default function App() {
           initialRoomCode={urlRoomCode}
           onSwitchGame={handleSwitchGame}
         />
+      )}
+
+      {/* 11. DARK PROTOCOL (2v1 ASYMMETRIC HORROR - PC EXCLUSIVE) */}
+      {currentView === 'DARK_PROTOCOL' && (
+        <DarkProtocolGame onBackToMenu={handleBackToMenu} />
       )}
 
       {/* OPTIONAL LOCAL PASS-AND-PLAY FALLBACKS */}

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Sparkles, HelpCircle, ArrowRight } from 'lucide-react';
+import { Play, Sparkles, HelpCircle, ArrowRight, Monitor, Lock } from 'lucide-react';
 import { SoundToggle } from './SoundToggle';
 import { HowToPlayModal } from './HowToPlayModal';
 import { HomeAnimatedBackground } from './HomeAnimatedBackground';
 import { audio } from '../utils/audio';
+import { isDesktopDevice } from '../utils/deviceDetection';
 
 interface MainMenuProps {
   onSelectGame: (gameId: string) => void;
@@ -12,6 +13,12 @@ interface MainMenuProps {
 export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [comingSoonToast, setComingSoonToast] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState<boolean>(true);
+  const [pcOnlyToast, setPcOnlyToast] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsDesktop(isDesktopDevice());
+  }, []);
 
   // Isolated dev-only diagnostic check for /assets/fonts/BLAZTER.ttf (never blocks or throws)
   useEffect(() => {
@@ -97,6 +104,14 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
           <div className="fixed top-20 z-50 animate-bounce px-6 py-3 rounded-2xl bg-amber-500 text-slate-950 font-black shadow-2xl border border-amber-300 flex items-center gap-2">
             <span>⏳</span>
             <span>¡{comingSoonToast} estará disponible muy pronto! Juega a La Bomba mientras tanto.</span>
+          </div>
+        )}
+
+        {/* PC only toast notification */}
+        {pcOnlyToast && (
+          <div className="fixed top-20 z-50 animate-bounce px-6 py-3 rounded-2xl bg-amber-500 text-slate-950 font-black shadow-2xl border border-amber-300 flex items-center gap-2">
+            <span>🖥️</span>
+            <span>Dark Protocol requiere un PC con teclado y ratón.</span>
           </div>
         )}
 
@@ -588,6 +603,88 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
               <div className="w-10 h-10 rounded-full bg-[#E7A54A] group-hover:bg-[#D8C6A0] text-[#0B0A0E] flex items-center justify-center font-black shadow-md shadow-[#E7A54A]/35 group-hover:scale-110 transition-all duration-300">
                 <Play className="w-4 h-4 fill-current ml-0.5" />
               </div>
+            </div>
+          </div>
+
+          {/* CARD 11: DARK PROTOCOL */}
+          <div
+            id="card-dark-protocol"
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              if (!isDesktop) {
+                setPcOnlyToast(true);
+                setTimeout(() => setPcOnlyToast(false), 4000);
+                return;
+              }
+              handleSelectGame('dark-protocol');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (!isDesktop) {
+                  setPcOnlyToast(true);
+                  setTimeout(() => setPcOnlyToast(false), 4000);
+                  return;
+                }
+                handleSelectGame('dark-protocol');
+              }
+            }}
+            className={`group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#A855F7]/45 hover:border-[#A855F7] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(168,85,247,0.36)] transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal ${
+              !isDesktop ? 'opacity-85 cursor-not-allowed' : 'cursor-pointer'
+            }`}
+            style={{ animationDelay: '0.40s' }}
+          >
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#A855F7]/50 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.18),rgba(15,23,42,0.12)_45%,transparent_70%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-20 bg-[#A855F7] blur-2xl transition-opacity duration-500" />
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#3b0764] via-[#1e1b4b] to-[#030712] border border-[#A855F7]/50 flex items-center justify-center text-3xl shadow-lg shadow-[#A855F7]/25 group-hover:scale-105 group-hover:-translate-y-1 group-hover:rotate-2 transition-all duration-300">
+                  👁️
+                </div>
+                {isDesktop ? (
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
+                    ONLINE
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-full bg-slate-900/80 border border-amber-500/40 text-amber-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
+                    EXCLUSIVO PARA PC
+                  </span>
+                )}
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#A855F7] transition-colors duration-200">
+                DARK PROTOCOL
+              </h2>
+              <p className="text-slate-300/90 text-sm sm:text-base font-normal leading-snug">
+                &ldquo;Dos supervivientes, un Ente en la red y una instalación en sombras. Restablece la energía, evita las cámaras o muere en el intento.&rdquo;
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                <span className="px-2.5 py-1 rounded-lg bg-[#A855F7]/15 border border-[#A855F7]/40 text-purple-300 font-bold">2 vs 1 Asimétrico</span>
+                <span className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 font-bold">Terror 2D</span>
+                <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">Modo Prueba 1 Jugador</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
+              {isDesktop ? (
+                <>
+                  <span className="text-sm font-bold text-[#A855F7] group-hover:text-purple-300 group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
+                    Entrar a la instalación <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </span>
+                  <div className="w-10 h-10 rounded-full bg-[#A855F7] group-hover:bg-[#9333EA] text-white flex items-center justify-center font-black shadow-md shadow-[#A855F7]/35 group-hover:scale-110 transition-all duration-300">
+                    <Play className="w-4 h-4 fill-current ml-0.5" />
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-amber-300/90 font-medium">
+                  <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Dark Protocol requiere un PC con teclado y ratón.</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
