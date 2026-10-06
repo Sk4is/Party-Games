@@ -94,6 +94,28 @@ export const SURVIVOR_CHARACTERS: SurvivorCharacter[] = [
       stamina: 60,
     },
   },
+  {
+    id: 'operator',
+    name: 'Operador de Mando',
+    title: 'Control de Instalaciones y Enlace Táctico',
+    quote: 'Control central a supervivientes: mantengan la posición, vigilo sus espaldas en los monitores.',
+    role: 'Operador Táctico',
+    portraitIcon: '🎧',
+    primaryColor: '#0284c7', // Sky Blue
+    secondaryColor: '#0369a1',
+    passiveTitle: 'Enlace Táctico',
+    passiveDesc: 'Supervisión de cámaras CCTV y telemetría de sectores en tiempo real.',
+    strengthTitle: 'Visión Global',
+    strengthDesc: 'Control de compuertas hidráulicas y distribución de energía.',
+    weaknessTitle: 'Soporte Remoto',
+    weaknessDesc: 'Depende de las transmisiones y estado de las cámaras de seguridad.',
+    stats: {
+      speed: 75,
+      repairSpeed: 75,
+      stealth: 75,
+      stamina: 75,
+    },
+  },
 ];
 
 export function getCharacterById(id: string): SurvivorCharacter {

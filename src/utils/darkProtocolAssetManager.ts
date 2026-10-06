@@ -69,7 +69,7 @@ class DarkProtocolAssetManager {
 
       img.onerror = () => {
         this.failed.add(src);
-        console.warn(`[DarkProtocol] Asset failed to load: ${src}`);
+        console.error(`[DARK PROTOCOL ASSET ERROR]\nFailed:\n"${src}"`);
         resolve(null);
       };
     });
@@ -78,10 +78,9 @@ class DarkProtocolAssetManager {
     return promise;
   }
 
-  public preloadAll(): void {
-    Object.values(DARK_PROTOCOL_ASSETS).forEach((path) => {
-      this.preload(path);
-    });
+  public preloadAll(): Promise<HTMLImageElement[]> {
+    const promises = Object.values(DARK_PROTOCOL_ASSETS).map((path) => this.preload(path));
+    return Promise.all(promises).then((imgs) => imgs.filter(Boolean) as HTMLImageElement[]);
   }
 
   public isLoaded(src: string): boolean {
@@ -90,6 +89,12 @@ class DarkProtocolAssetManager {
 
   public hasFailed(src: string): boolean {
     return this.failed.has(src);
+  }
+
+  public getStatus(src: string): 'LOADED' | 'FAILED' | 'LOADING' {
+    if (this.loaded.has(src)) return 'LOADED';
+    if (this.failed.has(src)) return 'FAILED';
+    return 'LOADING';
   }
 
   public getImage(src: string): HTMLImageElement | null {

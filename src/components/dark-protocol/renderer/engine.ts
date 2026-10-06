@@ -11,15 +11,56 @@ import {
   InteractableObject,
   HidingSpot,
   CameraDefinition,
+  CharacterAnimState,
+  HealthState,
 } from '../../../types/darkProtocol';
 import {
   FACILITY_ROOMS,
   FACILITY_LIGHTS,
   FACILITY_INTERACTABLES,
   HIDING_SPOTS,
+  FACILITY_PROPS,
 } from '../../../data/darkProtocol/facilityMap';
 import { getCharacterById } from '../../../data/darkProtocol/characters';
 import { darkProtocolAudio } from '../../../utils/darkProtocolAudio';
+import { darkProtocolAssets } from '../../../utils/darkProtocolAssetManager';
+
+export const ROOM_BACKGROUND_MAP: Record<string, string> = {
+  control_room: '/assets/dark-protocol/sala1.png',
+  security: '/assets/dark-protocol/sala2.png',
+  laboratory: '/assets/dark-protocol/sala3.png',
+  electrical_room: '/assets/dark-protocol/sala4.png',
+  maintenance: '/assets/dark-protocol/sala5.png',
+  generators: '/assets/dark-protocol/sala6.png',
+  communications: '/assets/dark-protocol/sala7.png',
+  archive: '/assets/dark-protocol/sala8.png',
+  infirmary: '/assets/dark-protocol/sala9.png',
+  evacuation: '/assets/dark-protocol/sala10.png',
+};
+
+export const DOOR_ASSETS = {
+  closed: '/assets/dark-protocol/puerta_cerrada.png',
+  partial: '/assets/dark-protocol/puerta_entreabierta.png',
+  open: '/assets/dark-protocol/puerta_abierta.png',
+  evac: '/assets/dark-protocol/salida_evacuacion.png',
+};
+
+export interface ActiveSurvivorEntity {
+  id: string;
+  name: string;
+  characterId: string;
+  room: string;
+  x: number;
+  facing: 'left' | 'right';
+  vx: number;
+  health: HealthState;
+  flashlightOn: boolean;
+  flashlightAngle: number;
+  isHiding: boolean;
+  animState: CharacterAnimState;
+  animTimer: number;
+  isControlled: boolean;
+}
 
 export interface RendererDebugOptions {
   showInteractionZones: boolean;
@@ -85,6 +126,19 @@ export class DarkProtocolCanvasEngine {
   private particles: Particle[] = [];
   private sparkTimer: number = 0;
   private fanAngle: number = 0;
+
+  // Remote multiplayer players kinematics & animation tracking
+  private remotePlayerAnim: Record<
+    string,
+    {
+      x: number;
+      targetX: number;
+      vx: number;
+      facing: 'left' | 'right';
+      animState: CharacterAnimState;
+      lastUpdate: number;
+    }
+  > = {};
 
   // State reference & callbacks
   private getState: () => DarkProtocolGameState;
@@ -1035,11 +1089,11 @@ export class DarkProtocolCanvasEngine {
     this.ctx.save();
     this.ctx.translate(-Math.floor(this.cameraX), 0);
 
-    // Pass 1: World Scene
+    // Pass 1: World Scene (Authored Background Artwork -> Doors & Props -> Characters -> Particles)
     this.renderRoomBackground(room, isSectorPowered);
-    this.renderMachinesAndInteractables(room, isSectorPowered);
-    this.renderHidingSpots(room);
     this.renderDoors(room, state);
+    this.renderHidingSpots(room);
+    this.renderMachinesAndInteractables(room, isSectorPowered);
     this.renderCharacters(state, room);
     this.renderParticles();
 
@@ -1075,522 +1129,130 @@ export class DarkProtocolCanvasEngine {
   }
 
   /**
-   * CRITICAL BUG FIX: Seamless room background extension.
-   * Renders from -2000 to room.width + 2000 so no resolution or aspect ratio
-   * can ever show an empty black strip on the right or left!
+   * AUTHORED ROOM BACKGROUND RENDERING:
+   * Renders the true authored room PNG (sala1.png - sala10.png) at exactly (0, 0, 1983, 793).
+   * Extends the floor seamlessly past room borders so widescreen monitors never show empty voids.
    */
   private renderRoomBackground(room: RoomZone, isPowered: boolean) {
     const ctx = this.ctx;
     const w = room.width;
-    const h = this.viewportHeight;
-
-    const extLeft = -2500;
-    const extRight = w + 2500;
-    const extWidth = extRight - extLeft;
+    const h = room.height;
 
     const failureState = this.getSectorFailureFactor(room.sector);
     const effectivePowered = isPowered && (!failureState.inFailureSequence || failureState.strobe > 0.35);
 
-    // Back wall base color
-    ctx.fillStyle = effectivePowered ? '#0b111e' : '#030508';
-    ctx.fillRect(extLeft, 0, extWidth, h);
-
-    // Industrial wall panels & seams across the extended space
-    ctx.strokeStyle = effectivePowered ? '#141d2f' : '#070b12';
-    ctx.lineWidth = 2;
-    for (let x = extLeft; x <= extRight; x += 120) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, room.floorY);
-      ctx.stroke();
-
-      ctx.fillStyle = effectivePowered ? '#1e293b' : '#0a0f18';
-      ctx.fillRect(x - 2, 80, 4, 4);
-      ctx.fillRect(x - 2, 220, 4, 4);
-      ctx.fillRect(x - 2, 360, 4, 4);
+    // 1. Draw Authored Room PNG
+    const bgImg = darkProtocolAssets.getImage(room.background);
+    if (bgImg) {
+      ctx.drawImage(bgImg, 0, 0, w, h);
+    } else {
+      // High-contrast industrial base if loading
+      ctx.fillStyle = effectivePowered ? '#0b111e' : '#030508';
+      ctx.fillRect(0, 0, w, h);
     }
 
-    // Concrete floor & hazard stripe extending seamlessly
-    ctx.fillStyle = effectivePowered ? '#1e293b' : '#0d131d';
-    ctx.fillRect(extLeft, room.floorY, extWidth, h - room.floorY);
+    // 2. Seamless floor extension outside [0, w]
+    const extLeft = -2500;
+    const extRight = w + 2500;
+    const floorY = room.floorY;
+    const floorH = Math.max(h - floorY, this.viewportHeight - floorY);
 
-    ctx.fillStyle = effectivePowered ? '#b45309' : '#451a03';
-    ctx.fillRect(extLeft, room.floorY - 6, extWidth, 6);
+    // Dark void for outer walls
+    ctx.fillStyle = '#020408';
+    ctx.fillRect(extLeft, 0, -extLeft, floorY);
+    ctx.fillRect(w, 0, extRight - w, floorY);
 
-    // Ceiling industrial girders
-    ctx.fillStyle = effectivePowered ? '#0f172a' : '#050811';
-    ctx.fillRect(extLeft, 0, extWidth, 40);
+    // Concrete floor extension
+    ctx.fillStyle = effectivePowered ? '#141d2b' : '#090e17';
+    ctx.fillRect(extLeft, floorY, -extLeft, floorH);
+    ctx.fillRect(w, floorY, extRight - w, floorH);
 
-    // Overhead Cable bundles across the room
-    ctx.strokeStyle = effectivePowered ? '#334155' : '#111827';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(0, 25);
-    ctx.bezierCurveTo(w * 0.25, 45, w * 0.75, 45, w, 25);
-    ctx.stroke();
-
-    // Ceiling ventilation fans
-    ctx.save();
-    ctx.translate(w * 0.5, 30);
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.arc(0, 0, 22, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.rotate(this.fanAngle);
-    ctx.fillStyle = effectivePowered ? '#475569' : '#1e293b';
-    for (let b = 0; b < 4; b++) {
-      ctx.rotate(Math.PI / 2);
-      ctx.fillRect(-3, -18, 6, 36);
-    }
-    ctx.restore();
+    // Hazard stripe continuation
+    ctx.fillStyle = effectivePowered ? '#92400e' : '#451a03';
+    ctx.fillRect(extLeft, floorY - 6, -extLeft, 6);
+    ctx.fillRect(w, floorY - 6, extRight - w, 6);
   }
 
+  /**
+   * INTERACTIVE PROPS & AUTHORED OBJECTS:
+   * Renders the supplied PNG props (camara.png, mesa.png, taquilla.png, valvula.png, trampilla.png, salida_evacuacion.png)
+   * along with gameplay status cues (LEDs, code displays).
+   */
   private renderMachinesAndInteractables(room: RoomZone, isPowered: boolean) {
     const ctx = this.ctx;
+
+    // Render props configured for this room in FACILITY_PROPS
+    for (const prop of FACILITY_PROPS) {
+      if (prop.room === room.id) {
+        // If it's a camera, skip here since renderCameras draws it or handles it
+        if (prop.type === 'camera') continue;
+        // If it's a door/locker/table/vent, draw the real authored PNG
+        const img = darkProtocolAssets.getImage(prop.asset);
+        if (img) {
+          const naturalW = img.naturalWidth || 800;
+          const naturalH = img.naturalHeight || 800;
+          const drawW = naturalW * prop.scale;
+          const drawH = naturalH * prop.scale;
+          const drawX = prop.x - drawW * prop.anchorX;
+          const drawY = prop.y - drawH * prop.anchorY;
+
+          ctx.save();
+          if (prop.flipX) {
+            ctx.translate(prop.x, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(img, -drawW * prop.anchorX, drawY, drawW, drawH);
+          } else {
+            ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          }
+          ctx.restore();
+        }
+      }
+    }
+
+    // Dynamic UI overlays for interactive machines (e.g. code displays, LEDs)
     const floorY = room.floorY;
 
-    if (room.id === 'control_room') {
-      // Station 1: CCTV Array (x: 340)
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(295, floorY - 110, 90, 110);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(302, floorY - 102, 76, 56);
-      if (isPowered) {
-        ctx.fillStyle = '#0284c7';
-        ctx.fillRect(306, floorY - 98, 68, 48);
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        for (let sx = 0; sx < 64; sx += 8) {
-          const sy = Math.sin(this.animTimer * 5 + sx * 0.3) * 6;
-          if (sx === 0) ctx.moveTo(308 + sx, floorY - 74 + sy);
-          else ctx.lineTo(308 + sx, floorY - 74 + sy);
-        }
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = '#030712';
-        ctx.fillRect(306, floorY - 98, 68, 48);
-      }
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '9px monospace';
+    if (room.id === 'evacuation') {
+      // Armored Keypad LCD status
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(1175, 595, 50, 22);
+      ctx.fillStyle = this.getState().coopSolved ? '#22c55e' : '#f59e0b';
+      ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('CCTV ARRAY', 340, floorY - 26);
-      ctx.fillText('[E] MONITOR', 340, floorY - 12);
+      ctx.fillText(this.getState().coopSolved ? 'OK' : '****', 1200, 611);
 
-      // Station 2: Bunker Tactical Map (x: 700)
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(650, floorY - 95, 100, 95);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(658, floorY - 88, 84, 52);
-      if (isPowered) {
-        ctx.fillStyle = '#042f2e';
-        ctx.fillRect(662, floorY - 84, 76, 44);
-        ctx.strokeStyle = '#2dd4bf';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(668, floorY - 78, 22, 14);
-        ctx.strokeRect(694, floorY - 78, 22, 14);
-        ctx.strokeRect(682, floorY - 60, 24, 14);
-      }
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('PLANO TÁCTICO', 700, floorY - 22);
-      ctx.fillText('[E] MAPA', 700, floorY - 10);
-
-      // Station 3: Network Diagnosis Board (x: 1000)
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(955, floorY - 105, 90, 105);
-      ctx.fillStyle = '#090d16';
-      ctx.fillRect(962, floorY - 98, 76, 75);
-      // Status LEDs
+      // Warning beacon above evacuation blast gate
+      const beaconOn = Math.floor(this.animTimer * 4) % 2 === 0;
+      ctx.fillStyle = beaconOn ? '#ef4444' : '#7f1d1d';
+      ctx.beginPath();
+      ctx.arc(1550, 480, 10, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (room.id === 'control_room') {
+      // Diagnostic LED cluster above console
       const sectors = [
-        { label: 'SEC-A', powered: Boolean(this.getState().circuits['sector_a']?.powered), y: -85 },
-        { label: 'SEC-B', powered: Boolean(this.getState().circuits['sector_b']?.powered), y: -68 },
-        { label: 'SEC-C', powered: Boolean(this.getState().circuits['sector_c']?.powered), y: -51 },
+        { label: 'A', powered: Boolean(this.getState().circuits['sector_a']?.powered), x: 770 },
+        { label: 'B', powered: Boolean(this.getState().circuits['sector_b']?.powered), x: 800 },
+        { label: 'C', powered: Boolean(this.getState().circuits['sector_c']?.powered), x: 830 },
       ];
       for (const s of sectors) {
         ctx.fillStyle = s.powered ? '#10b981' : '#ef4444';
         ctx.beginPath();
-        ctx.arc(975, floorY + s.y, 4, 0, Math.PI * 2);
+        ctx.arc(s.x, floorY - 95, 4, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#cbd5e1';
-        ctx.font = '8px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(s.label + (s.powered ? ' [OK]' : ' [FAIL]'), 985, floorY + s.y + 3);
-      }
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('DIAGNÓSTICO', 1000, floorY - 10);
-
-    } else if (room.id === 'security') {
-      // Station 1: Network Router Rack (x: 380)
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(335, floorY - 145, 90, 145);
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(338, floorY - 142, 84, 140);
-      for (let slot = 0; slot < 5; slot++) {
-        const sy = floorY - 132 + slot * 24;
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(344, sy, 72, 18);
-        for (let led = 0; led < 4; led++) {
-          const blink = isPowered && ((slot + led + Math.floor(this.animTimer * 6)) % 3 === 0);
-          ctx.fillStyle = blink ? '#22c55e' : '#eab308';
-          ctx.fillRect(348 + led * 7, sy + 6, 3, 5);
-        }
-      }
-      ctx.fillStyle = '#cbd5e1';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('ROUTER CCTV', 380, floorY - 148);
-
-      // Station 2: Security Lock Bypass (x: 860)
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(820, floorY - 110, 80, 110);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(828, floorY - 100, 64, 45);
-      ctx.fillStyle = isPowered ? '#ef4444' : '#7f1d1d';
-      ctx.fillRect(845, floorY - 88, 30, 20); // Emergency lockout switch
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(825, floorY - 105, 70, 70);
-      ctx.fillStyle = '#fbbf24';
-      ctx.font = '8px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('ESCLUSAS', 860, floorY - 30);
-
-    } else if (room.id === 'archive') {
-      // Tape server racks & classified archive terminal (x: 560)
-      // Reel-to-reel server racks on left and right
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(460, floorY - 150, 70, 150);
-      ctx.fillRect(630, floorY - 150, 70, 150);
-      for (const rx of [475, 645]) {
-        for (let reel = 0; reel < 2; reel++) {
-          const ry = floorY - 130 + reel * 55;
-          ctx.fillStyle = '#0f172a';
-          ctx.beginPath();
-          ctx.arc(rx + 20, ry + 20, 18, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = isPowered ? '#94a3b8' : '#334155';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          // Spinning reel hub
-          ctx.save();
-          ctx.translate(rx + 20, ry + 20);
-          if (isPowered) ctx.rotate(this.animTimer * (reel === 0 ? 3 : -2));
-          ctx.strokeStyle = '#e2e8f0';
-          ctx.beginPath();
-          ctx.moveTo(-14, 0);
-          ctx.lineTo(14, 0);
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
-
-      // Center CRT Terminal (x: 560)
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(525, floorY - 105, 70, 105);
-      ctx.fillStyle = '#022c22';
-      ctx.fillRect(532, floorY - 98, 56, 46);
-      if (isPowered) {
-        ctx.fillStyle = '#22c55e';
-        ctx.font = '8px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('REC-03', 560, floorY - 80);
-        ctx.fillText('CLAVE', 560, floorY - 68);
-      }
-      ctx.fillStyle = '#cbd5e1';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('ARCHIVO CLAVE', 560, floorY - 20);
-
-    } else if (room.id === 'laboratory') {
-      // Cryo pod on left (x: 300)
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(270, floorY - 155, 65, 155);
-      ctx.fillStyle = isPowered ? 'rgba(16, 185, 129, 0.45)' : 'rgba(5, 40, 25, 0.3)';
-      ctx.fillRect(278, floorY - 145, 49, 135);
-      // Floating bubble particles inside cryo chamber
-      if (isPowered) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        for (let b = 0; b < 4; b++) {
-          const by = floorY - 30 - ((this.animTimer * 30 + b * 28) % 110);
-          const bx = 286 + (b * 9);
-          ctx.fillRect(bx, by, 3, 3);
-        }
-      }
-
-      // Valve Station (x: 920)
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(870, floorY - 120, 100, 120);
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(874, floorY - 116, 92, 112);
-      // 3 Brass Pressure Gauges
-      for (let i = 0; i < 3; i++) {
-        const gx = 890 + i * 30;
-        const gy = floorY - 85;
-        ctx.fillStyle = '#020617';
-        ctx.beginPath();
-        ctx.arc(gx, gy, 11, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = isPowered ? '#06b6d4' : '#1e293b';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        // Needle
-        ctx.save();
-        ctx.translate(gx, gy);
-        const needleAngle = isPowered ? Math.sin(this.animTimer * 2 + i * 1.5) * 1.2 : -1.2;
-        ctx.rotate(needleAngle);
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(0, -9);
-        ctx.stroke();
-        ctx.restore();
-      }
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('VÁLVULAS CRYO', 920, floorY - 30);
-      ctx.fillText('(OBJ 2)', 920, floorY - 16);
-
-    } else if (room.id === 'infirmary') {
-      // First aid medical station (x: 620)
-      // Crash cart & heart monitor
-      ctx.fillStyle = '#e2e8f0';
-      ctx.fillRect(580, floorY - 95, 80, 95);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(590, floorY - 88, 60, 42);
-      // EKG Heartbeat waveform line
-      if (isPowered) {
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        for (let x = 0; x < 54; x += 3) {
-          let yOffset = 0;
-          const phase = (x + this.animTimer * 60) % 54;
-          if (phase > 22 && phase < 26) yOffset = -14;
-          else if (phase >= 26 && phase < 30) yOffset = 10;
-          if (x === 0) ctx.moveTo(593 + x, floorY - 67 + yOffset);
-          else ctx.lineTo(593 + x, floorY - 67 + yOffset);
-        }
-        ctx.stroke();
-      }
-      // Medical Red Cross emblem
-      ctx.fillStyle = '#ef4444';
-      ctx.fillRect(615, floorY - 35, 10, 24);
-      ctx.fillRect(608, floorY - 28, 24, 10);
-      ctx.fillStyle = '#0f172a';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('TRIAGE', 620, floorY - 6);
-
-    } else if (room.id === 'communications') {
-      // Radio frequency station (x: 680)
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(625, floorY - 135, 110, 135);
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(629, floorY - 131, 102, 127);
-      // Oscilloscope screen
-      ctx.fillStyle = '#022c22';
-      ctx.fillRect(640, floorY - 120, 80, 50);
-      if (isPowered) {
-        ctx.strokeStyle = '#4ade80';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let sx = 0; sx < 74; sx += 4) {
-          const sy = Math.sin(this.animTimer * 10 + sx * 0.25) * 14;
-          if (sx === 0) ctx.moveTo(643 + sx, floorY - 95 + sy);
-          else ctx.lineTo(643 + sx, floorY - 95 + sy);
-        }
-        ctx.stroke();
-      }
-      // Tuning dial knob
-      ctx.fillStyle = '#475569';
-      ctx.beginPath();
-      ctx.arc(680, floorY - 45, 16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('RADIO SOS (OBJ 3)', 680, floorY - 14);
-
-    } else if (room.id === 'electrical_room') {
-      // Main High-Voltage Substation (x: 820)
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(765, floorY - 145, 110, 145);
-      ctx.strokeStyle = isPowered ? '#38bdf8' : '#e11d48';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(770, floorY - 140, 100, 135);
-      // Ceramic Fuse Banks
-      for (let f = 0; f < 3; f++) {
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(785 + f * 24, floorY - 125, 14, 38);
-        ctx.fillStyle = '#64748b';
-        ctx.fillRect(785 + f * 24, floorY - 128, 14, 5);
-        ctx.fillRect(785 + f * 24, floorY - 90, 14, 5);
-      }
-      // High Voltage Warning Stencil
-      ctx.fillStyle = '#fbbf24';
-      ctx.font = '22px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⚡', 820, floorY - 45);
-      ctx.font = '9px monospace';
-      ctx.fillText('380V SUBESTACIÓN', 820, floorY - 20);
-
-    } else if (room.id === 'maintenance') {
-      // Steam valve purge station (x: 620)
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(575, floorY - 120, 90, 120);
-      ctx.strokeStyle = '#64748b';
-      ctx.lineWidth = 4;
-      // Main steam piping
-      ctx.beginPath();
-      ctx.moveTo(620, 0);
-      ctx.lineTo(620, floorY - 70);
-      ctx.lineTo(650, floorY - 70);
-      ctx.stroke();
-      // Rotary Wheel Valve
-      ctx.save();
-      ctx.translate(620, floorY - 70);
-      ctx.rotate(this.animTimer * 1.5);
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, 16, 0, Math.PI * 2);
-      ctx.moveTo(-16, 0); ctx.lineTo(16, 0);
-      ctx.moveTo(0, -16); ctx.lineTo(0, 16);
-      ctx.stroke();
-      ctx.restore();
-      ctx.fillStyle = '#cbd5e1';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('PURGA VAPOR', 620, floorY - 20);
-
-    } else if (room.id === 'generators') {
-      // Giant Industrial Combustion Turbine (x: 600)
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(490, floorY - 165, 220, 165);
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(495, floorY - 160, 210, 155);
-      // Large Flywheel rotor
-      ctx.save();
-      ctx.translate(600, floorY - 85);
-      if (isPowered) ctx.rotate(this.animTimer * 8);
-      ctx.strokeStyle = isPowered ? '#f59e0b' : '#334155';
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.arc(0, 0, 45, 0, Math.PI * 2);
-      ctx.stroke();
-      for (let s = 0; s < 6; s++) {
-        ctx.rotate(Math.PI / 3);
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(45, 0);
-        ctx.stroke();
-      }
-      ctx.restore();
-      ctx.fillStyle = '#f59e0b';
-      ctx.font = '10px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('TURBINA DE COMBUSTIÓN', 600, floorY - 18);
-
-    } else if (room.id === 'evacuation') {
-      // Station 1: Armored 4-digit code authorization keypad (x: 650)
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(615, floorY - 110, 70, 110);
-      ctx.strokeStyle = '#e2e8f0';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(618, floorY - 107, 64, 104);
-      // Illuminated LCD code display
-      ctx.fillStyle = '#020617';
-      ctx.fillRect(625, floorY - 98, 50, 24);
-      ctx.fillStyle = this.getState().coopSolved ? '#22c55e' : '#f59e0b';
-      ctx.font = '10px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(this.getState().coopSolved ? 'OK' : '****', 650, floorY - 82);
-      ctx.fillStyle = '#e2e8f0';
-      ctx.font = '8px monospace';
-      ctx.fillText('TECLADO', 650, floorY - 45);
-      ctx.fillText('(OBJ 5)', 650, floorY - 32);
-
-      // Station 2: Final Hydraulic Blast Gate (x: 1050)
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(990, floorY - 190, 120, 190);
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(995, floorY - 185, 110, 185);
-      // Hazard diagonal stripes
-      ctx.fillStyle = '#eab308';
-      for (let stripe = 0; stripe < 8; stripe++) {
-        ctx.beginPath();
-        ctx.moveTo(995 + stripe * 14, floorY);
-        ctx.lineTo(1015 + stripe * 14, floorY);
-        ctx.lineTo(1005 + stripe * 14, floorY - 20);
-        ctx.lineTo(985 + stripe * 14, floorY - 20);
-        ctx.fill();
-      }
-      // Red Rotary Beacon
-      const beaconOn = Math.floor(this.animTimer * 4) % 2 === 0;
-      ctx.fillStyle = beaconOn ? '#ef4444' : '#7f1d1d';
-      ctx.beginPath();
-      ctx.arc(1050, floorY - 198, 12, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = '10px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('COMPUERTA EXTERIOR', 1050, floorY - 150);
-      ctx.fillText(this.getState().escapeUnlocked ? '[ABIERTA]' : '[CERRADA]', 1050, floorY - 135);
-    }
-  }
-
-  private renderHidingSpots(room: RoomZone) {
-    const ctx = this.ctx;
-    for (const spot of HIDING_SPOTS) {
-      if (spot.room === room.id) {
-        if (spot.type === 'TAQUILLA') {
-          ctx.fillStyle = '#334155';
-          ctx.fillRect(spot.x - spot.width / 2, spot.y - 10, spot.width, spot.height);
-          ctx.strokeStyle = '#1e293b';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(spot.x - spot.width / 2, spot.y - 10, spot.width, spot.height);
-
-          ctx.fillStyle = '#0f172a';
-          ctx.fillRect(spot.x - 12, spot.y + 10, 24, 3);
-          ctx.fillRect(spot.x - 12, spot.y + 18, 24, 3);
-          ctx.fillRect(spot.x - 12, spot.y + 26, 24, 3);
-        } else if (spot.type === 'BAJO_MESA') {
-          ctx.fillStyle = '#1e293b';
-          ctx.fillRect(spot.x - spot.width / 2, spot.y, spot.width, 8);
-          ctx.fillRect(spot.x - spot.width / 2 + 5, spot.y + 8, 8, spot.height - 8);
-          ctx.fillRect(spot.x + spot.width / 2 - 13, spot.y + 8, 8, spot.height - 8);
-        } else if (spot.type === 'COMPARTIMENTO_TECNICO') {
-          ctx.fillStyle = '#0f172a';
-          ctx.fillRect(spot.x - spot.width / 2, spot.y, spot.width, spot.height);
-          ctx.strokeStyle = '#475569';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(spot.x - spot.width / 2, spot.y, spot.width, spot.height);
-          for (let gx = spot.x - spot.width / 2 + 6; gx < spot.x + spot.width / 2 - 6; gx += 8) {
-            ctx.beginPath();
-            ctx.moveTo(gx, spot.y + 4);
-            ctx.lineTo(gx, spot.y + spot.height - 4);
-            ctx.stroke();
-          }
-        }
       }
     }
   }
 
+  private renderHidingSpots(_room: RoomZone) {
+    // Hiding spots are authored into the room artwork or rendered via FACILITY_PROPS (mesa, taquilla, trampilla).
+    // No procedural rectangular placeholders needed.
+  }
+
+  /**
+   * AUTHORED DOOR RENDERING:
+   * Uses puerta_cerrada.png, puerta_entreabierta.png, and puerta_abierta.png.
+   * Positioned cleanly on the authored floor line.
+   */
   private renderDoors(room: RoomZone, state: DarkProtocolGameState) {
     const ctx = this.ctx;
     const floorY = room.floorY;
@@ -1600,381 +1262,468 @@ export class DarkProtocolCanvasEngine {
         const x = door.fromX;
         const isPowered = !door.requiresPower || (door.circuitId && state.circuits[door.circuitId]?.powered);
 
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(x - 30, floorY - 120, 60, 120);
+        // Select door state asset
+        let doorAsset = DOOR_ASSETS.closed;
+        if (door.lockedByEntity) {
+          doorAsset = DOOR_ASSETS.closed;
+        } else if (door.state === 'OPEN') {
+          doorAsset = DOOR_ASSETS.open;
+        } else if (door.state === 'AJAR') {
+          doorAsset = DOOR_ASSETS.partial;
+        }
 
-        ctx.fillStyle = isPowered ? '#334155' : '#0f172a';
-        ctx.fillRect(x - 24, floorY - 114, 48, 114);
+        const img = darkProtocolAssets.getImage(doorAsset);
+        // Door opening: ~85px wide, ~140px tall (anchored at floorY)
+        const doorW = 86;
+        const doorH = 142;
+        const doorX = x - doorW / 2;
+        const doorY = floorY - doorH;
 
+        if (img) {
+          ctx.drawImage(img, doorX, doorY, doorW, doorH);
+        } else {
+          // Fallback industrial frame
+          ctx.fillStyle = isPowered ? '#1e293b' : '#0f172a';
+          ctx.fillRect(doorX, doorY, doorW, doorH);
+        }
+
+        // Status LED Indicator above door frame
         let ledColor = '#10b981';
-        if (!isPowered) ledColor = '#334155';
+        if (!isPowered) ledColor = '#475569';
         if (door.lockedByEntity) ledColor = '#ef4444';
 
         ctx.fillStyle = ledColor;
         ctx.beginPath();
-        ctx.arc(x, floorY - 128, 5, 0, Math.PI * 2);
+        ctx.arc(x, doorY - 10, 4, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '9px monospace';
+        // Door Label
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(door.name.replace('Acceso a ', '').toUpperCase(), x, floorY - 136);
+        ctx.fillText(door.name.replace('Acceso a ', '').toUpperCase(), x, doorY - 18);
       }
     }
   }
 
   /**
-   * ANIMATED PIXEL-ART CHARACTERS
-   * Full articulated skeletal/pixel kinematics:
-   * - Alternating leg strides with foot contact and lift
-   * - Idle breathing cycle (torso/chest expand, feet strictly planted)
-   * - Running forward lean and energetic stride
-   * - Front arm dynamically holding & aiming the steel flashlight toward mouse
-   * - Working/interacting machine poses
-   * - Distinct silhouette and equipment per character
-   * - Demonic manifested Entity with void tendrils and crimson eyes
+   * UNIFIED SURVIVOR KINEMATICS RENDERER:
+   * Scales any human character to ~88px tall (62% of door height).
+   * Supports local player, operator, and any remote survivor player seamlessly.
+   */
+  private renderSurvivorBody(
+    x: number,
+    y: number,
+    facing: 'left' | 'right',
+    animState: CharacterAnimState,
+    health: HealthState,
+    characterId: string,
+    flashlightOn: boolean,
+    flashlightAngle: number
+  ) {
+    const ctx = this.ctx;
+    const char = getCharacterById(characterId);
+
+    const isWalking = animState === 'WALK' || animState === 'WALK_FLASHLIGHT';
+    const isRunning = animState === 'RUN' || animState === 'RUN_FLASHLIGHT';
+    const isWorking = animState === 'WORKING' || animState === 'INTERACT';
+    const isDowned = health === 'AGONIZANDO' || health === 'MUERTO';
+    const isMoving = isWalking || isRunning;
+
+    // Kinematic calculations
+    const breathBob = isMoving ? 0 : Math.sin(this.animTimer * 2.6) * 1.6;
+    const breathChest = isMoving ? 0 : Math.sin(this.animTimer * 2.6) * 0.8;
+
+    let strideAngle = 0;
+    let kneeFlex = 0;
+    let torsoLean = 0;
+    let walkBob = 0;
+
+    if (isRunning) {
+      strideAngle = Math.sin(this.animTimer * 15) * 0.52;
+      kneeFlex = Math.abs(Math.cos(this.animTimer * 15)) * 0.35;
+      torsoLean = 0.12;
+      walkBob = Math.abs(Math.sin(this.animTimer * 15)) * 2.5;
+    } else if (isWalking) {
+      strideAngle = Math.sin(this.animTimer * 9) * 0.36;
+      kneeFlex = Math.abs(Math.cos(this.animTimer * 9)) * 0.22;
+      walkBob = Math.abs(Math.sin(this.animTimer * 9)) * 1.5;
+    }
+
+    ctx.save();
+    ctx.translate(x, y);
+    // Authentic human scale factor: 1.35x brings height to 88px (believable vs 142px door)
+    ctx.scale(1.35, 1.35);
+    if (facing === 'left') ctx.scale(-1, 1);
+
+    // Contact shadow on floor
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, isRunning ? 18 : 15, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (isDowned) {
+      // Agonizing crawling pose on the floor
+      const crawlBob = Math.sin(this.animTimer * 2) * 1.5;
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-22, -12, 14, 8); // Legs trailing
+      ctx.fillStyle = char.primaryColor;
+      ctx.fillRect(-10, -18 + crawlBob, 22, 14); // Torso
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(10, -22 + crawlBob, 12, 12); // Head
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(16, -18 + crawlBob, 5, 3); // Visor alert
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(18, -10 + crawlBob, 12, 5); // Outstretched arm
+    } else {
+      // BACK ARM
+      const backArmAngle = isWorking
+        ? -0.6 + Math.sin(this.animTimer * 6) * 0.08
+        : isRunning
+        ? -Math.sin(this.animTimer * 15) * 0.6
+        : isWalking
+        ? -Math.sin(this.animTimer * 9) * 0.4
+        : 0.1;
+
+      ctx.save();
+      ctx.translate(-4, -38 + breathBob - walkBob);
+      ctx.rotate(backArmAngle);
+      ctx.fillStyle = char.secondaryColor || '#1e293b';
+      ctx.fillRect(-3, 0, 6, 11);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-2.5, 9, 5, 10);
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(-2.5, 17, 5, 4);
+      ctx.restore();
+
+      // LEGS & BOOTS
+      if (!isMoving) {
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(-9, -23, 7, 15);
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(-11, -8, 10, 8);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(-11, -3, 10, 3);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(2, -23, 7, 15);
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(0, -8, 10, 8);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(0, -3, 10, 3);
+      } else {
+        ctx.save();
+        ctx.translate(-3, -23);
+        ctx.rotate(strideAngle);
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(-3, 0, 6, 12);
+        ctx.translate(0, 10);
+        ctx.rotate(kneeFlex);
+        ctx.fillRect(-3, 0, 6, 11);
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(-3, 7, 9, 7);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(-3, 12, 9, 2);
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(3, -23);
+        ctx.rotate(-strideAngle);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(-3, 0, 6, 12);
+        ctx.translate(0, 10);
+        ctx.rotate(-kneeFlex * 0.5);
+        ctx.fillRect(-3, 0, 6, 11);
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(-3, 7, 9, 7);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(-3, 12, 9, 2);
+        ctx.restore();
+      }
+
+      // TORSO & CHEST
+      ctx.save();
+      ctx.translate(0, -breathBob + walkBob);
+      if (torsoLean > 0) ctx.rotate(torsoLean);
+
+      ctx.fillStyle = char.primaryColor;
+      ctx.fillRect(-11 - breathChest / 2, -48, 22 + breathChest, 27);
+
+      // Character-specific pixel accessories
+      if (char.id === 'mara_velasco') {
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(-12, -27, 24, 5);
+        ctx.fillStyle = '#d97706';
+        ctx.fillRect(8, -25, 4, 11);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(7, -19, 6, 3);
+        ctx.fillStyle = '#451a03';
+        ctx.fillRect(-9, -46, 18, 5);
+      } else if (char.id === 'hector_gaona') {
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(-10, -48, 7, 25);
+        ctx.fillRect(3, -48, 7, 25);
+        ctx.fillStyle = '#06b6d4';
+        ctx.fillRect(-14, -42, 4, 13);
+        ctx.fillStyle = '#a5f3fc';
+        ctx.fillRect(-14, -40, 4, 2);
+      } else if (char.id === 'valeria_cruz') {
+        ctx.fillStyle = '#1e1b4b';
+        ctx.fillRect(-10, -47, 20, 20);
+        ctx.fillStyle = '#312e81';
+        ctx.fillRect(-8, -45, 16, 15);
+        ctx.fillStyle = '#e11d48';
+        ctx.fillRect(-13, -48, 5, 5);
+        ctx.fillRect(8, -48, 5, 5);
+      } else if (char.id === 'sergio_prada') {
+        ctx.fillStyle = '#064e3b';
+        ctx.fillRect(-15, -46, 6, 21);
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-12, -46);
+        const antennaSway = isMoving ? Math.sin(this.animTimer * 12) * 3 : 0;
+        ctx.lineTo(-12 + antennaSway, -68);
+        ctx.stroke();
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(-13 + antennaSway, -70, 3, 3);
+      } else if (char.id === 'operator') {
+        // Operator Labcoat & Badge
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(-10, -46, 8, 24);
+        ctx.fillRect(2, -46, 8, 24);
+        ctx.fillStyle = '#0284c7';
+        ctx.fillRect(3, -40, 4, 6);
+      }
+
+      // HEAD & HELMET
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(-4, -51, 8, 4);
+
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(-9, -64, 18, 15);
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(-10, -62, 2, 10);
+
+      // Visor / Optics
+      if (char.id === 'mara_velasco') {
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(2, -59, 7, 5);
+      } else if (char.id === 'hector_gaona') {
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(1, -59, 4, 4);
+        ctx.fillRect(6, -59, 4, 4);
+      } else if (char.id === 'valeria_cruz') {
+        ctx.fillStyle = '#e11d48';
+        ctx.fillRect(2, -59, 7, 4);
+      } else if (char.id === 'operator') {
+        ctx.fillStyle = '#fbcfe8';
+        ctx.fillRect(0, -60, 8, 10);
+        ctx.fillStyle = '#0284c7';
+        ctx.fillRect(-9, -65, 18, 3);
+        ctx.fillRect(-9, -58, 3, 6);
+        ctx.fillRect(-7, -54, 7, 2);
+      } else {
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(2, -59, 7, 5);
+        ctx.fillStyle = '#065f46';
+        ctx.fillRect(-8, -58, 3, 5);
+        ctx.fillRect(-6, -55, 6, 2);
+      }
+
+      // FRONT ARM & FLASHLIGHT
+      let frontArmAngle = isRunning
+        ? Math.sin(this.animTimer * 15) * 0.6
+        : isWalking
+        ? Math.sin(this.animTimer * 9) * 0.4
+        : -0.05;
+
+      if (isWorking) {
+        frontArmAngle = -0.75 + Math.sin(this.animTimer * 6) * 0.08;
+      } else if (flashlightOn) {
+        let targetAngle = flashlightAngle;
+        if (facing === 'left') {
+          targetAngle = Math.PI - targetAngle;
+          if (targetAngle > Math.PI) targetAngle -= Math.PI * 2;
+        }
+        frontArmAngle = Math.max(-1.1, Math.min(0.9, targetAngle));
+      }
+
+      ctx.save();
+      ctx.translate(4, -38);
+      ctx.rotate(frontArmAngle);
+
+      ctx.fillStyle = char.primaryColor;
+      ctx.fillRect(-3, 0, 6, 10);
+      ctx.fillStyle = char.secondaryColor || '#1e293b';
+      ctx.fillRect(-2.5, 8, 5, 9);
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(-3, 15, 6, 5);
+
+      if (flashlightOn) {
+        // Flashlight barrel & glow
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(0, 13, 14, 5);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(3, 12, 4, 7);
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(12, 11, 4, 9);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(16, 12, 2, 7);
+        ctx.fillStyle = 'rgba(254, 240, 138, 0.7)';
+        ctx.fillRect(17, 10, 3, 11);
+      } else {
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(0, 13, 14, 5);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(16, 12, 2, 7);
+      }
+
+      ctx.restore(); // Front arm
+      ctx.restore(); // Torso
+    }
+
+    ctx.restore(); // Character
+  }
+
+  /**
+   * CHARACTERS RENDERING:
+   * Supports local Explorer, local Operator, local/manifested Entity,
+   * AND any remote multiplayer players via state.players dictionary.
    */
   private renderCharacters(state: DarkProtocolGameState, currentRoom: RoomZone) {
     const ctx = this.ctx;
     const floorY = currentRoom.floorY;
 
+    // Track rendered player IDs to prevent duplicate rendering
+    const renderedPlayerIds = new Set<string>();
+
     // 1. Render Explorer if in current room and NOT hiding
     if (state.explorer.room === currentRoom.id && !state.explorer.isHiding) {
-      const char = getCharacterById(state.selectedCharacterId);
-      const x = state.explorer.x;
-      const y = floorY;
-      const facing = state.explorer.facing;
-      const animState = state.explorer.animState || 'IDLE';
-
-      const isWalking = animState === 'WALK' || animState === 'WALK_FLASHLIGHT';
-      const isRunning = animState === 'RUN' || animState === 'RUN_FLASHLIGHT';
-      const isWorking = animState === 'WORKING' || animState === 'INTERACT';
-      const isDowned = state.explorer.health === 'AGONIZANDO' || state.explorer.health === 'MUERTO';
-      const isMoving = isWalking || isRunning;
-
-      // Kinematic calculations
-      const breathBob = isMoving ? 0 : Math.sin(this.animTimer * 2.6) * 1.6;
-      const breathChest = isMoving ? 0 : Math.sin(this.animTimer * 2.6) * 0.8;
-
-      let strideAngle = 0;
-      let kneeFlex = 0;
-      let torsoLean = 0;
-      let walkBob = 0;
-
-      if (isRunning) {
-        strideAngle = Math.sin(this.animTimer * 15) * 0.52;
-        kneeFlex = Math.abs(Math.cos(this.animTimer * 15)) * 0.35;
-        torsoLean = 0.12; // Forward lean
-        walkBob = Math.abs(Math.sin(this.animTimer * 15)) * 2.5;
-      } else if (isWalking) {
-        strideAngle = Math.sin(this.animTimer * 9) * 0.36;
-        kneeFlex = Math.abs(Math.cos(this.animTimer * 9)) * 0.22;
-        walkBob = Math.abs(Math.sin(this.animTimer * 9)) * 1.5;
-      }
-
-      ctx.save();
-      ctx.translate(x, y);
-      if (facing === 'left') ctx.scale(-1, 1);
-
-      // Contact shadow on floor
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, isRunning ? 22 : 18, 5, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      if (isDowned) {
-        // Agonizing crawling pose on the floor
-        const crawlBob = Math.sin(this.animTimer * 2) * 1.5;
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(-22, -12, 14, 8); // Legs trailing
-        ctx.fillStyle = char.primaryColor;
-        ctx.fillRect(-10, -18 + crawlBob, 22, 14); // Torso
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(10, -22 + crawlBob, 12, 12); // Head
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(16, -18 + crawlBob, 5, 3); // Visor alert
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(18, -10 + crawlBob, 12, 5); // Outstretched arm
-      } else {
-        // =====================================================================
-        // BACK ARM (swings counter to front leg)
-        // =====================================================================
-        const backArmAngle = isWorking
-          ? -0.6 + Math.sin(this.animTimer * 6) * 0.08
-          : isRunning
-          ? -Math.sin(this.animTimer * 15) * 0.6
-          : isWalking
-          ? -Math.sin(this.animTimer * 9) * 0.4
-          : 0.1;
-
-        ctx.save();
-        ctx.translate(-4, -38 + breathBob - walkBob);
-        ctx.rotate(backArmAngle);
-        ctx.fillStyle = char.secondaryColor || '#1e293b';
-        ctx.fillRect(-3, 0, 6, 11); // Upper arm
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(-2.5, 9, 5, 10); // Forearm
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(-2.5, 17, 5, 4); // Hand / Glove
-        ctx.restore();
-
-        // =====================================================================
-        // LEGS & BOOTS (Articulated Kinematics)
-        // =====================================================================
-        if (!isMoving) {
-          // Idle: Feet firmly planted on the floor
-          // Back leg
-          ctx.fillStyle = '#090d16';
-          ctx.fillRect(-9, -23, 7, 15); // Thigh & shin
-          ctx.fillStyle = '#020617';
-          ctx.fillRect(-11, -8, 10, 8); // Heavy boot
-          ctx.fillStyle = '#334155';
-          ctx.fillRect(-11, -3, 10, 3); // Boot sole
-
-          // Front leg
-          ctx.fillStyle = '#0f172a';
-          ctx.fillRect(2, -23, 7, 15);
-          ctx.fillStyle = '#020617';
-          ctx.fillRect(0, -8, 10, 8);
-          ctx.fillStyle = '#334155';
-          ctx.fillRect(0, -3, 10, 3);
-        } else {
-          // Walking/Running: Alternating leg strides
-          // Back Leg (strideAngle)
-          ctx.save();
-          ctx.translate(-3, -23);
-          ctx.rotate(strideAngle);
-          ctx.fillStyle = '#090d16';
-          ctx.fillRect(-3, 0, 6, 12); // Thigh
-          ctx.translate(0, 10);
-          ctx.rotate(kneeFlex);
-          ctx.fillRect(-3, 0, 6, 11); // Shin
-          ctx.fillStyle = '#020617';
-          ctx.fillRect(-3, 7, 9, 7); // Boot
-          ctx.fillStyle = '#334155';
-          ctx.fillRect(-3, 12, 9, 2); // Sole
-          ctx.restore();
-
-          // Front Leg (-strideAngle)
-          ctx.save();
-          ctx.translate(3, -23);
-          ctx.rotate(-strideAngle);
-          ctx.fillStyle = '#0f172a';
-          ctx.fillRect(-3, 0, 6, 12);
-          ctx.translate(0, 10);
-          ctx.rotate(-kneeFlex * 0.5);
-          ctx.fillRect(-3, 0, 6, 11);
-          ctx.fillStyle = '#020617';
-          ctx.fillRect(-3, 7, 9, 7);
-          ctx.fillStyle = '#334155';
-          ctx.fillRect(-3, 12, 9, 2);
-          ctx.restore();
-        }
-
-        // =====================================================================
-        // TORSO & UPPER BODY (Chest, Suit, Harness)
-        // =====================================================================
-        ctx.save();
-        ctx.translate(0, -breathBob + walkBob);
-        if (torsoLean > 0) ctx.rotate(torsoLean);
-
-        // Base protective jumpsuit
-        ctx.fillStyle = char.primaryColor;
-        ctx.fillRect(-11 - breathChest / 2, -48, 22 + breathChest, 27);
-
-        // Character-specific pixel accessories
-        if (char.id === 'mara_velasco') {
-          // Mechanic: Heavy leather toolbelt & wrench holster
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(-12, -27, 24, 5);
-          ctx.fillStyle = '#d97706';
-          ctx.fillRect(8, -25, 4, 11); // Steel pipe wrench
-          ctx.fillStyle = '#94a3b8';
-          ctx.fillRect(7, -19, 6, 3); // Wrench jaw
-          ctx.fillStyle = '#451a03';
-          ctx.fillRect(-9, -46, 18, 5); // Suspenders
-        } else if (char.id === 'hector_gaona') {
-          // Doctor: Crisp white labcoat lapels & cold cryo container
-          ctx.fillStyle = '#f8fafc';
-          ctx.fillRect(-10, -48, 7, 25);
-          ctx.fillRect(3, -48, 7, 25);
-          ctx.fillStyle = '#06b6d4';
-          ctx.fillRect(-14, -42, 4, 13); // Cryo vial
-          ctx.fillStyle = '#a5f3fc';
-          ctx.fillRect(-14, -40, 4, 2); // Glow indicator
-        } else if (char.id === 'valeria_cruz') {
-          // Guard: Reinforced ballistic plate carrier & crimson military epaulettes
-          ctx.fillStyle = '#1e1b4b';
-          ctx.fillRect(-10, -47, 20, 20);
-          ctx.fillStyle = '#312e81';
-          ctx.fillRect(-8, -45, 16, 15); // Ceramic plate
-          ctx.fillStyle = '#e11d48';
-          ctx.fillRect(-13, -48, 5, 5); // Left epaulette
-          ctx.fillRect(8, -48, 5, 5); // Right epaulette
-        } else if (char.id === 'sergio_prada') {
-          // Tech: Communications harness & radio backpack with tall antenna
-          ctx.fillStyle = '#064e3b';
-          ctx.fillRect(-15, -46, 6, 21); // Radio pack
-          ctx.strokeStyle = '#cbd5e1';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(-12, -46);
-          // Antenna sways gently with movement
-          const antennaSway = isMoving ? Math.sin(this.animTimer * 12) * 3 : 0;
-          ctx.lineTo(-12 + antennaSway, -68);
-          ctx.stroke();
-          ctx.fillStyle = '#ef4444';
-          ctx.fillRect(-13 + antennaSway, -70, 3, 3); // LED tip
-        }
-
-        // =====================================================================
-        // HEAD, HELMET & VISOR
-        // =====================================================================
-        // Neck
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(-4, -51, 8, 4);
-
-        // Helmet / Head
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(-9, -64, 18, 15);
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(-10, -62, 2, 10); // Brow protection
-
-        // Visor / Optics
-        if (char.id === 'mara_velasco') {
-          ctx.fillStyle = '#fbbf24';
-          ctx.fillRect(2, -59, 7, 5); // Golden welder shield
-        } else if (char.id === 'hector_gaona') {
-          ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(1, -59, 4, 4); // Optical loupe
-          ctx.fillRect(6, -59, 4, 4);
-        } else if (char.id === 'valeria_cruz') {
-          ctx.fillStyle = '#e11d48';
-          ctx.fillRect(2, -59, 7, 4); // Crimson tactical visor
-        } else {
-          ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(2, -59, 7, 5); // Blue HUD visor
-          ctx.fillStyle = '#065f46';
-          ctx.fillRect(-8, -58, 3, 5); // Headset earcup
-          ctx.fillRect(-6, -55, 6, 2); // Boom mic
-        }
-
-        // =====================================================================
-        // FRONT ARM & HELD FLASHLIGHT / WORKING POSE
-        // =====================================================================
-        let frontArmAngle = isRunning
-          ? Math.sin(this.animTimer * 15) * 0.6
-          : isWalking
-          ? Math.sin(this.animTimer * 9) * 0.4
-          : -0.05;
-
-        if (isWorking) {
-          // Reaching toward machine faceplate, hands actively manipulating knobs
-          frontArmAngle = -0.75 + Math.sin(this.animTimer * 6) * 0.08;
-        } else if (state.explorer.flashlightOn) {
-          // Front arm aims toward mouse cursor
-          let targetAngle = state.explorer.flashlightAngle;
-          if (facing === 'left') {
-            targetAngle = Math.PI - targetAngle;
-            if (targetAngle > Math.PI) targetAngle -= Math.PI * 2;
-          }
-          frontArmAngle = Math.max(-1.1, Math.min(0.9, targetAngle));
-        }
-
-        ctx.save();
-        ctx.translate(4, -38);
-        ctx.rotate(frontArmAngle);
-
-        // Shoulder & Upper Arm
-        ctx.fillStyle = char.primaryColor;
-        ctx.fillRect(-3, 0, 6, 10);
-        // Forearm
-        ctx.fillStyle = char.secondaryColor || '#1e293b';
-        ctx.fillRect(-2.5, 8, 5, 9);
-        // Hand / Glove
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(-3, 15, 6, 5);
-
-        // Steel Flashlight held in hand
-        ctx.fillStyle = '#64748b';
-        ctx.fillRect(0, 13, 14, 5); // Metal barrel
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(3, 12, 4, 7); // Grip knurling
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(12, 11, 4, 9); // Bezel reflector
-
-        if (state.explorer.flashlightOn) {
-          // Glowing lens cap
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(16, 12, 2, 7);
-          ctx.fillStyle = 'rgba(254, 240, 138, 0.7)';
-          ctx.fillRect(17, 10, 3, 11);
-        } else {
-          ctx.fillStyle = '#334155';
-          ctx.fillRect(16, 12, 2, 7);
-        }
-
-        ctx.restore(); // Front arm
-
-        ctx.restore(); // Torso
-      }
-
-      ctx.restore(); // Character
+      renderedPlayerIds.add('player_explorer');
+      this.renderSurvivorBody(
+        state.explorer.x,
+        floorY,
+        state.explorer.facing,
+        state.explorer.animState || 'IDLE',
+        state.explorer.health,
+        state.selectedCharacterId,
+        state.explorer.flashlightOn,
+        state.explorer.flashlightAngle
+      );
     }
 
-    // 2. Render Operator if in current room (Control Room)
+    // 2. Render Operator if in current room
     if (state.operator.room === currentRoom.id) {
-      const x = state.operator.x;
-      const y = floorY;
-      const facing = state.operator.facing;
-
-      ctx.save();
-      ctx.translate(x, y);
-      if (facing === 'left') ctx.scale(-1, 1);
-
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 16, 5, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Boots
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(-8, -8, 7, 8);
-      ctx.fillRect(1, -8, 7, 8);
-      ctx.fillRect(-7, -22, 5, 15);
-      ctx.fillRect(2, -22, 5, 15);
-
-      // White Labcoat
-      ctx.fillStyle = '#f1f5f9';
-      ctx.fillRect(-10, -48, 20, 28);
-      ctx.fillStyle = '#0284c7';
-      ctx.fillRect(2, -42, 4, 7); // Operator ID badge
-
-      // Arms & console clipboard
-      ctx.fillStyle = '#e2e8f0';
-      ctx.fillRect(-12, -44, 4, 16);
-      ctx.fillRect(8, -44, 4, 16);
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(2, -36, 10, 12); // Tactical tablet
-
-      // Head & Operator Headset
-      ctx.fillStyle = '#fbcfe8';
-      ctx.fillRect(-7, -62, 14, 14); // Face
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(-8, -64, 16, 5); // Hair
-      ctx.fillStyle = '#0284c7';
-      ctx.fillRect(-9, -65, 18, 3); // Headband
-      ctx.fillRect(-9, -58, 3, 6); // Left earcup
-      ctx.fillRect(-7, -54, 7, 2); // Mic boom
-
-      ctx.restore();
+      renderedPlayerIds.add('player_operator');
+      // If active role is Operator, use operator position and kinematics
+      const isOperatorMoving = state.activeRole === 'OPERADOR' && Math.abs(this.playerVx) > 5;
+      const opAnim: CharacterAnimState = isOperatorMoving ? 'WALK' : (state.operator.animState || 'IDLE');
+      this.renderSurvivorBody(
+        state.operator.x,
+        floorY,
+        state.operator.facing,
+        opAnim,
+        'SANO',
+        'operator',
+        false,
+        0
+      );
     }
 
-    // 3. Render Manifested Entity if in current room
+    // 3. Render any other multiplayer survivors in this room with full kinematics and animations
+    if (state.players) {
+      for (const [playerId, pData] of Object.entries(state.players)) {
+        if (renderedPlayerIds.has(playerId)) continue;
+        if (pData.roomId === currentRoom.id && pData.role !== 'ENTE') {
+          renderedPlayerIds.add(playerId);
+
+          const targetX = pData.normalizedRoomPosition * currentRoom.width;
+
+          // Initialize or update remote player animation interpolation
+          if (!this.remotePlayerAnim[playerId]) {
+            this.remotePlayerAnim[playerId] = {
+              x: targetX,
+              targetX,
+              vx: 0,
+              facing: 'right',
+              animState: 'IDLE',
+              lastUpdate: performance.now(),
+            };
+          }
+
+          const rAnim = this.remotePlayerAnim[playerId];
+          const prevX = rAnim.x;
+          // Smooth interpolation towards targetX
+          rAnim.x += (targetX - rAnim.x) * 0.15;
+          const deltaX = rAnim.x - prevX;
+          rAnim.vx = deltaX * 60; // Approximate velocity
+
+          if (Math.abs(deltaX) > 0.4) {
+            rAnim.facing = deltaX < 0 ? 'left' : 'right';
+            const isSprinting = Math.abs(deltaX) > 2.5;
+            rAnim.animState = isSprinting ? 'RUN' : 'WALK';
+          } else {
+            rAnim.animState = 'IDLE';
+          }
+
+          // Resolve character archetype
+          let charId = 'mara_velasco';
+          if (pData.role === 'OPERADOR') {
+            charId = 'operator';
+          } else if (pData.characterName?.toLowerCase().includes('gaona') || pData.characterName?.toLowerCase().includes('héctor')) {
+            charId = 'hector_gaona';
+          } else if (pData.characterName?.toLowerCase().includes('valeria') || pData.characterName?.toLowerCase().includes('cruz')) {
+            charId = 'valeria_cruz';
+          } else if (pData.characterName?.toLowerCase().includes('sergio') || pData.characterName?.toLowerCase().includes('prada')) {
+            charId = 'sergio_prada';
+          }
+
+          const hasFlashlight = pData.role === 'EXPLORADOR';
+          const flashlightAim = rAnim.facing === 'left' ? Math.PI : 0;
+
+          // Render high-fidelity animated survivor body matching unified scale (~88px)
+          this.renderSurvivorBody(
+            rAnim.x,
+            floorY,
+            rAnim.facing,
+            rAnim.animState,
+            'SANO',
+            charId,
+            hasFlashlight,
+            flashlightAim
+          );
+
+          // Tactical Multiplayer Nameplate above survivor
+          ctx.save();
+          ctx.font = 'bold 9px monospace';
+          ctx.textAlign = 'center';
+
+          // Background tag pill
+          const nameText = pData.displayName || pData.characterName || 'SUPERVIVIENTE';
+          const tagW = ctx.measureText(nameText).width + 12;
+          const tagX = rAnim.x - tagW / 2;
+          const tagY = floorY - 96;
+
+          ctx.fillStyle = 'rgba(2, 6, 23, 0.75)';
+          ctx.fillRect(tagX, tagY, tagW, 14);
+          ctx.strokeStyle = pData.role === 'OPERADOR' ? 'rgba(56, 189, 248, 0.5)' : 'rgba(245, 158, 11, 0.5)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(tagX, tagY, tagW, 14);
+
+          // Nameplate label
+          ctx.fillStyle = pData.role === 'OPERADOR' ? '#38bdf8' : '#fbbf24';
+          ctx.fillText(nameText, rAnim.x, tagY + 10);
+          ctx.restore();
+        }
+      }
+    }
+
+    // 4. Render Manifested Entity if in current room
     if (state.entity.isManifested && state.entity.room === currentRoom.id) {
       const x = state.entity.x;
       const levitate = Math.sin(this.animTimer * 4) * 8;
-      const y = floorY - 18 + levitate;
+      const y = floorY - 24 + levitate;
       const animState = state.entity.animState || 'IDLE';
 
       ctx.save();
@@ -1983,35 +1732,35 @@ export class DarkProtocolCanvasEngine {
       // Deep Shadow floor portal
       ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
       ctx.beginPath();
-      ctx.ellipse(0, 18 - levitate, 28, 7, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 24 - levitate, 34, 8, 0, 0, Math.PI * 2);
       ctx.fill();
 
       // Pulsing Abyssal Core
       ctx.fillStyle = '#05010a';
       ctx.beginPath();
-      ctx.arc(0, -38, 26, 0, Math.PI * 2);
+      ctx.arc(0, -45, 30, 0, Math.PI * 2);
       ctx.fill();
 
       // Purple void nebula
       const corePulse = 0.5 + Math.sin(this.animTimer * 6) * 0.25;
       ctx.fillStyle = `rgba(147, 51, 234, ${corePulse})`;
       ctx.beginPath();
-      ctx.arc(0, -38, 18, 0, Math.PI * 2);
+      ctx.arc(0, -45, 22, 0, Math.PI * 2);
       ctx.fill();
 
-      // 6 Procedural Undulating Void Tendrils
+      // 6 Undulating Void Tendrils
       ctx.strokeStyle = '#05010a';
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 4.5;
       for (let t = 0; t < 6; t++) {
         const tAngle = (t / 6) * Math.PI * 2;
-        const wave = Math.sin(this.animTimer * 7 + t * 1.2) * 12;
+        const wave = Math.sin(this.animTimer * 7 + t * 1.2) * 14;
         ctx.beginPath();
-        ctx.moveTo(Math.cos(tAngle) * 18, -38 + Math.sin(tAngle) * 18);
+        ctx.moveTo(Math.cos(tAngle) * 22, -45 + Math.sin(tAngle) * 22);
         ctx.quadraticCurveTo(
-          Math.cos(tAngle) * 36 + wave,
-          -38 + Math.sin(tAngle) * 36 - wave,
-          Math.cos(tAngle) * 48 + wave * 1.5,
-          -38 + Math.sin(tAngle) * 48
+          Math.cos(tAngle) * 44 + wave,
+          -45 + Math.sin(tAngle) * 44 - wave,
+          Math.cos(tAngle) * 58 + wave * 1.5,
+          -45 + Math.sin(tAngle) * 58
         );
         ctx.stroke();
       }
@@ -2019,43 +1768,43 @@ export class DarkProtocolCanvasEngine {
       // Obsidian Horned Skull
       ctx.fillStyle = '#020005';
       ctx.beginPath();
-      ctx.moveTo(-12, -45);
-      ctx.lineTo(-18, -68); // Left horn
-      ctx.lineTo(-7, -55);
-      ctx.lineTo(0, -62);
-      ctx.lineTo(7, -55);
-      ctx.lineTo(18, -68); // Right horn
-      ctx.lineTo(12, -45);
+      ctx.moveTo(-15, -52);
+      ctx.lineTo(-22, -80);
+      ctx.lineTo(-9, -64);
+      ctx.lineTo(0, -72);
+      ctx.lineTo(9, -64);
+      ctx.lineTo(22, -80);
+      ctx.lineTo(15, -52);
       ctx.closePath();
       ctx.fill();
 
       // Glowing Crimson Eyes
       const eyeFlicker = 0.85 + Math.random() * 0.15;
       ctx.fillStyle = `rgba(239, 68, 68, ${eyeFlicker})`;
-      ctx.fillRect(-7, -46, 5, 3);
-      ctx.fillRect(2, -46, 5, 3);
+      ctx.fillRect(-9, -54, 6, 4);
+      ctx.fillRect(3, -54, 6, 4);
 
       // Violet distortion shockwave aura
       ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(0, -38, 36 + Math.sin(this.animTimer * 8) * 5, 0, Math.PI * 2);
+      ctx.arc(0, -45, 42 + Math.sin(this.animTimer * 8) * 6, 0, Math.PI * 2);
       ctx.stroke();
 
       // Attack lashing claws
       if (animState === 'ATTACK') {
         ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3.5;
         ctx.beginPath();
-        ctx.moveTo(15, -40);
-        ctx.lineTo(55, -48);
-        ctx.lineTo(75, -35);
+        ctx.moveTo(18, -48);
+        ctx.lineTo(65, -56);
+        ctx.lineTo(88, -42);
         ctx.stroke();
 
         ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.arc(35, -40, 25, -0.6, 0.6);
+        ctx.arc(42, -48, 30, -0.6, 0.6);
         ctx.stroke();
       }
 

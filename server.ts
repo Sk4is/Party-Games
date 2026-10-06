@@ -37,7 +37,9 @@ try {
 }
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const portArgIdx = process.argv.indexOf('--port');
+const portFromArg = portArgIdx !== -1 && process.argv[portArgIdx + 1] ? Number(process.argv[portArgIdx + 1]) : null;
+const PORT = portFromArg || Number(process.env.PORT) || 3000;
 
 // ============================================================================
 // CORS & ALLOWED ORIGINS CONFIGURATION (SPLIT RENDER DEPLOYMENT)

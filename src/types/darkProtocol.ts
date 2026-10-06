@@ -307,6 +307,7 @@ export interface DarkProtocolGameState {
     x: number;
     facing: 'left' | 'right';
     activeStation: 'cctv' | 'electric' | 'map' | 'comms' | null;
+    animState?: CharacterAnimState;
   };
 
   entity: {

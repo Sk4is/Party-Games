@@ -86,7 +86,7 @@ export function createInitialGameState(characterId: string = 'mara_velasco'): Da
 
     explorer: {
       room: 'control_room',
-      x: 350,
+      x: 500,
       facing: 'right',
       health: 'SANO',
       flashlightOn: true,
@@ -101,9 +101,10 @@ export function createInitialGameState(characterId: string = 'mara_velasco'): Da
 
     operator: {
       room: 'control_room',
-      x: 620,
+      x: 800,
       facing: 'right',
       activeStation: null,
+      animState: 'IDLE',
     },
 
     entity: {

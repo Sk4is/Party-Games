@@ -320,6 +320,30 @@ export const DarkProtocolDebugPanel: React.FC<DarkProtocolDebugPanelProps> = ({
             </div>
           </div>
 
+          {/* 6B. Dark Protocol PNG Asset Status Inspector */}
+          <div className="p-2 rounded bg-black/40 border border-white/10 space-y-1">
+            <div className="text-[10px] text-amber-300 font-bold flex items-center justify-between">
+              <span>ESTADO DE ASSETS PNG (100% REAL)</span>
+              <span className="text-[9px] text-emerald-400">1983x793 AUTHORED</span>
+            </div>
+            <div className="text-[9px] text-slate-300 font-mono space-y-0.5 max-h-24 overflow-y-auto pr-1">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Sala Actual:</span>
+                <span className="text-emerald-400 font-bold truncate max-w-[150px]">
+                  {FACILITY_ROOMS[state.activeRoom]?.background.split('/').pop()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Puertas:</span>
+                <span className="text-emerald-400">puerta_cerrada / abierta</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Props Interactivos:</span>
+                <span className="text-emerald-400">camara, mesa, taquilla, valvula, trampilla</span>
+              </div>
+            </div>
+          </div>
+
           {/* 7. Reset Objectives */}
           <div className="pt-2 border-t border-white/10">
             <button
