@@ -16,7 +16,8 @@ export type DoorState =
   | 'CLOSING'
   | 'LOCKED'
   | 'UNPOWERED'
-  | 'JAMMED';
+  | 'JAMMED'
+  | 'AJAR';
 
 export type CameraState =
   | 'ONLINE'

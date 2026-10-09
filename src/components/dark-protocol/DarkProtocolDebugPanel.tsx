@@ -317,6 +317,20 @@ export const DarkProtocolDebugPanel: React.FC<DarkProtocolDebugPanelProps> = ({
                 />
                 <span>Radios de Luz</span>
               </label>
+              <label className="flex items-center gap-1.5 text-[10px] cursor-pointer text-cyan-300 font-bold">
+                <input
+                  type="checkbox"
+                  checked={Boolean(debugOptions.showAuthoringOverlay)}
+                  onChange={(e) =>
+                    onUpdateDebugOptions((prev) => ({
+                      ...prev,
+                      showAuthoringOverlay: e.target.checked,
+                    }))
+                  }
+                  className="rounded"
+                />
+                <span>Modo Autor (F8)</span>
+              </label>
             </div>
           </div>
 

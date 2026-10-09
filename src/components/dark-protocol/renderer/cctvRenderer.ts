@@ -9,8 +9,11 @@ import {
   FACILITY_LIGHTS,
   FACILITY_INTERACTABLES,
   HIDING_SPOTS,
+  SOURCE_ROOM_WIDTH,
+  SOURCE_ROOM_HEIGHT,
 } from '../../../data/darkProtocol/facilityMap';
 import { getCharacterById } from '../../../data/darkProtocol/characters';
+import { darkProtocolAssets } from '../../../utils/darkProtocolAssetManager';
 
 /**
  * Authentic live CCTV renderer.
@@ -83,7 +86,7 @@ export function renderLiveCctvFeed(
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 
-  const scale = h / 600;
+  const scale = h / SOURCE_ROOM_HEIGHT;
   ctx.scale(scale, scale);
 
   const viewWidthInRoom = w / scale;
@@ -91,23 +94,18 @@ export function renderLiveCctvFeed(
   camOffset = Math.max(0, Math.min(camOffset, room.width - viewWidthInRoom));
   ctx.translate(-camOffset, 0);
 
-  // Background Wall
-  ctx.fillStyle = isPowered ? '#080d17' : '#030508';
-  ctx.fillRect(0, 0, room.width, 600);
-
-  // Wall structural ribs
-  ctx.strokeStyle = isPowered ? '#111a2c' : '#060a12';
-  ctx.lineWidth = 2;
-  for (let x = 0; x < room.width; x += 100) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, room.floorY);
-    ctx.stroke();
+  // Background Wall / Real Authored Room PNG
+  const bgImg = darkProtocolAssets.getImage(room.background);
+  if (bgImg) {
+    ctx.drawImage(bgImg, 0, 0, room.width, SOURCE_ROOM_HEIGHT);
+  } else {
+    ctx.fillStyle = isPowered ? '#080d17' : '#030508';
+    ctx.fillRect(0, 0, room.width, SOURCE_ROOM_HEIGHT);
   }
 
-  // Floor
+  // Floor extension
   ctx.fillStyle = isPowered ? '#1a2233' : '#0b0f17';
-  ctx.fillRect(0, room.floorY, room.width, 600 - room.floorY);
+  ctx.fillRect(0, room.floorY, room.width, SOURCE_ROOM_HEIGHT - room.floorY);
   ctx.fillStyle = isPowered ? '#9a3412' : '#3f1a07';
   ctx.fillRect(0, room.floorY - 5, room.width, 5);
 

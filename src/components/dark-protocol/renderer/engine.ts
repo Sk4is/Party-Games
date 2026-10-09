@@ -15,15 +15,22 @@ import {
   HealthState,
 } from '../../../types/darkProtocol';
 import {
+  SOURCE_ROOM_WIDTH,
+  SOURCE_ROOM_HEIGHT,
+  ROOM_COMPOSITIONS,
   FACILITY_ROOMS,
   FACILITY_LIGHTS,
   FACILITY_INTERACTABLES,
   HIDING_SPOTS,
   FACILITY_PROPS,
+  roomToWorldX,
+  roomToWorldY,
+  worldToRoomNormX,
+  worldToRoomNormY,
 } from '../../../data/darkProtocol/facilityMap';
 import { getCharacterById } from '../../../data/darkProtocol/characters';
 import { darkProtocolAudio } from '../../../utils/darkProtocolAudio';
-import { darkProtocolAssets } from '../../../utils/darkProtocolAssetManager';
+import { darkProtocolAssets, DARK_PROTOCOL_ASSETS } from '../../../utils/darkProtocolAssetManager';
 
 export const ROOM_BACKGROUND_MAP: Record<string, string> = {
   control_room: '/assets/dark-protocol/sala1.png',
@@ -67,6 +74,7 @@ export interface RendererDebugOptions {
   showCameraFOV: boolean;
   showLightBounds: boolean;
   showCollisionBounds: boolean;
+  showAuthoringOverlay?: boolean;
 }
 
 export interface Particle {
@@ -103,24 +111,33 @@ export class DarkProtocolCanvasEngine {
   private animFrameId: number | null = null;
   private lastTime: number = 0;
 
-  // Camera & Viewport
+  // Camera & Viewport Scaling (Contain-by-height, ZERO vertical cropping)
   public cameraX: number = 0;
   private targetCameraX: number = 0;
   public viewportWidth: number = 1200;
   public viewportHeight: number = 600;
+  public roomScale: number = 1.0;
+  public roomOffsetY: number = 44;
 
-  // Input
-  private keys: Record<string, boolean> = {};
+  // Single Room Coordinate Tracking
   public mouseX: number = 0;
   public mouseY: number = 0;
   public worldMouseX: number = 0;
   public worldMouseY: number = 0;
+  public normMouseX: number = 0;
+  public normMouseY: number = 0;
+
+  // Input
+  private keys: Record<string, boolean> = {};
 
   // Physics & Animation
   private playerVx: number = 0;
   private animTimer: number = 0;
   private footstepTimer: number = 0;
   private transitionCooldownTimer: number = 0;
+
+  // Animated door progression: 0 = closed, 0.5 = partial, 1.0 = fully open
+  private doorAnimProgress: Record<string, number> = {};
 
   // Ambient simulation
   private particles: Particle[] = [];
@@ -159,6 +176,7 @@ export class DarkProtocolCanvasEngine {
     showCameraFOV: false,
     showLightBounds: false,
     showCollisionBounds: false,
+    showAuthoringOverlay: false,
   };
 
   constructor(
@@ -191,8 +209,9 @@ export class DarkProtocolCanvasEngine {
   }
 
   /**
-   * CRITICAL BUG FIX: Viewport Resizing
-   * Fills 100% of available screen without black vertical gaps.
+   * REQUIREMENT 2: NEVER CROP THE BOTTOM OF THE ROOM
+   * Calculate room scale using available gameplay height between top HUD and bottom HUD.
+   * Contain-by-height world scaling preserves the complete vertical authored room PNG.
    */
   public handleResize() {
     if (!this.canvas) return;
@@ -208,20 +227,28 @@ export class DarkProtocolCanvasEngine {
     this.lightCanvas.width = this.viewportWidth;
     this.lightCanvas.height = this.viewportHeight;
 
+    // Available gameplay height between top HUD (~46px) and bottom HUD (~52px)
+    const topHUDHeight = 44;
+    const bottomHUDHeight = 48;
+    const availableHeight = Math.max(320, this.viewportHeight - topHUDHeight - bottomHUDHeight);
+
+    this.roomScale = availableHeight / SOURCE_ROOM_HEIGHT;
+    this.roomOffsetY = topHUDHeight;
+
     this.ctx.imageSmoothingEnabled = false;
     this.lightCtx.imageSmoothingEnabled = true;
   }
 
   private initDustParticles() {
     this.particles = [];
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 45; i++) {
       this.particles.push({
-        x: Math.random() * 2000 - 300,
-        y: Math.random() * 520,
-        vx: (Math.random() - 0.5) * 12,
-        vy: -4 - Math.random() * 10,
+        x: Math.random() * SOURCE_ROOM_WIDTH,
+        y: Math.random() * 600,
+        vx: (Math.random() - 0.5) * 10,
+        vy: -3 - Math.random() * 8,
         size: 1.5 + Math.random() * 1.5,
-        alpha: 0.12 + Math.random() * 0.25,
+        alpha: 0.12 + Math.random() * 0.2,
         maxLife: 6 + Math.random() * 6,
         life: Math.random() * 5,
         color: '#94a3b8',
@@ -252,6 +279,13 @@ export class DarkProtocolCanvasEngine {
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
+    // F8: Room Authoring Debug Mode Toggle
+    if (e.key === 'F8') {
+      e.preventDefault();
+      this.debugOptions.showAuthoringOverlay = !this.debugOptions.showAuthoringOverlay;
+      return;
+    }
+
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
       e.preventDefault();
     }
@@ -259,7 +293,7 @@ export class DarkProtocolCanvasEngine {
     const state = this.getState();
     const canMove = state.inputContext === 'WORLD' || state.inputContext === 'INFORMATIONAL';
 
-    // Strictly disable physical world inputs when any machine/terminal modal is open
+    // REQUIREMENT 26: Physical modal locks movement
     if (!canMove) {
       return;
     }
@@ -295,30 +329,46 @@ export class DarkProtocolCanvasEngine {
     this.keys[e.key.toLowerCase()] = false;
   };
 
+  /**
+   * REQUIREMENT 16: FLASHLIGHT MUST FOLLOW THE MOUSE
+   * Converts screen mouse coordinates through canvas room scale and camera transform
+   * to true world coordinates. Continuously updates flashlight aim in real time.
+   */
   private handleMouseMove = (e: MouseEvent) => {
     const rect = this.canvas.getBoundingClientRect();
     this.mouseX = e.clientX - rect.left;
     this.mouseY = e.clientY - rect.top;
-    this.worldMouseX = this.mouseX + this.cameraX;
-    this.worldMouseY = this.mouseY;
 
-    // Flashlight direction follows mouse only when movement/world input is allowed
+    // Convert screen coordinates to world source coordinates (0..1983, 0..793)
+    this.worldMouseX = (this.mouseX / this.roomScale) + this.cameraX;
+    this.worldMouseY = (this.mouseY - this.roomOffsetY) / this.roomScale;
+
+    // Normalized room coordinates (0.0 .. 1.0) for authoring & alignment
+    this.normMouseX = worldToRoomNormX(this.worldMouseX);
+    this.normMouseY = worldToRoomNormY(this.worldMouseY);
+
     const state = this.getState();
     const canAim = state.inputContext === 'WORLD' || state.inputContext === 'INFORMATIONAL';
 
     if (canAim && state.activeRole === 'EXPLORADOR') {
-      const charX = state.explorer.x;
-      const charY = 440;
-      const dx = this.worldMouseX - charX;
-      const dy = this.worldMouseY - charY;
+      const room = FACILITY_ROOMS[state.explorer.room] || FACILITY_ROOMS.control_room;
+      // Character hand origin: anchored relative to floorY
+      const handX = state.explorer.x + (state.explorer.facing === 'right' ? 8 : -8);
+      const handY = room.floorY - 78;
+
+      const dx = this.worldMouseX - handX;
+      const dy = this.worldMouseY - handY;
       const angle = Math.atan2(dy, dx);
+
+      // Facing naturally follows pointer aim
+      const newFacing = dx >= 0 ? 'right' : 'left';
 
       this.updateState((prev) => ({
         ...prev,
         explorer: {
           ...prev.explorer,
           flashlightAngle: angle,
-          facing: dx >= 0 ? 'right' : 'left',
+          facing: newFacing,
         },
       }));
     }
@@ -395,7 +445,7 @@ export class DarkProtocolCanvasEngine {
     this.lastTime = currentTime;
 
     this.update(dt);
-    this.render();
+    this.render(dt);
 
     this.animFrameId = requestAnimationFrame(this.loop);
   };
@@ -472,14 +522,13 @@ export class DarkProtocolCanvasEngine {
       const isNowPowered = circuit.powered;
       const wasPowered = this.prevSectorPowered[sector] ?? true;
       if (wasPowered && !isNowPowered) {
-        // Start 1.8s physical failure breakdown sequence!
         this.sabotageTimers[sector] = 1.8;
         darkProtocolAudio.playLightBuzz();
       }
       this.prevSectorPowered[sector] = isNowPowered;
     }
 
-    // Advance sabotage failure timers and trigger synchronized sound hooks
+    // Advance sabotage failure timers
     for (const sector of Object.keys(this.sabotageTimers)) {
       if (this.sabotageTimers[sector] > 0) {
         const prevT = this.sabotageTimers[sector];
@@ -510,7 +559,6 @@ export class DarkProtocolCanvasEngine {
       characterX = state.explorer.x;
 
       if (!canMove) {
-        // Strictly frozen at machine when physical modal is open
         this.playerVx = 0;
         if (state.explorer.animState !== 'WORKING') {
           this.updateState((prev) => ({
@@ -523,13 +571,12 @@ export class DarkProtocolCanvasEngine {
         const right = this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight'];
         isRunning = Boolean(this.keys['ShiftLeft'] || this.keys['ShiftRight']);
 
-        // Character trait speed modifier
         const charData = getCharacterById(state.selectedCharacterId);
-        const speedMult = charData.stats.speed / 75; // Baseline normalized
+        const speedMult = charData.stats.speed / 75;
 
-        const speed = (isRunning ? 230 : 140) * speedMult;
-        const accel = 1300;
-        const friction = 950;
+        const speed = (isRunning ? 240 : 150) * speedMult;
+        const accel = 1400;
+        const friction = 1000;
 
         if (left && !right) {
           this.playerVx = Math.max(this.playerVx - accel * dt, -speed);
@@ -546,19 +593,24 @@ export class DarkProtocolCanvasEngine {
         }
 
         characterX += this.playerVx * dt;
-        characterX = Math.max(45, Math.min(characterX, currentRoom.width - 45));
+        // REQUIREMENT 30: Constrain character to room walkable boundaries
+        characterX = Math.max(60, Math.min(characterX, SOURCE_ROOM_WIDTH - 60));
 
-        // Footstep audio cadence
         if (isMoving && Math.abs(this.playerVx) > 30) {
           this.footstepTimer += dt;
-          const stepCadence = isRunning ? 0.26 : 0.40;
+          const stepCadence = isRunning ? 0.25 : 0.38;
           if (this.footstepTimer >= stepCadence) {
             this.footstepTimer = 0;
             darkProtocolAudio.playFootstep(isRunning);
           }
         }
 
-        const facing = this.playerVx < -5 ? 'left' : this.playerVx > 5 ? 'right' : state.explorer.facing;
+        // When not aiming with mouse, face moving direction
+        let facing = state.explorer.facing;
+        if (Math.abs(this.playerVx) > 10 && !this.keys['KeyF']) {
+          facing = this.playerVx < 0 ? 'left' : 'right';
+        }
+
         const currentAnim = isMoving
           ? isRunning
             ? state.explorer.flashlightOn
@@ -588,7 +640,7 @@ export class DarkProtocolCanvasEngine {
       } else {
         const left = this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft'];
         const right = this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight'];
-        const speed = 130;
+        const speed = 140;
 
         if (left && !right) {
           this.playerVx = -speed;
@@ -601,11 +653,11 @@ export class DarkProtocolCanvasEngine {
         }
 
         characterX += this.playerVx * dt;
-        characterX = Math.max(60, Math.min(characterX, currentRoom.width - 60));
+        characterX = Math.max(60, Math.min(characterX, SOURCE_ROOM_WIDTH - 60));
 
         if (isMoving) {
           this.footstepTimer += dt;
-          if (this.footstepTimer >= 0.45) {
+          if (this.footstepTimer >= 0.42) {
             this.footstepTimer = 0;
             darkProtocolAudio.playFootstep(false);
           }
@@ -626,7 +678,7 @@ export class DarkProtocolCanvasEngine {
       characterX = state.entity.x;
       const left = this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft'];
       const right = this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight'];
-      const speed = 200;
+      const speed = 210;
 
       if (left && !right) {
         this.playerVx = -speed;
@@ -639,7 +691,7 @@ export class DarkProtocolCanvasEngine {
       }
 
       characterX += this.playerVx * dt;
-      characterX = Math.max(50, Math.min(characterX, currentRoom.width - 50));
+      characterX = Math.max(60, Math.min(characterX, SOURCE_ROOM_WIDTH - 60));
 
       const facing = this.playerVx < 0 ? 'left' : this.playerVx > 0 ? 'right' : state.entity.facing;
       const entityAnim = isMoving ? 'MOVE' : 'IDLE';
@@ -655,9 +707,7 @@ export class DarkProtocolCanvasEngine {
       }));
     }
 
-    // 2. CRITICAL BUG FIX: Smooth Camera Framing & Clamping
-    // When room width < viewport width, center the room!
-    // When room width > viewport width, smoothly track character!
+    // 2. SMOOTH CAMERA TRACKING WITH WORLD SCALING
     const targetCharX =
       activeRole === 'EXPLORADOR'
         ? state.explorer.x
@@ -665,15 +715,17 @@ export class DarkProtocolCanvasEngine {
         ? state.operator.x
         : state.entity.isManifested
         ? state.entity.x
-        : currentRoom.width / 2;
+        : SOURCE_ROOM_WIDTH / 2;
 
-    if (this.viewportWidth >= currentRoom.width) {
-      // Room is narrower than viewport -> Center the room perfectly!
-      this.targetCameraX = -Math.floor((this.viewportWidth - currentRoom.width) / 2);
+    const viewSourceW = this.viewportWidth / this.roomScale;
+
+    if (viewSourceW >= SOURCE_ROOM_WIDTH) {
+      // Room fits inside viewport -> center room
+      this.targetCameraX = -(viewSourceW - SOURCE_ROOM_WIDTH) / 2;
     } else {
-      // Room is wider than viewport -> Horizontal camera tracking clamped to room boundaries
-      this.targetCameraX = targetCharX - this.viewportWidth / 2;
-      const maxCameraX = currentRoom.width - this.viewportWidth;
+      // Horizontal camera panning clamped to source room edges
+      this.targetCameraX = targetCharX - viewSourceW / 2;
+      const maxCameraX = SOURCE_ROOM_WIDTH - viewSourceW;
       this.targetCameraX = Math.max(0, Math.min(this.targetCameraX, maxCameraX));
     }
 
@@ -733,28 +785,25 @@ export class DarkProtocolCanvasEngine {
     // 5. Update Ambient Particles
     this.updateParticles(dt, currentRoom);
 
-    // 6. Closest Interactable Targeting (No Flickering!)
+    // 6. Closest Interactable Targeting
     this.checkInteractionPrompt(characterX, currentRoom.id);
   }
 
   private updateParticles(dt: number, room: RoomZone) {
-    const leftBound = Math.min(0, this.cameraX - 100);
-    const rightBound = Math.max(room.width, this.cameraX + this.viewportWidth + 100);
-
     for (const p of this.particles) {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.life += dt;
 
-      if (p.x < leftBound) p.x = rightBound;
-      if (p.x > rightBound) p.x = leftBound;
-      if (p.y < 0) p.y = 520;
-      if (p.y > 520) p.y = 0;
+      if (p.x < 0) p.x = SOURCE_ROOM_WIDTH;
+      if (p.x > SOURCE_ROOM_WIDTH) p.x = 0;
+      if (p.y < 0) p.y = 560;
+      if (p.y > 560) p.y = 0;
 
       if (p.life >= p.maxLife) {
         p.life = 0;
-        p.x = leftBound + Math.random() * (rightBound - leftBound);
-        p.y = 100 + Math.random() * 380;
+        p.x = Math.random() * SOURCE_ROOM_WIDTH;
+        p.y = 100 + Math.random() * 420;
       }
     }
 
@@ -766,7 +815,7 @@ export class DarkProtocolCanvasEngine {
         darkProtocolAudio.playElectricSpark();
         for (let i = 0; i < 8; i++) {
           this.particles.push({
-            x: 250,
+            x: 380,
             y: 280,
             vx: (Math.random() - 0.5) * 120,
             vy: -40 - Math.random() * 80,
@@ -784,7 +833,7 @@ export class DarkProtocolCanvasEngine {
 
   /**
    * Targets the single closest valid interactable.
-   * Emits precise screen coordinates for minimal contextual HUD badge.
+   * Emits precise screen coordinates for contextual HUD prompt.
    */
   private checkInteractionPrompt(charX: number, roomId: string) {
     const state = this.getState();
@@ -795,15 +844,17 @@ export class DarkProtocolCanvasEngine {
       return;
     }
 
+    const room = FACILITY_ROOMS[roomId] || FACILITY_ROOMS.control_room;
+
     if (state.explorer.isHiding) {
-      const screenX = charX - this.cameraX;
-      const screenY = 380;
+      const screenX = (charX - this.cameraX) * this.roomScale;
+      const screenY = this.roomOffsetY + (room.floorY - 90) * this.roomScale;
       this.onInteractPrompt({
         id: 'exit_hide',
         name: 'ESCONDITE',
         actionText: `SALIR (${Math.ceil(state.explorer.hideTimeRemaining)}s)`,
         worldX: charX,
-        worldY: 440,
+        worldY: room.floorY - 90,
         screenX,
         screenY,
         type: 'exit_hide',
@@ -812,22 +863,22 @@ export class DarkProtocolCanvasEngine {
     }
 
     let closestTarget: InteractionPromptTarget | null = null;
-    let minDistance = 75; // Proximity threshold
+    let minDistance = 85;
 
-    // 1. Check Doors
+    // 1. Check Traversal Doors
     for (const door of Object.values(state.doors)) {
       if (door.fromRoom === roomId) {
         const dist = Math.abs(charX - door.fromX);
-        if (dist <= 60 && dist < minDistance) {
+        if (dist <= 75 && dist < minDistance) {
           minDistance = dist;
-          const screenX = door.fromX - this.cameraX;
-          const screenY = 360;
+          const screenX = (door.fromX - this.cameraX) * this.roomScale;
+          const screenY = this.roomOffsetY + (room.floorY - 140) * this.roomScale;
           closestTarget = {
             id: door.id,
             name: door.name,
             actionText: door.lockedByEntity ? 'BLOQUEADA' : 'ENTRAR',
             worldX: door.fromX,
-            worldY: 360,
+            worldY: room.floorY - 140,
             screenX,
             screenY,
             type: 'door',
@@ -840,10 +891,10 @@ export class DarkProtocolCanvasEngine {
     for (const spot of HIDING_SPOTS) {
       if (spot.room === roomId) {
         const dist = Math.abs(charX - spot.x);
-        if (dist <= 65 && dist < minDistance) {
+        if (dist <= 80 && dist < minDistance) {
           minDistance = dist;
-          const screenX = spot.x - this.cameraX;
-          const screenY = spot.y - 20;
+          const screenX = (spot.x - this.cameraX) * this.roomScale;
+          const screenY = this.roomOffsetY + (spot.y - 40) * this.roomScale;
 
           if (activeRole === 'ENTE' && state.entity.isManifested) {
             closestTarget = {
@@ -874,16 +925,16 @@ export class DarkProtocolCanvasEngine {
       }
     }
 
-    // 3. Check Interactable Objects
+    // 3. Check Interactable Objects / Machines
     for (const obj of FACILITY_INTERACTABLES) {
       if (obj.room === roomId) {
         const dist = Math.abs(charX - obj.x);
         if (dist <= obj.radius && dist < minDistance) {
           minDistance = dist;
-          const screenX = obj.x - this.cameraX;
-          const screenY = obj.y - 35;
+          const screenX = (obj.x - this.cameraX) * this.roomScale;
+          const screenY = this.roomOffsetY + (obj.y - 40) * this.roomScale;
 
-          let actionVerb = 'USAR';
+          let actionVerb = 'INTERACTUAR';
           if (obj.id === 'electrical_main_panel') {
             actionVerb = state.electricalPuzzleSolved ? 'CIRCUITO OK' : 'REPARAR CIRCUITO';
           } else if (obj.id === 'lab_pressure_valves') {
@@ -951,7 +1002,7 @@ export class DarkProtocolCanvasEngine {
 
     // B. Check Doors with bidirectional safe spawn
     for (const door of Object.values(state.doors)) {
-      if (door.fromRoom === currentRoom && Math.abs(charX - door.fromX) <= 65) {
+      if (door.fromRoom === currentRoom && Math.abs(charX - door.fromX) <= 75) {
         if (door.lockedByEntity) {
           darkProtocolAudio.playMinigameFail();
           return { actionType: 'door_locked', targetId: door.id };
@@ -959,7 +1010,7 @@ export class DarkProtocolCanvasEngine {
 
         // Traversed door!
         darkProtocolAudio.playDoorSlide();
-        this.transitionCooldownTimer = 0.6; // 0.6s cooldown eliminates instant bounce
+        this.transitionCooldownTimer = 0.6;
         this.onRoomChange(door.toRoom, door.spawnX, door.spawnFacing);
         return { actionType: 'door_enter', targetId: door.toRoom };
       }
@@ -967,7 +1018,7 @@ export class DarkProtocolCanvasEngine {
 
     // C. Check Hiding Spots
     for (const spot of HIDING_SPOTS) {
-      if (spot.room === currentRoom && Math.abs(charX - spot.x) <= 65) {
+      if (spot.room === currentRoom && Math.abs(charX - spot.x) <= 80) {
         if (activeRole === 'ENTE' && state.entity.isManifested) {
           this.entitySearchHidingSpot(spot);
           return { actionType: 'entity_search', targetId: spot.id };
@@ -1079,19 +1130,20 @@ export class DarkProtocolCanvasEngine {
   }
 
   // =========================================================================
-  // RENDERING PIPELINE (2-PASS COMPOSITING WITH DYNAMIC LIGHTING)
+  // RENDERING PIPELINE (2-PASS COMPOSITING WITH AUTHORED ROOM COMPOSITION)
   // =========================================================================
-  private render() {
+  private render(dt: number) {
     const state = this.getState();
     const room = FACILITY_ROOMS[state.activeRoom] || FACILITY_ROOMS.control_room;
     const isSectorPowered = Boolean(state.circuits[room.sector]?.powered);
 
+    // Pass 1: World Scene (Authored Background -> Doors -> Props -> Characters -> Particles)
     this.ctx.save();
-    this.ctx.translate(-Math.floor(this.cameraX), 0);
+    this.ctx.translate(-Math.floor(this.cameraX * this.roomScale), Math.floor(this.roomOffsetY));
+    this.ctx.scale(this.roomScale, this.roomScale);
 
-    // Pass 1: World Scene (Authored Background Artwork -> Doors & Props -> Characters -> Particles)
     this.renderRoomBackground(room, isSectorPowered);
-    this.renderDoors(room, state);
+    this.renderDoors(room, state, dt);
     this.renderHidingSpots(room);
     this.renderMachinesAndInteractables(room, isSectorPowered);
     this.renderCharacters(state, room);
@@ -1108,35 +1160,44 @@ export class DarkProtocolCanvasEngine {
     this.ctx.drawImage(this.lightCanvas, 0, 0);
     this.ctx.restore();
 
-    // Pass 4: Bloom Halos & Lens Flare
-    this.renderLightBloom(state, room, isSectorPowered);
-
-    // Pass 5: Cameras & Debug Visuals
+    // Pass 4: Atmospheric Light Bloom (NO floating dots) & CCTV / Debug Visuals
     this.ctx.save();
-    this.ctx.translate(-Math.floor(this.cameraX), 0);
+    this.ctx.translate(-Math.floor(this.cameraX * this.roomScale), Math.floor(this.roomOffsetY));
+    this.ctx.scale(this.roomScale, this.roomScale);
+
+    this.renderLightBloom(state, room, isSectorPowered);
     this.renderCameras(room, state);
+
     if (
+      this.debugOptions.showAuthoringOverlay ||
       this.debugOptions.showInteractionZones ||
       this.debugOptions.showCameraFOV ||
-      this.debugOptions.showLightBounds
+      this.debugOptions.showLightBounds ||
+      this.debugOptions.showCollisionBounds
     ) {
       this.renderDebugVisuals(room, state);
     }
+
     this.ctx.restore();
 
-    // Vignette & Subtle CRT Scanlines
+    // Vignette & CRT Scanlines
     this.renderVignette();
+
+    // F8 Authoring Overlay (Screen-space OSD)
+    if (this.debugOptions.showAuthoringOverlay) {
+      this.renderAuthoringOsd(room);
+    }
   }
 
   /**
-   * AUTHORED ROOM BACKGROUND RENDERING:
-   * Renders the true authored room PNG (sala1.png - sala10.png) at exactly (0, 0, 1983, 793).
-   * Extends the floor seamlessly past room borders so widescreen monitors never show empty voids.
+   * REQUIREMENT 1 & 2: THE BACKGROUND PNG DEFINES THE ROOM
+   * Renders the true authored room PNG at exactly (0, 0, 1983, 793).
+   * Extends floor seamlessly so widescreen displays never show void borders.
    */
   private renderRoomBackground(room: RoomZone, isPowered: boolean) {
     const ctx = this.ctx;
-    const w = room.width;
-    const h = room.height;
+    const w = SOURCE_ROOM_WIDTH;
+    const h = SOURCE_ROOM_HEIGHT;
 
     const failureState = this.getSectorFailureFactor(room.sector);
     const effectivePowered = isPowered && (!failureState.inFailureSequence || failureState.strobe > 0.35);
@@ -1146,16 +1207,15 @@ export class DarkProtocolCanvasEngine {
     if (bgImg) {
       ctx.drawImage(bgImg, 0, 0, w, h);
     } else {
-      // High-contrast industrial base if loading
       ctx.fillStyle = effectivePowered ? '#0b111e' : '#030508';
       ctx.fillRect(0, 0, w, h);
     }
 
-    // 2. Seamless floor extension outside [0, w]
+    // 2. Seamless floor extension outside [0, w] for widescreen margins
     const extLeft = -2500;
     const extRight = w + 2500;
     const floorY = room.floorY;
-    const floorH = Math.max(h - floorY, this.viewportHeight - floorY);
+    const floorH = h - floorY;
 
     // Dark void for outer walls
     ctx.fillStyle = '#020408';
@@ -1169,120 +1229,53 @@ export class DarkProtocolCanvasEngine {
 
     // Hazard stripe continuation
     ctx.fillStyle = effectivePowered ? '#92400e' : '#451a03';
-    ctx.fillRect(extLeft, floorY - 6, -extLeft, 6);
-    ctx.fillRect(w, floorY - 6, extRight - w, 6);
+    ctx.fillRect(extLeft, floorY - 4, -extLeft, 4);
+    ctx.fillRect(w, floorY - 4, extRight - w, 4);
   }
 
   /**
-   * INTERACTIVE PROPS & AUTHORED OBJECTS:
-   * Renders the supplied PNG props (camara.png, mesa.png, taquilla.png, valvula.png, trampilla.png, salida_evacuacion.png)
-   * along with gameplay status cues (LEDs, code displays).
+   * REQUIREMENT 6, 7, 8, 9: EXACTLY TWO TRAVERSAL DOORS PER ROOM + SALA 10 ESCAPE GATE
+   * Overlays puerta_cerrada.png, puerta_entreabierta.png, and puerta_abierta.png
+   * EXACTLY over the painted doorways in the artwork.
+   * Smooth state transitions: cerrada -> entreabierta -> abierta.
    */
-  private renderMachinesAndInteractables(room: RoomZone, isPowered: boolean) {
-    const ctx = this.ctx;
-
-    // Render props configured for this room in FACILITY_PROPS
-    for (const prop of FACILITY_PROPS) {
-      if (prop.room === room.id) {
-        // If it's a camera, skip here since renderCameras draws it or handles it
-        if (prop.type === 'camera') continue;
-        // If it's a door/locker/table/vent, draw the real authored PNG
-        const img = darkProtocolAssets.getImage(prop.asset);
-        if (img) {
-          const naturalW = img.naturalWidth || 800;
-          const naturalH = img.naturalHeight || 800;
-          const drawW = naturalW * prop.scale;
-          const drawH = naturalH * prop.scale;
-          const drawX = prop.x - drawW * prop.anchorX;
-          const drawY = prop.y - drawH * prop.anchorY;
-
-          ctx.save();
-          if (prop.flipX) {
-            ctx.translate(prop.x, 0);
-            ctx.scale(-1, 1);
-            ctx.drawImage(img, -drawW * prop.anchorX, drawY, drawW, drawH);
-          } else {
-            ctx.drawImage(img, drawX, drawY, drawW, drawH);
-          }
-          ctx.restore();
-        }
-      }
-    }
-
-    // Dynamic UI overlays for interactive machines (e.g. code displays, LEDs)
-    const floorY = room.floorY;
-
-    if (room.id === 'evacuation') {
-      // Armored Keypad LCD status
-      ctx.fillStyle = '#020617';
-      ctx.fillRect(1175, 595, 50, 22);
-      ctx.fillStyle = this.getState().coopSolved ? '#22c55e' : '#f59e0b';
-      ctx.font = 'bold 11px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(this.getState().coopSolved ? 'OK' : '****', 1200, 611);
-
-      // Warning beacon above evacuation blast gate
-      const beaconOn = Math.floor(this.animTimer * 4) % 2 === 0;
-      ctx.fillStyle = beaconOn ? '#ef4444' : '#7f1d1d';
-      ctx.beginPath();
-      ctx.arc(1550, 480, 10, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (room.id === 'control_room') {
-      // Diagnostic LED cluster above console
-      const sectors = [
-        { label: 'A', powered: Boolean(this.getState().circuits['sector_a']?.powered), x: 770 },
-        { label: 'B', powered: Boolean(this.getState().circuits['sector_b']?.powered), x: 800 },
-        { label: 'C', powered: Boolean(this.getState().circuits['sector_c']?.powered), x: 830 },
-      ];
-      for (const s of sectors) {
-        ctx.fillStyle = s.powered ? '#10b981' : '#ef4444';
-        ctx.beginPath();
-        ctx.arc(s.x, floorY - 95, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-
-  private renderHidingSpots(_room: RoomZone) {
-    // Hiding spots are authored into the room artwork or rendered via FACILITY_PROPS (mesa, taquilla, trampilla).
-    // No procedural rectangular placeholders needed.
-  }
-
-  /**
-   * AUTHORED DOOR RENDERING:
-   * Uses puerta_cerrada.png, puerta_entreabierta.png, and puerta_abierta.png.
-   * Positioned cleanly on the authored floor line.
-   */
-  private renderDoors(room: RoomZone, state: DarkProtocolGameState) {
+  private renderDoors(room: RoomZone, state: DarkProtocolGameState, dt: number) {
     const ctx = this.ctx;
     const floorY = room.floorY;
+    const comp = ROOM_COMPOSITIONS[room.id];
+
+    // Standard Door Dimensions matching painted doorway openings
+    const doorW = 154;
+    const doorH = 236;
 
     for (const door of Object.values(state.doors)) {
       if (door.fromRoom === room.id) {
         const x = door.fromX;
         const isPowered = !door.requiresPower || (door.circuitId && state.circuits[door.circuitId]?.powered);
 
-        // Select door state asset
+        // Smooth door animation tracking: 0 = closed, 0.5 = partial, 1.0 = open
+        const targetOpen = door.state === 'OPEN' ? 1.0 : door.state === 'AJAR' || door.state === 'OPENING_STAGE_1' ? 0.5 : 0.0;
+        const currentProgress = this.doorAnimProgress[door.id] ?? 0.0;
+        const nextProgress = currentProgress + (targetOpen - currentProgress) * Math.min(1, dt * 6);
+        this.doorAnimProgress[door.id] = nextProgress;
+
+        // Select door state asset based on animated progression
         let doorAsset = DOOR_ASSETS.closed;
         if (door.lockedByEntity) {
           doorAsset = DOOR_ASSETS.closed;
-        } else if (door.state === 'OPEN') {
+        } else if (nextProgress > 0.65) {
           doorAsset = DOOR_ASSETS.open;
-        } else if (door.state === 'AJAR') {
+        } else if (nextProgress > 0.2) {
           doorAsset = DOOR_ASSETS.partial;
         }
 
         const img = darkProtocolAssets.getImage(doorAsset);
-        // Door opening: ~85px wide, ~140px tall (anchored at floorY)
-        const doorW = 86;
-        const doorH = 142;
         const doorX = x - doorW / 2;
         const doorY = floorY - doorH;
 
         if (img) {
           ctx.drawImage(img, doorX, doorY, doorW, doorH);
         } else {
-          // Fallback industrial frame
           ctx.fillStyle = isPowered ? '#1e293b' : '#0f172a';
           ctx.fillRect(doorX, doorY, doorW, doorH);
         }
@@ -1294,22 +1287,44 @@ export class DarkProtocolCanvasEngine {
 
         ctx.fillStyle = ledColor;
         ctx.beginPath();
-        ctx.arc(x, doorY - 10, 4, 0, Math.PI * 2);
+        ctx.arc(x, doorY - 8, 3.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Door Label
-        ctx.fillStyle = '#cbd5e1';
+        // Architectural Door Label
+        ctx.fillStyle = '#94a3b8';
         ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(door.name.replace('Acceso a ', '').toUpperCase(), x, doorY - 18);
+        ctx.fillText(door.name.replace('Acceso a ', '').toUpperCase(), x, doorY - 14);
       }
+    }
+
+    // REQUIREMENT 9 & 31: SALA 10 SPECIAL CENTRAL EVACUATION BLAST GATE
+    // Placed EXACTLY over the large central "SALIDA DE EMERGENCIA" in sala10.png
+    if (room.id === 'evacuation' && comp?.escapeExit) {
+      const gate = comp.escapeExit;
+      const evacImg = darkProtocolAssets.getImage(DARK_PROTOCOL_ASSETS.salida_evacuacion);
+      const gateX = gate.x - gate.width / 2;
+      const gateY = gate.y - gate.height;
+
+      if (evacImg) {
+        ctx.drawImage(evacImg, gateX, gateY, gate.width, gate.height);
+      }
+
+      // Emergency Beacon above Central Escape Exit
+      const isUnlocked = state.escapeUnlocked;
+      const beaconFlicker = Math.floor(this.animTimer * 4) % 2 === 0;
+      const beaconColor = isUnlocked ? (beaconFlicker ? '#10b981' : '#047857') : (beaconFlicker ? '#ef4444' : '#7f1d1d');
+
+      ctx.fillStyle = beaconColor;
+      ctx.beginPath();
+      ctx.arc(gate.x, gateY + 22, 5, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
   /**
-   * UNIFIED SURVIVOR KINEMATICS RENDERER:
-   * Scales any human character to ~88px tall (62% of door height).
-   * Supports local player, operator, and any remote survivor player seamlessly.
+   * REQUIREMENT 4: SURVIVOR VISUAL SCALE (~150px tall, 63.7% of standard door opening)
+   * Scaled from BOTTOM CENTER: feet remain attached to floorY.
    */
   private renderSurvivorBody(
     x: number,
@@ -1330,7 +1345,7 @@ export class DarkProtocolCanvasEngine {
     const isDowned = health === 'AGONIZANDO' || health === 'MUERTO';
     const isMoving = isWalking || isRunning;
 
-    // Kinematic calculations
+    // Kinematics & Breathing
     const breathBob = isMoving ? 0 : Math.sin(this.animTimer * 2.6) * 1.6;
     const breathChest = isMoving ? 0 : Math.sin(this.animTimer * 2.6) * 0.8;
 
@@ -1351,30 +1366,31 @@ export class DarkProtocolCanvasEngine {
     }
 
     ctx.save();
+    // Anchor at BOTTOM CENTER: feet stay firmly attached to floorY
     ctx.translate(x, y);
-    // Authentic human scale factor: 1.35x brings height to 88px (believable vs 142px door)
-    ctx.scale(1.35, 1.35);
+    // Scale 2.35x brings 64px character height to 150.4px (~64% of 236px door height)
+    ctx.scale(2.35, 2.35);
     if (facing === 'left') ctx.scale(-1, 1);
 
     // Contact shadow on floor
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.beginPath();
-    ctx.ellipse(0, 0, isRunning ? 18 : 15, 4.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, isRunning ? 16 : 14, 4, 0, 0, Math.PI * 2);
     ctx.fill();
 
     if (isDowned) {
-      // Agonizing crawling pose on the floor
+      // Downed pose on floor
       const crawlBob = Math.sin(this.animTimer * 2) * 1.5;
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(-22, -12, 14, 8); // Legs trailing
+      ctx.fillRect(-22, -12, 14, 8);
       ctx.fillStyle = char.primaryColor;
-      ctx.fillRect(-10, -18 + crawlBob, 22, 14); // Torso
+      ctx.fillRect(-10, -18 + crawlBob, 22, 14);
       ctx.fillStyle = '#334155';
-      ctx.fillRect(10, -22 + crawlBob, 12, 12); // Head
+      ctx.fillRect(10, -22 + crawlBob, 12, 12);
       ctx.fillStyle = '#ef4444';
-      ctx.fillRect(16, -18 + crawlBob, 5, 3); // Visor alert
+      ctx.fillRect(16, -18 + crawlBob, 5, 3);
       ctx.fillStyle = '#475569';
-      ctx.fillRect(18, -10 + crawlBob, 12, 5); // Outstretched arm
+      ctx.fillRect(18, -10 + crawlBob, 12, 5);
     } else {
       // BACK ARM
       const backArmAngle = isWorking
@@ -1449,51 +1465,26 @@ export class DarkProtocolCanvasEngine {
       ctx.fillStyle = char.primaryColor;
       ctx.fillRect(-11 - breathChest / 2, -48, 22 + breathChest, 27);
 
-      // Character-specific pixel accessories
+      // Character-specific details
       if (char.id === 'mara_velasco') {
         ctx.fillStyle = '#78350f';
         ctx.fillRect(-12, -27, 24, 5);
         ctx.fillStyle = '#d97706';
         ctx.fillRect(8, -25, 4, 11);
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillRect(7, -19, 6, 3);
-        ctx.fillStyle = '#451a03';
-        ctx.fillRect(-9, -46, 18, 5);
       } else if (char.id === 'hector_gaona') {
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(-10, -48, 7, 25);
         ctx.fillRect(3, -48, 7, 25);
-        ctx.fillStyle = '#06b6d4';
-        ctx.fillRect(-14, -42, 4, 13);
-        ctx.fillStyle = '#a5f3fc';
-        ctx.fillRect(-14, -40, 4, 2);
       } else if (char.id === 'valeria_cruz') {
         ctx.fillStyle = '#1e1b4b';
         ctx.fillRect(-10, -47, 20, 20);
-        ctx.fillStyle = '#312e81';
-        ctx.fillRect(-8, -45, 16, 15);
-        ctx.fillStyle = '#e11d48';
-        ctx.fillRect(-13, -48, 5, 5);
-        ctx.fillRect(8, -48, 5, 5);
       } else if (char.id === 'sergio_prada') {
         ctx.fillStyle = '#064e3b';
         ctx.fillRect(-15, -46, 6, 21);
-        ctx.strokeStyle = '#cbd5e1';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(-12, -46);
-        const antennaSway = isMoving ? Math.sin(this.animTimer * 12) * 3 : 0;
-        ctx.lineTo(-12 + antennaSway, -68);
-        ctx.stroke();
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(-13 + antennaSway, -70, 3, 3);
       } else if (char.id === 'operator') {
-        // Operator Labcoat & Badge
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(-10, -46, 8, 24);
         ctx.fillRect(2, -46, 8, 24);
-        ctx.fillStyle = '#0284c7';
-        ctx.fillRect(3, -40, 4, 6);
       }
 
       // HEAD & HELMET
@@ -1505,31 +1496,9 @@ export class DarkProtocolCanvasEngine {
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(-10, -62, 2, 10);
 
-      // Visor / Optics
-      if (char.id === 'mara_velasco') {
-        ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(2, -59, 7, 5);
-      } else if (char.id === 'hector_gaona') {
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(1, -59, 4, 4);
-        ctx.fillRect(6, -59, 4, 4);
-      } else if (char.id === 'valeria_cruz') {
-        ctx.fillStyle = '#e11d48';
-        ctx.fillRect(2, -59, 7, 4);
-      } else if (char.id === 'operator') {
-        ctx.fillStyle = '#fbcfe8';
-        ctx.fillRect(0, -60, 8, 10);
-        ctx.fillStyle = '#0284c7';
-        ctx.fillRect(-9, -65, 18, 3);
-        ctx.fillRect(-9, -58, 3, 6);
-        ctx.fillRect(-7, -54, 7, 2);
-      } else {
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(2, -59, 7, 5);
-        ctx.fillStyle = '#065f46';
-        ctx.fillRect(-8, -58, 3, 5);
-        ctx.fillRect(-6, -55, 6, 2);
-      }
+      // Visor
+      ctx.fillStyle = char.id === 'mara_velasco' ? '#fbbf24' : char.id === 'valeria_cruz' ? '#e11d48' : '#38bdf8';
+      ctx.fillRect(2, -59, 7, 5);
 
       // FRONT ARM & FLASHLIGHT
       let frontArmAngle = isRunning
@@ -1541,12 +1510,14 @@ export class DarkProtocolCanvasEngine {
       if (isWorking) {
         frontArmAngle = -0.75 + Math.sin(this.animTimer * 6) * 0.08;
       } else if (flashlightOn) {
-        let targetAngle = flashlightAngle;
+        // Arm seamlessly rotates towards aim direction
+        let aimAngle = flashlightAngle;
         if (facing === 'left') {
-          targetAngle = Math.PI - targetAngle;
-          if (targetAngle > Math.PI) targetAngle -= Math.PI * 2;
+          aimAngle = Math.PI - aimAngle;
+          if (aimAngle > Math.PI) aimAngle -= Math.PI * 2;
+          if (aimAngle < -Math.PI) aimAngle += Math.PI * 2;
         }
-        frontArmAngle = Math.max(-1.1, Math.min(0.9, targetAngle));
+        frontArmAngle = Math.max(-1.4, Math.min(1.2, aimAngle));
       }
 
       ctx.save();
@@ -1561,22 +1532,20 @@ export class DarkProtocolCanvasEngine {
       ctx.fillRect(-3, 15, 6, 5);
 
       if (flashlightOn) {
-        // Flashlight barrel & glow
+        // Flashlight barrel & lens glow
         ctx.fillStyle = '#64748b';
         ctx.fillRect(0, 13, 14, 5);
         ctx.fillStyle = '#1e293b';
         ctx.fillRect(3, 12, 4, 7);
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(12, 11, 4, 9);
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(16, 12, 2, 7);
-        ctx.fillStyle = 'rgba(254, 240, 138, 0.7)';
-        ctx.fillRect(17, 10, 3, 11);
+        ctx.fillRect(14, 12, 3, 7);
+        ctx.fillStyle = 'rgba(255, 248, 225, 0.85)';
+        ctx.fillRect(17, 11, 3, 9);
       } else {
         ctx.fillStyle = '#64748b';
         ctx.fillRect(0, 13, 14, 5);
         ctx.fillStyle = '#334155';
-        ctx.fillRect(16, 12, 2, 7);
+        ctx.fillRect(14, 12, 3, 7);
       }
 
       ctx.restore(); // Front arm
@@ -1587,18 +1556,13 @@ export class DarkProtocolCanvasEngine {
   }
 
   /**
-   * CHARACTERS RENDERING:
-   * Supports local Explorer, local Operator, local/manifested Entity,
-   * AND any remote multiplayer players via state.players dictionary.
+   * CHARACTERS RENDERING (Explorer, Operator, Entity, Multiplayer)
    */
   private renderCharacters(state: DarkProtocolGameState, currentRoom: RoomZone) {
-    const ctx = this.ctx;
     const floorY = currentRoom.floorY;
-
-    // Track rendered player IDs to prevent duplicate rendering
     const renderedPlayerIds = new Set<string>();
 
-    // 1. Render Explorer if in current room and NOT hiding
+    // 1. Explorer
     if (state.explorer.room === currentRoom.id && !state.explorer.isHiding) {
       renderedPlayerIds.add('player_explorer');
       this.renderSurvivorBody(
@@ -1613,10 +1577,9 @@ export class DarkProtocolCanvasEngine {
       );
     }
 
-    // 2. Render Operator if in current room
+    // 2. Operator
     if (state.operator.room === currentRoom.id) {
       renderedPlayerIds.add('player_operator');
-      // If active role is Operator, use operator position and kinematics
       const isOperatorMoving = state.activeRole === 'OPERADOR' && Math.abs(this.playerVx) > 5;
       const opAnim: CharacterAnimState = isOperatorMoving ? 'WALK' : (state.operator.animState || 'IDLE');
       this.renderSurvivorBody(
@@ -1631,16 +1594,14 @@ export class DarkProtocolCanvasEngine {
       );
     }
 
-    // 3. Render any other multiplayer survivors in this room with full kinematics and animations
+    // 3. Multiplayer remote players
     if (state.players) {
       for (const [playerId, pData] of Object.entries(state.players)) {
         if (renderedPlayerIds.has(playerId)) continue;
         if (pData.roomId === currentRoom.id && pData.role !== 'ENTE') {
           renderedPlayerIds.add(playerId);
+          const targetX = pData.normalizedRoomPosition * SOURCE_ROOM_WIDTH;
 
-          const targetX = pData.normalizedRoomPosition * currentRoom.width;
-
-          // Initialize or update remote player animation interpolation
           if (!this.remotePlayerAnim[playerId]) {
             this.remotePlayerAnim[playerId] = {
               x: targetX,
@@ -1654,35 +1615,20 @@ export class DarkProtocolCanvasEngine {
 
           const rAnim = this.remotePlayerAnim[playerId];
           const prevX = rAnim.x;
-          // Smooth interpolation towards targetX
           rAnim.x += (targetX - rAnim.x) * 0.15;
           const deltaX = rAnim.x - prevX;
-          rAnim.vx = deltaX * 60; // Approximate velocity
+          rAnim.vx = deltaX * 60;
 
           if (Math.abs(deltaX) > 0.4) {
             rAnim.facing = deltaX < 0 ? 'left' : 'right';
-            const isSprinting = Math.abs(deltaX) > 2.5;
-            rAnim.animState = isSprinting ? 'RUN' : 'WALK';
+            rAnim.animState = Math.abs(deltaX) > 2.5 ? 'RUN' : 'WALK';
           } else {
             rAnim.animState = 'IDLE';
           }
 
-          // Resolve character archetype
           let charId = 'mara_velasco';
-          if (pData.role === 'OPERADOR') {
-            charId = 'operator';
-          } else if (pData.characterName?.toLowerCase().includes('gaona') || pData.characterName?.toLowerCase().includes('héctor')) {
-            charId = 'hector_gaona';
-          } else if (pData.characterName?.toLowerCase().includes('valeria') || pData.characterName?.toLowerCase().includes('cruz')) {
-            charId = 'valeria_cruz';
-          } else if (pData.characterName?.toLowerCase().includes('sergio') || pData.characterName?.toLowerCase().includes('prada')) {
-            charId = 'sergio_prada';
-          }
+          if (pData.role === 'OPERADOR') charId = 'operator';
 
-          const hasFlashlight = pData.role === 'EXPLORADOR';
-          const flashlightAim = rAnim.facing === 'left' ? Math.PI : 0;
-
-          // Render high-fidelity animated survivor body matching unified scale (~88px)
           this.renderSurvivorBody(
             rAnim.x,
             floorY,
@@ -1690,126 +1636,66 @@ export class DarkProtocolCanvasEngine {
             rAnim.animState,
             'SANO',
             charId,
-            hasFlashlight,
-            flashlightAim
+            pData.role === 'EXPLORADOR',
+            rAnim.facing === 'left' ? Math.PI : 0
           );
-
-          // Tactical Multiplayer Nameplate above survivor
-          ctx.save();
-          ctx.font = 'bold 9px monospace';
-          ctx.textAlign = 'center';
-
-          // Background tag pill
-          const nameText = pData.displayName || pData.characterName || 'SUPERVIVIENTE';
-          const tagW = ctx.measureText(nameText).width + 12;
-          const tagX = rAnim.x - tagW / 2;
-          const tagY = floorY - 96;
-
-          ctx.fillStyle = 'rgba(2, 6, 23, 0.75)';
-          ctx.fillRect(tagX, tagY, tagW, 14);
-          ctx.strokeStyle = pData.role === 'OPERADOR' ? 'rgba(56, 189, 248, 0.5)' : 'rgba(245, 158, 11, 0.5)';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(tagX, tagY, tagW, 14);
-
-          // Nameplate label
-          ctx.fillStyle = pData.role === 'OPERADOR' ? '#38bdf8' : '#fbbf24';
-          ctx.fillText(nameText, rAnim.x, tagY + 10);
-          ctx.restore();
         }
       }
     }
 
-    // 4. Render Manifested Entity if in current room
+    // 4. Manifested Entity
     if (state.entity.isManifested && state.entity.room === currentRoom.id) {
-      const x = state.entity.x;
-      const levitate = Math.sin(this.animTimer * 4) * 8;
-      const y = floorY - 24 + levitate;
-      const animState = state.entity.animState || 'IDLE';
-
-      ctx.save();
-      ctx.translate(x, y);
-
-      // Deep Shadow floor portal
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-      ctx.beginPath();
-      ctx.ellipse(0, 24 - levitate, 34, 8, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Pulsing Abyssal Core
-      ctx.fillStyle = '#05010a';
-      ctx.beginPath();
-      ctx.arc(0, -45, 30, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Purple void nebula
-      const corePulse = 0.5 + Math.sin(this.animTimer * 6) * 0.25;
-      ctx.fillStyle = `rgba(147, 51, 234, ${corePulse})`;
-      ctx.beginPath();
-      ctx.arc(0, -45, 22, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 6 Undulating Void Tendrils
-      ctx.strokeStyle = '#05010a';
-      ctx.lineWidth = 4.5;
-      for (let t = 0; t < 6; t++) {
-        const tAngle = (t / 6) * Math.PI * 2;
-        const wave = Math.sin(this.animTimer * 7 + t * 1.2) * 14;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(tAngle) * 22, -45 + Math.sin(tAngle) * 22);
-        ctx.quadraticCurveTo(
-          Math.cos(tAngle) * 44 + wave,
-          -45 + Math.sin(tAngle) * 44 - wave,
-          Math.cos(tAngle) * 58 + wave * 1.5,
-          -45 + Math.sin(tAngle) * 58
-        );
-        ctx.stroke();
-      }
-
-      // Obsidian Horned Skull
-      ctx.fillStyle = '#020005';
-      ctx.beginPath();
-      ctx.moveTo(-15, -52);
-      ctx.lineTo(-22, -80);
-      ctx.lineTo(-9, -64);
-      ctx.lineTo(0, -72);
-      ctx.lineTo(9, -64);
-      ctx.lineTo(22, -80);
-      ctx.lineTo(15, -52);
-      ctx.closePath();
-      ctx.fill();
-
-      // Glowing Crimson Eyes
-      const eyeFlicker = 0.85 + Math.random() * 0.15;
-      ctx.fillStyle = `rgba(239, 68, 68, ${eyeFlicker})`;
-      ctx.fillRect(-9, -54, 6, 4);
-      ctx.fillRect(3, -54, 6, 4);
-
-      // Violet distortion shockwave aura
-      ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, -45, 42 + Math.sin(this.animTimer * 8) * 6, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Attack lashing claws
-      if (animState === 'ATTACK') {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3.5;
-        ctx.beginPath();
-        ctx.moveTo(18, -48);
-        ctx.lineTo(65, -56);
-        ctx.lineTo(88, -42);
-        ctx.stroke();
-
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.arc(42, -48, 30, -0.6, 0.6);
-        ctx.stroke();
-      }
-
-      ctx.restore();
+      this.renderEntity(state.entity.x, floorY, state.entity.animState || 'IDLE');
     }
+  }
+
+  private renderEntity(x: number, floorY: number, animState: string) {
+    const ctx = this.ctx;
+    const levitate = Math.sin(this.animTimer * 4) * 8;
+    const y = floorY - 32 + levitate;
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Deep Shadow floor portal
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.beginPath();
+    ctx.ellipse(0, 32 - levitate, 40, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Void Core
+    ctx.fillStyle = '#05010a';
+    ctx.beginPath();
+    ctx.arc(0, -55, 36, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Purple nebula pulse
+    const corePulse = 0.5 + Math.sin(this.animTimer * 6) * 0.25;
+    ctx.fillStyle = `rgba(147, 51, 234, ${corePulse})`;
+    ctx.beginPath();
+    ctx.arc(0, -55, 26, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Obsidian Horned Skull
+    ctx.fillStyle = '#020005';
+    ctx.beginPath();
+    ctx.moveTo(-18, -62);
+    ctx.lineTo(-26, -96);
+    ctx.lineTo(-11, -76);
+    ctx.lineTo(0, -86);
+    ctx.lineTo(11, -76);
+    ctx.lineTo(26, -96);
+    ctx.lineTo(18, -62);
+    ctx.closePath();
+    ctx.fill();
+
+    // Crimson Eyes
+    const eyeFlicker = 0.85 + Math.random() * 0.15;
+    ctx.fillStyle = `rgba(239, 68, 68, ${eyeFlicker})`;
+    ctx.fillRect(-11, -64, 7, 5);
+    ctx.fillRect(4, -64, 7, 5);
+
+    ctx.restore();
   }
 
   private renderParticles() {
@@ -1822,9 +1708,138 @@ export class DarkProtocolCanvasEngine {
     ctx.globalAlpha = 1;
   }
 
-  // =========================================================================
-  // LIGHT MAP OFFSCREEN RENDERING
-  // =========================================================================
+  /**
+   * REQUIREMENT 5, 22-25: INTERACTIVE PROPS & VISIBLE PHYSICAL TASK ANCHORS
+   * Renders props only where required (mesa, taquilla, valvula, trampilla).
+   * Displays subtle pixel shimmer / state indicator for nearby active tasks.
+   */
+  private renderMachinesAndInteractables(room: RoomZone, isPowered: boolean) {
+    const ctx = this.ctx;
+    const state = this.getState();
+    const floorY = room.floorY;
+
+    // Render interactive overlay props configured for this room
+    for (const prop of FACILITY_PROPS) {
+      if (prop.room === room.id) {
+        // Skip camera (rendered in renderCameras) and evac_gate in non-evac room
+        if (prop.type === 'camera') continue;
+        if (prop.type === 'evac_door' && room.id !== 'evacuation') continue;
+
+        const img = darkProtocolAssets.getImage(prop.asset);
+        if (img) {
+          const naturalW = img.naturalWidth || 800;
+          const naturalH = img.naturalHeight || 800;
+          const drawW = naturalW * prop.scale;
+          const drawH = naturalH * prop.scale;
+          const drawX = prop.x - drawW * prop.anchorX;
+          const drawY = prop.y - drawH * prop.anchorY;
+
+          ctx.save();
+          if (prop.flipX) {
+            ctx.translate(prop.x, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(img, -drawW * prop.anchorX, drawY, drawW, drawH);
+          } else {
+            ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          }
+          ctx.restore();
+        }
+      }
+    }
+
+    // REQUIREMENT 24 & 25: Subtle pixel feedback for interactive machines
+    for (const obj of FACILITY_INTERACTABLES) {
+      if (obj.room === room.id) {
+        const distToPlayer = Math.abs(state.explorer.x - obj.x);
+        const inRange = distToPlayer <= obj.radius;
+
+        if (inRange) {
+          // Subtle technical pixel pulse indicator
+          const pulse = (Math.sin(this.animTimer * 5) + 1) / 2;
+          ctx.strokeStyle = `rgba(56, 189, 248, ${0.4 + pulse * 0.4})`;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([3, 3]);
+
+          // Bounding frame bracket around the machine
+          const frameW = 60;
+          const frameH = 50;
+          const fx = obj.x - frameW / 2;
+          const fy = obj.y - frameH / 2;
+
+          ctx.strokeRect(fx, fy, frameW, frameH);
+          ctx.setLineDash([]);
+        }
+      }
+    }
+
+    // Room-specific hardware feedback
+    if (room.id === 'evacuation') {
+      // Keypad LCD status
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(715, 620, 50, 20);
+      ctx.fillStyle = state.coopSolved ? '#22c55e' : '#f59e0b';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(state.coopSolved ? 'OK' : '****', 740, 634);
+    }
+  }
+
+  private renderHidingSpots(_room: RoomZone) {
+    // Rendered cleanly via FACILITY_PROPS
+  }
+
+  /**
+   * REQUIREMENT 10 & 11: CCTV CAMERA SPRITE RENDERING
+   * Actually renders /assets/dark-protocol/camara.png high on walls.
+   * Surveillance cone originates exactly from the camera lens.
+   */
+  private renderCameras(room: RoomZone, state: DarkProtocolGameState) {
+    const ctx = this.ctx;
+    const camImg = darkProtocolAssets.getImage(DARK_PROTOCOL_ASSETS.camara);
+
+    for (const cam of Object.values(state.cameras)) {
+      if (cam.room === room.id) {
+        const isPowered = Boolean(state.circuits[cam.circuitId]?.powered);
+        const isOnline = cam.state === 'ONLINE' && isPowered;
+
+        const camW = 72;
+        const camH = 48;
+        const drawX = cam.x - camW / 2;
+        const drawY = cam.y - camH / 2;
+
+        ctx.save();
+        if (cam.facing === 'left') {
+          ctx.translate(cam.x, 0);
+          ctx.scale(-1, 1);
+          if (camImg) {
+            ctx.drawImage(camImg, -camW / 2, drawY, camW, camH);
+          }
+        } else {
+          if (camImg) {
+            ctx.drawImage(camImg, drawX, drawY, camW, camH);
+          }
+        }
+        ctx.restore();
+
+        // Operational LED status on camera chassis
+        let ledColor = '#10b981';
+        if (!isPowered) ledColor = '#475569';
+        else if (cam.state === 'INTERFERENCE') ledColor = '#f59e0b';
+        else if (cam.state !== 'ONLINE') ledColor = '#ef4444';
+
+        ctx.fillStyle = ledColor;
+        ctx.beginPath();
+        ctx.arc(cam.x + (cam.facing === 'right' ? 14 : -14), cam.y + 2, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  /**
+   * REQUIREMENT 16, 17, 18, 19, 20, 21: VOLUMETRIC FLASHLIGHT CONE & LIGHT MAP
+   * Layered soft light cone: bright soft core + medium cone + very soft feathered falloff.
+   * Warm-neutral 4100K color. Darkness/light-mask composited via multiply.
+   */
   private renderLightMap(state: DarkProtocolGameState, room: RoomZone, isPowered: boolean) {
     const lCtx = this.lightCtx;
     const w = this.viewportWidth;
@@ -1833,7 +1848,8 @@ export class DarkProtocolCanvasEngine {
     lCtx.save();
     lCtx.clearRect(0, 0, w, h);
 
-    let ambientDarkness = 'rgb(40, 48, 60)';
+    // Ambient darkness based on power state and room identity
+    let ambientDarkness = 'rgb(44, 52, 64)';
     if (!isPowered) {
       ambientDarkness = 'rgb(8, 10, 16)';
     }
@@ -1841,10 +1857,13 @@ export class DarkProtocolCanvasEngine {
     lCtx.fillRect(0, 0, w, h);
 
     lCtx.globalCompositeOperation = 'lighter';
-    lCtx.translate(-Math.floor(this.cameraX), 0);
+    // Translate and scale to match world scene
+    lCtx.translate(-Math.floor(this.cameraX * this.roomScale), Math.floor(this.roomOffsetY));
+    lCtx.scale(this.roomScale, this.roomScale);
 
     const failureState = this.getSectorFailureFactor(room.sector);
 
+    // 1. Environmental Lights matching visible artwork fixtures
     for (const light of FACILITY_LIGHTS) {
       if (light.room === room.id) {
         let active = true;
@@ -1875,7 +1894,7 @@ export class DarkProtocolCanvasEngine {
         );
 
         grad.addColorStop(0, light.color);
-        grad.addColorStop(0.5, this.hexToRgba(light.color, 0.45 * light.intensity));
+        grad.addColorStop(0.45, this.hexToRgba(light.color, 0.45 * light.intensity));
         grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
         lCtx.fillStyle = grad;
@@ -1885,70 +1904,115 @@ export class DarkProtocolCanvasEngine {
       }
     }
 
-    // Directional Flashlight Cone (originates physically from the hand-held flashlight lens!)
+    // 2. Volumetric Soft Flashlight Cone (originates from character's HAND)
     if (
       state.explorer.room === room.id &&
       !state.explorer.isHiding &&
       state.explorer.flashlightOn
     ) {
       const char = getCharacterById(state.selectedCharacterId);
-      const isHector = char.id === 'hector_gaona'; // Doctor has 35% wider cone
-      const coneHalfAngle = isHector ? 0.52 : 0.38;
-      const coneLength = isHector ? 430 : 390;
+      const isHector = char.id === 'hector_gaona';
 
-      const charFacing = state.explorer.facing;
-      const breathBob = Math.sin(this.animTimer * 2.6) * 1.6;
-      const shoulderX = state.explorer.x + (charFacing === 'right' ? 4 : -4);
-      const shoulderY = room.floorY - 38 + breathBob;
+      // Hand position in source space
+      const handX = state.explorer.x + (state.explorer.facing === 'right' ? 18 : -18);
+      const handY = room.floorY - 78;
+      const angle = state.explorer.flashlightAngle;
 
-      let targetAngle = state.explorer.flashlightAngle;
-      if (charFacing === 'left') {
-        targetAngle = Math.PI - targetAngle;
-        if (targetAngle > Math.PI) targetAngle -= Math.PI * 2;
-      }
-      const clampedAngle = Math.max(-1.1, Math.min(0.9, targetAngle));
-      const effectiveAim = charFacing === 'right' ? clampedAngle : Math.PI - clampedAngle;
+      // REQUIREMENT 19 & 20: Beam angles (inner ~20°, middle ~32°, outer ~48°)
+      const outerSpread = isHector ? 0.48 : 0.42; // ~48°
+      const middleSpread = isHector ? 0.32 : 0.28; // ~32°
+      const innerSpread = isHector ? 0.20 : 0.16; // ~18-20°
 
-      const handX = shoulderX + Math.cos(effectiveAim) * 18;
-      const handY = shoulderY + Math.sin(effectiveAim) * 18;
-      const angle = effectiveAim;
+      const maxDist = isHector ? 520 : 470;
 
-      const grad = lCtx.createRadialGradient(
+      // Flashlight color: warm-neutral 4100K
+      const coreColor = '#fffdf5';
+      const midColor = 'rgba(255, 248, 225, 0.65)';
+      const outerColor = 'rgba(254, 240, 138, 0.25)';
+
+      // Layer 1: Outer Feathered Light Cone
+      const outerGrad = lCtx.createRadialGradient(
         handX,
         handY,
-        15,
-        handX + Math.cos(angle) * coneLength * 0.7,
-        handY + Math.sin(angle) * coneLength * 0.7,
-        coneLength
+        20,
+        handX + Math.cos(angle) * maxDist * 0.7,
+        handY + Math.sin(angle) * maxDist * 0.7,
+        maxDist
       );
-      grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(0.2, '#fef08a');
-      grad.addColorStop(0.65, 'rgba(254, 240, 138, 0.35)');
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      outerGrad.addColorStop(0, midColor);
+      outerGrad.addColorStop(0.5, outerColor);
+      outerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
-      lCtx.fillStyle = grad;
+      lCtx.fillStyle = outerGrad;
       lCtx.beginPath();
       lCtx.moveTo(handX, handY);
-      lCtx.arc(handX, handY, coneLength, angle - coneHalfAngle, angle + coneHalfAngle);
+      lCtx.arc(handX, handY, maxDist, angle - outerSpread, angle + outerSpread);
       lCtx.closePath();
       lCtx.fill();
 
-      const haloGrad = lCtx.createRadialGradient(handX, handY, 5, handX, handY, 70);
-      haloGrad.addColorStop(0, 'rgba(254, 240, 138, 0.5)');
+      // Layer 2: Medium-Intensity Mid Cone
+      const midGrad = lCtx.createRadialGradient(
+        handX,
+        handY,
+        15,
+        handX + Math.cos(angle) * maxDist * 0.5,
+        handY + Math.sin(angle) * maxDist * 0.5,
+        maxDist * 0.85
+      );
+      midGrad.addColorStop(0, coreColor);
+      midGrad.addColorStop(0.4, midColor);
+      midGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      lCtx.fillStyle = midGrad;
+      lCtx.beginPath();
+      lCtx.moveTo(handX, handY);
+      lCtx.arc(handX, handY, maxDist * 0.85, angle - middleSpread, angle + middleSpread);
+      lCtx.closePath();
+      lCtx.fill();
+
+      // Layer 3: Bright Soft Core
+      const coreGrad = lCtx.createRadialGradient(
+        handX,
+        handY,
+        5,
+        handX + Math.cos(angle) * maxDist * 0.35,
+        handY + Math.sin(angle) * maxDist * 0.35,
+        maxDist * 0.65
+      );
+      coreGrad.addColorStop(0, '#ffffff');
+      coreGrad.addColorStop(0.3, coreColor);
+      coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      lCtx.fillStyle = coreGrad;
+      lCtx.beginPath();
+      lCtx.moveTo(handX, handY);
+      lCtx.arc(handX, handY, maxDist * 0.65, angle - innerSpread, angle + innerSpread);
+      lCtx.closePath();
+      lCtx.fill();
+
+      // Layer 4: Soft 360° Hand Halo
+      const haloGrad = lCtx.createRadialGradient(handX, handY, 2, handX, handY, 65);
+      haloGrad.addColorStop(0, 'rgba(255, 250, 230, 0.65)');
+      haloGrad.addColorStop(0.6, 'rgba(254, 240, 138, 0.25)');
       haloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
       lCtx.fillStyle = haloGrad;
       lCtx.beginPath();
-      lCtx.arc(handX, handY, 70, 0, Math.PI * 2);
+      lCtx.arc(handX, handY, 65, 0, Math.PI * 2);
       lCtx.fill();
     }
 
     lCtx.restore();
   }
 
+  /**
+   * REQUIREMENT 12: REMOVE FLOATING LIGHT DOTS
+   * Atmospheric Bloom: enhances ambient glow with soft screen blending.
+   * NO circular opaque dots are drawn at light origins!
+   */
   private renderLightBloom(state: DarkProtocolGameState, room: RoomZone, isPowered: boolean) {
     const ctx = this.ctx;
     ctx.save();
-    ctx.translate(-Math.floor(this.cameraX), 0);
     ctx.globalCompositeOperation = 'screen';
 
     for (const light of FACILITY_LIGHTS) {
@@ -1961,91 +2025,19 @@ export class DarkProtocolCanvasEngine {
         }
         if (!active) continue;
 
-        ctx.fillStyle = light.color;
-        ctx.globalAlpha = 0.45;
+        // Soft, diffused ambient flare (NO hard dots)
+        const bloomRadius = 24;
+        const bGrad = ctx.createRadialGradient(light.x, light.y, 2, light.x, light.y, bloomRadius);
+        bGrad.addColorStop(0, this.hexToRgba(light.color, 0.25));
+        bGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        ctx.fillStyle = bGrad;
         ctx.beginPath();
-        ctx.arc(light.x, light.y, 8, 0, Math.PI * 2);
+        ctx.arc(light.x, light.y, bloomRadius, 0, Math.PI * 2);
         ctx.fill();
       }
     }
     ctx.restore();
-  }
-
-  private renderCameras(room: RoomZone, state: DarkProtocolGameState) {
-    const ctx = this.ctx;
-
-    for (const cam of Object.values(state.cameras)) {
-      if (cam.room === room.id) {
-        const isOnline = cam.state === 'ONLINE' && Boolean(state.circuits[cam.circuitId]?.powered);
-
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(cam.x - 10, cam.y - 12, 20, 8);
-
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.arc(cam.x, cam.y, 10, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        ctx.fillStyle = isOnline ? '#10b981' : cam.state === 'INTERFERENCE' ? '#f59e0b' : '#ef4444';
-        ctx.beginPath();
-        ctx.arc(cam.x + (cam.facing === 'right' ? 6 : -6), cam.y + 4, 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-
-  private renderDebugVisuals(room: RoomZone, state: DarkProtocolGameState) {
-    const ctx = this.ctx;
-
-    if (this.debugOptions.showInteractionZones) {
-      ctx.strokeStyle = 'rgba(234, 179, 8, 0.7)';
-      ctx.setLineDash([4, 4]);
-      for (const obj of FACILITY_INTERACTABLES) {
-        if (obj.room === room.id) {
-          ctx.beginPath();
-          ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.fillStyle = 'rgba(234, 179, 8, 0.8)';
-          ctx.font = '10px monospace';
-          ctx.fillText(obj.id, obj.x - 30, obj.y - obj.radius - 4);
-        }
-      }
-      ctx.setLineDash([]);
-    }
-
-    if (this.debugOptions.showCameraFOV) {
-      for (const cam of Object.values(state.cameras)) {
-        if (cam.room === room.id) {
-          const isOnline = cam.state === 'ONLINE' && Boolean(state.circuits[cam.circuitId]?.powered);
-          ctx.strokeStyle = isOnline ? 'rgba(16, 185, 129, 0.45)' : 'rgba(239, 68, 68, 0.4)';
-          ctx.fillStyle = isOnline ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.04)';
-
-          const centerAngle = cam.facing === 'right' ? 0.35 : Math.PI - 0.35;
-          const halfFov = (cam.fovAngle * Math.PI) / 360;
-
-          ctx.beginPath();
-          ctx.moveTo(cam.x, cam.y);
-          ctx.arc(cam.x, cam.y, cam.range, centerAngle - halfFov, centerAngle + halfFov);
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-        }
-      }
-    }
-
-    if (this.debugOptions.showLightBounds) {
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-      for (const l of FACILITY_LIGHTS) {
-        if (l.room === room.id) {
-          ctx.beginPath();
-          ctx.arc(l.x, l.y, l.radius, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
-    }
   }
 
   private renderVignette() {
@@ -2056,28 +2048,162 @@ export class DarkProtocolCanvasEngine {
     const vGrad = ctx.createRadialGradient(
       w / 2,
       h / 2,
-      w * 0.35,
+      w * 0.38,
       w / 2,
       h / 2,
-      w * 0.65
+      w * 0.68
     );
     vGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vGrad.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
+    vGrad.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
 
     ctx.fillStyle = vGrad;
     ctx.fillRect(0, 0, w, h);
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+    // Subtle CRT scanlines
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
     for (let y = 0; y < h; y += 4) {
-      ctx.fillRect(0, y, w, 1.5);
+      ctx.fillRect(0, y, w, 1.2);
     }
   }
 
   /**
-   * CRITICAL REQUIREMENT 24 & 25: REAL CCTV FEED RENDERER
-   * Renders the ACTUAL GAME WORLD from the camera's true viewpoint!
-   * Shows real room geometry, lights, doors, animated objects,
-   * and the Survivor if inside the camera's FOV!
+   * REQUIREMENT 33 & 34: F8 AUTHORING DEBUG MODE
+   * In F8 mode ONLY: displays normalized grid, live mouse room coordinate,
+   * floorY, door bounds, camera mounts, light origins with radii, and task anchors.
+   */
+  private renderDebugVisuals(room: RoomZone, state: DarkProtocolGameState) {
+    const ctx = this.ctx;
+    const comp = ROOM_COMPOSITIONS[room.id];
+
+    // Normalized coordinate grid (every 0.1)
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
+    ctx.lineWidth = 1;
+    for (let xNorm = 0.1; xNorm < 1.0; xNorm += 0.1) {
+      const wx = roomToWorldX(xNorm);
+      ctx.beginPath();
+      ctx.moveTo(wx, 0);
+      ctx.lineTo(wx, SOURCE_ROOM_HEIGHT);
+      ctx.stroke();
+    }
+    for (let yNorm = 0.1; yNorm < 1.0; yNorm += 0.1) {
+      const wy = roomToWorldY(yNorm);
+      ctx.beginPath();
+      ctx.moveTo(0, wy);
+      ctx.lineTo(SOURCE_ROOM_WIDTH, wy);
+      ctx.stroke();
+    }
+
+    // Authored floorY line
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(0, room.floorY);
+    ctx.lineTo(SOURCE_ROOM_WIDTH, room.floorY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Door Bounds & Labels
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.7)';
+    ctx.lineWidth = 1.5;
+    for (const door of Object.values(state.doors)) {
+      if (door.fromRoom === room.id) {
+        ctx.strokeRect(door.fromX - 77, room.floorY - 236, 154, 236);
+        ctx.fillStyle = '#10b981';
+        ctx.font = '10px monospace';
+        ctx.fillText(`DOOR: ${door.toRoom} (${(door.fromX / SOURCE_ROOM_WIDTH).toFixed(3)})`, door.fromX - 60, room.floorY - 242);
+      }
+    }
+
+    // Evacuation Central Escape Gate Bounds
+    if (room.id === 'evacuation' && comp?.escapeExit) {
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+      ctx.strokeRect(comp.escapeExit.x - comp.escapeExit.width / 2, comp.escapeExit.y - comp.escapeExit.height, comp.escapeExit.width, comp.escapeExit.height);
+      ctx.fillStyle = '#ef4444';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText(`CENTRAL ESCAPE GATE (${comp.escapeExit.normX.toFixed(3)})`, comp.escapeExit.x - 80, comp.escapeExit.y - comp.escapeExit.height - 8);
+    }
+
+    // REQUIREMENT 34: Debug Light Visualization in F8 Mode ONLY
+    for (const l of FACILITY_LIGHTS) {
+      if (l.room === room.id) {
+        ctx.strokeStyle = l.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(l.x, l.y, l.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = l.color;
+        ctx.beginPath();
+        ctx.arc(l.x, l.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = '9px monospace';
+        ctx.fillText(`${l.type}: ${l.id} (${(l.x / SOURCE_ROOM_WIDTH).toFixed(3)}, ${(l.y / SOURCE_ROOM_HEIGHT).toFixed(3)})`, l.x + 8, l.y - 4);
+      }
+    }
+
+    // Task Anchors & Interaction Zones
+    for (const obj of FACILITY_INTERACTABLES) {
+      if (obj.room === room.id) {
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+        ctx.beginPath();
+        ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '10px monospace';
+        ctx.fillText(`TASK: ${obj.id}`, obj.x - 40, obj.y - obj.radius - 4);
+      }
+    }
+
+    // CCTV Camera Mount & Cones
+    for (const cam of Object.values(state.cameras)) {
+      if (cam.room === room.id) {
+        const centerAngle = cam.facing === 'right' ? 0.35 : Math.PI - 0.35;
+        const halfFov = (cam.fovAngle * Math.PI) / 360;
+
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.05)';
+        ctx.beginPath();
+        ctx.moveTo(cam.x, cam.y);
+        ctx.arc(cam.x, cam.y, cam.range, centerAngle - halfFov, centerAngle + halfFov);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+  }
+
+  /**
+   * REQUIREMENT 33: Screen-space OSD for F8 Authoring Mode
+   * Displays live mouse normalized coordinates: ROOM X: 0.438  ROOM Y: 0.721
+   */
+  private renderAuthoringOsd(room: RoomZone) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.9)';
+    ctx.fillRect(16, this.viewportHeight - 70, 360, 48);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(16, this.viewportHeight - 70, 360, 48);
+
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(`[F8 ROOM AUTHORING MODE] ${room.name}`, 26, this.viewportHeight - 52);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText(
+      `ROOM X: ${this.normMouseX.toFixed(3)}  ROOM Y: ${this.normMouseY.toFixed(3)} | floorY: ${(room.floorY / SOURCE_ROOM_HEIGHT).toFixed(3)}`,
+      26,
+      this.viewportHeight - 34
+    );
+    ctx.restore();
+  }
+
+  /**
+   * REAL CCTV FEED RENDERER
    */
   public renderCctvSnapshot(targetCanvas: HTMLCanvasElement, camId: string, now: number) {
     const targetCtx = targetCanvas.getContext('2d');
@@ -2097,12 +2223,10 @@ export class DarkProtocolCanvasEngine {
     const tw = targetCanvas.width;
     const th = targetCanvas.height;
 
-    // 1. If Offline or Unpowered -> Static noise screen
     if (!isOnline && !isInterfered) {
       targetCtx.fillStyle = '#05070c';
       targetCtx.fillRect(0, 0, tw, th);
 
-      // Static noise
       const imgData = targetCtx.createImageData(tw, th);
       const data = imgData.data;
       for (let i = 0; i < data.length; i += 4) {
@@ -2114,72 +2238,48 @@ export class DarkProtocolCanvasEngine {
       }
       targetCtx.putImageData(imgData, 0, 0);
 
-      // Warning text
       targetCtx.fillStyle = '#ef4444';
       targetCtx.font = 'bold 12px monospace';
       targetCtx.textAlign = 'center';
       targetCtx.fillText('SIN SEÑAL // CORTE DE ENERGÍA', tw / 2, th / 2);
-      targetCtx.fillStyle = '#94a3b8';
-      targetCtx.font = '10px monospace';
-      targetCtx.fillText(`${cam.name.toUpperCase()}`, tw / 2, th / 2 + 18);
       return;
     }
 
-    // 2. Camera is Online / Feed is active -> Render the REAL WORLD!
     targetCtx.save();
-
-    // Scale world to fit CCTV viewport
-    const scale = th / 600; // Room height is 600
+    const scale = th / SOURCE_ROOM_HEIGHT;
     targetCtx.scale(scale, scale);
 
-    // Center camera view around camera position or target region
-    const camTargetX = Math.max(0, Math.min(cam.x - (tw / scale) / 2, room.width - tw / scale));
+    const camTargetX = Math.max(0, Math.min(cam.x - (tw / scale) / 2, SOURCE_ROOM_WIDTH - tw / scale));
     targetCtx.translate(-camTargetX, 0);
 
-    // Render Room Geometry
     this.renderRoomBackground(room, isPowered);
     this.renderMachinesAndInteractables(room, isPowered);
     this.renderHidingSpots(room);
-    this.renderDoors(room, state);
+    this.renderDoors(room, state, 0.016);
 
-    // Check if Survivor is in this room & within Camera FOV!
     if (state.explorer.room === cam.room && !state.explorer.isHiding) {
       const charX = state.explorer.x;
       const dist = Math.abs(charX - cam.x);
       const isFacingTowards = (cam.facing === 'right' && charX >= cam.x - 50) || (cam.facing === 'left' && charX <= cam.x + 50);
 
       if (dist <= cam.range && isFacingTowards) {
-        // Draw the real Survivor in the feed!
         this.renderCharacters(state, room);
       }
     }
 
-    // If Manifested Entity is in this room, draw it!
     if (state.entity.isManifested && state.entity.room === cam.room) {
       this.renderCharacters(state, room);
     }
 
     targetCtx.restore();
 
-    // 3. CCTV Authentic Video Overlay (Timestamp, REC, Scanlines, Noise)
+    // CCTV Video Overlay
     targetCtx.save();
-
-    if (isInterfered) {
-      // Interference glitch bands
-      targetCtx.fillStyle = 'rgba(234, 179, 8, 0.15)';
-      for (let i = 0; i < 6; i++) {
-        const gy = Math.random() * th;
-        targetCtx.fillRect(0, gy, tw, 8);
-      }
-    }
-
-    // CRT Scanlines
-    targetCtx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    targetCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
     for (let y = 0; y < th; y += 3) {
       targetCtx.fillRect(0, y, tw, 1);
     }
 
-    // Header OSD
     targetCtx.fillStyle = '#10b981';
     targetCtx.font = 'bold 10px monospace';
     targetCtx.textAlign = 'left';
@@ -2188,11 +2288,6 @@ export class DarkProtocolCanvasEngine {
     targetCtx.textAlign = 'right';
     const dateStr = new Date().toLocaleTimeString();
     targetCtx.fillText(`2026-10-05 ${dateStr}`, tw - 10, 16);
-
-    targetCtx.textAlign = 'left';
-    targetCtx.fillStyle = '#38bdf8';
-    targetCtx.fillText(`${room.name} // SECTOR ${room.sector.split('_')[1].toUpperCase()}`, 10, th - 10);
-
     targetCtx.restore();
   }
 

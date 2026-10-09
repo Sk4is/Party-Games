@@ -97,11 +97,12 @@ export const DarkProtocolGame: React.FC<DarkProtocolGameProps> = ({ onBackToMenu
     showCameraFOV: false,
     showLightBounds: false,
     showCollisionBounds: false,
+    showAuthoringOverlay: false,
   });
 
   const engineRef = useRef<DarkProtocolCanvasEngine | null>(null);
 
-  // Global F1, F2, F3 hotkey listener for instantaneous role switching
+  // Global F1, F2, F3 hotkey listener for role switching & F8 for authoring debug mode
   useEffect(() => {
     const handleRoleKey = (e: KeyboardEvent) => {
       if (!inGame) return;
@@ -114,6 +115,12 @@ export const DarkProtocolGame: React.FC<DarkProtocolGameProps> = ({ onBackToMenu
       } else if (e.key === 'F3') {
         e.preventDefault();
         handleRoleSwitch('ENTE');
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        setDebugOptions((prev) => ({
+          ...prev,
+          showAuthoringOverlay: !prev.showAuthoringOverlay,
+        }));
       }
     };
 
