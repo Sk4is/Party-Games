@@ -9,6 +9,7 @@ import {
   CuantoTeAtrevesTopic,
   CuantoTeAtrevesLastResult,
   CUANTO_TE_ATREVES_TOPICS,
+  pickBalancedTopic,
 } from '../src/types/cuantoTeAtreves';
 import { roomRegistry } from './roomRegistry';
 
@@ -29,6 +30,7 @@ interface ServerRoom {
   activePlayerId: string | null;
   currentTopic: CuantoTeAtrevesTopic | null;
   usedTopicIds: Set<string>;
+  recentCategories: string[];
   targetBet: number | null;
   timerInterval: NodeJS.Timeout | null;
   timerSecondsRemaining: number;
@@ -92,11 +94,12 @@ export class CuantoTeAtrevesServer {
   }
 
   private pickNextTopic(room: ServerRoom): CuantoTeAtrevesTopic {
-    const available = CUANTO_TE_ATREVES_TOPICS.filter((t) => !room.usedTopicIds.has(t.id));
-    const pool = available.length > 0 ? available : CUANTO_TE_ATREVES_TOPICS;
-    const picked = pool[Math.floor(Math.random() * pool.length)];
-    room.usedTopicIds.add(picked.id);
-    return picked;
+    const { topic } = pickBalancedTopic(room.usedTopicIds, room.recentCategories);
+    room.recentCategories.push(topic.category);
+    if (room.recentCategories.length > 8) {
+      room.recentCategories.shift();
+    }
+    return topic;
   }
 
   public createRoomDirect(
@@ -144,6 +147,7 @@ export class CuantoTeAtrevesServer {
       activePlayerId: null,
       currentTopic: null,
       usedTopicIds: new Set<string>(),
+      recentCategories: [],
       targetBet: null,
       timerInterval: null,
       timerSecondsRemaining: 0,
@@ -307,6 +311,7 @@ export class CuantoTeAtrevesServer {
 
       room.currentChallengeNumber = 1;
       room.usedTopicIds.clear();
+      room.recentCategories = [];
       room.currentTopic = this.pickNextTopic(room);
       room.activePlayerId = null;
       room.targetBet = null;

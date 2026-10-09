@@ -211,18 +211,40 @@ export const CuantoTeAtrevesPlaceholder: React.FC<CuantoTeAtrevesPlaceholderProp
 
             {/* PHASE A & B: TOPIC REVEAL CARD */}
             {roomState.currentTopic && (
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-[#1c0d03] to-[#2c1303] border-2 border-yellow-500/30 text-center space-y-2 shadow-inner">
-                <div className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400 flex items-center justify-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-                  <span>TEMA DEL RETO</span>
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-[#1c0d03] to-[#2c1303] border-2 border-yellow-500/30 text-center space-y-3 shadow-inner">
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <div className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400 flex items-center justify-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                    <span>TEMA DEL RETO</span>
+                  </div>
+                  {roomState.currentTopic.difficulty && (
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        roomState.currentTopic.difficulty === 'easy'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : roomState.currentTopic.difficulty === 'hard'
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      }`}
+                    >
+                      {roomState.currentTopic.difficulty === 'easy'
+                        ? 'Dificultad accesible'
+                        : roomState.currentTopic.difficulty === 'hard'
+                        ? 'Desafío experto'
+                        : 'Dificultad media'}
+                    </span>
+                  )}
                 </div>
+
                 <h3 className="text-2xl sm:text-3xl font-black font-display text-white uppercase tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-300 to-amber-200">
-                  «{roomState.currentTopic.title}»
+                  «{roomState.currentTopic.text || roomState.currentTopic.title}»
                 </h3>
-                {roomState.currentTopic.hint && (
-                  <p className="text-xs text-amber-200/80 font-medium max-w-md mx-auto">
-                    {roomState.currentTopic.hint}
-                  </p>
+
+                {(roomState.currentTopic.validationHint || roomState.currentTopic.hint) && (
+                  <div className="text-xs text-amber-200/90 font-medium max-w-lg mx-auto bg-black/50 p-3 rounded-xl border border-white/10 text-left sm:text-center">
+                    <span className="font-bold text-amber-400">Guía de validación: </span>
+                    <span>{roomState.currentTopic.validationHint || roomState.currentTopic.hint}</span>
+                  </div>
                 )}
               </div>
             )}
@@ -404,6 +426,21 @@ export const CuantoTeAtrevesPlaceholder: React.FC<CuantoTeAtrevesPlaceholderProp
                     </div>
                   )}
                 </div>
+
+                {/* Live Topic & Validation Reference */}
+                {roomState.currentTopic && (
+                  <div className="p-3.5 rounded-2xl bg-black/60 border border-orange-500/30 text-center space-y-1">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 block">
+                      Reto: «{roomState.currentTopic.text || roomState.currentTopic.title}»
+                    </span>
+                    {(roomState.currentTopic.validationHint || roomState.currentTopic.hint) && (
+                      <p className="text-xs text-slate-300 font-medium">
+                        <span className="text-amber-400 font-bold">Criterio: </span>
+                        {roomState.currentTopic.validationHint || roomState.currentTopic.hint}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* CRITICAL SECTION 6 CONTROLS FOR ADMINISTRATOR */}
                 {isHost ? (

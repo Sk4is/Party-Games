@@ -421,6 +421,10 @@ export const CuantoTeAtrevesLobby: React.FC<CuantoTeAtrevesLobbyProps> = ({
                 <span className="text-slate-400 font-medium">Tipo de retos:</span>
                 <span className="font-bold text-orange-300">Conocimiento verbal</span>
               </div>
+              <div className="flex justify-between items-center p-2.5 rounded-xl bg-black/40 border border-white/5">
+                <span className="text-slate-400 font-medium">Temas disponibles:</span>
+                <span className="font-bold text-emerald-400">+640 temas únicos</span>
+              </div>
             </div>
 
             {/* Host live adjustments */}
