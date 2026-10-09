@@ -15,6 +15,9 @@ import { EntreToposServer } from './server/entreToposGameServer';
 import { CantinaServer } from './server/cantinaGameServer';
 import { FortunariumServer } from './server/fortunariumGameServer';
 import { LaCriptaServer } from './server/laCriptaGameServer';
+import { CuantoTeAtrevesServer } from './server/cuantoTeAtrevesGameServer';
+import { UnoSobraServer } from './server/unoSobraGameServer';
+import { ElPrecioJustoServer } from './server/elPrecioJustoGameServer';
 import { roomRegistry } from './server/roomRegistry';
 import {
   ALL_CRIPTA_CHARACTER_IDS,
@@ -286,6 +289,9 @@ let entreToposServer: EntreToposServer;
 let cantinaServer: CantinaServer;
 let fortunariumServer: FortunariumServer;
 let laCriptaServer: LaCriptaServer;
+let cuantoTeAtrevesServer: CuantoTeAtrevesServer;
+let unoSobraServer: UnoSobraServer;
+let elPrecioJustoServer: ElPrecioJustoServer;
 
 // Check room info by code
 app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
@@ -325,6 +331,18 @@ app.get(['/api/rooms/:code', '/api/room/:code'], (req, res) => {
   const laCriptaInfo = laCriptaServer?.getRoomInfo(code);
   if (laCriptaInfo) {
     return res.json({ exists: true, room: laCriptaInfo, code: laCriptaInfo.code, gameType: laCriptaInfo.gameType });
+  }
+  const cuantoInfo = cuantoTeAtrevesServer?.getRoomInfo(code);
+  if (cuantoInfo) {
+    return res.json({ exists: true, room: cuantoInfo, code: cuantoInfo.code, gameType: cuantoInfo.gameType });
+  }
+  const unoSobraInfo = unoSobraServer?.getRoomInfo(code);
+  if (unoSobraInfo) {
+    return res.json({ exists: true, room: unoSobraInfo, code: unoSobraInfo.code, gameType: unoSobraInfo.gameType });
+  }
+  const elPrecioJustoInfo = elPrecioJustoServer?.getRoomInfo(code);
+  if (elPrecioJustoInfo) {
+    return res.json({ exists: true, room: elPrecioJustoInfo, code: elPrecioJustoInfo.code, gameType: elPrecioJustoInfo.gameType });
   }
   return res.status(404).json({ exists: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
 });
@@ -373,6 +391,15 @@ app.post('/api/rooms/create', (req, res) => {
     } else if (gameType === 'la-cripta') {
       const room = laCriptaServer.createRoomDirect(normalizedPlayer);
       return res.json({ success: true, room });
+    } else if (gameType === 'cuanto-te-atreves') {
+      const room = cuantoTeAtrevesServer.createRoomDirect(normalizedPlayer, config);
+      return res.json({ success: true, room });
+    } else if (gameType === 'uno-sobra') {
+      const room = unoSobraServer.createRoomDirect(normalizedPlayer, config);
+      return res.json({ success: true, room });
+    } else if (gameType === 'el-precio-justo') {
+      const room = elPrecioJustoServer.createRoomDirect(normalizedPlayer, config);
+      return res.json({ success: true, room });
     }
 
     return res.status(400).json({ success: false, message: 'Tipo de juego no soportado' });
@@ -400,6 +427,9 @@ app.post('/api/rooms/validate-join', (req, res) => {
     const cantinaInfo = cantinaServer?.getRoomInfo(code);
     const fortunariumInfo = fortunariumServer?.getRoomInfo(code);
     const laCriptaInfo = laCriptaServer?.getRoomInfo(code);
+    const cuantoInfo = cuantoTeAtrevesServer?.getRoomInfo(code);
+    const unoSobraInfo = unoSobraServer?.getRoomInfo(code);
+    const elPrecioJustoInfo = elPrecioJustoServer?.getRoomInfo(code);
     const roomInfo =
       partyInfo ||
       pinturilloInfo ||
@@ -409,7 +439,10 @@ app.post('/api/rooms/validate-join', (req, res) => {
       entreToposInfo ||
       cantinaInfo ||
       fortunariumInfo ||
-      laCriptaInfo;
+      laCriptaInfo ||
+      cuantoInfo ||
+      unoSobraInfo ||
+      elPrecioJustoInfo;
 
     if (!roomInfo) {
       return res.status(404).json({ valid: false, message: 'NO SE HA ENCONTRADO ESA SALA' });
@@ -435,6 +468,12 @@ app.post('/api/rooms/validate-join', (req, res) => {
           ? 'FORTUNARIUM'
           : roomInfo.gameType === 'la-cripta'
           ? 'LA CRIPTA'
+          : roomInfo.gameType === 'cuanto-te-atreves'
+          ? '¿CUÁNTO TE ATREVES?'
+          : roomInfo.gameType === 'uno-sobra'
+          ? 'UNO SOBRA'
+          : roomInfo.gameType === 'el-precio-justo'
+          ? 'EL PRECIO JUSTO'
           : 'ENTRE TOPOS';
       return res.status(400).json({
         valid: false,
@@ -483,6 +522,9 @@ async function startServer() {
   cantinaServer = new CantinaServer();
   fortunariumServer = new FortunariumServer();
   laCriptaServer = new LaCriptaServer();
+  cuantoTeAtrevesServer = new CuantoTeAtrevesServer();
+  unoSobraServer = new UnoSobraServer();
+  elPrecioJustoServer = new ElPrecioJustoServer();
 
   let vite: any = null;
   app.use('/assets', (req, res, next) => {
@@ -578,6 +620,18 @@ async function startServer() {
     } else if (pathname === '/ws/la-cripta') {
       laCriptaServer.wss.handleUpgrade(request, socket, head, (ws) => {
         laCriptaServer.wss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/ws/cuanto-te-atreves') {
+      cuantoTeAtrevesServer.wss.handleUpgrade(request, socket, head, (ws) => {
+        cuantoTeAtrevesServer.wss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/ws/uno-sobra') {
+      unoSobraServer.wss.handleUpgrade(request, socket, head, (ws) => {
+        unoSobraServer.wss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/ws/el-precio-justo') {
+      elPrecioJustoServer.wss.handleUpgrade(request, socket, head, (ws) => {
+        elPrecioJustoServer.wss.emit('connection', ws, request);
       });
     } else if (pathname === '/ws/party' || pathname === '/ws') {
       partyGameServer.wss.handleUpgrade(request, socket, head, (ws) => {

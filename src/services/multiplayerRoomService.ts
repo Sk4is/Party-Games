@@ -23,7 +23,10 @@ export type MultiplayerGameType =
   | 'entre-topos'
   | 'la_cantina_del_farol'
   | 'fortunarium'
-  | 'la-cripta';
+  | 'la-cripta'
+  | 'cuanto-te-atreves'
+  | 'uno-sobra'
+  | 'el-precio-justo';
 
 export interface SharedRoomSummary {
   roomId: string;

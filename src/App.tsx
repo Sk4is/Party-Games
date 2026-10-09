@@ -20,6 +20,9 @@ import { CantinaGame } from './components/cantina/CantinaGame';
 import { FortunariumGame } from './components/fortunarium/FortunariumGame';
 import { LaCriptaGame } from './components/la-cripta/LaCriptaGame';
 import { DarkProtocolGame } from './components/dark-protocol/DarkProtocolGame';
+import { CuantoTeAtrevesGame } from './components/cuanto-te-atreves/CuantoTeAtrevesGame';
+import { UnoSobraGame } from './components/uno-sobra/UnoSobraGame';
+import { ElPrecioJustoGame } from './components/el-precio-justo/ElPrecioJustoGame';
 import { Player, GameConfig, LPRPlayer, LaPeorRespuestaConfig } from './types';
 import { sessionRecovery } from './services/sessionRecovery';
 import { BackendConnectingModal } from './components/common/BackendConnectingModal';
@@ -37,6 +40,9 @@ type AppView =
   | 'FORTUNARIUM'
   | 'LA_CRIPTA'
   | 'DARK_PROTOCOL'
+  | 'CUANTO_TE_ATREVES'
+  | 'UNO_SOBRA'
+  | 'EL_PRECIO_JUSTO'
   | 'BOMBA_LOCAL_SETUP'
   | 'BOMBA_LOCAL_GAME'
   | 'LPR_LOCAL_SETUP'
@@ -78,6 +84,15 @@ export default function App() {
       if ((activeSession.gameType as string) === 'dark-protocol') {
         return 'DARK_PROTOCOL';
       }
+      if ((activeSession.gameType as string) === 'cuanto-te-atreves') {
+        return 'CUANTO_TE_ATREVES';
+      }
+      if ((activeSession.gameType as string) === 'uno-sobra') {
+        return 'UNO_SOBRA';
+      }
+      if ((activeSession.gameType as string) === 'el-precio-justo') {
+        return 'EL_PRECIO_JUSTO';
+      }
     }
 
     if (typeof window !== 'undefined') {
@@ -96,6 +111,9 @@ export default function App() {
       if (game === 'fortunarium') return 'FORTUNARIUM';
       if (game === 'la-cripta') return 'LA_CRIPTA';
       if (game === 'dark-protocol') return 'DARK_PROTOCOL';
+      if (game === 'cuanto-te-atreves') return 'CUANTO_TE_ATREVES';
+      if (game === 'uno-sobra') return 'UNO_SOBRA';
+      if (game === 'el-precio-justo') return 'EL_PRECIO_JUSTO';
       if (room) {
         return 'PINTURILLO';
       }
@@ -138,6 +156,12 @@ export default function App() {
       setCurrentView('LA_CRIPTA');
     } else if (gameId === 'dark-protocol') {
       setCurrentView('DARK_PROTOCOL');
+    } else if (gameId === 'cuanto-te-atreves') {
+      setCurrentView('CUANTO_TE_ATREVES');
+    } else if (gameId === 'uno-sobra') {
+      setCurrentView('UNO_SOBRA');
+    } else if (gameId === 'el-precio-justo') {
+      setCurrentView('EL_PRECIO_JUSTO');
     }
   };
 
@@ -158,7 +182,10 @@ export default function App() {
       | 'entre-topos'
       | 'la_cantina_del_farol'
       | 'fortunarium'
-      | 'la-cripta',
+      | 'la-cripta'
+      | 'cuanto-te-atreves'
+      | 'uno-sobra'
+      | 'el-precio-justo',
     code: string
   ) => {
     setUrlRoomCode(code);
@@ -172,6 +199,9 @@ export default function App() {
     else if (game === 'la_cantina_del_farol') setCurrentView('CANTINA');
     else if (game === 'fortunarium') setCurrentView('FORTUNARIUM');
     else if (game === 'la-cripta') setCurrentView('LA_CRIPTA');
+    else if (game === 'cuanto-te-atreves') setCurrentView('CUANTO_TE_ATREVES');
+    else if (game === 'uno-sobra') setCurrentView('UNO_SOBRA');
+    else if (game === 'el-precio-justo') setCurrentView('EL_PRECIO_JUSTO');
   };
 
   return (
@@ -276,6 +306,33 @@ export default function App() {
       {/* 11. DARK PROTOCOL (2v1 ASYMMETRIC HORROR - PC EXCLUSIVE) */}
       {currentView === 'DARK_PROTOCOL' && (
         <DarkProtocolGame onBackToMenu={handleBackToMenu} />
+      )}
+
+      {/* 12. ¿CUÁNTO TE ATREVES? (ONLINE MULTIPLAYER ARCADE GAME SHOW 3-10 PLAYERS) */}
+      {currentView === 'CUANTO_TE_ATREVES' && (
+        <CuantoTeAtrevesGame
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
+      )}
+
+      {/* 13. UNO SOBRA (ONLINE MULTIPLAYER SOCIAL ELIMINATION 3-10 PLAYERS) */}
+      {currentView === 'UNO_SOBRA' && (
+        <UnoSobraGame
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
+      )}
+
+      {/* 14. EL PRECIO JUSTO (ONLINE MULTIPLAYER SECRET MONEY DEDUCTION 3-10 PLAYERS) */}
+      {currentView === 'EL_PRECIO_JUSTO' && (
+        <ElPrecioJustoGame
+          onBackToMenu={handleBackToMenu}
+          initialRoomCode={urlRoomCode}
+          onSwitchGame={handleSwitchGame}
+        />
       )}
 
       {/* OPTIONAL LOCAL PASS-AND-PLAY FALLBACKS */}

@@ -687,6 +687,150 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame }) => {
               )}
             </div>
           </div>
+
+          {/* CARD 12: ¿CUÁNTO TE ATREVES? */}
+          <div
+            id="card-cuanto-te-atreves"
+            role="button"
+            tabIndex={0}
+            onClick={() => handleSelectGame('cuanto-te-atreves')}
+            onKeyDown={(e) => handleKeyDown(e, 'cuanto-te-atreves')}
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#F97316]/45 hover:border-[#F97316] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(249,115,22,0.36)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
+            style={{ animationDelay: '0.44s' }}
+          >
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#F97316]/50 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),rgba(234,179,8,0.12)_45%,transparent_70%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-20 bg-[#F97316] blur-2xl transition-opacity duration-500" />
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#F97316] via-[#EA580C] to-[#C2410C] border border-[#FDBA74]/50 flex items-center justify-center text-3xl shadow-lg shadow-[#F97316]/30 group-hover:scale-105 group-hover:-translate-y-1 group-hover:rotate-2 transition-all duration-300">
+                  🔥
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
+                  ONLINE
+                </span>
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#F97316] transition-colors duration-200">
+                ¿CUÁNTO TE ATREVES?
+              </h2>
+              <p className="text-slate-300/90 text-sm sm:text-base font-normal leading-snug">
+                &ldquo;Retos contrarreloj en directo, apuestas de valor y desafíos al límite. ¿Te atreves a superar la prueba ante el grupo?&rdquo;
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                <span className="px-2.5 py-1 rounded-lg bg-[#F97316]/15 border border-[#F97316]/40 text-[#FDBA74] font-bold">3–10 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300">Show Arcade</span>
+                <span className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 font-bold">Retos Contrarreloj</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
+              <span className="text-sm font-bold text-[#F97316] group-hover:text-[#FDBA74] group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
+                Entrar al show <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </span>
+              <div className="w-10 h-10 rounded-full bg-[#F97316] group-hover:bg-[#EA580C] text-slate-950 flex items-center justify-center font-black shadow-md shadow-[#F97316]/35 group-hover:scale-110 transition-all duration-300">
+                <Play className="w-4 h-4 fill-current ml-0.5" />
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 13: UNO SOBRA */}
+          <div
+            id="card-uno-sobra"
+            role="button"
+            tabIndex={0}
+            onClick={() => handleSelectGame('uno-sobra')}
+            onKeyDown={(e) => handleKeyDown(e, 'uno-sobra')}
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#8B5CF6]/45 hover:border-[#8B5CF6] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(139,92,246,0.36)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
+            style={{ animationDelay: '0.48s' }}
+          >
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#8B5CF6]/50 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.18),rgba(6,182,212,0.12)_45%,transparent_70%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-20 bg-[#8B5CF6] blur-2xl transition-opacity duration-500" />
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#8B5CF6] via-[#6366F1] to-[#06B6D4] border border-[#C4B5FD]/50 flex items-center justify-center text-3xl shadow-lg shadow-[#8B5CF6]/30 group-hover:scale-105 group-hover:-translate-y-1 group-hover:-rotate-2 transition-all duration-300">
+                  👥
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
+                  ONLINE
+                </span>
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#A78BFA] transition-colors duration-200">
+                UNO SOBRA
+              </h2>
+              <p className="text-slate-300/90 text-sm sm:text-base font-normal leading-snug">
+                &ldquo;Un escenario crítico con plazas limitadas. Debatid, argumentad quién es imprescindible y votad en secreto quién debe abandonar.&rdquo;
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                <span className="px-2.5 py-1 rounded-lg bg-[#8B5CF6]/15 border border-[#8B5CF6]/40 text-[#C4B5FD] font-bold">3–10 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">Deducción Social</span>
+                <span className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 font-bold">Eliminación Directa</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
+              <span className="text-sm font-bold text-[#A78BFA] group-hover:text-white group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
+                Entrar a la evacuación <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </span>
+              <div className="w-10 h-10 rounded-full bg-[#8B5CF6] group-hover:bg-[#7C3AED] text-white flex items-center justify-center font-black shadow-md shadow-[#8B5CF6]/35 group-hover:scale-110 transition-all duration-300">
+                <Play className="w-4 h-4 fill-current ml-0.5" />
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 14: EL PRECIO JUSTO */}
+          <div
+            id="card-el-precio-justo"
+            role="button"
+            tabIndex={0}
+            onClick={() => handleSelectGame('el-precio-justo')}
+            onKeyDown={(e) => handleKeyDown(e, 'el-precio-justo')}
+            className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl fam-card-surface border border-[#10B981]/45 hover:border-[#10B981] shadow-xl hover:shadow-[0_16px_45px_-10px_rgba(16,185,129,0.36)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:scale-[1.012] active:scale-[0.98] overflow-hidden animate-card-reveal"
+            style={{ animationDelay: '0.52s' }}
+          >
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#10B981]/50 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),rgba(245,158,11,0.12)_45%,transparent_70%)] pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-0 group-hover:opacity-20 bg-[#10B981] blur-2xl transition-opacity duration-500" />
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#059669] via-[#10B981] to-[#D97706] border border-[#6EE7B7]/50 flex items-center justify-center text-3xl shadow-lg shadow-[#10B981]/30 group-hover:scale-105 group-hover:-translate-y-1 group-hover:rotate-2 transition-all duration-300">
+                  💰
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/35 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-status-breathe" />
+                  ONLINE
+                </span>
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-black font-display text-white tracking-wide mb-2 group-hover:text-[#34D399] transition-colors duration-200">
+                EL PRECIO JUSTO
+              </h2>
+              <p className="text-slate-300/90 text-sm sm:text-base font-normal leading-snug">
+                &ldquo;Cada jugador guarda un importe secreto en su libreta. Investigad con preguntas sutiles y estimad las fortunas sin revelar la vuestra.&rdquo;
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
+                <span className="px-2.5 py-1 rounded-lg bg-[#10B981]/15 border border-[#10B981]/40 text-[#6EE7B7] font-bold">3–10 Jugadores</span>
+                <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300">Deducción Elegante</span>
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold">Fortunas Secretas</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-between">
+              <span className="text-sm font-bold text-[#10B981] group-hover:text-[#6EE7B7] group-hover:translate-x-1.5 transition-all duration-200 flex items-center gap-1.5">
+                Entrar a la mesa <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </span>
+              <div className="w-10 h-10 rounded-full bg-[#10B981] group-hover:bg-[#059669] text-white flex items-center justify-center font-black shadow-md shadow-[#10B981]/35 group-hover:scale-110 transition-all duration-300">
+                <Play className="w-4 h-4 fill-current ml-0.5" />
+              </div>
+            </div>
+          </div>
         </div>
       </main>
 

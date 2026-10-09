@@ -8,12 +8,23 @@ export type SupportedGameType =
   | 'entre-topos'
   | 'la_cantina_del_farol'
   | 'fortunarium'
-  | 'la-cripta';
+  | 'la-cripta'
+  | 'cuanto-te-atreves'
+  | 'uno-sobra'
+  | 'el-precio-justo';
 
 interface RoomMeta {
   code: string;
   gameType: SupportedGameType;
-  serverType: 'party' | 'pinturillo' | 'cantina' | 'fortunarium' | 'la-cripta';
+  serverType:
+    | 'party'
+    | 'pinturillo'
+    | 'cantina'
+    | 'fortunarium'
+    | 'la-cripta'
+    | 'cuanto-te-atreves'
+    | 'uno-sobra'
+    | 'el-precio-justo';
   createdAt: number;
 }
 
@@ -23,7 +34,15 @@ class RoomRegistry {
   register(
     code: string,
     gameType: SupportedGameType,
-    serverType: 'party' | 'pinturillo' | 'cantina' | 'fortunarium' | 'la-cripta'
+    serverType:
+      | 'party'
+      | 'pinturillo'
+      | 'cantina'
+      | 'fortunarium'
+      | 'la-cripta'
+      | 'cuanto-te-atreves'
+      | 'uno-sobra'
+      | 'el-precio-justo'
   ) {
     const cleanCode = code.toUpperCase().trim();
     this.rooms.set(cleanCode, {

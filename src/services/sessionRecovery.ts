@@ -14,7 +14,10 @@ export type SupportedGameType =
   | 'entre-topos'
   | 'la_cantina_del_farol'
   | 'fortunarium'
-  | 'la-cripta';
+  | 'la-cripta'
+  | 'cuanto-te-atreves'
+  | 'uno-sobra'
+  | 'el-precio-justo';
 
 export interface ActiveSessionData {
   gameType: SupportedGameType;
@@ -106,6 +109,9 @@ export const sessionRecovery = {
           'la_cantina_del_farol',
           'fortunarium',
           'la-cripta',
+          'cuanto-te-atreves',
+          'uno-sobra',
+          'el-precio-justo',
         ].includes(urlGame)
       ) {
         const playerId =
